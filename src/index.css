@@ -1,0 +1,80 @@
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500&display=swap');
+
+:root {
+  font-family: 'Space Grotesk', sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+  color: #16202d;
+  background:
+    radial-gradient(circle at top left, rgba(251, 212, 180, 0.85), transparent 32%),
+    radial-gradient(circle at top right, rgba(196, 233, 214, 0.72), transparent 28%),
+    linear-gradient(180deg, #f6f2e8 0%, #efe7d8 100%);
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+
+  --accent: #184f88;
+  --accent-strong: #0f3f6f;
+  --muted: #5f6670;
+  --card-border: rgba(22, 32, 45, 0.1);
+  --surface: rgba(255, 251, 245, 0.82);
+  --surface-strong: rgba(255, 255, 255, 0.88);
+  --shadow-soft: 0 16px 40px rgba(25, 42, 64, 0.08);
+  --shadow-strong: 0 18px 50px rgba(6, 28, 50, 0.18);
+  --pace-green: #178f63;
+  --pace-red: #d9485f;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+h1,
+h2,
+h3,
+p {
+  margin: 0;
+}
+
+h1,
+h2,
+h3 {
+  color: #0f1724;
+}
+
+h1 {
+  font-size: clamp(2.4rem, 5vw, 4.4rem);
+  line-height: 0.98;
+  margin-bottom: 14px;
+}
+
+h2 {
+  font-size: 1.35rem;
+  margin-bottom: 8px;
+}
+
+code {
+  font-family: 'IBM Plex Mono', monospace;
+}

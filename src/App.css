@@ -1,0 +1,256 @@
+.app-shell {
+  width: min(1200px, calc(100% - 32px));
+  margin: 0 auto;
+  padding: 32px 0 56px;
+}
+
+.app-header {
+  display: grid;
+  grid-template-columns: minmax(0, 1.5fr) minmax(280px, 420px);
+  gap: 24px;
+  align-items: start;
+  margin-bottom: 28px;
+}
+
+.eyebrow {
+  margin-bottom: 10px;
+  font-size: 0.8rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--accent-strong);
+}
+
+.subtitle {
+  max-width: 62ch;
+  color: var(--muted);
+}
+
+.header-actions {
+  display: grid;
+  gap: 14px;
+}
+
+.last-updated-card,
+.sync-panel,
+.chart-card,
+.summary-card {
+  border: 1px solid var(--card-border);
+  background: var(--surface-strong);
+  box-shadow: var(--shadow-soft);
+}
+
+.last-updated-card {
+  padding: 16px 18px;
+  border-radius: 20px;
+  background: linear-gradient(160deg, rgba(255, 255, 255, 0.82), rgba(245, 240, 228, 0.82));
+  backdrop-filter: blur(12px);
+}
+
+.last-updated-label,
+.status-label,
+.summary-label,
+.summary-kicker {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 0.75rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.dashboard-grid {
+  display: grid;
+  gap: 24px;
+}
+
+.dashboard-summary {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(240px, 1fr);
+  gap: 20px;
+}
+
+.dashboard-status-panel {
+  display: grid;
+  gap: 14px;
+  padding: 20px;
+  border-radius: 24px;
+  background: linear-gradient(180deg, rgba(12, 34, 58, 0.95), rgba(17, 49, 81, 0.9));
+  color: #f3f2eb;
+  box-shadow: var(--shadow-strong);
+}
+
+.status-block strong {
+  font-size: 1rem;
+  line-height: 1.4;
+}
+
+.summary-card {
+  padding: 22px;
+  border-radius: 28px;
+}
+
+.summary-card-on-pace {
+  background: linear-gradient(160deg, rgba(224, 247, 237, 0.98), rgba(255, 255, 255, 0.92));
+}
+
+.summary-card-behind {
+  background: linear-gradient(160deg, rgba(253, 231, 234, 0.98), rgba(255, 255, 255, 0.92));
+}
+
+.summary-heading {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.pace-pill {
+  padding: 8px 12px;
+  border-radius: 999px;
+  font-weight: 700;
+  font-size: 0.85rem;
+}
+
+.pace-pill.positive,
+.summary-value-positive {
+  color: var(--pace-green);
+}
+
+.pace-pill.positive {
+  background: rgba(23, 143, 99, 0.12);
+}
+
+.pace-pill.negative,
+.summary-value-negative {
+  color: var(--pace-red);
+}
+
+.pace-pill.negative {
+  background: rgba(217, 72, 95, 0.12);
+}
+
+.summary-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.summary-metric {
+  padding: 16px;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.6);
+}
+
+.summary-value {
+  font-size: clamp(1.65rem, 2vw, 2.2rem);
+}
+
+.summary-footnote {
+  margin-top: 16px;
+  color: var(--muted);
+}
+
+.sync-panel {
+  padding: 16px;
+  border-radius: 20px;
+}
+
+.sync-button {
+  width: 100%;
+  padding: 14px 18px;
+  border: none;
+  border-radius: 16px;
+  background: linear-gradient(135deg, #184f88, #2f7cbf);
+  color: #f8fafc;
+  font-weight: 700;
+  transition: transform 0.18s ease, opacity 0.18s ease;
+}
+
+.sync-button:hover:enabled {
+  transform: translateY(-1px);
+}
+
+.sync-button:disabled {
+  opacity: 0.7;
+  cursor: wait;
+}
+
+.sync-status {
+  margin-top: 10px;
+  color: var(--muted);
+  font-size: 0.95rem;
+}
+
+.chart-stack {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 20px;
+}
+
+.chart-card {
+  display: grid;
+  gap: 14px;
+  padding: 18px;
+  border-radius: 24px;
+}
+
+.chart-card-copy p {
+  color: var(--muted);
+}
+
+.chart-frame {
+  height: 300px;
+}
+
+.banner {
+  margin-top: 18px;
+  padding: 14px 18px;
+  border-radius: 18px;
+  border: 1px solid transparent;
+  font-weight: 600;
+}
+
+.banner-error {
+  background: rgba(217, 72, 95, 0.12);
+  border-color: rgba(217, 72, 95, 0.2);
+  color: #8b2435;
+}
+
+.banner-info {
+  background: rgba(30, 111, 199, 0.12);
+  border-color: rgba(30, 111, 199, 0.2);
+  color: #154a83;
+}
+
+@media (max-width: 1080px) {
+  .app-header,
+  .dashboard-summary,
+  .chart-stack {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 720px) {
+  .app-shell {
+    width: min(100%, calc(100% - 20px));
+    padding-top: 20px;
+    padding-bottom: 32px;
+  }
+
+  .summary-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .last-updated-card,
+  .sync-panel,
+  .chart-card,
+  .summary-card,
+  .dashboard-status-panel {
+    border-radius: 18px;
+  }
+
+  .summary-heading {
+    flex-direction: column;
+  }
+}
