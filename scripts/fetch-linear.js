@@ -24,19 +24,14 @@ function toDay(dateValue) {
 
 async function fetchBugIssues() {
   const apiKey = getRequiredEnv('LINEAR_API_KEY')
-  const teamId = process.env.LINEAR_TEAM_ID
-  const projectId = process.env.LINEAR_PROJECT_ID
+  const teamKey = process.env.LINEAR_TEAM_KEY ?? 'CP'
 
   const filters = [
     '{ labels: { some: { name: { eq: "bug" } } } }',
   ]
 
-  if (teamId) {
-    filters.push(`{ team: { id: { eq: \"${teamId}\" } } }`)
-  }
-
-  if (projectId) {
-    filters.push(`{ project: { id: { eq: \"${projectId}\" } } }`)
+  if (teamKey) {
+    filters.push(`{ team: { key: { eq: \"${teamKey}\" } } }`)
   }
 
   const query = `

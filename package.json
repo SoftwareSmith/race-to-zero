@@ -3,7 +3,7 @@
   "private": true,
   "version": "1.0.0",
   "type": "module",
-  "homepage": "https://SoftwareSmith.github.io/race-to-zero",
+  "homepage": "https://SoftwareSmith.github.io/race-to-zero/",
   "scripts": {
     "dev": "vite",
     "build": "vite build",

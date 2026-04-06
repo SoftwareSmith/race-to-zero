@@ -4,12 +4,12 @@ Race to Zero Bugs is a React and Vite dashboard that reads a sanitized bug snaps
 
 ## Features
 
-- React dashboard with reusable summary, chart, and sync button components
+- Dark-themed dashboard with deadline picker and time-range drill-down controls
 - Charts powered by Chart.js through `react-chartjs-2`
 - Date handling with `date-fns`
 - Manual GitHub Actions sync from the UI using `workflow_dispatch`
 - Polling for workflow completion and updated metrics publication
-- Frontend-derived deadline and pace calculations using the end of the current year
+- Frontend-derived deadline, pace, and time-window calculations
 - GitHub Pages-ready Vite base path at `/race-to-zero/`
 
 ## Environment
@@ -41,10 +41,8 @@ npm run deploy
 
 ## GitHub Action Sync
 
-The workflow in `.github/workflows/sync-linear.yml` runs every 6 hours and on manual dispatch. It expects these GitHub secrets:
+The workflow in `.github/workflows/sync-linear.yml` runs every day at midnight UTC and on manual dispatch. It expects these GitHub secrets:
 
 - `LINEAR_API_KEY`
-- `LINEAR_TEAM_ID` optional
-- `LINEAR_PROJECT_ID` optional
 
-The workflow runs `scripts/fetch-linear.js`, writes sanitized bug records into `public/data/metrics.json`, then commits and pushes the result back to the repository. The frontend calculates the deadline, daily series, burn rate, and burndown locally.
+The workflow runs `scripts/fetch-linear.js`, scopes to the `CP` team, writes sanitized bug records into `public/data/metrics.json`, then commits and pushes the result back to the repository. The frontend calculates the deadline, rates, and projections locally.

@@ -11,11 +11,11 @@ export function getLineChartOptions() {
         labels: {
           usePointStyle: true,
           boxWidth: 10,
-          color: '#334155',
+          color: '#cbd5e1',
         },
       },
       tooltip: {
-        backgroundColor: '#10243b',
+        backgroundColor: '#050816',
         titleColor: '#f8fafc',
         bodyColor: '#dbeafe',
         padding: 12,
@@ -25,20 +25,20 @@ export function getLineChartOptions() {
     scales: {
       x: {
         grid: {
-          display: false,
+          color: 'rgba(94, 106, 130, 0.15)',
         },
         ticks: {
-          color: '#475569',
+          color: '#8fa2c0',
           maxRotation: 0,
         },
       },
       y: {
         beginAtZero: true,
         grid: {
-          color: 'rgba(71, 85, 105, 0.12)',
+          color: 'rgba(94, 106, 130, 0.15)',
         },
         ticks: {
-          color: '#475569',
+          color: '#8fa2c0',
           precision: 0,
         },
       },

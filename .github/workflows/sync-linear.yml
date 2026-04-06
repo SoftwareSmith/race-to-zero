@@ -3,7 +3,7 @@ name: Sync Linear Metrics
 on:
   workflow_dispatch:
   schedule:
-    - cron: '0 */6 * * *'
+    - cron: '0 0 * * *'
 
 jobs:
   sync:
@@ -27,8 +27,7 @@ jobs:
       - name: Fetch Linear metrics
         env:
           LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
-          LINEAR_TEAM_ID: ${{ secrets.LINEAR_TEAM_ID }}
-          LINEAR_PROJECT_ID: ${{ secrets.LINEAR_PROJECT_ID }}
+          LINEAR_TEAM_KEY: CP
         run: node scripts/fetch-linear.js
 
       - name: Commit updated metrics
