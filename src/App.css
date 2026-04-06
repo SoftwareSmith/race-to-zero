@@ -178,6 +178,49 @@
   color: var(--muted);
 }
 
+.likelihood-panel {
+  display: grid;
+  gap: 14px;
+  padding: 18px;
+  border-radius: 20px;
+  background: rgba(3, 8, 20, 0.38);
+}
+
+.likelihood-copy strong {
+  display: block;
+  font-size: clamp(2rem, 3vw, 3rem);
+  line-height: 1;
+}
+
+.likelihood-copy p {
+  margin-top: 8px;
+  color: var(--muted);
+}
+
+.likelihood-meter-track {
+  height: 14px;
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.16);
+  overflow: hidden;
+}
+
+.likelihood-meter-fill {
+  height: 100%;
+  border-radius: 999px;
+}
+
+.likelihood-meter-fill-positive {
+  background: linear-gradient(90deg, #22c55e, #86efac);
+}
+
+.likelihood-meter-fill-warning {
+  background: linear-gradient(90deg, #f59e0b, #fde68a);
+}
+
+.likelihood-meter-fill-negative {
+  background: linear-gradient(90deg, #ef4444, #fca5a5);
+}
+
 .hero-metric-grid,
 .kpi-grid {
   display: grid;

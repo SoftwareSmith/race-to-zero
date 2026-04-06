@@ -133,6 +133,19 @@ function App() {
                 <strong>{summary.deadlineLabel}</strong>
               </div>
             </div>
+
+            <div className="likelihood-panel">
+              <div className="likelihood-copy">
+                <span className="status-label">Likelihood of success</span>
+                <strong>{summary.likelihoodScore}%</strong>
+                <p>Estimated from recent net burn versus the net burn required to hit the selected deadline.</p>
+              </div>
+              <div aria-hidden="true" className="likelihood-meter">
+                <div className="likelihood-meter-track">
+                  <div className={`likelihood-meter-fill likelihood-meter-fill-${dashboardMetrics.paceTone}`} style={{ width: `${summary.likelihoodScore}%` }} />
+                </div>
+              </div>
+            </div>
           </article>
 
           <aside className="side-panel">

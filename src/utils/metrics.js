@@ -128,6 +128,23 @@ function getPaceStatus({ remainingBugs, currentNetBurnRate, neededNetBurnRate, d
   }
 }
 
+function getLikelihoodScore({ remainingBugs, currentNetBurnRate, neededNetBurnRate, daysUntilDeadline }) {
+  if (remainingBugs === 0) {
+    return 100
+  }
+
+  if (daysUntilDeadline === 0) {
+    return 0
+  }
+
+  if (neededNetBurnRate <= 0) {
+    return currentNetBurnRate > 0 ? 100 : 0
+  }
+
+  const ratio = currentNetBurnRate / neededNetBurnRate
+  return Math.max(0, Math.min(100, Math.round(ratio * 100)))
+}
+
 function createLabelSeries(primarySeries, secondarySeries = []) {
   return [...new Set([
     ...primarySeries.map((entry) => entry.date),
@@ -167,6 +184,12 @@ export function getDashboardMetrics(source, { deadlineDate, rangeDays = '30' } =
     neededNetBurnRate,
     daysUntilDeadline,
   })
+  const likelihoodScore = getLikelihoodScore({
+    remainingBugs,
+    currentNetBurnRate,
+    neededNetBurnRate,
+    daysUntilDeadline,
+  })
 
   return {
     bugs,
@@ -192,6 +215,7 @@ export function getDashboardMetrics(source, { deadlineDate, rangeDays = '30' } =
     paceSignal: paceStatus.signal,
     paceHeadline: paceStatus.headline,
     paceBody: paceStatus.body,
+    likelihoodScore,
     deadline,
     deadlineLabel: format(deadline, 'MMM d, yyyy'),
     startDate: safeStartDate,
@@ -298,5 +322,6 @@ export function getSummaryMetrics(dashboardMetrics) {
     onPace: dashboardMetrics.onPace,
     deadlineLabel: dashboardMetrics.deadlineLabel,
     paceSignal: dashboardMetrics.paceSignal,
+    likelihoodScore: dashboardMetrics.likelihoodScore,
   }
 }
