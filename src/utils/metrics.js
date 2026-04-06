@@ -5,6 +5,7 @@ import {
   endOfYear,
   format,
   isBefore,
+  isValid,
   parseISO,
   subDays,
 } from 'date-fns'
@@ -97,6 +98,20 @@ function getDeadlineDate(referenceDate = new Date()) {
   return endOfYear(referenceDate)
 }
 
+function getValidDate(dateValue, fallbackDate) {
+  if (!dateValue) {
+    return fallbackDate
+  }
+
+  const parsedDate = parseISO(dateValue)
+  return isValid(parsedDate) ? parsedDate : fallbackDate
+}
+
+function getNumericRangeDays(rangeDays, fallbackDays = 30) {
+  const numericRange = Number(rangeDays)
+  return Number.isFinite(numericRange) && numericRange > 0 ? numericRange : fallbackDays
+}
+
 function filterSeriesByStartDate(series, startDate) {
   const startDateKey = format(startDate, 'yyyy-MM-dd')
   return series.filter((entry) => entry.date >= startDateKey)
@@ -107,13 +122,58 @@ function getRangeStartDate(startDate, rangeDays, today) {
     return startDate
   }
 
-  const numericRange = Number(rangeDays)
-  if (!Number.isFinite(numericRange) || numericRange <= 0) {
+  const numericRange = getNumericRangeDays(rangeDays, NaN)
+  if (!Number.isFinite(numericRange)) {
     return startDate
   }
 
   const candidate = subDays(today, numericRange - 1)
   return isBefore(candidate, startDate) ? startDate : candidate
+}
+
+function clampTargetWindow(targetFromDate, targetToDate) {
+  if (compareAsc(targetFromDate, targetToDate) === 1) {
+    return {
+      targetFromDate: targetToDate,
+      targetToDate,
+    }
+  }
+
+  return { targetFromDate, targetToDate }
+}
+
+function getWindowStats(bugs, startDate, endDate) {
+  const startKey = format(startDate, 'yyyy-MM-dd')
+  const endKey = format(endDate, 'yyyy-MM-dd')
+  const dayCount = Math.max(differenceInCalendarDays(endDate, startDate) + 1, 1)
+  let created = 0
+  let fixed = 0
+
+  for (const bug of bugs) {
+    if (bug.createdAt >= startKey && bug.createdAt <= endKey) {
+      created += 1
+    }
+
+    if (bug.completedAt && bug.completedAt >= startKey && bug.completedAt <= endKey) {
+      fixed += 1
+    }
+  }
+
+  const addRate = created / dayCount
+  const fixRate = fixed / dayCount
+  const netBurnRate = fixRate - addRate
+
+  return {
+    startDate,
+    endDate,
+    dayCount,
+    created,
+    fixed,
+    addRate,
+    fixRate,
+    netBurnRate,
+    label: `${format(startDate, 'MMM d')} - ${format(endDate, 'MMM d')}`,
+  }
 }
 
 function getPaceStatus({ remainingBugs, currentNetBurnRate, neededNetBurnRate, daysUntilDeadline }) {
@@ -185,7 +245,7 @@ function createLabelSeries(primarySeries, secondarySeries = []) {
   ])].sort((left, right) => left.localeCompare(right))
 }
 
-export function getDashboardMetrics(source, { deadlineDate, rangeDays = '30' } = {}) {
+export function getDashboardMetrics(source, { deadlineDate, targetFromDate, targetToDate, rangeDays = '30' } = {}) {
   const bugs = normalizeBugRecords(source)
   const allCreatedPerDay = buildSeriesFromField(bugs, 'createdAt')
   const allCompletedPerDay = buildSeriesFromField(bugs, 'completedAt')
@@ -194,15 +254,17 @@ export function getDashboardMetrics(source, { deadlineDate, rangeDays = '30' } =
   const totalBugCount = bugs.length
   const today = new Date()
   const defaultDeadline = getDeadlineDate(today)
-  const parsedDeadline = deadlineDate ? parseISO(deadlineDate) : defaultDeadline
-  const deadline = Number.isNaN(parsedDeadline.getTime()) ? defaultDeadline : parsedDeadline
+  const rawTargetFromDate = getValidDate(targetFromDate, today)
+  const rawTargetToDate = getValidDate(targetToDate ?? deadlineDate, defaultDeadline)
+  const { targetFromDate: targetStart, targetToDate: targetEnd } = clampTargetWindow(rawTargetFromDate, rawTargetToDate)
   const startDate = bugs[0]?.createdAt ? parseISO(bugs[0].createdAt) : today
-  const safeStartDate = isBefore(deadline, startDate) ? deadline : startDate
+  const safeStartDate = isBefore(targetEnd, startDate) ? targetEnd : startDate
   const rangeStartDate = getRangeStartDate(safeStartDate, rangeDays, today)
   const createdPerDay = filterSeriesByStartDate(allCreatedPerDay, rangeStartDate)
   const completedPerDay = filterSeriesByStartDate(allCompletedPerDay, rangeStartDate)
   const remainingPerDay = filterSeriesByStartDate(allRemainingPerDay, rangeStartDate)
-  const daysUntilDeadline = Math.max(differenceInCalendarDays(deadline, today), 0)
+  const runwayStart = compareAsc(today, targetStart) === 1 ? today : targetStart
+  const daysUntilDeadline = Math.max(differenceInCalendarDays(targetEnd, runwayStart), 0)
   const rangeLength = Math.max(differenceInCalendarDays(today, rangeStartDate) + 1, 1)
   const createdInRange = createdPerDay.reduce((sum, entry) => sum + entry.count, 0)
   const completedInRange = completedPerDay.reduce((sum, entry) => sum + entry.count, 0)
@@ -251,8 +313,12 @@ export function getDashboardMetrics(source, { deadlineDate, rangeDays = '30' } =
     paceBody: paceStatus.body,
     priorityDistribution,
     likelihoodScore,
-    deadline,
-    deadlineLabel: format(deadline, 'MMM d, yyyy'),
+    deadline: targetEnd,
+    deadlineLabel: format(targetEnd, 'MMM d, yyyy'),
+    targetFromDate: targetStart,
+    targetToDate: targetEnd,
+    targetFromLabel: format(targetStart, 'MMM d, yyyy'),
+    targetToLabel: format(targetEnd, 'MMM d, yyyy'),
     startDate: safeStartDate,
     today,
   }
@@ -315,8 +381,10 @@ export function buildBacklogChartData(dashboardMetrics) {
 export function buildProjectionChartData(dashboardMetrics) {
   const deadline = dashboardMetrics.deadline
   const today = dashboardMetrics.today
-  const start = compareAsc(today, deadline) === 1 ? deadline : today
-  const dates = eachDayOfInterval({ start, end: deadline })
+  const targetFromDate = dashboardMetrics.targetFromDate
+  const start = compareAsc(today, targetFromDate) === 1 ? today : targetFromDate
+  const safeStart = compareAsc(start, deadline) === 1 ? deadline : start
+  const dates = eachDayOfInterval({ start: safeStart, end: deadline })
   const daysRemaining = Math.max(dates.length - 1, 1)
   const idealStep = dashboardMetrics.remainingBugs / daysRemaining
 
@@ -374,6 +442,80 @@ export function buildPriorityChartData(dashboardMetrics) {
   }
 }
 
+export function getComparisonMetrics(source, { rangeDays = '30' } = {}) {
+  const bugs = normalizeBugRecords(source)
+  const today = new Date()
+  const usedFallbackRange = rangeDays === 'all'
+  const comparisonRangeDays = getNumericRangeDays(rangeDays, 30)
+  const currentStart = subDays(today, comparisonRangeDays - 1)
+  const previousEnd = subDays(currentStart, 1)
+  const previousStart = subDays(previousEnd, comparisonRangeDays - 1)
+  const currentWindow = getWindowStats(bugs, currentStart, today)
+  const previousWindow = getWindowStats(bugs, previousStart, previousEnd)
+  const netBurnDelta = currentWindow.netBurnRate - previousWindow.netBurnRate
+  const addRateDelta = currentWindow.addRate - previousWindow.addRate
+  const fixRateDelta = currentWindow.fixRate - previousWindow.fixRate
+
+  let tone = 'warning'
+  let headline = 'Mixed movement versus the prior window'
+  let body = 'Recent results are close to the previous period, so the trend is not decisively better yet.'
+
+  if (netBurnDelta > 0.05) {
+    tone = 'positive'
+    headline = 'Improving versus the prior window'
+    body = 'Net burn improved over the previous period, meaning fixes are outpacing bug intake more effectively.'
+  } else if (netBurnDelta < -0.05) {
+    tone = 'negative'
+    headline = 'Worse than the prior window'
+    body = 'Net burn slipped compared with the previous period, so intake pressure or slower fixes are hurting progress.'
+  }
+
+  return {
+    comparisonRangeDays,
+    usedFallbackRange,
+    currentWindow,
+    previousWindow,
+    netBurnDelta,
+    addRateDelta,
+    fixRateDelta,
+    tone,
+    headline,
+    body,
+  }
+}
+
+export function buildComparisonChartData(comparisonMetrics) {
+  return {
+    labels: ['Created / day', 'Fixed / day', 'Net burn / day'],
+    datasets: [
+      {
+        label: `Current ${comparisonMetrics.comparisonRangeDays} days`,
+        data: [
+          comparisonMetrics.currentWindow.addRate,
+          comparisonMetrics.currentWindow.fixRate,
+          comparisonMetrics.currentWindow.netBurnRate,
+        ],
+        backgroundColor: 'rgba(96, 165, 250, 0.78)',
+        borderColor: '#60a5fa',
+        borderWidth: 1,
+        borderRadius: 8,
+      },
+      {
+        label: `Previous ${comparisonMetrics.comparisonRangeDays} days`,
+        data: [
+          comparisonMetrics.previousWindow.addRate,
+          comparisonMetrics.previousWindow.fixRate,
+          comparisonMetrics.previousWindow.netBurnRate,
+        ],
+        backgroundColor: 'rgba(244, 114, 182, 0.74)',
+        borderColor: '#f472b6',
+        borderWidth: 1,
+        borderRadius: 8,
+      },
+    ],
+  }
+}
+
 export function getSummaryMetrics(dashboardMetrics) {
   return {
     bugCount: dashboardMetrics.remainingBugs,
@@ -384,6 +526,8 @@ export function getSummaryMetrics(dashboardMetrics) {
     currentNetBurnRate: dashboardMetrics.currentNetBurnRate,
     onPace: dashboardMetrics.onPace,
     deadlineLabel: dashboardMetrics.deadlineLabel,
+    targetFromLabel: dashboardMetrics.targetFromLabel,
+    targetToLabel: dashboardMetrics.targetToLabel,
     paceSignal: dashboardMetrics.paceSignal,
     likelihoodScore: dashboardMetrics.likelihoodScore,
   }
