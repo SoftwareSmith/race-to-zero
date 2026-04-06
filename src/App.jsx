@@ -7,6 +7,7 @@ import { useMetrics } from './hooks/useMetrics.js'
 import {
   buildBacklogChartData,
   buildFlowChartData,
+  buildPriorityChartData,
   buildProjectionChartData,
   getDashboardMetrics,
   getSummaryMetrics,
@@ -216,6 +217,13 @@ function App() {
             title="Projection To Deadline"
             description="Projected backlog versus the required glide path from today to the chosen deadline."
             data={buildProjectionChartData(dashboardMetrics)}
+          />
+          <ChartCard
+            className="chart-card-priority"
+            title="Open Bugs By Priority"
+            description="Current open backlog split by Linear priority to show concentration at the top end."
+            data={buildPriorityChartData(dashboardMetrics)}
+            variant="bar"
           />
         </section>
       </main>

@@ -8,6 +8,8 @@ const __dirname = path.dirname(__filename)
 const ROOT_DIR = path.resolve(__dirname, '..')
 const OUTPUT_PATH = path.join(ROOT_DIR, 'public', 'data', 'metrics.json')
 const LINEAR_API_URL = 'https://api.linear.app/graphql'
+const BUG_LABEL_NAMES = new Set(['bug', 'cs bug', 'cs bugs'])
+const BUG_PARENT_NAMES = new Set(['bug reason'])
 
 function getRequiredEnv(name) {
   const value = process.env[name]
@@ -26,22 +28,14 @@ async function fetchBugIssues() {
   const apiKey = getRequiredEnv('LINEAR_API_KEY')
   const teamKey = process.env.LINEAR_TEAM_KEY ?? 'CP'
 
-  const filters = [
-    '{ labels: { some: { name: { eq: "bug" } } } }',
-  ]
-
-  if (teamKey) {
-    filters.push(`{ team: { key: { eq: \"${teamKey}\" } } }`)
-  }
+  const teamFilter = teamKey ? `filter: { team: { key: { eq: \"${teamKey}\" } } }` : ''
 
   const query = `
     query FetchBugIssues($after: String) {
       issues(
         first: 100
         after: $after
-        filter: {
-          and: [${filters.join(',\n')}]
-        }
+        ${teamFilter}
       ) {
         pageInfo {
           hasNextPage
@@ -50,6 +44,19 @@ async function fetchBugIssues() {
         nodes {
           createdAt
           completedAt
+          priority
+          state {
+            name
+            type
+          }
+          labels {
+            nodes {
+              name
+              parent {
+                name
+              }
+            }
+          }
         }
       }
     }
@@ -93,8 +100,18 @@ async function fetchBugIssues() {
   return issues
 }
 
+function isBugIssue(issue) {
+  return issue.labels?.nodes?.some((label) => {
+    const labelName = label.name?.trim().toLowerCase()
+    const parentName = label.parent?.name?.trim().toLowerCase()
+    return BUG_LABEL_NAMES.has(labelName) || BUG_PARENT_NAMES.has(parentName)
+  })
+}
+
 function buildMetrics(issues) {
-  const sortedIssues = [...issues].sort((left, right) => left.createdAt.localeCompare(right.createdAt))
+  const sortedIssues = [...issues]
+    .filter(isBugIssue)
+    .sort((left, right) => left.createdAt.localeCompare(right.createdAt))
 
   return {
     generatedAt: new Date().toISOString(),
@@ -102,6 +119,9 @@ function buildMetrics(issues) {
     bugs: sortedIssues.map((issue) => ({
       createdAt: toDay(issue.createdAt),
       completedAt: issue.completedAt ? toDay(issue.completedAt) : null,
+      priority: issue.priority ?? 0,
+      stateName: issue.state?.name ?? null,
+      stateType: issue.state?.type ?? null,
     })),
   }
 }

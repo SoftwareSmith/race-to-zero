@@ -14,9 +14,42 @@ function normalizeBugRecords(source) {
     .map((entry) => ({
       createdAt: entry.createdAt,
       completedAt: entry.completedAt || null,
+      priority: Number(entry.priority ?? 0),
+      stateName: entry.stateName ?? null,
+      stateType: entry.stateType ?? null,
     }))
     .filter((entry) => Boolean(entry.createdAt))
     .sort((left, right) => left.createdAt.localeCompare(right.createdAt))
+}
+
+function getPriorityLabel(priority) {
+  switch (priority) {
+    case 1:
+      return 'Urgent'
+    case 2:
+      return 'High'
+    case 3:
+      return 'Normal'
+    case 4:
+      return 'Low'
+    default:
+      return 'Unspecified'
+  }
+}
+
+function buildPriorityDistribution(bugs) {
+  const openBugs = bugs.filter((bug) => !bug.completedAt)
+  const counts = new Map()
+
+  for (const bug of openBugs) {
+    const label = getPriorityLabel(bug.priority)
+    counts.set(label, (counts.get(label) ?? 0) + 1)
+  }
+
+  return ['Urgent', 'High', 'Normal', 'Low', 'Unspecified'].map((label) => ({
+    label,
+    count: counts.get(label) ?? 0,
+  }))
 }
 
 function formatLabel(dateValue) {
@@ -184,6 +217,7 @@ export function getDashboardMetrics(source, { deadlineDate, rangeDays = '30' } =
     neededNetBurnRate,
     daysUntilDeadline,
   })
+  const priorityDistribution = buildPriorityDistribution(bugs)
   const likelihoodScore = getLikelihoodScore({
     remainingBugs,
     currentNetBurnRate,
@@ -215,6 +249,7 @@ export function getDashboardMetrics(source, { deadlineDate, rangeDays = '30' } =
     paceSignal: paceStatus.signal,
     paceHeadline: paceStatus.headline,
     paceBody: paceStatus.body,
+    priorityDistribution,
     likelihoodScore,
     deadline,
     deadlineLabel: format(deadline, 'MMM d, yyyy'),
@@ -306,6 +341,34 @@ export function buildProjectionChartData(dashboardMetrics) {
         tension: 0,
         borderWidth: 2,
         pointRadius: 0,
+      },
+    ],
+  }
+}
+
+export function buildPriorityChartData(dashboardMetrics) {
+  return {
+    labels: dashboardMetrics.priorityDistribution.map((entry) => entry.label),
+    datasets: [
+      {
+        label: 'Open bugs',
+        data: dashboardMetrics.priorityDistribution.map((entry) => entry.count),
+        backgroundColor: [
+          'rgba(248, 113, 113, 0.78)',
+          'rgba(251, 146, 60, 0.78)',
+          'rgba(96, 165, 250, 0.78)',
+          'rgba(52, 211, 153, 0.78)',
+          'rgba(148, 163, 184, 0.72)',
+        ],
+        borderColor: [
+          '#f87171',
+          '#fb923c',
+          '#60a5fa',
+          '#34d399',
+          '#94a3b8',
+        ],
+        borderWidth: 1,
+        borderRadius: 8,
       },
     ],
   }

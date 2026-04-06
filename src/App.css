@@ -1,15 +1,15 @@
 .app-shell {
-  width: min(1380px, calc(100% - 40px));
+  width: min(1440px, calc(100% - 28px));
   margin: 0 auto;
-  padding: 34px 0 56px;
+  padding: 24px 0 40px;
 }
 
 .app-header {
   display: grid;
   grid-template-columns: minmax(0, 1.6fr) minmax(320px, 420px);
-  gap: 24px;
+  gap: 18px;
   align-items: start;
-  margin-bottom: 28px;
+  margin-bottom: 18px;
 }
 
 .hero-copy {
@@ -39,7 +39,7 @@
 
 .header-actions {
   display: grid;
-  gap: 12px;
+  gap: 10px;
 }
 
 .control-panel,
@@ -56,14 +56,14 @@
 .control-panel,
 .sync-panel,
 .kpi-card {
-  padding: 16px 18px;
-  border-radius: 18px;
+  padding: 14px 16px;
+  border-radius: 16px;
 }
 
 .control-input {
   width: 100%;
-  padding: 12px 14px;
-  border-radius: 14px;
+  padding: 10px 12px;
+  border-radius: 12px;
   border: 1px solid rgba(143, 162, 192, 0.24);
   background: rgba(8, 13, 30, 0.84);
   color: var(--text-main);
@@ -92,25 +92,25 @@
 
 .dashboard-grid {
   display: grid;
-  gap: 24px;
+  gap: 18px;
 }
 
 .hero-grid {
   display: grid;
   grid-template-columns: minmax(0, 1.7fr) minmax(280px, 0.9fr);
-  gap: 20px;
+  gap: 16px;
 }
 
 .hero-panel,
 .side-panel,
 .chart-card {
-  border-radius: 28px;
-  padding: 22px;
+  border-radius: 22px;
+  padding: 18px;
 }
 
 .hero-panel {
   display: grid;
-  gap: 22px;
+  gap: 16px;
 }
 
 .hero-panel-positive {
@@ -128,12 +128,12 @@
 .hero-panel-head {
   display: flex;
   justify-content: space-between;
-  gap: 18px;
+  gap: 14px;
   align-items: start;
 }
 
 .signal-pill {
-  padding: 10px 14px;
+  padding: 8px 12px;
   border-radius: 999px;
   font-weight: 700;
   letter-spacing: 0.06em;
@@ -156,14 +156,14 @@
 }
 
 .hero-highlight {
-  padding: 20px;
-  border-radius: 22px;
+  padding: 16px;
+  border-radius: 18px;
   background: rgba(3, 8, 20, 0.46);
 }
 
 .hero-highlight-label {
   display: block;
-  margin-bottom: 10px;
+  margin-bottom: 8px;
   color: var(--muted);
 }
 
@@ -174,15 +174,15 @@
 }
 
 .hero-highlight p {
-  margin-top: 10px;
+  margin-top: 8px;
   color: var(--muted);
 }
 
 .likelihood-panel {
   display: grid;
-  gap: 14px;
-  padding: 18px;
-  border-radius: 20px;
+  gap: 10px;
+  padding: 14px;
+  border-radius: 16px;
   background: rgba(3, 8, 20, 0.38);
 }
 
@@ -193,7 +193,7 @@
 }
 
 .likelihood-copy p {
-  margin-top: 8px;
+  margin-top: 6px;
   color: var(--muted);
 }
 
@@ -225,13 +225,13 @@
 .kpi-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 14px;
+  gap: 12px;
 }
 
 .hero-mini-metric,
 .kpi-card {
-  padding: 16px;
-  border-radius: 18px;
+  padding: 14px;
+  border-radius: 16px;
   background: rgba(2, 7, 18, 0.46);
 }
 
@@ -244,14 +244,14 @@
 
 .side-panel {
   display: grid;
-  gap: 18px;
+  gap: 14px;
   align-content: start;
 }
 
 .range-toggle-group {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 10px;
+  gap: 8px;
 }
 
 .range-toggle,
@@ -264,7 +264,7 @@
 }
 
 .range-toggle {
-  padding: 12px 10px;
+  padding: 10px 8px;
   font-weight: 700;
 }
 
@@ -285,7 +285,7 @@
 
 .sync-button-subtle {
   width: 100%;
-  padding: 14px 16px;
+  padding: 12px 14px;
   font-weight: 700;
 }
 
@@ -301,7 +301,7 @@
 
 .data-source-details {
   border-top: 1px solid rgba(143, 162, 192, 0.12);
-  padding-top: 14px;
+  padding-top: 12px;
 }
 
 .data-source-details summary {
@@ -312,8 +312,8 @@
 
 .details-copy {
   display: grid;
-  gap: 10px;
-  padding-top: 12px;
+  gap: 8px;
+  padding-top: 10px;
 }
 
 .details-copy a {
@@ -323,22 +323,26 @@
 
 .chart-stack {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 20px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
 }
 
 .chart-card-copy h2 {
-  margin-bottom: 10px;
+  margin-bottom: 8px;
 }
 
 .chart-frame {
-  height: 320px;
+  height: 250px;
+}
+
+.chart-card-priority {
+  grid-column: span 2;
 }
 
 .banner {
-  margin-top: 18px;
-  padding: 14px 18px;
-  border-radius: 18px;
+  margin-top: 14px;
+  padding: 12px 16px;
+  border-radius: 16px;
   border: 1px solid transparent;
   font-weight: 600;
 }
@@ -360,6 +364,10 @@
   .hero-grid,
   .chart-stack {
     grid-template-columns: 1fr;
+  }
+
+  .chart-card-priority {
+    grid-column: auto;
   }
 
   .hero-metric-grid,
