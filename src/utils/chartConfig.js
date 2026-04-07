@@ -1,4 +1,4 @@
-export function getLineChartOptions() {
+export function getLineChartOptions(variant = 'line') {
   return {
     responsive: true,
     maintainAspectRatio: false,
@@ -11,35 +11,46 @@ export function getLineChartOptions() {
         labels: {
           usePointStyle: true,
           boxWidth: 10,
-          color: '#cbd5e1',
+          color: '#d6d3d1',
+          padding: 18,
+          font: {
+            size: 12,
+            weight: 600,
+          },
         },
       },
       tooltip: {
-        backgroundColor: '#050816',
-        titleColor: '#f8fafc',
-        bodyColor: '#dbeafe',
+        backgroundColor: '#1c1917',
+        titleColor: '#fafaf9',
+        bodyColor: '#e7e5e4',
         padding: 12,
         displayColors: true,
+        borderColor: 'rgba(255,255,255,0.08)',
+        borderWidth: 1,
       },
     },
     scales: {
       x: {
         grid: {
-          color: 'rgba(94, 106, 130, 0.15)',
+          color: 'rgba(245, 245, 244, 0.08)',
+          drawBorder: false,
         },
         ticks: {
-          color: '#8fa2c0',
+          color: '#a8a29e',
           maxRotation: 0,
+          padding: 10,
         },
       },
       y: {
         beginAtZero: true,
         grid: {
-          color: 'rgba(94, 106, 130, 0.15)',
+          color: 'rgba(245, 245, 244, 0.08)',
+          drawBorder: false,
         },
         ticks: {
-          color: '#8fa2c0',
-          precision: 0,
+          color: '#a8a29e',
+          precision: variant === 'bar' ? 0 : undefined,
+          padding: 10,
         },
       },
     },

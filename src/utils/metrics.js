@@ -180,8 +180,8 @@ function getDeadlineStatus({ remainingBugs, currentNetBurnRate, neededNetBurnRat
   if (remainingBugs === 0) {
     return {
       tone: 'positive',
-      signal: 'On track',
-      headline: 'Backlog cleared',
+      signal: 'Ahead',
+      headline: 'Queue is already at zero',
       body: 'The current snapshot shows no remaining bugs in scope.',
     }
   }
@@ -190,7 +190,7 @@ function getDeadlineStatus({ remainingBugs, currentNetBurnRate, neededNetBurnRat
     return {
       tone: 'negative',
       signal: 'Behind',
-      headline: 'Deadline is today',
+      headline: 'Deadline has arrived',
       body: 'There is no remaining runway to burn down the current backlog.',
     }
   }
@@ -198,17 +198,17 @@ function getDeadlineStatus({ remainingBugs, currentNetBurnRate, neededNetBurnRat
   if (currentNetBurnRate >= neededNetBurnRate) {
     return {
       tone: 'positive',
-      signal: 'On track',
-      headline: 'Likely to hit the target',
-      body: 'Recent fix velocity is strong enough to offset new bugs and still reduce the backlog at the required pace.',
+      signal: 'Ahead',
+      headline: 'Ahead of the zero-bug pace',
+      body: 'Recent fix velocity is offsetting new bugs and still reducing the backlog quickly enough to reach zero by the selected deadline if the same trend holds.',
     }
   }
 
   return {
     tone: 'negative',
     signal: 'Behind',
-    headline: 'Off track at current trend',
-    body: 'Recent intake is matching or exceeding fixes, so the backlog is not burning down fast enough.',
+    headline: 'Behind the zero-bug pace',
+    body: 'Recent intake is matching or exceeding fixes, so the backlog is not burning down fast enough to hit the selected deadline without a throughput change.',
   }
 }
 
@@ -342,8 +342,8 @@ export function buildDeadlineBurndownChartData(deadlineMetrics) {
       {
         label: 'Actual remaining bugs',
         data: labels.map((entry) => (entry <= todayKey ? actualLookup.get(entry) ?? null : null)),
-        borderColor: '#60a5fa',
-        backgroundColor: 'rgba(96, 165, 250, 0.14)',
+        borderColor: '#38bdf8',
+        backgroundColor: 'rgba(56, 189, 248, 0.18)',
         fill: false,
         tension: 0.22,
         borderWidth: 3,
@@ -357,8 +357,8 @@ export function buildDeadlineBurndownChartData(deadlineMetrics) {
           const elapsed = Math.max(differenceInCalendarDays(currentDate, idealStartDate), 0)
           return Math.max(0, Number((idealStartCount - (idealStartCount / idealDuration) * elapsed).toFixed(2)))
         }),
-        borderColor: '#22c55e',
-        backgroundColor: 'rgba(34, 197, 94, 0.06)',
+        borderColor: '#34d399',
+        backgroundColor: 'rgba(52, 211, 153, 0.08)',
         borderDash: [6, 6],
         tension: 0,
         borderWidth: 2,
@@ -376,18 +376,18 @@ export function buildPriorityChartData(metricsWithPriority) {
         label: 'Open bugs',
         data: metricsWithPriority.priorityDistribution.map((entry) => entry.count),
         backgroundColor: [
-          'rgba(248, 113, 113, 0.78)',
-          'rgba(251, 146, 60, 0.78)',
-          'rgba(96, 165, 250, 0.78)',
+          'rgba(239, 68, 68, 0.76)',
+          'rgba(245, 158, 11, 0.78)',
+          'rgba(20, 184, 166, 0.78)',
           'rgba(52, 211, 153, 0.78)',
-          'rgba(148, 163, 184, 0.72)',
+          'rgba(168, 162, 158, 0.78)',
         ],
         borderColor: [
-          '#f87171',
-          '#fb923c',
-          '#60a5fa',
+          '#ef4444',
+          '#f59e0b',
+          '#14b8a6',
           '#34d399',
-          '#94a3b8',
+          '#a8a29e',
         ],
         borderWidth: 1,
         borderRadius: 8,
@@ -432,24 +432,24 @@ export function getComparisonMetrics(source, { rangeKey = '30', customFromDate, 
 
   let tone = currentWindow.netChange > 0 ? 'negative' : currentWindow.netChange < 0 ? 'positive' : 'neutral'
   let headline = currentWindow.netChange > 0
-    ? 'Backlog grew in the selected period'
+    ? 'Intake is outpacing completions'
     : currentWindow.netChange < 0
-      ? 'Backlog shrank in the selected period'
-      : 'Created and completed stayed balanced'
+      ? 'Completions are outpacing intake'
+      : 'Intake and completions are running even'
   let body = currentWindow.netChange > 0
-    ? 'More bugs were created than completed in the selected window, so backlog pressure increased.'
+    ? `The current window created ${currentWindow.created} bugs and closed ${currentWindow.fixed}, so backlog pressure increased by ${currentWindow.netChange}.`
     : currentWindow.netChange < 0
-      ? 'More bugs were completed than created in the selected window, so the backlog reduced.'
-      : 'Creation and completion were evenly matched in the selected window.'
+      ? `The current window closed ${currentWindow.fixed} bugs and created ${currentWindow.created}, so the backlog reduced by ${Math.abs(currentWindow.netChange)}.`
+      : `The current window created and closed ${currentWindow.created} bugs, leaving net backlog movement flat.`
 
   if (!hasComparisonWindow) {
     tone = 'neutral'
     headline = 'All-time trend view'
-    body = 'All time shows the full bug history for the CP scope. Switch to a fixed or custom range to compare against a previous window.'
+    body = 'All time shows the full bug history for the CP scope. Switch to a fixed or custom range to compare this period against a previous one.'
   } else if (currentWindow.netChange < previousWindow.netChange) {
-    body += ' This is better than the previous comparison window.'
+    body += ` That is better than the previous window by ${Math.abs(currentWindow.netChange - previousWindow.netChange)} net bugs.`
   } else if (currentWindow.netChange > previousWindow.netChange) {
-    body += ' This is worse than the previous comparison window.'
+    body += ` That is worse than the previous window by ${Math.abs(currentWindow.netChange - previousWindow.netChange)} net bugs.`
   }
 
   return {
@@ -484,8 +484,8 @@ export function buildComparisonTimelineChartData(comparisonMetrics) {
       {
         label: 'Created',
         data: createdValues,
-        borderColor: '#f87171',
-        backgroundColor: 'rgba(248, 113, 113, 0.12)',
+        borderColor: '#f97316',
+        backgroundColor: 'rgba(249, 115, 22, 0.14)',
         tension: 0.25,
         borderWidth: 2,
         pointRadius: 2,
@@ -493,8 +493,8 @@ export function buildComparisonTimelineChartData(comparisonMetrics) {
       {
         label: 'Completed',
         data: completedValues,
-        borderColor: '#22c55e',
-        backgroundColor: 'rgba(34, 197, 94, 0.12)',
+        borderColor: '#34d399',
+        backgroundColor: 'rgba(52, 211, 153, 0.14)',
         tension: 0.25,
         borderWidth: 2,
         pointRadius: 2,
@@ -502,7 +502,7 @@ export function buildComparisonTimelineChartData(comparisonMetrics) {
       {
         label: `${movingAverageWindow}D created avg`,
         data: buildMovingAverage(createdValues, movingAverageWindow),
-        borderColor: '#fda4af',
+        borderColor: '#fdba74',
         borderDash: [5, 4],
         tension: 0.2,
         borderWidth: 2,
@@ -511,7 +511,7 @@ export function buildComparisonTimelineChartData(comparisonMetrics) {
       {
         label: `${movingAverageWindow}D completed avg`,
         data: buildMovingAverage(completedValues, movingAverageWindow),
-        borderColor: '#86efac',
+        borderColor: '#a7f3d0',
         borderDash: [5, 4],
         tension: 0.2,
         borderWidth: 2,
@@ -531,8 +531,8 @@ export function buildComparisonSummaryChartData(comparisonMetrics) {
         comparisonMetrics.currentWindow.netChange,
         Number(comparisonMetrics.currentWindow.completionRate.toFixed(2)),
       ],
-      backgroundColor: 'rgba(96, 165, 250, 0.78)',
-      borderColor: '#60a5fa',
+      backgroundColor: 'rgba(56, 189, 248, 0.74)',
+      borderColor: '#38bdf8',
       borderWidth: 1,
       borderRadius: 8,
     },
@@ -547,8 +547,8 @@ export function buildComparisonSummaryChartData(comparisonMetrics) {
         comparisonMetrics.previousWindow.netChange,
         Number(comparisonMetrics.previousWindow.completionRate.toFixed(2)),
       ],
-      backgroundColor: 'rgba(244, 114, 182, 0.74)',
-      borderColor: '#f472b6',
+      backgroundColor: 'rgba(20, 184, 166, 0.72)',
+      borderColor: '#14b8a6',
       borderWidth: 1,
       borderRadius: 8,
     })
