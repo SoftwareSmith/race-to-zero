@@ -35,6 +35,7 @@ const EXCLUDE_HOLIDAYS_STORAGE_KEY = 'race-to-zero:exclude-holidays-awst'
 const SHOW_PARTICLE_COUNT_STORAGE_KEY = 'race-to-zero:show-particle-count'
 const BUG_SIZE_STORAGE_KEY = 'race-to-zero:bug-size-multiplier'
 const BUG_CHAOS_STORAGE_KEY = 'race-to-zero:bug-chaos-multiplier'
+const TERMINATOR_MODE_STORAGE_KEY = 'race-to-zero:terminator-mode'
 
 function StatusBanner({ kind = 'info', children }) {
   const styles = {
@@ -55,7 +56,7 @@ function StatusBanner({ kind = 'info', children }) {
   )
 }
 
-const OverviewView = memo(function OverviewView({ deadlineMetrics, summary, workdaySettings }) {
+const OverviewView = memo(function OverviewView({ deadlineMetrics, onChartFocusChange, summary, workdaySettings }) {
   const metricTone = deadlineMetrics.statusTone
   const isWorkdayMode = workdaySettings.excludeWeekends || workdaySettings.excludePublicHolidays
   const backlogSummary = summary.currentNetBurnRate > 0
@@ -104,6 +105,7 @@ const OverviewView = memo(function OverviewView({ deadlineMetrics, summary, work
           chartKey="bug-burndown"
           className="min-h-[420px]"
           data={deadlineBurndownData}
+          onHoverStateChange={onChartFocusChange}
           summary={backlogSummary}
           title="Bug burndown"
         />
@@ -112,6 +114,7 @@ const OverviewView = memo(function OverviewView({ deadlineMetrics, summary, work
           className="min-h-[420px]"
           data={priorityChartData}
           description="Breakdown of the open backlog by priority so the biggest risk pockets are visible without hovering."
+          onHoverStateChange={onChartFocusChange}
           title="Open bugs by priority"
           variant="bar"
         />
@@ -120,7 +123,7 @@ const OverviewView = memo(function OverviewView({ deadlineMetrics, summary, work
   )
 })
 
-const PeriodsView = memo(function PeriodsView({ comparisonMetrics }) {
+const PeriodsView = memo(function PeriodsView({ comparisonMetrics, onChartFocusChange }) {
   const createdTone = getMetricTone(comparisonMetrics.currentWindow.created, comparisonMetrics.previousWindow?.created ?? null, false)
   const completedTone = comparisonMetrics.currentWindow.fixed > comparisonMetrics.currentWindow.created
     ? 'positive'
@@ -170,6 +173,7 @@ const PeriodsView = memo(function PeriodsView({ comparisonMetrics }) {
           chartKey="comparison-timeline"
           className="min-h-[420px]"
           data={comparisonTimelineData}
+          onHoverStateChange={onChartFocusChange}
           summary="Compare daily intake against completions to see whether recent periods are relieving pressure or letting backlog build."
           title="Created vs completed over time"
         />
@@ -178,6 +182,7 @@ const PeriodsView = memo(function PeriodsView({ comparisonMetrics }) {
           className="min-h-[420px]"
           data={comparisonSummaryData}
           description="Each x-axis group is one metric type, with current and previous period bars paired so the change is easy to read."
+          onHoverStateChange={onChartFocusChange}
           summary="These bars compare the current period with the previous one across intake, completions, net movement, and completion rate."
           title="Current vs previous window"
           variant="bar"
@@ -195,6 +200,7 @@ function App() {
   const [excludeWeekends, setExcludeWeekends] = useState(() => readStoredFlag(EXCLUDE_WEEKENDS_STORAGE_KEY, false))
   const [excludePublicHolidays, setExcludePublicHolidays] = useState(() => readStoredFlag(EXCLUDE_HOLIDAYS_STORAGE_KEY, false))
   const [showParticleCount, setShowParticleCount] = useState(() => readStoredFlag(SHOW_PARTICLE_COUNT_STORAGE_KEY, true))
+  const [terminatorMode, setTerminatorMode] = useState(() => readStoredFlag(TERMINATOR_MODE_STORAGE_KEY, false))
   const [openTopMenu, setOpenTopMenu] = useState(null)
   const [bugSizeMultiplier, setBugSizeMultiplier] = useState(() => {
     const storedValue = typeof window !== 'undefined' ? window.localStorage.getItem(BUG_SIZE_STORAGE_KEY) : null
@@ -209,8 +215,11 @@ function App() {
   const [compareRangeKey, setCompareRangeKey] = useState('30')
   const [customFromDate, setCustomFromDate] = useState(() => format(subDays(new Date(), 29), 'yyyy-MM-dd'))
   const [customToDate, setCustomToDate] = useState(() => format(new Date(), 'yyyy-MM-dd'))
+  const [chartFocus, setChartFocus] = useState(null)
+  const [milestoneFlash, setMilestoneFlash] = useState(null)
   const settingsMenuRef = useRef(null)
   const bugSettingsMenuRef = useRef(null)
+  const previousBugCountRef = useRef(null)
 
   const workdaySettings = useMemo(() => ({
     excludePublicHolidays,
@@ -260,6 +269,12 @@ function App() {
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
+      window.localStorage.setItem(TERMINATOR_MODE_STORAGE_KEY, String(terminatorMode))
+    }
+  }, [terminatorMode])
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
       window.localStorage.setItem(BUG_SIZE_STORAGE_KEY, String(bugSizeMultiplier))
     }
   }, [bugSizeMultiplier])
@@ -291,6 +306,10 @@ function App() {
 
     if (settingKey === 'showParticleCount') {
       setShowParticleCount((currentValue) => !currentValue)
+    }
+
+    if (settingKey === 'terminatorMode') {
+      setTerminatorMode((currentValue) => !currentValue)
     }
   }, [])
 
@@ -342,6 +361,10 @@ function App() {
     setActiveTab(tabId)
   }, [])
 
+  const handleChartFocusChange = useCallback((nextFocus) => {
+    setChartFocus(nextFocus)
+  }, [])
+
   useEffect(() => {
     if (!openTopMenu) {
       return undefined
@@ -374,25 +397,61 @@ function App() {
     }
   }, [openTopMenu])
 
+  useEffect(() => {
+    const currentBugCount = summary.bugCount
+    const previousBugCount = previousBugCountRef.current
+    const milestoneThresholds = [100, 50, 25, 10, 0]
+
+    if (previousBugCount != null) {
+      const crossedThreshold = milestoneThresholds.find((threshold) => previousBugCount > threshold && currentBugCount <= threshold)
+      if (crossedThreshold != null && typeof window !== 'undefined') {
+        const sessionKey = `race-to-zero:milestone:${crossedThreshold}`
+        if (!window.sessionStorage.getItem(sessionKey)) {
+          window.sessionStorage.setItem(sessionKey, 'true')
+          setMilestoneFlash({ threshold: crossedThreshold, token: Date.now() })
+        }
+      }
+    }
+
+    previousBugCountRef.current = currentBugCount
+  }, [summary.bugCount])
+
+  useEffect(() => {
+    if (!milestoneFlash) {
+      return undefined
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      setMilestoneFlash(null)
+    }, 1800)
+
+    return () => window.clearTimeout(timeoutId)
+  }, [milestoneFlash])
+
+  const headerEyebrow = summary.bugCount === 0 ? 'All clear' : 'Operations dashboard'
+  const headerSubtitle = summary.bugCount === 0
+    ? 'No open bugs in the current public snapshot.'
+    : 'Current pace against the zero-bug deadline.'
+
   return (
     <div className="relative min-h-screen overflow-hidden bg-[#050608]">
-      <BackgroundField bugCount={summary.bugCount} bugVisualSettings={bugVisualSettings} showParticleCount={showParticleCount} tone={deadlineMetrics.statusTone} />
+      <BackgroundField bugCount={summary.bugCount} bugVisualSettings={bugVisualSettings} chartFocus={chartFocus} milestoneFlash={milestoneFlash} showParticleCount={showParticleCount} terminatorMode={terminatorMode} tone={deadlineMetrics.statusTone} />
 
       <div className="relative mx-auto flex min-h-screen w-full max-w-[1380px] flex-col gap-8 px-4 py-6 sm:px-6 sm:py-8 lg:px-8 lg:py-10">
         <header className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div className="max-w-3xl">
-            <p className="text-[0.72rem] font-semibold uppercase tracking-[0.28em] text-stone-500">Operations dashboard</p>
+            <p className="text-[0.72rem] font-semibold uppercase tracking-[0.28em] text-stone-500">{headerEyebrow}</p>
             <h1 className="mt-2 font-[family-name:var(--font-display)] text-4xl leading-[0.94] tracking-[-0.06em] text-stone-50 sm:text-5xl xl:text-6xl">
               Race to Zero Bugs
             </h1>
             <p className="mt-3 max-w-xl text-sm leading-6 text-stone-400 sm:text-base">
-              Current pace against the zero-bug deadline.
+              {headerSubtitle}
             </p>
           </div>
 
           <div className="flex items-center gap-2 self-end lg:self-auto">
             <SettingsMenu containerRef={settingsMenuRef} onMenuToggle={() => handleTopMenuToggle('settings')} onToggle={handleToggleSetting} open={openTopMenu === 'settings'} settings={settings} />
-            <BugSettingsMenu bugVisualSettings={bugVisualSettings} containerRef={bugSettingsMenuRef} onChange={handleBugVisualSetting} onMenuToggle={() => handleTopMenuToggle('bugs')} onToggle={handleToggleSetting} open={openTopMenu === 'bugs'} showParticleCount={showParticleCount} />
+            <BugSettingsMenu bugVisualSettings={bugVisualSettings} containerRef={bugSettingsMenuRef} onChange={handleBugVisualSetting} onMenuToggle={() => handleTopMenuToggle('bugs')} onToggle={handleToggleSetting} open={openTopMenu === 'bugs'} showParticleCount={showParticleCount} terminatorMode={terminatorMode} />
           </div>
         </header>
 
@@ -419,6 +478,7 @@ function App() {
           {activeTab === 'overview' ? (
             <OverviewView
               deadlineMetrics={deadlineMetrics}
+              onChartFocusChange={handleChartFocusChange}
               summary={summary}
               workdaySettings={workdaySettings}
             />
@@ -427,6 +487,7 @@ function App() {
           {activeTab === 'periods' ? (
             <PeriodsView
               comparisonMetrics={comparisonMetrics}
+              onChartFocusChange={handleChartFocusChange}
             />
           ) : null}
 

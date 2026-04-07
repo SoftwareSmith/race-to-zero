@@ -23,10 +23,10 @@ function CommandCenter({ deadlineMetrics, summary }) {
               <StatusTag tone={deadlineMetrics.statusTone}>{getStatusTagText(deadlineMetrics.statusTone)}</StatusTag>
             </div>
             <h2 className="mt-3 font-[family-name:var(--font-display)] text-3xl leading-tight tracking-[-0.04em] text-stone-50 sm:text-[2.8rem]">
-              Are we clearing bugs fast enough to reach zero?
+              {summary.bugCount === 0 ? 'The bug queue is clear.' : 'Are we clearing bugs fast enough to reach zero?'}
             </h2>
             <p className="mt-3 w-full text-sm leading-6 text-stone-300 sm:text-base">
-              {paceGap >= 0 ? 'Ahead of' : 'Behind'} required pace for {summary.deadlineLabel}.
+              {summary.bugCount === 0 ? `Current snapshot is at zero open bugs for ${summary.deadlineLabel}.` : `${paceGap >= 0 ? 'Ahead of' : 'Behind'} required pace for ${summary.deadlineLabel}.`}
             </p>
           </div>
         </div>

@@ -1,5 +1,11 @@
 export function getEffectPalette(tone) {
   const palettes = {
+    'all-clear': {
+      bug: 'rgba(134,239,172,0.18)',
+      fireflies: ['rgba(187,247,208,0.76)', 'rgba(125,211,252,0.48)', 'rgba(110,231,183,0.42)'],
+      orbA: 'rgba(16,185,129,0.08)',
+      orbB: 'rgba(125,211,252,0.06)',
+    },
     positive: {
       bug: 'rgba(167,243,208,0.42)',
       fireflies: ['rgba(16,185,129,0.72)', 'rgba(56,189,248,0.52)', 'rgba(167,243,208,0.42)'],
@@ -25,8 +31,7 @@ export function getEffectPalette(tone) {
 
 export function createFireflyParticles(tone) {
   const palette = getEffectPalette(tone).fireflies
-
-  return [
+  const baseParticles = [
     { x: '10%', y: '16%', size: '5px', duration: '10s', delay: '0s', driftX: '18px', color: palette[0] },
     { x: '24%', y: '34%', size: '4px', duration: '12s', delay: '2s', driftX: '-22px', color: palette[1] },
     { x: '72%', y: '12%', size: '6px', duration: '9s', delay: '1s', driftX: '14px', color: palette[0] },
@@ -51,6 +56,19 @@ export function createFireflyParticles(tone) {
     { x: '57%', y: '16%', size: '5px', duration: '14.5s', delay: '3.2s', driftX: '20px', color: palette[2] },
     { x: '69%', y: '88%', size: '3px', duration: '12.8s', delay: '1.1s', driftX: '-18px', color: palette[0] },
     { x: '94%', y: '32%', size: '4px', duration: '15.8s', delay: '4.9s', driftX: '-14px', color: palette[1] },
+  ]
+
+  if (tone !== 'all-clear') {
+    return baseParticles
+  }
+
+  return [
+    ...baseParticles,
+    { x: '12%', y: '60%', size: '4px', duration: '18s', delay: '1.7s', driftX: '16px', color: palette[2] },
+    { x: '28%', y: '82%', size: '5px', duration: '20s', delay: '3.4s', driftX: '-12px', color: palette[0] },
+    { x: '49%', y: '24%', size: '4px', duration: '17s', delay: '2.3s', driftX: '14px', color: palette[1] },
+    { x: '77%', y: '70%', size: '5px', duration: '21s', delay: '4.1s', driftX: '-18px', color: palette[2] },
+    { x: '91%', y: '18%', size: '3px', duration: '16.8s', delay: '0.9s', driftX: '10px', color: palette[0] },
   ]
 }
 
@@ -81,6 +99,14 @@ export function createBugParticles(bugCount) {
 }
 
 export function getMotionProfile(tone) {
+  if (tone === 'all-clear') {
+    return {
+      durationMultiplier: 1.45,
+      opacityMultiplier: 0.45,
+      scale: 0.82,
+    }
+  }
+
   if (tone === 'positive') {
     return {
       durationMultiplier: 1.25,
@@ -102,4 +128,27 @@ export function getMotionProfile(tone) {
     opacityMultiplier: 1,
     scale: 1,
   }
+}
+
+export function getSceneProfile(tone) {
+  const profiles = {
+    'all-clear': {
+      chartFocusStrength: 0,
+      clusterStrength: -0.16,
+    },
+    positive: {
+      chartFocusStrength: 0.12,
+      clusterStrength: -0.08,
+    },
+    negative: {
+      chartFocusStrength: 0.22,
+      clusterStrength: 0.2,
+    },
+    neutral: {
+      chartFocusStrength: 0.16,
+      clusterStrength: 0.02,
+    },
+  }
+
+  return profiles[tone] ?? profiles.neutral
 }

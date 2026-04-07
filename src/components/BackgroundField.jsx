@@ -1,5 +1,5 @@
-import { memo, useEffect, useMemo, useRef } from 'react'
-import { createBugParticles, createFireflyParticles, getEffectPalette, getMotionProfile } from '../utils/backgroundEffects.js'
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { createBugParticles, createFireflyParticles, getEffectPalette, getMotionProfile, getSceneProfile } from '../utils/backgroundEffects.js'
 
 const TARGET_FRAME_MS = 1000 / 24
 const TRANSITION_EASING = 0.08
@@ -52,11 +52,16 @@ function drawBug(ctx, x, y, size, opacity, rotation, color) {
   ctx.restore()
 }
 
-const BugCanvas = memo(function BugCanvas({ bugColor, bugVisualSettings, motionProfile, particles }) {
+const BugCanvas = memo(function BugCanvas({ bugColor, bugVisualSettings, chartFocus, motionProfile, onHit, particles, sceneProfile, terminatorMode }) {
   const canvasRef = useRef(null)
   const particlesRef = useRef(particles)
   const motionProfileRef = useRef(motionProfile)
+  const sceneProfileRef = useRef(sceneProfile)
+  const chartFocusRef = useRef(chartFocus)
   const bugColorRef = useRef(bugColor)
+  const boundsRef = useRef({ height: 0, left: 0, top: 0, width: 0 })
+  const latestBugPositionsRef = useRef([])
+  const deadBugIndexesRef = useRef(new Set())
   const targetSettingsRef = useRef({
     sizeMultiplier: bugVisualSettings?.sizeMultiplier ?? 1,
     speedMultiplier: Math.max(0.2, bugVisualSettings?.chaosMultiplier ?? 1),
@@ -68,11 +73,20 @@ const BugCanvas = memo(function BugCanvas({ bugColor, bugVisualSettings, motionP
 
   useEffect(() => {
     particlesRef.current = particles
+    deadBugIndexesRef.current = new Set()
   }, [particles])
 
   useEffect(() => {
     motionProfileRef.current = motionProfile
   }, [motionProfile])
+
+  useEffect(() => {
+    sceneProfileRef.current = sceneProfile
+  }, [sceneProfile])
+
+  useEffect(() => {
+    chartFocusRef.current = chartFocus
+  }, [chartFocus])
 
   useEffect(() => {
     bugColorRef.current = bugColor
@@ -84,6 +98,12 @@ const BugCanvas = memo(function BugCanvas({ bugColor, bugVisualSettings, motionP
       speedMultiplier: Math.max(0.2, bugVisualSettings?.chaosMultiplier ?? 1),
     }
   }, [bugVisualSettings])
+
+  useEffect(() => {
+    if (!terminatorMode) {
+      deadBugIndexesRef.current = new Set()
+    }
+  }, [terminatorMode])
 
   useEffect(() => {
     const canvas = canvasRef.current
@@ -113,6 +133,12 @@ const BugCanvas = memo(function BugCanvas({ bugColor, bugVisualSettings, motionP
 
       width = nextWidth
       height = nextHeight
+      boundsRef.current = {
+        height: nextHeight,
+        left: canvas.getBoundingClientRect().left,
+        top: canvas.getBoundingClientRect().top,
+        width: nextWidth,
+      }
       canvas.width = Math.floor(nextWidth * devicePixelRatio)
       canvas.height = Math.floor(nextHeight * devicePixelRatio)
       context.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0)
@@ -151,19 +177,40 @@ const BugCanvas = memo(function BugCanvas({ bugColor, bugVisualSettings, motionP
       const speedMultiplier = clamp(animatedState.speedMultiplier, 0.2, 6)
       const activeParticles = particlesRef.current
       const activeMotionProfile = motionProfileRef.current
+      const activeSceneProfile = sceneProfileRef.current
+      const activeChartFocus = chartFocusRef.current
       const activeBugColor = bugColorRef.current
+      const deadBugIndexes = deadBugIndexesRef.current
+      const focusX = activeChartFocus?.relativeIndex ?? 0.5
+      const focusStrength = activeChartFocus ? activeSceneProfile.chartFocusStrength : 0
+      const clusterCenterX = 0.5
+      const clusterCenterY = 0.48
+      latestBugPositionsRef.current = []
 
       for (let index = 0; index < activeParticles.length; index += 1) {
+        if (deadBugIndexes.has(index)) {
+          continue
+        }
+
         const particle = activeParticles[index]
         const cycleDuration = Math.max(4, particle.duration * activeMotionProfile.durationMultiplier / speedMultiplier)
         const cycleProgress = ((timeSeconds + particle.delay) % cycleDuration) / cycleDuration
         const driftWave = Math.sin(cycleProgress * Math.PI * 2)
         const swayWave = Math.cos(cycleProgress * Math.PI * 2 * 1.35)
-        const x = (particle.x / 100) * width + driftWave * particle.driftX * speedMultiplier
-        const y = (particle.y / 100) * height + swayWave * particle.driftY * speedMultiplier
-        const opacity = Math.max(0.08, particle.opacity * activeMotionProfile.opacityMultiplier * (0.76 + 0.32 * Math.sin(cycleProgress * Math.PI * 2 + index * 0.2)))
-        const size = particle.size * activeMotionProfile.scale * sizeMultiplier
+        const normalizedX = particle.x / 100
+        const normalizedY = particle.y / 100
+        const clusterShiftX = (clusterCenterX - normalizedX) * width * activeSceneProfile.clusterStrength * 0.22
+        const clusterShiftY = (clusterCenterY - normalizedY) * height * activeSceneProfile.clusterStrength * 0.12
+        const focusDistance = Math.abs(normalizedX - focusX)
+        const focusFalloff = activeChartFocus ? Math.max(0, 1 - focusDistance * 3.1) : 0
+        const chartShiftX = activeChartFocus ? (focusX - normalizedX) * width * focusStrength * focusFalloff * 0.2 : 0
+        const x = normalizedX * width + clusterShiftX + chartShiftX + driftWave * particle.driftX * speedMultiplier
+        const y = normalizedY * height + clusterShiftY + swayWave * particle.driftY * speedMultiplier
+        const opacity = Math.max(0.08, particle.opacity * activeMotionProfile.opacityMultiplier * (0.76 + 0.32 * Math.sin(cycleProgress * Math.PI * 2 + index * 0.2)) * (activeChartFocus ? 0.72 + focusFalloff * 0.6 : 1))
+        const size = particle.size * activeMotionProfile.scale * sizeMultiplier * (activeChartFocus ? 0.92 + focusFalloff * 0.26 : 1)
         const rotation = Math.sin(cycleProgress * Math.PI * 4 + index * 0.12) * 0.22
+
+        latestBugPositionsRef.current.push({ index, radius: Math.max(size * 0.7, 12), x, y })
 
         drawBug(context, x, y, size, opacity, rotation, activeBugColor)
       }
@@ -178,9 +225,46 @@ const BugCanvas = memo(function BugCanvas({ bugColor, bugVisualSettings, motionP
     })
     resizeObserver.observe(canvas)
 
+    const handlePointerDown = (event) => {
+      if (!terminatorMode) {
+        return
+      }
+
+      const targetElement = event.target instanceof Element ? event.target : null
+      if (targetElement?.closest('button, a, input, select, textarea, label, summary')) {
+        return
+      }
+
+      const bounds = boundsRef.current
+      if (!bounds.width || !bounds.height) {
+        return
+      }
+
+      const clickX = event.clientX - bounds.left
+      const clickY = event.clientY - bounds.top
+      let hitCandidate = null
+
+      for (const bugPosition of latestBugPositionsRef.current) {
+        const distance = Math.hypot(clickX - bugPosition.x, clickY - bugPosition.y)
+        if (distance <= bugPosition.radius && (!hitCandidate || distance < hitCandidate.distance)) {
+          hitCandidate = { distance, index: bugPosition.index }
+        }
+      }
+
+      if (hitCandidate) {
+        if (deadBugIndexesRef.current.has(hitCandidate.index)) {
+          return
+        }
+
+        deadBugIndexesRef.current.add(hitCandidate.index)
+        onHit({ x: event.clientX, y: event.clientY })
+      }
+    }
+
     document.addEventListener('visibilitychange', updateActivity)
     window.addEventListener('focus', updateActivity)
     window.addEventListener('blur', updateActivity)
+    window.addEventListener('mousedown', handlePointerDown)
     animationFrameId = window.requestAnimationFrame(renderFrame)
 
     return () => {
@@ -188,11 +272,12 @@ const BugCanvas = memo(function BugCanvas({ bugColor, bugVisualSettings, motionP
       document.removeEventListener('visibilitychange', updateActivity)
       window.removeEventListener('focus', updateActivity)
       window.removeEventListener('blur', updateActivity)
+      window.removeEventListener('mousedown', handlePointerDown)
       if (animationFrameId) {
         window.cancelAnimationFrame(animationFrameId)
       }
     }
-  }, [])
+  }, [onHit, terminatorMode])
 
   return <canvas ref={canvasRef} className="app-bug-canvas absolute inset-0 h-full w-full" aria-hidden="true" />
 })
@@ -221,22 +306,126 @@ const Fireflies = memo(function Fireflies({ tone }) {
   )
 })
 
-const BackgroundField = memo(function BackgroundField({ bugCount, bugVisualSettings, showParticleCount, tone }) {
-  const colors = useMemo(() => getEffectPalette(tone), [tone])
+const BackgroundField = memo(function BackgroundField({ bugCount, bugVisualSettings, chartFocus, milestoneFlash, showParticleCount, terminatorMode, tone }) {
+  const visualTone = bugCount === 0 ? 'all-clear' : tone
+  const colors = useMemo(() => getEffectPalette(visualTone), [visualTone])
   const particles = useMemo(() => createBugParticles(bugCount), [bugCount])
-  const motionProfile = useMemo(() => getMotionProfile(tone), [tone])
+  const motionProfile = useMemo(() => getMotionProfile(visualTone), [visualTone])
+  const sceneProfile = useMemo(() => getSceneProfile(visualTone), [visualTone])
   const totalBugCount = Math.max(0, Math.floor(bugCount ?? 0))
+  const gameSessionKey = `${terminatorMode ? 'terminator' : 'ambient'}:${totalBugCount}`
+  const [hammerPosition, setHammerPosition] = useState({ x: 0, y: 0 })
+  const [hammerSwing, setHammerSwing] = useState(false)
+  const [gameState, setGameState] = useState(() => ({
+    remainingTargets: totalBugCount,
+    sessionKey: gameSessionKey,
+    splats: [],
+  }))
+  const activeGameState = gameState.sessionKey === gameSessionKey
+    ? gameState
+    : { remainingTargets: totalBugCount, sessionKey: gameSessionKey, splats: [] }
+
+  useEffect(() => {
+    if (!terminatorMode) {
+      return undefined
+    }
+
+    const handlePointerMove = (event) => {
+      setHammerPosition({ x: event.clientX, y: event.clientY })
+    }
+
+    window.addEventListener('mousemove', handlePointerMove)
+    return () => {
+      window.removeEventListener('mousemove', handlePointerMove)
+    }
+  }, [terminatorMode])
+
+  useEffect(() => {
+    if (!hammerSwing) {
+      return undefined
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      setHammerSwing(false)
+    }, 180)
+
+    return () => {
+      window.clearTimeout(timeoutId)
+    }
+  }, [hammerSwing])
+
+  useEffect(() => {
+    if (activeGameState.splats.length === 0) {
+      return undefined
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      setGameState((currentValue) => {
+        if (currentValue.sessionKey !== gameSessionKey || currentValue.splats.length <= 3) {
+          return currentValue
+        }
+
+        return {
+          ...currentValue,
+          splats: currentValue.splats.slice(-3),
+        }
+      })
+    }, 420)
+
+    return () => {
+      window.clearTimeout(timeoutId)
+    }
+  }, [activeGameState.splats.length, gameSessionKey])
+
+  const handleBugHit = useCallback((payload) => {
+    setHammerSwing(true)
+    setGameState((currentValue) => {
+      const nextState = currentValue.sessionKey === gameSessionKey
+        ? currentValue
+        : { remainingTargets: totalBugCount, sessionKey: gameSessionKey, splats: [] }
+
+      return {
+        remainingTargets: Math.max(0, nextState.remainingTargets - 1),
+        sessionKey: gameSessionKey,
+        splats: [...nextState.splats.slice(-5), { id: `${payload.x}-${payload.y}-${Date.now()}`, x: payload.x, y: payload.y }],
+      }
+    })
+  }, [gameSessionKey, totalBugCount])
+
+  const overlayLabel = terminatorMode
+    ? activeGameState.remainingTargets === 0
+      ? 'Target neutralized'
+      : `${activeGameState.remainingTargets} targets left`
+    : `${totalBugCount} bugs rendered`
 
   return (
     <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden="true">
       <div className="absolute left-[-10rem] top-[8rem] h-72 w-72 rounded-full blur-3xl" style={{ backgroundColor: colors.orbA }} />
       <div className="absolute right-[-8rem] top-[24rem] h-80 w-80 rounded-full blur-3xl" style={{ backgroundColor: colors.orbB }} />
       <div className="absolute bottom-[-8rem] left-[18%] h-72 w-72 rounded-full blur-3xl" style={{ backgroundColor: colors.orbB }} />
-      <Fireflies tone={tone} />
-      <BugCanvas bugColor={colors.bug} bugVisualSettings={bugVisualSettings} motionProfile={motionProfile} particles={particles} />
-      {showParticleCount ? (
+      <Fireflies tone={visualTone} />
+      {milestoneFlash ? <div className="app-milestone-burst absolute inset-0" /> : null}
+      {chartFocus ? <div className="app-chart-focus absolute inset-y-0 w-48 -translate-x-1/2 blur-3xl" style={{ left: `${(chartFocus.relativeIndex ?? 0.5) * 100}%`, background: colors.orbA }} /> : null}
+      <BugCanvas bugColor={colors.bug} bugVisualSettings={bugVisualSettings} chartFocus={chartFocus} motionProfile={motionProfile} onHit={handleBugHit} particles={particles} sceneProfile={sceneProfile} terminatorMode={terminatorMode} />
+      {totalBugCount === 0 ? <div className="app-all-clear-glow absolute inset-0" /> : null}
+      {terminatorMode ? (
+        <div
+          className={`app-hammer-cursor fixed left-0 top-0 z-[90] ${hammerSwing ? 'app-hammer-swing' : ''}`}
+          style={{ transform: `translate3d(${hammerPosition.x}px, ${hammerPosition.y}px, 0)` }}
+        >
+          <span className="app-hammer-icon">🔨</span>
+        </div>
+      ) : null}
+      {activeGameState.splats.map((splat) => (
+        <div
+          key={splat.id}
+          className="app-bug-splat fixed z-[80]"
+          style={{ left: `${splat.x}px`, top: `${splat.y}px` }}
+        />
+      ))}
+      {(showParticleCount || terminatorMode) ? (
         <div className="absolute bottom-5 right-5 rounded-full border border-white/8 bg-black/35 px-3 py-1.5 text-[0.68rem] font-semibold uppercase tracking-[0.22em] text-stone-300 backdrop-blur-xl">
-          {totalBugCount} bugs rendered
+          {overlayLabel}
         </div>
       ) : null}
     </div>
