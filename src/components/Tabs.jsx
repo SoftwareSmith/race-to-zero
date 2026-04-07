@@ -1,10 +1,16 @@
+import { memo, useCallback } from 'react'
 import { cn } from '../utils/cn.js'
 
-function Tabs({ tabs, activeTab, onChange }) {
+const Tabs = memo(function Tabs({ tabs, activeTab, onChange }) {
+  const handleTabClick = useCallback((event) => {
+    const nextTabId = event.currentTarget.dataset.tabId
+    onChange(nextTabId)
+  }, [onChange])
+
   return (
     <div
       aria-label="Dashboard sections"
-      className="inline-flex rounded-full border border-white/6 bg-white/[0.02] p-1 shadow-[0_8px_18px_rgba(0,0,0,0.12)] backdrop-blur-xl"
+      className="inline-flex rounded-full border border-white/6 bg-white/[0.02] p-0.5 shadow-[0_8px_18px_rgba(0,0,0,0.12)] backdrop-blur-xl"
       role="tablist"
     >
       {tabs.map((tab) => {
@@ -15,12 +21,13 @@ function Tabs({ tabs, activeTab, onChange }) {
             key={tab.id}
             aria-selected={isActive}
             className={cn(
-              'rounded-full px-4 py-2 text-sm font-semibold transition duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300/40',
+              'rounded-full px-3.5 py-1.5 text-[0.82rem] font-semibold transition duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300/40',
               isActive
                 ? 'bg-sky-400/8 text-sky-100 shadow-[inset_0_0_0_1px_rgba(56,189,248,0.14)]'
                 : 'text-stone-400 hover:bg-white/4 hover:text-stone-100',
             )}
-            onClick={() => onChange(tab.id)}
+            data-tab-id={tab.id}
+            onClick={handleTabClick}
             role="tab"
             type="button"
           >
@@ -30,6 +37,6 @@ function Tabs({ tabs, activeTab, onChange }) {
       })}
     </div>
   )
-}
+})
 
 export default Tabs

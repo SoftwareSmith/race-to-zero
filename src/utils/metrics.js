@@ -14,6 +14,8 @@ import {
 import { countConfiguredDays } from './workCalendar.js'
 
 const DEADLINE_TREND_WINDOW_DAYS = 30
+const PRIORITY_ORDER = ['Urgent', 'High', 'Normal', 'Low', 'Unspecified']
+const PREPARED_SOURCE_CACHE = new WeakMap()
 
 function normalizeBugRecords(source) {
   return [...(source?.bugs ?? [])]
@@ -52,7 +54,14 @@ function buildPriorityDistribution(bugs) {
     counts.set(label, (counts.get(label) ?? 0) + 1)
   }
 
-  return ['Urgent', 'High', 'Normal', 'Low', 'Unspecified'].map((label) => ({
+  return PRIORITY_ORDER.map((label) => ({
+    label,
+    count: counts.get(label) ?? 0,
+  }))
+}
+
+function buildPriorityDistributionFromCounts(counts) {
+  return PRIORITY_ORDER.map((label) => ({
     label,
     count: counts.get(label) ?? 0,
   }))
@@ -103,16 +112,136 @@ function buildRemainingSeries(createdPerDay, completedPerDay) {
   return remainingPerDay
 }
 
-function getOpenBugsAtDate(bugs, date) {
-  const dateKey = format(date, 'yyyy-MM-dd')
+function buildSeriesIndex(series, { usePrefixSums = true } = {}) {
+  const dates = []
+  const values = []
+  const prefixSums = []
+  let runningTotal = 0
 
-  return bugs.filter((bug) => {
-    if (bug.createdAt > dateKey) {
-      return false
+  for (const entry of series) {
+    dates.push(entry.date)
+    values.push(entry.count)
+
+    if (usePrefixSums) {
+      runningTotal += entry.count
+      prefixSums.push(runningTotal)
     }
+  }
 
-    return !bug.completedAt || bug.completedAt > dateKey
-  }).length
+  return {
+    dates,
+    prefixSums,
+    series,
+    values,
+  }
+}
+
+function findLowerBound(values, target) {
+  let low = 0
+  let high = values.length
+
+  while (low < high) {
+    const middle = Math.floor((low + high) / 2)
+    if (values[middle] < target) {
+      low = middle + 1
+    } else {
+      high = middle
+    }
+  }
+
+  return low
+}
+
+function findUpperBound(values, target) {
+  let low = 0
+  let high = values.length
+
+  while (low < high) {
+    const middle = Math.floor((low + high) / 2)
+    if (values[middle] <= target) {
+      low = middle + 1
+    } else {
+      high = middle
+    }
+  }
+
+  return low
+}
+
+function filterSeriesByDateRange(seriesIndex, startDate, endDate) {
+  const startDateKey = format(startDate, 'yyyy-MM-dd')
+  const endDateKey = format(endDate, 'yyyy-MM-dd')
+  const startIndex = findLowerBound(seriesIndex.dates, startDateKey)
+  const endIndex = findUpperBound(seriesIndex.dates, endDateKey)
+
+  return seriesIndex.series.slice(startIndex, endIndex)
+}
+
+function getSeriesTotalInRange(seriesIndex, startDate, endDate) {
+  const startDateKey = format(startDate, 'yyyy-MM-dd')
+  const endDateKey = format(endDate, 'yyyy-MM-dd')
+  const startIndex = findLowerBound(seriesIndex.dates, startDateKey)
+  const endIndex = findUpperBound(seriesIndex.dates, endDateKey) - 1
+
+  if (startIndex > endIndex || endIndex < 0 || !seriesIndex.prefixSums.length) {
+    return 0
+  }
+
+  const endTotal = seriesIndex.prefixSums[endIndex] ?? 0
+  const startTotal = startIndex > 0 ? seriesIndex.prefixSums[startIndex - 1] ?? 0 : 0
+
+  return endTotal - startTotal
+}
+
+function getSeriesValueAtOrBefore(seriesIndex, date) {
+  const dateKey = typeof date === 'string' ? date : format(date, 'yyyy-MM-dd')
+  const index = findUpperBound(seriesIndex.dates, dateKey) - 1
+
+  if (index < 0) {
+    return 0
+  }
+
+  return seriesIndex.values[index] ?? 0
+}
+
+function prepareMetricsSource(source) {
+  if (source && PREPARED_SOURCE_CACHE.has(source)) {
+    return PREPARED_SOURCE_CACHE.get(source)
+  }
+
+  const bugs = normalizeBugRecords(source)
+  const priorityCounts = new Map()
+  let remainingBugs = 0
+
+  for (const bug of bugs) {
+    if (!bug.completedAt) {
+      remainingBugs += 1
+      const label = getPriorityLabel(bug.priority)
+      priorityCounts.set(label, (priorityCounts.get(label) ?? 0) + 1)
+    }
+  }
+
+  const createdSeries = buildSeriesFromField(bugs, 'createdAt')
+  const completedSeries = buildSeriesFromField(bugs, 'completedAt')
+  const remainingSeries = buildRemainingSeries(createdSeries, completedSeries)
+  const preparedSource = {
+    bugs,
+    completedIndex: buildSeriesIndex(completedSeries),
+    completedSeries,
+    createdIndex: buildSeriesIndex(createdSeries),
+    createdSeries,
+    firstBugDate: bugs[0]?.createdAt ? parseISO(bugs[0].createdAt) : null,
+    priorityDistribution: buildPriorityDistributionFromCounts(priorityCounts),
+    remainingBugs,
+    remainingIndex: buildSeriesIndex(remainingSeries, { usePrefixSums: false }),
+    remainingSeries,
+  }
+
+  if (source) {
+    PREPARED_SOURCE_CACHE.set(source, preparedSource)
+  }
+
+  return preparedSource
 }
 
 function getDeadlineDate(referenceDate = new Date()) {
@@ -133,28 +262,10 @@ function getNumericRangeDays(rangeDays, fallbackDays = 30) {
   return Number.isFinite(numericRange) && numericRange > 0 ? numericRange : fallbackDays
 }
 
-function filterSeriesByDateRange(series, startDate, endDate) {
-  const startDateKey = format(startDate, 'yyyy-MM-dd')
-  const endDateKey = format(endDate, 'yyyy-MM-dd')
-  return series.filter((entry) => entry.date >= startDateKey && entry.date <= endDateKey)
-}
-
-function getWindowStats(bugs, startDate, endDate) {
-  const startKey = format(startDate, 'yyyy-MM-dd')
-  const endKey = format(endDate, 'yyyy-MM-dd')
+function getWindowStats(preparedSource, startDate, endDate) {
   const dayCount = Math.max(differenceInCalendarDays(endDate, startDate) + 1, 1)
-  let created = 0
-  let fixed = 0
-
-  for (const bug of bugs) {
-    if (bug.createdAt >= startKey && bug.createdAt <= endKey) {
-      created += 1
-    }
-
-    if (bug.completedAt && bug.completedAt >= startKey && bug.completedAt <= endKey) {
-      fixed += 1
-    }
-  }
+  const created = getSeriesTotalInRange(preparedSource.createdIndex, startDate, endDate)
+  const fixed = getSeriesTotalInRange(preparedSource.completedIndex, startDate, endDate)
 
   const addRate = created / dayCount
   const fixRate = fixed / dayCount
@@ -260,19 +371,20 @@ function getCustomRangeDates(customFromDate, customToDate, today) {
 }
 
 export function getDeadlineMetrics(source, { deadlineDate, trackingStartDate, workdaySettings } = {}) {
-  const bugs = normalizeBugRecords(source)
-  const allCreatedPerDay = buildSeriesFromField(bugs, 'createdAt')
-  const allCompletedPerDay = buildSeriesFromField(bugs, 'completedAt')
-  const allRemainingPerDay = buildRemainingSeries(allCreatedPerDay, allCompletedPerDay)
-  const remainingBugs = bugs.filter((bug) => !bug.completedAt).length
+  const preparedSource = prepareMetricsSource(source)
+  const bugs = preparedSource.bugs
+  const allCreatedPerDay = preparedSource.createdSeries
+  const allCompletedPerDay = preparedSource.completedSeries
+  const allRemainingPerDay = preparedSource.remainingSeries
+  const remainingBugs = preparedSource.remainingBugs
   const today = startOfDay(new Date())
   const defaultDeadline = getDeadlineDate(today)
   const deadline = getValidDate(deadlineDate, defaultDeadline)
-  const firstBugDate = bugs[0]?.createdAt ? parseISO(bugs[0].createdAt) : today
+  const firstBugDate = preparedSource.firstBugDate ?? today
   const requestedTrackingStartDate = getValidDate(trackingStartDate, subDays(today, DEADLINE_TREND_WINDOW_DAYS - 1))
   const trackingStart = isBefore(requestedTrackingStartDate, firstBugDate) ? firstBugDate : requestedTrackingStartDate
-  const recentCreatedPerDay = filterSeriesByDateRange(allCreatedPerDay, trackingStart, today)
-  const recentCompletedPerDay = filterSeriesByDateRange(allCompletedPerDay, trackingStart, today)
+  const recentCreatedPerDay = filterSeriesByDateRange(preparedSource.createdIndex, trackingStart, today)
+  const recentCompletedPerDay = filterSeriesByDateRange(preparedSource.completedIndex, trackingStart, today)
   const trendDayCount = Math.max(countConfiguredDays(trackingStart, today, workdaySettings, { inclusive: true }), 1)
   const currentAddRate = recentCreatedPerDay.reduce((sum, entry) => sum + entry.count, 0) / trendDayCount
   const currentFixRate = recentCompletedPerDay.reduce((sum, entry) => sum + entry.count, 0) / trendDayCount
@@ -293,7 +405,7 @@ export function getDeadlineMetrics(source, { deadlineDate, trackingStartDate, wo
     remainingBugs,
     trackingStartDate: trackingStart,
     trackingStartLabel: format(trackingStart, 'MMM d, yyyy'),
-    trackingStartBacklog: getOpenBugsAtDate(bugs, trackingStart),
+    trackingStartBacklog: getSeriesValueAtOrBefore(preparedSource.remainingIndex, trackingStart),
     currentAddRate,
     currentFixRate,
     currentNetBurnRate,
@@ -314,7 +426,7 @@ export function getDeadlineMetrics(source, { deadlineDate, trackingStartDate, wo
       neededNetBurnRate,
       daysUntilDeadline,
     }),
-    priorityDistribution: buildPriorityDistribution(bugs),
+    priorityDistribution: preparedSource.priorityDistribution,
     today,
     workdaySettings,
   }
@@ -342,10 +454,10 @@ export function buildDeadlineBurndownChartData(deadlineMetrics) {
     labels: labels.map((entry) => formatLabel(entry)),
     datasets: [
       {
-        label: 'Actual remaining bugs',
+        label: 'Remaining bugs',
         data: labels.map((entry) => (entry <= todayKey ? actualLookup.get(entry) ?? null : null)),
-        borderColor: '#38bdf8',
-        backgroundColor: 'rgba(56, 189, 248, 0.18)',
+        borderColor: '#f87171',
+        backgroundColor: 'rgba(248, 113, 113, 0.18)',
         fill: false,
         tension: 0.22,
         borderWidth: 3,
@@ -359,8 +471,8 @@ export function buildDeadlineBurndownChartData(deadlineMetrics) {
           const elapsed = Math.max(countConfiguredDays(idealStartDate, currentDate, deadlineMetrics.workdaySettings, { inclusive: false }), 0)
           return Math.max(0, Number((idealStartCount - (idealStartCount / idealDuration) * elapsed).toFixed(2)))
         }),
-        borderColor: '#34d399',
-        backgroundColor: 'rgba(52, 211, 153, 0.08)',
+        borderColor: '#5eead4',
+        backgroundColor: 'rgba(94, 234, 212, 0.08)',
         borderDash: [6, 6],
         tension: 0,
         borderWidth: 2,
@@ -378,18 +490,18 @@ export function buildPriorityChartData(metricsWithPriority) {
         label: 'Open bugs',
         data: metricsWithPriority.priorityDistribution.map((entry) => entry.count),
         backgroundColor: [
-          'rgba(239, 68, 68, 0.76)',
-          'rgba(245, 158, 11, 0.78)',
-          'rgba(20, 184, 166, 0.78)',
-          'rgba(52, 211, 153, 0.78)',
-          'rgba(168, 162, 158, 0.78)',
+          'rgba(248, 113, 113, 0.72)',
+          'rgba(125, 211, 252, 0.72)',
+          'rgba(94, 234, 212, 0.72)',
+          'rgba(148, 163, 184, 0.7)',
+          'rgba(120, 113, 108, 0.66)',
         ],
         borderColor: [
-          '#ef4444',
-          '#f59e0b',
-          '#14b8a6',
-          '#34d399',
-          '#a8a29e',
+          '#f87171',
+          '#7dd3fc',
+          '#5eead4',
+          '#94a3b8',
+          '#78716c',
         ],
         borderWidth: 1,
         borderRadius: 8,
@@ -399,11 +511,10 @@ export function buildPriorityChartData(metricsWithPriority) {
 }
 
 export function getComparisonMetrics(source, { rangeKey = '30', customFromDate, customToDate } = {}) {
-  const bugs = normalizeBugRecords(source)
+  const preparedSource = prepareMetricsSource(source)
+  const bugs = preparedSource.bugs
   const today = startOfDay(new Date())
-  const earliestDate = bugs[0]?.createdAt ? parseISO(bugs[0].createdAt) : today
-  const allCreatedPerDay = buildSeriesFromField(bugs, 'createdAt')
-  const allCompletedPerDay = buildSeriesFromField(bugs, 'completedAt')
+  const earliestDate = preparedSource.firstBugDate ?? today
   const isAllTime = rangeKey === 'all'
   const isCustom = rangeKey === 'custom'
 
@@ -420,17 +531,17 @@ export function getComparisonMetrics(source, { rangeKey = '30', customFromDate, 
     currentEndDate = today
   }
 
-  const currentWindow = getWindowStats(bugs, currentStartDate, currentEndDate)
+  const currentWindow = getWindowStats(preparedSource, currentStartDate, currentEndDate)
   const hasComparisonWindow = !isAllTime
   const previousWindow = hasComparisonWindow
     ? getWindowStats(
-        bugs,
+        preparedSource,
         subDays(currentStartDate, currentWindow.dayCount),
         subDays(currentStartDate, 1),
       )
     : null
-  const createdSeries = filterSeriesByDateRange(allCreatedPerDay, currentStartDate, currentEndDate)
-  const completedSeries = filterSeriesByDateRange(allCompletedPerDay, currentStartDate, currentEndDate)
+  const createdSeries = filterSeriesByDateRange(preparedSource.createdIndex, currentStartDate, currentEndDate)
+  const completedSeries = filterSeriesByDateRange(preparedSource.completedIndex, currentStartDate, currentEndDate)
 
   let tone = currentWindow.netChange > 0 ? 'negative' : currentWindow.netChange < 0 ? 'positive' : 'neutral'
   let headline = currentWindow.netChange > 0
@@ -485,8 +596,8 @@ export function buildComparisonTimelineChartData(comparisonMetrics) {
       {
         label: 'Created',
         data: createdValues,
-        borderColor: '#f97316',
-        backgroundColor: 'rgba(249, 115, 22, 0.14)',
+        borderColor: '#fda4af',
+        backgroundColor: 'rgba(253, 164, 175, 0.14)',
         tension: 0.25,
         borderWidth: 3,
         pointRadius: 2,
@@ -495,8 +606,8 @@ export function buildComparisonTimelineChartData(comparisonMetrics) {
       {
         label: 'Completed',
         data: completedValues,
-        borderColor: '#34d399',
-        backgroundColor: 'rgba(52, 211, 153, 0.14)',
+        borderColor: '#5eead4',
+        backgroundColor: 'rgba(94, 234, 212, 0.14)',
         tension: 0.25,
         borderWidth: 3,
         pointRadius: 2,
@@ -516,8 +627,8 @@ export function buildComparisonSummaryChartData(comparisonMetrics) {
         comparisonMetrics.currentWindow.netChange,
         Number(comparisonMetrics.currentWindow.completionRate.toFixed(2)),
       ],
-      backgroundColor: 'rgba(56, 189, 248, 0.74)',
-      borderColor: '#38bdf8',
+      backgroundColor: 'rgba(125, 211, 252, 0.72)',
+      borderColor: '#7dd3fc',
       borderWidth: 1,
       borderRadius: 8,
     },
@@ -532,8 +643,8 @@ export function buildComparisonSummaryChartData(comparisonMetrics) {
         comparisonMetrics.previousWindow.netChange,
         Number(comparisonMetrics.previousWindow.completionRate.toFixed(2)),
       ],
-      backgroundColor: 'rgba(20, 184, 166, 0.72)',
-      borderColor: '#14b8a6',
+      backgroundColor: 'rgba(94, 234, 212, 0.68)',
+      borderColor: '#5eead4',
       borderWidth: 1,
       borderRadius: 8,
     })

@@ -1,3 +1,4 @@
+import { memo, useMemo } from 'react'
 import {
   BarElement,
   CategoryScale,
@@ -9,6 +10,7 @@ import {
   PointElement,
   Tooltip,
 } from 'chart.js'
+import ChartDataLabels from 'chartjs-plugin-datalabels'
 import { Bar, Line } from 'react-chartjs-2'
 import { getLineChartOptions } from '../utils/chartConfig.js'
 import { cn } from '../utils/cn.js'
@@ -22,10 +24,12 @@ ChartJS.register(
   Filler,
   Tooltip,
   Legend,
+  ChartDataLabels,
 )
 
-function ChartCard({ title, description, data, variant = 'line', className = '' }) {
+const ChartCard = memo(function ChartCard({ title, description, summary, data, variant = 'line', chartKey, className = '' }) {
   const ChartComponent = variant === 'bar' ? Bar : Line
+  const options = useMemo(() => getLineChartOptions(variant, chartKey), [variant, chartKey])
 
   return (
     <article
@@ -50,11 +54,13 @@ function ChartCard({ title, description, data, variant = 'line', className = '' 
         </div>
 
         <div className={cn('h-[320px] sm:h-[360px]', description ? 'mt-6' : 'mt-4')}>
-          <ChartComponent data={data} options={getLineChartOptions(variant)} />
+          <ChartComponent data={data} options={options} />
         </div>
+
+        {summary ? <p className="mt-4 max-w-2xl text-sm leading-6 text-stone-400">{summary}</p> : null}
       </div>
     </article>
   )
-}
+})
 
 export default ChartCard

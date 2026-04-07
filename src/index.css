@@ -56,8 +56,13 @@ button {
 h1,
 h2,
 h3,
-p {
+p,
+span,
+strong,
+label,
+summary {
   margin: 0;
+  cursor: default;
 }
 
 a {
@@ -88,19 +93,8 @@ input[type='date']::-webkit-calendar-picker-indicator {
   opacity: 0.55;
 }
 
-.app-bug-particle {
-  position: absolute;
-  left: var(--bug-x);
-  top: var(--bug-y);
-  width: var(--bug-size);
-  height: var(--bug-size);
-  border-radius: 999px;
-  background: var(--bug-color);
-  box-shadow: 0 0 8px color-mix(in srgb, var(--bug-color) 82%, transparent), 0 0 18px color-mix(in srgb, var(--bug-color) 44%, transparent);
-  opacity: var(--bug-opacity);
-  animation: bug-drift var(--bug-duration) ease-in-out infinite, bug-fade 5.2s ease-in-out infinite;
-  animation-delay: var(--bug-delay), var(--bug-delay);
-  will-change: transform, opacity;
+.app-bug-canvas {
+  opacity: 0.96;
 }
 
 @keyframes firefly-drift {
@@ -118,35 +112,6 @@ input[type='date']::-webkit-calendar-picker-indicator {
 
   100% {
     transform: translate3d(0, 0, 0);
-  }
-}
-
-@keyframes bug-drift {
-  0% {
-    transform: translate3d(0, 0, 0) scale(1);
-  }
-
-  35% {
-    transform: translate3d(var(--bug-drift-x), calc(var(--bug-drift-y) * -1), 0) scale(1.08);
-  }
-
-  70% {
-    transform: translate3d(calc(var(--bug-drift-x) * -0.55), var(--bug-drift-y), 0) scale(0.92);
-  }
-
-  100% {
-    transform: translate3d(0, 0, 0) scale(1);
-  }
-}
-
-@keyframes bug-fade {
-  0%,
-  100% {
-    opacity: calc(var(--bug-opacity) * 0.7);
-  }
-
-  50% {
-    opacity: calc(var(--bug-opacity) * 1.45);
   }
 }
 

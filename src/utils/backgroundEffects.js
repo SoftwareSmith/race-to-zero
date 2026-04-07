@@ -1,19 +1,19 @@
 export function getEffectPalette(tone) {
   const palettes = {
     positive: {
-      bug: 'rgba(167,243,208,0.32)',
+      bug: 'rgba(167,243,208,0.42)',
       fireflies: ['rgba(16,185,129,0.72)', 'rgba(56,189,248,0.52)', 'rgba(167,243,208,0.42)'],
       orbA: 'rgba(16,185,129,0.1)',
       orbB: 'rgba(56,189,248,0.08)',
     },
     negative: {
-      bug: 'rgba(252,165,165,0.3)',
+      bug: 'rgba(252,165,165,0.52)',
       fireflies: ['rgba(239,68,68,0.6)', 'rgba(56,189,248,0.4)', 'rgba(253,186,116,0.34)'],
       orbA: 'rgba(239,68,68,0.1)',
       orbB: 'rgba(56,189,248,0.07)',
     },
     neutral: {
-      bug: 'rgba(186,230,253,0.3)',
+      bug: 'rgba(186,230,253,0.46)',
       fireflies: ['rgba(56,189,248,0.58)', 'rgba(20,184,166,0.42)', 'rgba(186,230,253,0.28)'],
       orbA: 'rgba(56,189,248,0.09)',
       orbB: 'rgba(20,184,166,0.07)',
@@ -58,24 +58,48 @@ export function createBugParticles(bugCount) {
   const totalBugs = Math.max(0, Math.floor(bugCount))
 
   return Array.from({ length: totalBugs }, (_, index) => {
-    const x = ((index * 37.17) % 100).toFixed(2)
-    const y = ((index * 19.73 + Math.floor(index / 7) * 3.4) % 100).toFixed(2)
-    const size = (3 + (index % 3)).toFixed(0)
-    const duration = 16 + (index % 11)
-    const delay = ((index % 17) * 0.37).toFixed(2)
-    const driftX = ((index % 9) - 4) * 8
-    const driftY = ((index % 7) - 3) * 7
-    const opacity = (0.24 + (index % 5) * 0.05).toFixed(2)
+    const x = Number(((index * 37.17) % 100).toFixed(2))
+    const y = Number(((index * 19.73 + Math.floor(index / 7) * 3.4) % 100).toFixed(2))
+    const size = 4 + (index % 4)
+    const duration = 14 + (index % 9)
+    const delay = Number(((index % 17) * 0.37).toFixed(2))
+    const driftX = ((index % 9) - 4) * 10
+    const driftY = ((index % 7) - 3) * 9
+    const opacity = 0.38 + (index % 5) * 0.06
 
     return {
-      delay: `${delay}s`,
-      driftX: `${driftX}px`,
-      driftY: `${driftY}px`,
-      duration: `${duration}s`,
+      delay,
+      driftX,
+      driftY,
+      duration,
       opacity,
-      size: `${size}px`,
-      x: `${x}%`,
-      y: `${y}%`,
+      size,
+      x,
+      y,
     }
   })
+}
+
+export function getMotionProfile(tone) {
+  if (tone === 'positive') {
+    return {
+      durationMultiplier: 1.25,
+      opacityMultiplier: 0.85,
+      scale: 0.95,
+    }
+  }
+
+  if (tone === 'negative') {
+    return {
+      durationMultiplier: 0.82,
+      opacityMultiplier: 1.18,
+      scale: 1.1,
+    }
+  }
+
+  return {
+    durationMultiplier: 1,
+    opacityMultiplier: 1,
+    scale: 1,
+  }
 }

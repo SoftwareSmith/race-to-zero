@@ -1,3 +1,4 @@
+import { memo, useCallback } from 'react'
 import Tabs from './Tabs.jsx'
 import { cn } from '../utils/cn.js'
 import { COMPARE_RANGE_OPTIONS, getDateInputBounds, TAB_ITEMS } from '../utils/dashboard.js'
@@ -8,13 +9,13 @@ function CompactDateField({ label, value, onChange, min, max, disabled = false }
   return (
     <label
       className={cn(
-        'flex h-10 min-w-[146px] items-center gap-2 rounded-full border border-white/6 bg-white/[0.02] px-3 text-sm shadow-[0_8px_18px_rgba(0,0,0,0.1)] transition duration-200 backdrop-blur-xl',
+        'flex h-9 min-w-[128px] items-center gap-2 rounded-full border border-white/6 bg-white/[0.02] px-3 text-sm shadow-[0_8px_18px_rgba(0,0,0,0.1)] transition duration-200 backdrop-blur-xl',
         disabled ? 'cursor-default opacity-38' : 'hover:border-white/10 hover:bg-white/[0.04]',
       )}
     >
-      <span className="shrink-0 text-[0.66rem] font-semibold uppercase tracking-[0.18em] text-stone-500">{label}</span>
+      <span className="shrink-0 text-[0.62rem] font-semibold uppercase tracking-[0.16em] text-stone-500">{label}</span>
       <input
-        className="min-w-0 flex-1 bg-transparent text-sm font-medium text-stone-100 outline-none disabled:cursor-default"
+        className="min-w-0 flex-1 bg-transparent text-[0.82rem] font-medium text-stone-100 outline-none disabled:cursor-default"
         disabled={disabled}
         max={bounds.max}
         min={bounds.min}
@@ -27,6 +28,11 @@ function CompactDateField({ label, value, onChange, min, max, disabled = false }
 }
 
 function CompareRangePicker({ compareRangeKey, onChange }) {
+  const handleRangeClick = useCallback((event) => {
+    const nextRangeKey = event.currentTarget.dataset.rangeKey
+    onChange(nextRangeKey)
+  }, [onChange])
+
   return (
     <div className="flex flex-wrap gap-2" role="tablist" aria-label="Comparison period selector">
       {COMPARE_RANGE_OPTIONS.map((option) => {
@@ -37,12 +43,13 @@ function CompareRangePicker({ compareRangeKey, onChange }) {
             key={option.value}
             aria-selected={isActive}
             className={cn(
-              'h-10 rounded-full border px-4 text-sm font-semibold transition duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300/40',
+              'h-9 rounded-full border px-3.5 text-[0.82rem] font-semibold transition duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300/40',
               isActive
                 ? 'border-sky-400/24 bg-sky-400/8 text-sky-100 shadow-[inset_0_0_0_1px_rgba(56,189,248,0.12)]'
                 : 'border-white/6 bg-zinc-950/60 text-stone-400 hover:-translate-y-0.5 hover:border-white/10 hover:bg-zinc-900/88 hover:text-stone-100',
             )}
-            onClick={() => onChange(option.value)}
+            data-range-key={option.value}
+            onClick={handleRangeClick}
             type="button"
           >
             {option.label}
@@ -53,13 +60,14 @@ function CompareRangePicker({ compareRangeKey, onChange }) {
   )
 }
 
-function TopNav({
+const TopNav = memo(function TopNav({
   activeTab,
   compareRangeKey,
   customFromDate,
   customToDate,
   deadlineDate,
   deadlineFromDate,
+  onInteract,
   onCompareRangeChange,
   onCustomFromDateChange,
   onCustomToDateChange,
@@ -69,16 +77,20 @@ function TopNav({
   todayDate,
 }) {
   return (
-    <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+    <div
+      className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between"
+      onMouseDownCapture={onInteract}
+      onTouchStartCapture={onInteract}
+    >
       <Tabs activeTab={activeTab} onChange={onTabChange} tabs={TAB_ITEMS} />
 
       {activeTab === 'overview' ? (
-        <div className="flex flex-wrap gap-2 lg:justify-end">
+        <div className="flex flex-wrap gap-1.5 lg:justify-end">
           <CompactDateField label="From" max={deadlineDate} onChange={onDeadlineFromDateChange} value={deadlineFromDate} />
           <CompactDateField label="Deadline" min={todayDate} onChange={onDeadlineDateChange} value={deadlineDate} />
         </div>
       ) : (
-        <div className="flex flex-wrap items-center gap-2 lg:justify-end">
+        <div className="flex flex-wrap items-center gap-1.5 lg:justify-end">
           <CompareRangePicker compareRangeKey={compareRangeKey} onChange={onCompareRangeChange} />
           {compareRangeKey === 'custom' ? (
             <>
@@ -90,6 +102,6 @@ function TopNav({
       )}
     </div>
   )
-}
+})
 
 export default TopNav
