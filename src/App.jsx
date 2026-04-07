@@ -108,32 +108,25 @@ function getStatusTagText(tone) {
   return 'Flat'
 }
 
-function FieldShell({ children, className = '' }) {
+function CompactDateField({ label, value, onChange, min, max, disabled = false }) {
   return (
     <label
       className={cn(
-        'grid gap-2 rounded-[18px] border border-white/10 bg-zinc-950/74 p-4 shadow-[0_14px_30px_rgba(0,0,0,0.26)] backdrop-blur-xl',
-        className,
+        'flex h-[42px] min-w-[152px] items-center gap-2 rounded-full border border-white/8 bg-white/[0.03] px-3 text-sm shadow-[0_8px_18px_rgba(0,0,0,0.14)] transition duration-200 backdrop-blur-xl',
+        disabled ? 'cursor-default opacity-38' : 'hover:border-white/14 hover:bg-white/[0.05]',
       )}
     >
-      {children}
-    </label>
-  )
-}
-
-function DateField({ label, value, onChange, min, max }) {
-  return (
-    <FieldShell className="min-w-[180px]">
-      <span className="text-[0.72rem] font-semibold uppercase tracking-[0.24em] text-stone-400">{label}</span>
+      <span className="shrink-0 text-[0.66rem] font-semibold uppercase tracking-[0.18em] text-stone-500">{label}</span>
       <input
-        className="rounded-2xl border border-white/10 bg-black/28 px-3 py-3 text-sm font-medium text-stone-100 outline-none transition focus:border-sky-400/70 focus:ring-2 focus:ring-sky-300/20"
+        className="min-w-0 flex-1 bg-transparent text-sm font-medium text-stone-100 outline-none disabled:cursor-default"
+        disabled={disabled}
         max={max}
         min={min}
         onChange={onChange}
         type="date"
         value={value}
       />
-    </FieldShell>
+    </label>
   )
 }
 
@@ -167,7 +160,7 @@ function CompareRangePicker({ compareRangeKey, onChange }) {
             key={option.value}
             aria-selected={isActive}
             className={cn(
-              'rounded-full border px-4 py-2.5 text-sm font-semibold transition duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300/40',
+              'h-[42px] rounded-full border px-4 text-sm font-semibold transition duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300/40',
               isActive
                 ? 'border-sky-400/35 bg-sky-400/10 text-sky-100 shadow-[inset_0_0_0_1px_rgba(56,189,248,0.18)]'
                 : 'border-white/10 bg-zinc-950/72 text-stone-400 hover:-translate-y-0.5 hover:border-white/14 hover:bg-zinc-900 hover:text-stone-100',
@@ -179,6 +172,49 @@ function CompareRangePicker({ compareRangeKey, onChange }) {
           </button>
         )
       })}
+    </div>
+  )
+}
+
+function Fireflies({ tone }) {
+  const palette = {
+    positive: ['rgba(16,185,129,0.6)', 'rgba(56,189,248,0.45)', 'rgba(167,243,208,0.36)'],
+    negative: ['rgba(239,68,68,0.5)', 'rgba(56,189,248,0.35)', 'rgba(253,186,116,0.28)'],
+    neutral: ['rgba(56,189,248,0.48)', 'rgba(20,184,166,0.38)', 'rgba(186,230,253,0.24)'],
+  }[tone] ?? ['rgba(56,189,248,0.48)', 'rgba(20,184,166,0.38)', 'rgba(186,230,253,0.24)']
+
+  const particles = [
+    { x: '10%', y: '16%', size: '5px', duration: '10s', delay: '0s', driftX: '18px', color: palette[0] },
+    { x: '24%', y: '34%', size: '4px', duration: '12s', delay: '2s', driftX: '-22px', color: palette[1] },
+    { x: '72%', y: '12%', size: '6px', duration: '9s', delay: '1s', driftX: '14px', color: palette[0] },
+    { x: '84%', y: '38%', size: '4px', duration: '13s', delay: '4s', driftX: '-18px', color: palette[2] },
+    { x: '18%', y: '72%', size: '5px', duration: '11s', delay: '3s', driftX: '20px', color: palette[2] },
+    { x: '68%', y: '76%', size: '5px', duration: '14s', delay: '5s', driftX: '-16px', color: palette[1] },
+    { x: '33%', y: '18%', size: '4px', duration: '15s', delay: '6s', driftX: '12px', color: palette[2] },
+    { x: '46%', y: '62%', size: '3px', duration: '9s', delay: '1.5s', driftX: '-14px', color: palette[0] },
+    { x: '58%', y: '28%', size: '5px', duration: '12s', delay: '2.5s', driftX: '10px', color: palette[1] },
+    { x: '78%', y: '58%', size: '4px', duration: '16s', delay: '7s', driftX: '-20px', color: palette[0] },
+    { x: '8%', y: '48%', size: '3px', duration: '11s', delay: '2.2s', driftX: '16px', color: palette[1] },
+    { x: '90%', y: '80%', size: '5px', duration: '13s', delay: '5.2s', driftX: '-12px', color: palette[2] },
+  ]
+
+  return (
+    <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden="true">
+      {particles.map((particle, index) => (
+        <span
+          key={index}
+          className="app-firefly"
+          style={{
+            '--firefly-x': particle.x,
+            '--firefly-y': particle.y,
+            '--firefly-size': particle.size,
+            '--firefly-duration': particle.duration,
+            '--firefly-delay': particle.delay,
+            '--firefly-drift-x': particle.driftX,
+            '--firefly-color': particle.color,
+          }}
+        />
+      ))}
     </div>
   )
 }
@@ -213,55 +249,63 @@ function TopNav({
   todayDate,
 }) {
   return (
-    <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-      <Tabs activeTab={activeTab} onChange={onTabChange} tabs={TAB_ITEMS} />
+    <Surface className="px-3 py-3 sm:px-4" tone="subtle">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        <Tabs activeTab={activeTab} onChange={onTabChange} tabs={TAB_ITEMS} />
 
-      {activeTab === 'overview' ? (
-        <div className="grid gap-3 md:grid-cols-2">
-          <DateField
-            label="From"
-            max={deadlineDate}
-            onChange={onDeadlineFromDateChange}
-            value={deadlineFromDate}
-          />
-          <DateField
-            label="Deadline"
-            min={todayDate}
-            onChange={onDeadlineDateChange}
-            value={deadlineDate}
-          />
-        </div>
-      ) : (
-        <div className="grid gap-3 justify-items-start lg:justify-items-end">
-          <CompareRangePicker compareRangeKey={compareRangeKey} onChange={onCompareRangeChange} />
-          {compareRangeKey === 'custom' ? (
-            <div className="grid gap-3 md:grid-cols-2">
-              <DateField
-                label="From"
-                max={customToDate}
-                onChange={onCustomFromDateChange}
-                value={customFromDate}
-              />
-              <DateField
-                label="To"
-                min={customFromDate}
-                onChange={onCustomToDateChange}
-                value={customToDate}
-              />
-            </div>
-          ) : null}
-        </div>
-      )}
-    </div>
+        {activeTab === 'overview' ? (
+          <div className="flex flex-wrap gap-2 lg:justify-end">
+            <CompactDateField
+              label="From"
+              max={deadlineDate}
+              onChange={onDeadlineFromDateChange}
+              value={deadlineFromDate}
+            />
+            <CompactDateField
+              label="Deadline"
+              min={todayDate}
+              onChange={onDeadlineDateChange}
+              value={deadlineDate}
+            />
+          </div>
+        ) : (
+          <div className="flex flex-wrap items-center gap-2 lg:justify-end">
+            <CompareRangePicker compareRangeKey={compareRangeKey} onChange={onCompareRangeChange} />
+            {compareRangeKey === 'custom' ? (
+              <>
+                <CompactDateField
+                  label="From"
+                  max={customToDate}
+                  onChange={onCustomFromDateChange}
+                  value={customFromDate}
+                />
+                <CompactDateField
+                  label="To"
+                  min={customFromDate}
+                  onChange={onCustomToDateChange}
+                  value={customToDate}
+                />
+              </>
+            ) : null}
+          </div>
+        )}
+      </div>
+    </Surface>
   )
 }
 
 function CommandCenter({ deadlineMetrics, summary }) {
   const paceGap = summary.currentFixRate - summary.bugsPerDayRequired
   const paceTone = getDeltaTone(paceGap)
+  const glowStyles = {
+    positive: 'before:bg-[radial-gradient(circle_at_top_left,rgba(16,185,129,0.14),transparent_42%)] after:bg-[radial-gradient(circle_at_bottom_right,rgba(56,189,248,0.1),transparent_38%)]',
+    negative: 'before:bg-[radial-gradient(circle_at_top_left,rgba(239,68,68,0.14),transparent_42%)] after:bg-[radial-gradient(circle_at_bottom_right,rgba(56,189,248,0.08),transparent_38%)]',
+    neutral: 'before:bg-[radial-gradient(circle_at_top_left,rgba(56,189,248,0.14),transparent_42%)] after:bg-[radial-gradient(circle_at_bottom_right,rgba(20,184,166,0.08),transparent_38%)]',
+  }[deadlineMetrics.statusTone] ?? 'before:bg-[radial-gradient(circle_at_top_left,rgba(56,189,248,0.14),transparent_42%)] after:bg-[radial-gradient(circle_at_bottom_right,rgba(20,184,166,0.08),transparent_38%)]'
 
   return (
-    <Surface className="border-white/10 p-5 sm:p-6" tone="strong">
+    <Surface className={cn('relative border-white/10 p-5 before:pointer-events-none before:absolute before:inset-0 before:rounded-[28px] before:opacity-100 after:pointer-events-none after:absolute after:inset-0 after:rounded-[28px] after:opacity-100', glowStyles)} tone="strong">
+      <div className="relative">
       <div className="border-b border-white/8 pb-5">
         <div className="w-full">
           <div className="flex flex-wrap items-center gap-3">
@@ -314,6 +358,7 @@ function CommandCenter({ deadlineMetrics, summary }) {
           </div>
           <p className="mt-3 text-sm leading-6 text-stone-400">Runway remaining before the selected deadline.</p>
         </Surface>
+      </div>
       </div>
     </Surface>
   )
@@ -384,13 +429,13 @@ function OverviewView({ deadlineMetrics, summary }) {
         <ChartCard
           className="min-h-[420px]"
           data={buildDeadlineBurndownChartData(deadlineMetrics)}
-          description={`Stay on or under the ideal path to reach zero by ${summary.deadlineLabel}.`}
+          description={`Actual vs target path to zero by ${summary.deadlineLabel}.`}
           title="Burndown to zero"
         />
         <ChartCard
           className="min-h-[420px]"
           data={buildPriorityChartData(deadlineMetrics)}
-          description="Urgent and high-priority share of the remaining queue."
+          description="Priority mix of remaining bugs."
           title="Open bugs by priority"
           variant="bar"
         />
@@ -447,13 +492,13 @@ function PeriodsView({ comparisonMetrics }) {
         <ChartCard
           className="min-h-[420px]"
           data={buildComparisonTimelineChartData(comparisonMetrics)}
-          description="Created and completed lines show raw volume, while the moving averages reveal whether intake is structurally running above output or if a single spike is distorting the read."
+          description="Daily created vs completed volume."
           title="Created vs completed over time"
         />
         <ChartCard
           className="min-h-[420px]"
           data={buildComparisonSummaryChartData(comparisonMetrics)}
-          description="This stacked comparison makes the current period legible against the previous one. Look for falling created volume, rising completed volume, and a more negative net change if the process is improving."
+          description="Current period against the previous window."
           title="Current vs previous window"
           variant="bar"
         />
@@ -532,6 +577,7 @@ function App() {
 
   return (
     <div className="relative min-h-screen overflow-hidden bg-[#050608]">
+      <Fireflies tone={deadlineMetrics.statusTone} />
       <div className={cn('pointer-events-none absolute inset-x-0 top-0 h-[26rem]', backgroundStyle.top)} />
       <div className={cn('pointer-events-none absolute left-[-7rem] top-[20rem] h-72 w-72 rounded-full blur-3xl', backgroundStyle.left)} />
       <div className={cn('pointer-events-none absolute bottom-[-2rem] right-[-5rem] h-80 w-80 rounded-full blur-3xl', backgroundStyle.right)} />

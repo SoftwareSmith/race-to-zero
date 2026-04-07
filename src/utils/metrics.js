@@ -476,7 +476,6 @@ export function buildComparisonTimelineChartData(comparisonMetrics) {
   const completedLookup = new Map(comparisonMetrics.completedSeries.map((entry) => [entry.date, entry.count]))
   const createdValues = labels.map((entry) => createdLookup.get(entry) ?? 0)
   const completedValues = labels.map((entry) => completedLookup.get(entry) ?? 0)
-  const movingAverageWindow = Math.min(7, Math.max(3, Math.floor(labels.length / 5) || 3))
 
   return {
     labels: labels.map((entry) => formatLabel(entry)),
@@ -487,8 +486,9 @@ export function buildComparisonTimelineChartData(comparisonMetrics) {
         borderColor: '#f97316',
         backgroundColor: 'rgba(249, 115, 22, 0.14)',
         tension: 0.25,
-        borderWidth: 2,
+        borderWidth: 3,
         pointRadius: 2,
+        pointHoverRadius: 4,
       },
       {
         label: 'Completed',
@@ -496,26 +496,9 @@ export function buildComparisonTimelineChartData(comparisonMetrics) {
         borderColor: '#34d399',
         backgroundColor: 'rgba(52, 211, 153, 0.14)',
         tension: 0.25,
-        borderWidth: 2,
+        borderWidth: 3,
         pointRadius: 2,
-      },
-      {
-        label: `${movingAverageWindow}D created avg`,
-        data: buildMovingAverage(createdValues, movingAverageWindow),
-        borderColor: '#fdba74',
-        borderDash: [5, 4],
-        tension: 0.2,
-        borderWidth: 2,
-        pointRadius: 0,
-      },
-      {
-        label: `${movingAverageWindow}D completed avg`,
-        data: buildMovingAverage(completedValues, movingAverageWindow),
-        borderColor: '#a7f3d0',
-        borderDash: [5, 4],
-        tension: 0.2,
-        borderWidth: 2,
-        pointRadius: 0,
+        pointHoverRadius: 4,
       },
     ],
   }

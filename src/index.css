@@ -73,3 +73,48 @@ input[type='date']::-webkit-calendar-picker-indicator {
   opacity: 0.85;
   filter: invert(1);
 }
+
+.app-firefly {
+  position: absolute;
+  left: var(--firefly-x);
+  top: var(--firefly-y);
+  width: var(--firefly-size);
+  height: var(--firefly-size);
+  border-radius: 999px;
+  background: var(--firefly-color);
+  box-shadow: 0 0 12px var(--firefly-color), 0 0 24px color-mix(in srgb, var(--firefly-color) 55%, transparent);
+  animation: firefly-drift var(--firefly-duration) ease-in-out infinite, firefly-pulse 3.2s ease-in-out infinite;
+  animation-delay: var(--firefly-delay), var(--firefly-delay);
+  opacity: 0.55;
+}
+
+@keyframes firefly-drift {
+  0% {
+    transform: translate3d(0, 0, 0);
+  }
+
+  30% {
+    transform: translate3d(var(--firefly-drift-x), -10px, 0);
+  }
+
+  65% {
+    transform: translate3d(calc(var(--firefly-drift-x) * -0.45), 10px, 0);
+  }
+
+  100% {
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@keyframes firefly-pulse {
+  0%,
+  100% {
+    opacity: 0.2;
+    scale: 0.9;
+  }
+
+  50% {
+    opacity: 0.7;
+    scale: 1.15;
+  }
+}
