@@ -7,7 +7,6 @@
   color: #e5eefc;
   background:
     radial-gradient(circle at top left, rgba(56, 189, 248, 0.14), transparent 28%),
-    radial-gradient(circle at top right, rgba(244, 114, 182, 0.12), transparent 24%),
     linear-gradient(180deg, #040814 0%, #060b18 52%, #091120 100%);
   font-synthesis: none;
   text-rendering: optimizeLegibility;

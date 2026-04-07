@@ -1,4 +1,5 @@
 import {
+  addDays,
   compareAsc,
   differenceInCalendarDays,
   eachDayOfInterval,
@@ -7,8 +8,11 @@ import {
   isBefore,
   isValid,
   parseISO,
+  startOfDay,
   subDays,
 } from 'date-fns'
+
+const DEADLINE_TREND_WINDOW_DAYS = 30
 
 function normalizeBugRecords(source) {
   return [...(source?.bugs ?? [])]
@@ -57,6 +61,10 @@ function formatLabel(dateValue) {
   return format(parseISO(dateValue), 'MMM d')
 }
 
+function getDisplayRangeLabel(startDate, endDate) {
+  return `${format(startDate, 'MMM d')} - ${format(endDate, 'MMM d')}`
+}
+
 function buildSeriesFromField(bugs, fieldName) {
   const countsByDay = new Map()
 
@@ -94,6 +102,18 @@ function buildRemainingSeries(createdPerDay, completedPerDay) {
   return remainingPerDay
 }
 
+function getOpenBugsAtDate(bugs, date) {
+  const dateKey = format(date, 'yyyy-MM-dd')
+
+  return bugs.filter((bug) => {
+    if (bug.createdAt > dateKey) {
+      return false
+    }
+
+    return !bug.completedAt || bug.completedAt > dateKey
+  }).length
+}
+
 function getDeadlineDate(referenceDate = new Date()) {
   return endOfYear(referenceDate)
 }
@@ -112,34 +132,10 @@ function getNumericRangeDays(rangeDays, fallbackDays = 30) {
   return Number.isFinite(numericRange) && numericRange > 0 ? numericRange : fallbackDays
 }
 
-function filterSeriesByStartDate(series, startDate) {
+function filterSeriesByDateRange(series, startDate, endDate) {
   const startDateKey = format(startDate, 'yyyy-MM-dd')
-  return series.filter((entry) => entry.date >= startDateKey)
-}
-
-function getRangeStartDate(startDate, rangeDays, today) {
-  if (rangeDays === 'all') {
-    return startDate
-  }
-
-  const numericRange = getNumericRangeDays(rangeDays, NaN)
-  if (!Number.isFinite(numericRange)) {
-    return startDate
-  }
-
-  const candidate = subDays(today, numericRange - 1)
-  return isBefore(candidate, startDate) ? startDate : candidate
-}
-
-function clampTargetWindow(targetFromDate, targetToDate) {
-  if (compareAsc(targetFromDate, targetToDate) === 1) {
-    return {
-      targetFromDate: targetToDate,
-      targetToDate,
-    }
-  }
-
-  return { targetFromDate, targetToDate }
+  const endDateKey = format(endDate, 'yyyy-MM-dd')
+  return series.filter((entry) => entry.date >= startDateKey && entry.date <= endDateKey)
 }
 
 function getWindowStats(bugs, startDate, endDate) {
@@ -162,6 +158,8 @@ function getWindowStats(bugs, startDate, endDate) {
   const addRate = created / dayCount
   const fixRate = fixed / dayCount
   const netBurnRate = fixRate - addRate
+  const netChange = created - fixed
+  const completionRate = created > 0 ? Math.min((fixed / created) * 100, 999) : 0
 
   return {
     startDate,
@@ -172,15 +170,17 @@ function getWindowStats(bugs, startDate, endDate) {
     addRate,
     fixRate,
     netBurnRate,
-    label: `${format(startDate, 'MMM d')} - ${format(endDate, 'MMM d')}`,
+    netChange,
+    completionRate,
+    label: getDisplayRangeLabel(startDate, endDate),
   }
 }
 
-function getPaceStatus({ remainingBugs, currentNetBurnRate, neededNetBurnRate, daysUntilDeadline }) {
+function getDeadlineStatus({ remainingBugs, currentNetBurnRate, neededNetBurnRate, daysUntilDeadline }) {
   if (remainingBugs === 0) {
     return {
       tone: 'positive',
-      signal: 'Green',
+      signal: 'On track',
       headline: 'Backlog cleared',
       body: 'The current snapshot shows no remaining bugs in scope.',
     }
@@ -189,7 +189,7 @@ function getPaceStatus({ remainingBugs, currentNetBurnRate, neededNetBurnRate, d
   if (daysUntilDeadline === 0) {
     return {
       tone: 'negative',
-      signal: 'Red',
+      signal: 'Behind',
       headline: 'Deadline is today',
       body: 'There is no remaining runway to burn down the current backlog.',
     }
@@ -198,24 +198,15 @@ function getPaceStatus({ remainingBugs, currentNetBurnRate, neededNetBurnRate, d
   if (currentNetBurnRate >= neededNetBurnRate) {
     return {
       tone: 'positive',
-      signal: 'Green',
+      signal: 'On track',
       headline: 'Likely to hit the target',
       body: 'Recent fix velocity is strong enough to offset new bugs and still reduce the backlog at the required pace.',
     }
   }
 
-  if (currentNetBurnRate > 0) {
-    return {
-      tone: 'warning',
-      signal: 'Amber',
-      headline: 'Improving, but behind plan',
-      body: 'The backlog is shrinking, but not quickly enough to hit the selected deadline at the current trend.',
-    }
-  }
-
   return {
     tone: 'negative',
-    signal: 'Red',
+    signal: 'Behind',
     headline: 'Off track at current trend',
     body: 'Recent intake is matching or exceeding fixes, so the backlog is not burning down fast enough.',
   }
@@ -245,42 +236,50 @@ function createLabelSeries(primarySeries, secondarySeries = []) {
   ])].sort((left, right) => left.localeCompare(right))
 }
 
-export function getDashboardMetrics(source, { deadlineDate, targetFromDate, targetToDate, rangeDays = '30' } = {}) {
+function buildMovingAverage(values, windowSize) {
+  return values.map((_, index) => {
+    const slice = values.slice(Math.max(0, index - windowSize + 1), index + 1)
+    const total = slice.reduce((sum, value) => sum + value, 0)
+    return Number((total / slice.length).toFixed(2))
+  })
+}
+
+function getCustomRangeDates(customFromDate, customToDate, today) {
+  const startDate = getValidDate(customFromDate, subDays(today, 29))
+  const endDate = getValidDate(customToDate, today)
+
+  if (compareAsc(startDate, endDate) === 1) {
+    return {
+      startDate: endDate,
+      endDate,
+    }
+  }
+
+  return { startDate, endDate }
+}
+
+export function getDeadlineMetrics(source, { deadlineDate, trackingStartDate } = {}) {
   const bugs = normalizeBugRecords(source)
   const allCreatedPerDay = buildSeriesFromField(bugs, 'createdAt')
   const allCompletedPerDay = buildSeriesFromField(bugs, 'completedAt')
   const allRemainingPerDay = buildRemainingSeries(allCreatedPerDay, allCompletedPerDay)
   const remainingBugs = bugs.filter((bug) => !bug.completedAt).length
-  const totalBugCount = bugs.length
-  const today = new Date()
+  const today = startOfDay(new Date())
   const defaultDeadline = getDeadlineDate(today)
-  const rawTargetFromDate = getValidDate(targetFromDate, today)
-  const rawTargetToDate = getValidDate(targetToDate ?? deadlineDate, defaultDeadline)
-  const { targetFromDate: targetStart, targetToDate: targetEnd } = clampTargetWindow(rawTargetFromDate, rawTargetToDate)
-  const startDate = bugs[0]?.createdAt ? parseISO(bugs[0].createdAt) : today
-  const safeStartDate = isBefore(targetEnd, startDate) ? targetEnd : startDate
-  const rangeStartDate = getRangeStartDate(safeStartDate, rangeDays, today)
-  const createdPerDay = filterSeriesByStartDate(allCreatedPerDay, rangeStartDate)
-  const completedPerDay = filterSeriesByStartDate(allCompletedPerDay, rangeStartDate)
-  const remainingPerDay = filterSeriesByStartDate(allRemainingPerDay, rangeStartDate)
-  const runwayStart = compareAsc(today, targetStart) === 1 ? today : targetStart
-  const daysUntilDeadline = Math.max(differenceInCalendarDays(targetEnd, runwayStart), 0)
-  const rangeLength = Math.max(differenceInCalendarDays(today, rangeStartDate) + 1, 1)
-  const createdInRange = createdPerDay.reduce((sum, entry) => sum + entry.count, 0)
-  const completedInRange = completedPerDay.reduce((sum, entry) => sum + entry.count, 0)
-  const currentAddRate = createdInRange / rangeLength
-  const currentFixRate = completedInRange / rangeLength
+  const deadline = getValidDate(deadlineDate, defaultDeadline)
+  const firstBugDate = bugs[0]?.createdAt ? parseISO(bugs[0].createdAt) : today
+  const requestedTrackingStartDate = getValidDate(trackingStartDate, subDays(today, DEADLINE_TREND_WINDOW_DAYS - 1))
+  const trackingStart = isBefore(requestedTrackingStartDate, firstBugDate) ? firstBugDate : requestedTrackingStartDate
+  const recentCreatedPerDay = filterSeriesByDateRange(allCreatedPerDay, trackingStart, today)
+  const recentCompletedPerDay = filterSeriesByDateRange(allCompletedPerDay, trackingStart, today)
+  const trendDayCount = Math.max(differenceInCalendarDays(today, trackingStart) + 1, 1)
+  const currentAddRate = recentCreatedPerDay.reduce((sum, entry) => sum + entry.count, 0) / trendDayCount
+  const currentFixRate = recentCompletedPerDay.reduce((sum, entry) => sum + entry.count, 0) / trendDayCount
   const currentNetBurnRate = currentFixRate - currentAddRate
+  const daysUntilDeadline = Math.max(differenceInCalendarDays(deadline, today), 0)
   const neededNetBurnRate = daysUntilDeadline > 0 ? remainingBugs / daysUntilDeadline : remainingBugs
   const bugsPerDayRequired = daysUntilDeadline > 0 ? currentAddRate + neededNetBurnRate : remainingBugs
-  const paceStatus = getPaceStatus({
-    remainingBugs,
-    currentNetBurnRate,
-    neededNetBurnRate,
-    daysUntilDeadline,
-  })
-  const priorityDistribution = buildPriorityDistribution(bugs)
-  const likelihoodScore = getLikelihoodScore({
+  const status = getDeadlineStatus({
     remainingBugs,
     currentNetBurnRate,
     neededNetBurnRate,
@@ -289,123 +288,78 @@ export function getDashboardMetrics(source, { deadlineDate, targetFromDate, targ
 
   return {
     bugs,
-    createdPerDay,
-    completedPerDay,
-    remainingPerDay,
-    totalBugCount,
+    allRemainingPerDay,
     remainingBugs,
-    bugsPerDayRequired,
+    trackingStartDate: trackingStart,
+    trackingStartLabel: format(trackingStart, 'MMM d, yyyy'),
+    trackingStartBacklog: getOpenBugsAtDate(bugs, trackingStart),
     currentAddRate,
     currentFixRate,
     currentNetBurnRate,
     neededNetBurnRate,
+    bugsPerDayRequired,
     daysUntilDeadline,
-    createdInRange,
-    completedInRange,
-    rangeLength,
-    rangeStartDate,
-    rangeStartLabel: format(rangeStartDate, 'MMM d, yyyy'),
-    rangeLabel: rangeDays === 'all' ? 'All time' : `Last ${rangeDays} days`,
-    onPace: paceStatus.tone === 'positive',
-    paceTone: paceStatus.tone,
-    paceSignal: paceStatus.signal,
-    paceHeadline: paceStatus.headline,
-    paceBody: paceStatus.body,
-    priorityDistribution,
-    likelihoodScore,
-    deadline: targetEnd,
-    deadlineLabel: format(targetEnd, 'MMM d, yyyy'),
-    targetFromDate: targetStart,
-    targetToDate: targetEnd,
-    targetFromLabel: format(targetStart, 'MMM d, yyyy'),
-    targetToLabel: format(targetEnd, 'MMM d, yyyy'),
-    startDate: safeStartDate,
+    deadline,
+    deadlineLabel: format(deadline, 'MMM d, yyyy'),
+    trendWindowLabel: getDisplayRangeLabel(trackingStart, today),
+    statusTone: status.tone,
+    statusSignal: status.signal,
+    statusHeadline: status.headline,
+    statusBody: status.body,
+    onTrack: status.tone === 'positive',
+    likelihoodScore: getLikelihoodScore({
+      remainingBugs,
+      currentNetBurnRate,
+      neededNetBurnRate,
+      daysUntilDeadline,
+    }),
+    priorityDistribution: buildPriorityDistribution(bugs),
     today,
   }
 }
 
-export function buildFlowChartData(dashboardMetrics) {
-  const labels = createLabelSeries(dashboardMetrics.createdPerDay, dashboardMetrics.completedPerDay)
-  const createdLookup = new Map(dashboardMetrics.createdPerDay.map((entry) => [entry.date, entry.count]))
-  const completedLookup = new Map(dashboardMetrics.completedPerDay.map((entry) => [entry.date, entry.count]))
+export function buildDeadlineBurndownChartData(deadlineMetrics) {
+  const actualHistory = deadlineMetrics.allRemainingPerDay.filter(
+    (entry) => entry.date >= format(deadlineMetrics.trackingStartDate, 'yyyy-MM-dd'),
+  )
+  const historyDates = actualHistory.map((entry) => entry.date)
+  const futureDates = compareAsc(deadlineMetrics.today, deadlineMetrics.deadline) === -1
+    ? eachDayOfInterval({
+        start: addDays(deadlineMetrics.today, 1),
+        end: deadlineMetrics.deadline,
+      }).map((entry) => format(entry, 'yyyy-MM-dd'))
+    : []
+  const labels = [...new Set([...historyDates, ...futureDates])]
+  const todayKey = format(deadlineMetrics.today, 'yyyy-MM-dd')
+  const actualLookup = new Map(actualHistory.map((entry) => [entry.date, entry.count]))
+  const idealStartDate = deadlineMetrics.trackingStartDate
+  const idealStartCount = deadlineMetrics.trackingStartBacklog
+  const idealDuration = Math.max(differenceInCalendarDays(deadlineMetrics.deadline, idealStartDate), 1)
 
   return {
     labels: labels.map((entry) => formatLabel(entry)),
     datasets: [
       {
-        label: 'Created',
-        data: labels.map((entry) => createdLookup.get(entry) ?? 0),
-        borderColor: '#ff6b6b',
-        backgroundColor: 'rgba(255, 107, 107, 0.18)',
-        fill: true,
-        tension: 0.35,
-        borderWidth: 3,
-        pointRadius: 3,
-        pointHoverRadius: 5,
-      },
-      {
-        label: 'Fixed',
-        data: labels.map((entry) => completedLookup.get(entry) ?? 0),
-        borderColor: '#34d399',
-        backgroundColor: 'rgba(52, 211, 153, 0.14)',
-        fill: true,
-        tension: 0.35,
-        borderWidth: 3,
-        pointRadius: 3,
-        pointHoverRadius: 5,
-      },
-    ],
-  }
-}
-
-export function buildBacklogChartData(dashboardMetrics) {
-  const remainingMap = new Map(dashboardMetrics.remainingPerDay.map((entry) => [entry.date, entry.count]))
-  const labels = dashboardMetrics.remainingPerDay.map((entry) => entry.date)
-
-  return {
-    labels: labels.map((date) => formatLabel(date)),
-    datasets: [
-      {
-        label: 'Open bugs',
-        data: labels.map((date) => remainingMap.get(date) ?? null),
+        label: 'Actual remaining bugs',
+        data: labels.map((entry) => (entry <= todayKey ? actualLookup.get(entry) ?? null : null)),
         borderColor: '#60a5fa',
-        backgroundColor: 'rgba(96, 165, 250, 0.16)',
-        tension: 0.2,
+        backgroundColor: 'rgba(96, 165, 250, 0.14)',
+        fill: false,
+        tension: 0.22,
         borderWidth: 3,
-        spanGaps: true,
-      },
-    ],
-  }
-}
-
-export function buildProjectionChartData(dashboardMetrics) {
-  const deadline = dashboardMetrics.deadline
-  const today = dashboardMetrics.today
-  const targetFromDate = dashboardMetrics.targetFromDate
-  const start = compareAsc(today, targetFromDate) === 1 ? today : targetFromDate
-  const safeStart = compareAsc(start, deadline) === 1 ? deadline : start
-  const dates = eachDayOfInterval({ start: safeStart, end: deadline })
-  const daysRemaining = Math.max(dates.length - 1, 1)
-  const idealStep = dashboardMetrics.remainingBugs / daysRemaining
-
-  return {
-    labels: dates.map((date) => format(date, 'MMM d')),
-    datasets: [
-      {
-        label: 'Projected backlog',
-        data: dates.map((_, index) => Math.max(0, dashboardMetrics.remainingBugs - dashboardMetrics.currentNetBurnRate * index)),
-        borderColor: '#f472b6',
-        backgroundColor: 'rgba(244, 114, 182, 0.14)',
-        tension: 0.24,
-        borderWidth: 3,
-        spanGaps: true,
+        pointRadius: 2,
+        pointHoverRadius: 4,
       },
       {
-        label: 'Required glide path',
-        data: dates.map((_, index) => Math.max(0, dashboardMetrics.remainingBugs - idealStep * index)),
-        borderColor: '#fbbf24',
-        backgroundColor: 'rgba(251, 191, 36, 0.12)',
-        borderDash: [8, 6],
+        label: 'Ideal line',
+        data: labels.map((entry) => {
+          const currentDate = parseISO(entry)
+          const elapsed = Math.max(differenceInCalendarDays(currentDate, idealStartDate), 0)
+          return Math.max(0, Number((idealStartCount - (idealStartCount / idealDuration) * elapsed).toFixed(2)))
+        }),
+        borderColor: '#22c55e',
+        backgroundColor: 'rgba(34, 197, 94, 0.06)',
+        borderDash: [6, 6],
         tension: 0,
         borderWidth: 2,
         pointRadius: 0,
@@ -414,13 +368,13 @@ export function buildProjectionChartData(dashboardMetrics) {
   }
 }
 
-export function buildPriorityChartData(dashboardMetrics) {
+export function buildPriorityChartData(metricsWithPriority) {
   return {
-    labels: dashboardMetrics.priorityDistribution.map((entry) => entry.label),
+    labels: metricsWithPriority.priorityDistribution.map((entry) => entry.label),
     datasets: [
       {
         label: 'Open bugs',
-        data: dashboardMetrics.priorityDistribution.map((entry) => entry.count),
+        data: metricsWithPriority.priorityDistribution.map((entry) => entry.count),
         backgroundColor: [
           'rgba(248, 113, 113, 0.78)',
           'rgba(251, 146, 60, 0.78)',
@@ -442,93 +396,182 @@ export function buildPriorityChartData(dashboardMetrics) {
   }
 }
 
-export function getComparisonMetrics(source, { rangeDays = '30' } = {}) {
+export function getComparisonMetrics(source, { rangeKey = '30', customFromDate, customToDate } = {}) {
   const bugs = normalizeBugRecords(source)
-  const today = new Date()
-  const usedFallbackRange = rangeDays === 'all'
-  const comparisonRangeDays = getNumericRangeDays(rangeDays, 30)
-  const currentStart = subDays(today, comparisonRangeDays - 1)
-  const previousEnd = subDays(currentStart, 1)
-  const previousStart = subDays(previousEnd, comparisonRangeDays - 1)
-  const currentWindow = getWindowStats(bugs, currentStart, today)
-  const previousWindow = getWindowStats(bugs, previousStart, previousEnd)
-  const netBurnDelta = currentWindow.netBurnRate - previousWindow.netBurnRate
-  const addRateDelta = currentWindow.addRate - previousWindow.addRate
-  const fixRateDelta = currentWindow.fixRate - previousWindow.fixRate
+  const today = startOfDay(new Date())
+  const earliestDate = bugs[0]?.createdAt ? parseISO(bugs[0].createdAt) : today
+  const allCreatedPerDay = buildSeriesFromField(bugs, 'createdAt')
+  const allCompletedPerDay = buildSeriesFromField(bugs, 'completedAt')
+  const isAllTime = rangeKey === 'all'
+  const isCustom = rangeKey === 'custom'
 
-  let tone = 'warning'
-  let headline = 'Mixed movement versus the prior window'
-  let body = 'Recent results are close to the previous period, so the trend is not decisively better yet.'
+  let currentStartDate = earliestDate
+  let currentEndDate = today
 
-  if (netBurnDelta > 0.05) {
-    tone = 'positive'
-    headline = 'Improving versus the prior window'
-    body = 'Net burn improved over the previous period, meaning fixes are outpacing bug intake more effectively.'
-  } else if (netBurnDelta < -0.05) {
-    tone = 'negative'
-    headline = 'Worse than the prior window'
-    body = 'Net burn slipped compared with the previous period, so intake pressure or slower fixes are hurting progress.'
+  if (isCustom) {
+    const customDates = getCustomRangeDates(customFromDate, customToDate, today)
+    currentStartDate = customDates.startDate
+    currentEndDate = customDates.endDate
+  } else if (!isAllTime) {
+    const selectedDays = getNumericRangeDays(rangeKey, 30)
+    currentStartDate = subDays(today, selectedDays - 1)
+    currentEndDate = today
+  }
+
+  const currentWindow = getWindowStats(bugs, currentStartDate, currentEndDate)
+  const hasComparisonWindow = !isAllTime
+  const previousWindow = hasComparisonWindow
+    ? getWindowStats(
+        bugs,
+        subDays(currentStartDate, currentWindow.dayCount),
+        subDays(currentStartDate, 1),
+      )
+    : null
+  const createdSeries = filterSeriesByDateRange(allCreatedPerDay, currentStartDate, currentEndDate)
+  const completedSeries = filterSeriesByDateRange(allCompletedPerDay, currentStartDate, currentEndDate)
+
+  let tone = currentWindow.netChange > 0 ? 'negative' : currentWindow.netChange < 0 ? 'positive' : 'neutral'
+  let headline = currentWindow.netChange > 0
+    ? 'Backlog grew in the selected period'
+    : currentWindow.netChange < 0
+      ? 'Backlog shrank in the selected period'
+      : 'Created and completed stayed balanced'
+  let body = currentWindow.netChange > 0
+    ? 'More bugs were created than completed in the selected window, so backlog pressure increased.'
+    : currentWindow.netChange < 0
+      ? 'More bugs were completed than created in the selected window, so the backlog reduced.'
+      : 'Creation and completion were evenly matched in the selected window.'
+
+  if (!hasComparisonWindow) {
+    tone = 'neutral'
+    headline = 'All-time trend view'
+    body = 'All time shows the full bug history for the CP scope. Switch to a fixed or custom range to compare against a previous window.'
+  } else if (currentWindow.netChange < previousWindow.netChange) {
+    body += ' This is better than the previous comparison window.'
+  } else if (currentWindow.netChange > previousWindow.netChange) {
+    body += ' This is worse than the previous comparison window.'
   }
 
   return {
-    comparisonRangeDays,
-    usedFallbackRange,
+    rangeKey,
     currentWindow,
     previousWindow,
-    netBurnDelta,
-    addRateDelta,
-    fixRateDelta,
+    hasComparisonWindow,
     tone,
     headline,
     body,
+    createdSeries,
+    completedSeries,
+    rangeLabel: isAllTime
+      ? 'All time'
+      : isCustom
+        ? `Custom: ${getDisplayRangeLabel(currentStartDate, currentEndDate)}`
+        : `Last ${rangeKey} days`,
   }
 }
 
-export function buildComparisonChartData(comparisonMetrics) {
+export function buildComparisonTimelineChartData(comparisonMetrics) {
+  const labels = createLabelSeries(comparisonMetrics.createdSeries, comparisonMetrics.completedSeries)
+  const createdLookup = new Map(comparisonMetrics.createdSeries.map((entry) => [entry.date, entry.count]))
+  const completedLookup = new Map(comparisonMetrics.completedSeries.map((entry) => [entry.date, entry.count]))
+  const createdValues = labels.map((entry) => createdLookup.get(entry) ?? 0)
+  const completedValues = labels.map((entry) => completedLookup.get(entry) ?? 0)
+  const movingAverageWindow = Math.min(7, Math.max(3, Math.floor(labels.length / 5) || 3))
+
   return {
-    labels: ['Created / day', 'Fixed / day', 'Net burn / day'],
+    labels: labels.map((entry) => formatLabel(entry)),
     datasets: [
       {
-        label: `Current ${comparisonMetrics.comparisonRangeDays} days`,
-        data: [
-          comparisonMetrics.currentWindow.addRate,
-          comparisonMetrics.currentWindow.fixRate,
-          comparisonMetrics.currentWindow.netBurnRate,
-        ],
-        backgroundColor: 'rgba(96, 165, 250, 0.78)',
-        borderColor: '#60a5fa',
-        borderWidth: 1,
-        borderRadius: 8,
+        label: 'Created',
+        data: createdValues,
+        borderColor: '#f87171',
+        backgroundColor: 'rgba(248, 113, 113, 0.12)',
+        tension: 0.25,
+        borderWidth: 2,
+        pointRadius: 2,
       },
       {
-        label: `Previous ${comparisonMetrics.comparisonRangeDays} days`,
-        data: [
-          comparisonMetrics.previousWindow.addRate,
-          comparisonMetrics.previousWindow.fixRate,
-          comparisonMetrics.previousWindow.netBurnRate,
-        ],
-        backgroundColor: 'rgba(244, 114, 182, 0.74)',
-        borderColor: '#f472b6',
-        borderWidth: 1,
-        borderRadius: 8,
+        label: 'Completed',
+        data: completedValues,
+        borderColor: '#22c55e',
+        backgroundColor: 'rgba(34, 197, 94, 0.12)',
+        tension: 0.25,
+        borderWidth: 2,
+        pointRadius: 2,
+      },
+      {
+        label: `${movingAverageWindow}D created avg`,
+        data: buildMovingAverage(createdValues, movingAverageWindow),
+        borderColor: '#fda4af',
+        borderDash: [5, 4],
+        tension: 0.2,
+        borderWidth: 2,
+        pointRadius: 0,
+      },
+      {
+        label: `${movingAverageWindow}D completed avg`,
+        data: buildMovingAverage(completedValues, movingAverageWindow),
+        borderColor: '#86efac',
+        borderDash: [5, 4],
+        tension: 0.2,
+        borderWidth: 2,
+        pointRadius: 0,
       },
     ],
   }
 }
 
-export function getSummaryMetrics(dashboardMetrics) {
+export function buildComparisonSummaryChartData(comparisonMetrics) {
+  const datasets = [
+    {
+      label: 'Current period',
+      data: [
+        comparisonMetrics.currentWindow.created,
+        comparisonMetrics.currentWindow.fixed,
+        comparisonMetrics.currentWindow.netChange,
+        Number(comparisonMetrics.currentWindow.completionRate.toFixed(2)),
+      ],
+      backgroundColor: 'rgba(96, 165, 250, 0.78)',
+      borderColor: '#60a5fa',
+      borderWidth: 1,
+      borderRadius: 8,
+    },
+  ]
+
+  if (comparisonMetrics.previousWindow) {
+    datasets.push({
+      label: 'Previous period',
+      data: [
+        comparisonMetrics.previousWindow.created,
+        comparisonMetrics.previousWindow.fixed,
+        comparisonMetrics.previousWindow.netChange,
+        Number(comparisonMetrics.previousWindow.completionRate.toFixed(2)),
+      ],
+      backgroundColor: 'rgba(244, 114, 182, 0.74)',
+      borderColor: '#f472b6',
+      borderWidth: 1,
+      borderRadius: 8,
+    })
+  }
+
   return {
-    bugCount: dashboardMetrics.remainingBugs,
-    daysUntilDeadline: dashboardMetrics.daysUntilDeadline,
-    bugsPerDayRequired: dashboardMetrics.bugsPerDayRequired,
-    currentAddRate: dashboardMetrics.currentAddRate,
-    currentFixRate: dashboardMetrics.currentFixRate,
-    currentNetBurnRate: dashboardMetrics.currentNetBurnRate,
-    onPace: dashboardMetrics.onPace,
-    deadlineLabel: dashboardMetrics.deadlineLabel,
-    targetFromLabel: dashboardMetrics.targetFromLabel,
-    targetToLabel: dashboardMetrics.targetToLabel,
-    paceSignal: dashboardMetrics.paceSignal,
-    likelihoodScore: dashboardMetrics.likelihoodScore,
+    labels: ['Bugs created', 'Bugs completed', 'Net change', 'Completion rate %'],
+    datasets,
+  }
+}
+
+export function getSummaryMetrics(deadlineMetrics) {
+  return {
+    bugCount: deadlineMetrics.remainingBugs,
+    daysUntilDeadline: deadlineMetrics.daysUntilDeadline,
+    bugsPerDayRequired: deadlineMetrics.bugsPerDayRequired,
+    currentAddRate: deadlineMetrics.currentAddRate,
+    currentFixRate: deadlineMetrics.currentFixRate,
+    currentNetBurnRate: deadlineMetrics.currentNetBurnRate,
+    onTrack: deadlineMetrics.onTrack,
+    deadlineLabel: deadlineMetrics.deadlineLabel,
+    trackingStartLabel: deadlineMetrics.trackingStartLabel,
+    statusSignal: deadlineMetrics.statusSignal,
+    likelihoodScore: deadlineMetrics.likelihoodScore,
   }
 }

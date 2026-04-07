@@ -27,7 +27,7 @@ jobs:
       - name: Fetch Linear metrics
         env:
           LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
-          LINEAR_TEAM_KEY: CP
+          LINEAR_TEAM_KEYS: CP,T1,TA
         run: node scripts/fetch-linear.js
 
       - name: Commit updated metrics

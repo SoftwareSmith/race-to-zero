@@ -24,11 +24,23 @@ function toDay(dateValue) {
   return new Date(dateValue).toISOString().slice(0, 10)
 }
 
+function getTeamKeys() {
+  const rawValue = process.env.LINEAR_TEAM_KEYS ?? process.env.LINEAR_TEAM_KEY ?? 'CP,T1,TA'
+
+  return [...new Set(
+    rawValue
+      .split(',')
+      .map((entry) => entry.trim())
+      .filter(Boolean),
+  )]
+}
+
 async function fetchBugIssues() {
   const apiKey = getRequiredEnv('LINEAR_API_KEY')
-  const teamKey = process.env.LINEAR_TEAM_KEY ?? 'CP'
-
-  const teamFilter = teamKey ? `filter: { team: { key: { eq: \"${teamKey}\" } } }` : ''
+  const teamKeys = getTeamKeys()
+  const teamFilter = teamKeys.length
+    ? `filter: { or: [${teamKeys.map((teamKey) => `{ team: { key: { eq: \"${teamKey}\" } } }`).join(', ')}] }`
+    : ''
 
   const query = `
     query FetchBugIssues($after: String) {
@@ -45,6 +57,9 @@ async function fetchBugIssues() {
           createdAt
           completedAt
           priority
+          team {
+            key
+          }
           state {
             name
             type
@@ -122,6 +137,7 @@ function buildMetrics(issues) {
       priority: issue.priority ?? 0,
       stateName: issue.state?.name ?? null,
       stateType: issue.state?.type ?? null,
+      teamKey: issue.team?.key ?? null,
     })),
   }
 }

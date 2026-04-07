@@ -1,23 +1,36 @@
 import { useEffect, useState } from 'react'
-import { endOfYear, format, formatDistanceToNowStrict } from 'date-fns'
+import { endOfYear, format, formatDistanceToNowStrict, subDays } from 'date-fns'
 import ChartCard from './components/ChartCard.jsx'
 import SyncButton from './components/SyncButton.jsx'
+import Tabs from './components/Tabs.jsx'
 import { useManualSync } from './hooks/useManualSync.js'
 import { useMetrics } from './hooks/useMetrics.js'
 import {
-  buildBacklogChartData,
-  buildComparisonChartData,
-  buildFlowChartData,
+  buildComparisonSummaryChartData,
+  buildComparisonTimelineChartData,
+  buildDeadlineBurndownChartData,
   buildPriorityChartData,
-  buildProjectionChartData,
   getComparisonMetrics,
-  getDashboardMetrics,
+  getDeadlineMetrics,
   getSummaryMetrics,
 } from './utils/metrics.js'
 import './App.css'
 
-const TARGET_FROM_STORAGE_KEY = 'race-to-zero:target-from'
-const TARGET_TO_STORAGE_KEY = 'race-to-zero:target-to'
+const DEADLINE_STORAGE_KEY = 'race-to-zero:deadline-date'
+const DEADLINE_FROM_STORAGE_KEY = 'race-to-zero:deadline-from-date'
+
+const TAB_ITEMS = [
+  { id: 'deadline', label: 'Deadline' },
+  { id: 'compare', label: 'Compare Periods' },
+]
+
+const COMPARE_RANGE_OPTIONS = [
+  { label: '7D', value: '7' },
+  { label: '30D', value: '30' },
+  { label: '90D', value: '90' },
+  { label: 'All time', value: 'all' },
+  { label: 'Custom', value: 'custom' },
+]
 
 function readStoredDate(key, fallbackValue) {
   if (typeof window === 'undefined') {
@@ -27,13 +40,6 @@ function readStoredDate(key, fallbackValue) {
   const storedValue = window.localStorage.getItem(key)
   return storedValue || fallbackValue
 }
-
-const RANGE_OPTIONS = [
-  { label: '7D', value: '7' },
-  { label: '30D', value: '30' },
-  { label: '90D', value: '90' },
-  { label: 'All', value: 'all' },
-]
 
 function formatNumber(value, digits = 0) {
   if (!Number.isFinite(value)) {
@@ -46,21 +52,51 @@ function formatNumber(value, digits = 0) {
   }).format(value)
 }
 
-function formatDelta(value, digits = 2, invert = false) {
-  const normalizedValue = invert ? value * -1 : value
-  const prefix = normalizedValue > 0 ? '+' : ''
-  return `${prefix}${formatNumber(normalizedValue, digits)}`
+function formatSignedNumber(value, digits = 0) {
+  const prefix = value > 0 ? '+' : ''
+  return `${prefix}${formatNumber(value, digits)}`
+}
+
+function formatPercent(value, digits = 0) {
+  return `${formatNumber(value, digits)}%`
+}
+
+function getNetChangeTone(netChange) {
+  if (netChange > 0) {
+    return 'negative'
+  }
+
+  if (netChange < 0) {
+    return 'positive'
+  }
+
+  return 'neutral'
+}
+
+function getMetricTone(currentValue, previousValue, higherIsBetter) {
+  if (previousValue == null) {
+    return 'neutral'
+  }
+
+  if (Math.abs(currentValue - previousValue) < 0.01) {
+    return 'neutral'
+  }
+
+  const improved = higherIsBetter ? currentValue > previousValue : currentValue < previousValue
+  return improved ? 'positive' : 'negative'
 }
 
 function App() {
-  const { metrics, error, isLoading, refreshMetrics } = useMetrics()
-  const [targetFromDate, setTargetFromDate] = useState(() => readStoredDate(TARGET_FROM_STORAGE_KEY, format(new Date(), 'yyyy-MM-dd')))
-  const [targetToDate, setTargetToDate] = useState(() => readStoredDate(TARGET_TO_STORAGE_KEY, format(endOfYear(new Date()), 'yyyy-MM-dd')))
-  const [rangeDays, setRangeDays] = useState('30')
-  const [activeTab, setActiveTab] = useState('dashboard')
-  const dashboardMetrics = getDashboardMetrics(metrics, { targetFromDate, targetToDate, rangeDays })
-  const comparisonMetrics = getComparisonMetrics(metrics, { rangeDays })
-  const summary = getSummaryMetrics(dashboardMetrics)
+  const { metrics, error, refreshMetrics } = useMetrics()
+  const [deadlineDate, setDeadlineDate] = useState(() => readStoredDate(DEADLINE_STORAGE_KEY, format(endOfYear(new Date()), 'yyyy-MM-dd')))
+  const [deadlineFromDate, setDeadlineFromDate] = useState(() => readStoredDate(DEADLINE_FROM_STORAGE_KEY, format(subDays(new Date(), 29), 'yyyy-MM-dd')))
+  const [activeTab, setActiveTab] = useState('deadline')
+  const [compareRangeKey, setCompareRangeKey] = useState('30')
+  const [customFromDate, setCustomFromDate] = useState(() => format(subDays(new Date(), 29), 'yyyy-MM-dd'))
+  const [customToDate, setCustomToDate] = useState(() => format(new Date(), 'yyyy-MM-dd'))
+  const deadlineMetrics = getDeadlineMetrics(metrics, { deadlineDate, trackingStartDate: deadlineFromDate })
+  const comparisonMetrics = getComparisonMetrics(metrics, { rangeKey: compareRangeKey, customFromDate, customToDate })
+  const summary = getSummaryMetrics(deadlineMetrics)
   const [syncMessage, setSyncMessage] = useState('')
   const metricsUrl = `${import.meta.env.BASE_URL}data/metrics.json`
   const todayDate = format(new Date(), 'yyyy-MM-dd')
@@ -72,302 +108,287 @@ function App() {
   })
 
   let lastUpdatedLabel = 'No sync timestamp yet'
+  let lastUpdatedTooltip = 'Not synced yet'
   if (metrics?.lastUpdated) {
     const lastUpdated = new Date(metrics.lastUpdated)
     if (!Number.isNaN(lastUpdated.getTime())) {
       lastUpdatedLabel = formatDistanceToNowStrict(lastUpdated, {
         addSuffix: true,
       })
+      lastUpdatedTooltip = format(lastUpdated, 'MMM d, yyyy h:mm a')
     }
   }
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      window.localStorage.setItem(TARGET_FROM_STORAGE_KEY, targetFromDate)
+      window.localStorage.setItem(DEADLINE_STORAGE_KEY, deadlineDate)
     }
-  }, [targetFromDate])
+  }, [deadlineDate])
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      window.localStorage.setItem(TARGET_TO_STORAGE_KEY, targetToDate)
+      window.localStorage.setItem(DEADLINE_FROM_STORAGE_KEY, deadlineFromDate)
     }
-  }, [targetToDate])
+  }, [deadlineFromDate])
 
-  const handleTargetFromChange = (nextValue) => {
-    setTargetFromDate(nextValue)
-
-    if (nextValue > targetToDate) {
-      setTargetToDate(nextValue)
-    }
-  }
-
-  const handleTargetToChange = (nextValue) => {
-    setTargetToDate(nextValue)
-
-    if (nextValue < targetFromDate) {
-      setTargetFromDate(nextValue)
-    }
-  }
+  const createdTone = getMetricTone(comparisonMetrics.currentWindow.created, comparisonMetrics.previousWindow?.created ?? null, false)
+  const completedTone = getMetricTone(comparisonMetrics.currentWindow.fixed, comparisonMetrics.previousWindow?.fixed ?? null, true)
+  const netChangeTone = getNetChangeTone(comparisonMetrics.currentWindow.netChange)
+  const completionRateTone = getMetricTone(comparisonMetrics.currentWindow.completionRate, comparisonMetrics.previousWindow?.completionRate ?? null, true)
 
   return (
     <div className="app-shell">
-      <header className="app-header app-header-dark">
+      <header className="app-header">
         <div className="hero-copy hero-copy-wide">
           <p className="eyebrow">Coreplan CP bug command center</p>
           <h1>Race to Zero Bugs</h1>
           <p className="subtitle">
-            Inspect current bug pressure, tighten the target window, and compare recent periods without leaving the dashboard.
+            Track the bug backlog against a single deadline, then switch to period comparisons when you need trend analysis.
           </p>
         </div>
 
-        <div className="header-toolbar">
-          <label className="control-panel control-panel-compact">
-            <span className="control-label">From</span>
-            <input
-              className="control-input"
-              onChange={(event) => handleTargetFromChange(event.target.value)}
-              type="date"
-              value={targetFromDate}
-            />
-          </label>
-
-          <label className="control-panel control-panel-compact">
-            <span className="control-label">To</span>
-            <input
-              className="control-input"
-              min={targetFromDate || todayDate}
-              onChange={(event) => handleTargetToChange(event.target.value)}
-              type="date"
-              value={targetToDate}
-            />
-          </label>
-
-          <div className="toolbar-inline-meta">
-            <span className="header-meta-pill">Updated {lastUpdatedLabel}</span>
-          </div>
-
+        <div className="header-actions">
           <SyncButton
             isSyncing={isSyncing}
             onClick={triggerSync}
+            lastSyncedLabel={lastUpdatedTooltip}
+            snapshotUrl={metricsUrl}
             statusMessage={syncMessage}
+            relativeLabel={lastUpdatedLabel}
           />
-
-          <div className="toolbar-inline-meta">
-            <a className="header-link" href={metricsUrl} rel="noreferrer" target="_blank">
-              Open data snapshot
-            </a>
-          </div>
-        </div>
-
-        <div className="view-switcher" role="tablist" aria-label="Dashboard view selector">
-          <button
-            aria-selected={activeTab === 'dashboard'}
-            className={`view-toggle ${activeTab === 'dashboard' ? 'view-toggle-active' : ''}`}
-            onClick={() => setActiveTab('dashboard')}
-            type="button"
-          >
-            Dashboard
-          </button>
-          <button
-            aria-selected={activeTab === 'comparison'}
-            className={`view-toggle ${activeTab === 'comparison' ? 'view-toggle-active' : ''}`}
-            onClick={() => setActiveTab('comparison')}
-            type="button"
-          >
-            Compare Periods
-          </button>
         </div>
       </header>
 
-      <main className="dashboard-grid">
-        <section className="range-banner">
-          <div>
-            <span className="section-kicker">Time period</span>
-            <h2>{dashboardMetrics.rangeLabel}</h2>
-            <p className="side-panel-copy">Controls recent activity metrics, charts, and the comparison tab.</p>
-          </div>
-          <div className="range-toggle-group" role="tablist" aria-label="Time period selector">
-            {RANGE_OPTIONS.map((option) => (
-              <button
-                aria-selected={rangeDays === option.value}
-                className={`range-toggle ${rangeDays === option.value ? 'range-toggle-active' : ''}`}
-                key={option.value}
-                onClick={() => setRangeDays(option.value)}
-                type="button"
-              >
-                {option.label}
-              </button>
-            ))}
-          </div>
-        </section>
+      <Tabs activeTab={activeTab} onChange={setActiveTab} tabs={TAB_ITEMS} />
 
-        {activeTab === 'dashboard' ? (
+      <main className="dashboard-grid">
+        {activeTab === 'deadline' ? (
           <>
-            <section className="hero-grid hero-grid-single">
-              <article className={`hero-panel hero-panel-${dashboardMetrics.paceTone}`}>
-                <div className="hero-panel-head">
+            <section className="deadline-toolbar">
+              <div>
+                <span className="section-kicker">Deadline focus</span>
+                <h2>Track the path to zero</h2>
+                <p className="subtitle compact-copy">Choose where to start measuring the burndown, then see whether today’s pace can carry the backlog to zero by the deadline.</p>
+              </div>
+
+              <div className="deadline-date-controls">
+                <label className="control-panel control-panel-compact control-panel-inline">
+                  <span className="control-label">From</span>
+                  <input
+                    className="control-input"
+                    max={deadlineDate}
+                    onChange={(event) => setDeadlineFromDate(event.target.value)}
+                    type="date"
+                    value={deadlineFromDate}
+                  />
+                </label>
+
+                <label className="control-panel control-panel-compact control-panel-inline">
+                  <span className="control-label">Deadline</span>
+                  <input
+                    className="control-input"
+                    min={todayDate}
+                    onChange={(event) => setDeadlineDate(event.target.value)}
+                    type="date"
+                    value={deadlineDate}
+                  />
+                </label>
+              </div>
+            </section>
+
+            <section className="deadline-summary-grid">
+              <article className={`spotlight-card spotlight-card-${deadlineMetrics.statusTone}`}>
+                <div className="spotlight-head">
                   <div>
-                    <span className="section-kicker">Target outlook</span>
-                    <h2>{dashboardMetrics.paceHeadline}</h2>
-                    <p className="hero-panel-copy">{dashboardMetrics.paceBody}</p>
+                    <span className="section-kicker">Status</span>
+                    <h2>{deadlineMetrics.statusHeadline}</h2>
+                    <p className="hero-panel-copy">{deadlineMetrics.statusBody}</p>
                   </div>
-                  <span className={`signal-pill signal-pill-${dashboardMetrics.paceTone}`}>
-                    {summary.paceSignal}
+                  <span className={`status-pill status-pill-${deadlineMetrics.statusTone}`}>
+                    {deadlineMetrics.statusSignal} · {summary.daysUntilDeadline}d left
                   </span>
                 </div>
 
-                <div className="hero-highlight-grid">
-                  <div className="hero-highlight">
-                    <span className="hero-highlight-label">Fixes per day required</span>
+                <div className="spotlight-metrics">
+                  <div className={`spotlight-metric-card spotlight-metric-card-${deadlineMetrics.statusTone}`}>
+                    <span className="status-label">Remaining bugs</span>
+                    <strong>{formatNumber(summary.bugCount)}</strong>
+                    <span className="mini-metric-footnote">Open bugs still in the queue today.</span>
+                  </div>
+
+                  <div className={`spotlight-metric-card spotlight-metric-card-${deadlineMetrics.statusTone}`}>
+                    <span className="status-label">Bugs / day required</span>
                     <strong>{formatNumber(summary.bugsPerDayRequired, 2)}</strong>
-                    <p>Based on current backlog and recent add rate over {dashboardMetrics.rangeLabel.toLowerCase()}.</p>
-                  </div>
-
-                  <div className="likelihood-panel">
-                    <div className="likelihood-copy">
-                      <span className="status-label">Likelihood of success</span>
-                      <strong>{summary.likelihoodScore}%</strong>
-                      <p>Estimated from recent net burn versus the net burn required for the selected target window.</p>
-                    </div>
-                    <div aria-hidden="true" className="likelihood-meter">
-                      <div className="likelihood-meter-track">
-                        <div className={`likelihood-meter-fill likelihood-meter-fill-${dashboardMetrics.paceTone}`} style={{ width: `${summary.likelihoodScore}%` }} />
-                      </div>
-                    </div>
+                    <span className="mini-metric-footnote">Daily completions needed if intake stays at its current pace.</span>
                   </div>
                 </div>
 
-                <div className="hero-metric-grid">
-                  <div className="hero-mini-metric">
-                    <span className="status-label">Target window</span>
-                    <strong>{summary.targetFromLabel}</strong>
-                    <span className="mini-metric-footnote">to {summary.targetToLabel}</span>
-                  </div>
-                  <div className="hero-mini-metric">
-                    <span className="status-label">Current fix rate</span>
-                    <strong>{formatNumber(summary.currentFixRate, 2)}/day</strong>
-                  </div>
-                  <div className="hero-mini-metric">
-                    <span className="status-label">Current add rate</span>
-                    <strong>{formatNumber(summary.currentAddRate, 2)}/day</strong>
-                  </div>
-                  <div className="hero-mini-metric">
-                    <span className="status-label">Net burn</span>
+                <p className="spotlight-footnote">Measured from {summary.trackingStartLabel} through today, using the live Linear bug snapshot.</p>
+              </article>
+
+              <section className="metric-grid metric-grid-compact">
+                  <article className={`metric-card metric-card-${deadlineMetrics.statusTone}`}>
+                    <span className="status-label">Days left</span>
+                    <strong>{formatNumber(summary.daysUntilDeadline)}</strong>
+                    <span className="mini-metric-footnote">Runway remaining to hit zero by {summary.deadlineLabel}.</span>
+                  </article>
+                  <article className={`metric-card metric-card-${deadlineMetrics.statusTone}`}>
+                    <span className="status-label">Current net burn</span>
                     <strong>{formatNumber(summary.currentNetBurnRate, 2)}/day</strong>
-                  </div>
-                </div>
-              </article>
+                    <span className="mini-metric-footnote">Negative means backlog is growing; positive means it is shrinking.</span>
+                  </article>
+                  <article className={`metric-card metric-card-${deadlineMetrics.statusTone}`}>
+                    <span className="status-label">Fixes / day</span>
+                    <strong>{formatNumber(summary.currentFixRate, 2)}</strong>
+                    <span className="mini-metric-footnote">Average completions per day since the selected start date.</span>
+                  </article>
+                  <article className={`metric-card metric-card-${deadlineMetrics.statusTone}`}>
+                    <span className="status-label">Created / day</span>
+                    <strong>{formatNumber(summary.currentAddRate, 2)}</strong>
+                    <span className="mini-metric-footnote">Average new bugs arriving per day in the same window.</span>
+                  </article>
+                  <article className={`metric-card metric-card-${deadlineMetrics.statusTone}`}>
+                    <span className="status-label">Confidence</span>
+                    <strong>{formatPercent(summary.likelihoodScore)}</strong>
+                    <span className="mini-metric-footnote">A trend score comparing your current burn to the burn required.</span>
+                  </article>
+                  <article className={`metric-card metric-card-${deadlineMetrics.statusTone}`}>
+                    <span className="status-label">Required net burn</span>
+                    <strong>{formatNumber(deadlineMetrics.neededNetBurnRate, 2)}/day</strong>
+                    <span className="mini-metric-footnote">Minimum daily backlog reduction needed from here forward.</span>
+                  </article>
+              </section>
             </section>
 
-            <section className="kpi-grid">
-              <article className="kpi-card">
-                <span className="status-label">Open bug count</span>
-                <strong>{formatNumber(summary.bugCount)}</strong>
-              </article>
-              <article className="kpi-card">
-                <span className="status-label">Fixes/day required</span>
-                <strong>{formatNumber(summary.bugsPerDayRequired, 2)}</strong>
-              </article>
-              <article className="kpi-card">
-                <span className="status-label">New bugs since {dashboardMetrics.rangeStartLabel}</span>
-                <strong>{formatNumber(dashboardMetrics.createdInRange)}</strong>
-              </article>
-              <article className="kpi-card">
-                <span className="status-label">Bugs fixed since {dashboardMetrics.rangeStartLabel}</span>
-                <strong>{formatNumber(dashboardMetrics.completedInRange)}</strong>
-              </article>
-            </section>
-
-            <section className="chart-stack chart-stack-dark">
+            <section className="chart-grid chart-grid-deadline">
               <ChartCard
-                title={`Bug Flow • ${dashboardMetrics.rangeLabel}`}
-                description="Compare bug intake against fixes across the selected time window."
-                data={buildFlowChartData(dashboardMetrics)}
-              />
-              <ChartCard
-                title={`Backlog Trend • ${dashboardMetrics.rangeLabel}`}
-                description="See how the open bug count moved through the selected period."
-                data={buildBacklogChartData(dashboardMetrics)}
-              />
-              <ChartCard
-                title="Projection To Target"
-                description="Projected backlog versus the required glide path across the selected target window."
-                data={buildProjectionChartData(dashboardMetrics)}
+                className="chart-card chart-card-wide"
+                title="Burndown To Zero"
+                description={`If the actual line stays above the ideal line, the team needs more daily net burn to reach zero by ${summary.deadlineLabel}.`}
+                data={buildDeadlineBurndownChartData(deadlineMetrics)}
               />
               <ChartCard
                 title="Open Bugs By Priority"
-                description="Current open backlog split by Linear priority to show concentration at the top end."
-                data={buildPriorityChartData(dashboardMetrics)}
+                description="Shows whether the remaining backlog is concentrated in urgent work or mostly sitting in lower-priority cleanup."
+                data={buildPriorityChartData(deadlineMetrics)}
                 variant="bar"
               />
             </section>
           </>
         ) : (
-          <section className="comparison-layout">
-            <article className={`comparison-hero comparison-hero-${comparisonMetrics.tone}`}>
-              <div className="hero-panel-head">
-                <div>
-                  <span className="section-kicker">Period comparison</span>
-                  <h2>{comparisonMetrics.headline}</h2>
-                  <p className="hero-panel-copy">
-                    {comparisonMetrics.body}
-                    {comparisonMetrics.usedFallbackRange ? ' All-time cannot be compared as an equal prior period, so this view uses 30-day windows.' : ''}
-                  </p>
-                </div>
-                <span className={`signal-pill signal-pill-${comparisonMetrics.tone}`}>
-                  {comparisonMetrics.comparisonRangeDays}D
-                </span>
+          <>
+            <section className="compare-toolbar">
+              <div>
+                <span className="section-kicker">Compare periods</span>
+                <h2>{comparisonMetrics.rangeLabel}</h2>
+                <p className="subtitle compact-copy">Choose one range mode at a time. Custom range replaces the presets so the comparison stays unambiguous.</p>
               </div>
 
-              <div className="comparison-window-grid">
-                <div className="hero-mini-metric">
-                  <span className="status-label">Current window</span>
-                  <strong>{comparisonMetrics.currentWindow.label}</strong>
+              <div className="compare-controls-stack">
+                <div className="range-toggle-group range-toggle-group-compare" role="tablist" aria-label="Comparison period selector">
+                  {COMPARE_RANGE_OPTIONS.map((option) => (
+                    <button
+                      aria-selected={compareRangeKey === option.value}
+                      className={`range-toggle ${compareRangeKey === option.value ? 'range-toggle-active' : ''}`}
+                      key={option.value}
+                      onClick={() => setCompareRangeKey(option.value)}
+                      type="button"
+                    >
+                      {option.label}
+                    </button>
+                  ))}
                 </div>
-                <div className="hero-mini-metric">
-                  <span className="status-label">Previous window</span>
-                  <strong>{comparisonMetrics.previousWindow.label}</strong>
-                </div>
-                <div className="hero-mini-metric">
-                  <span className="status-label">Net burn delta</span>
-                  <strong>{formatDelta(comparisonMetrics.netBurnDelta)}</strong>
-                  <span className="mini-metric-footnote">positive is better</span>
-                </div>
-              </div>
-            </article>
 
-            <section className="comparison-kpi-grid">
-              <article className="kpi-card">
-                <span className="status-label">Created / day</span>
-                <strong>{formatNumber(comparisonMetrics.currentWindow.addRate, 2)}</strong>
-                <span className="mini-metric-footnote">vs {formatNumber(comparisonMetrics.previousWindow.addRate, 2)} previous</span>
-              </article>
-              <article className="kpi-card">
-                <span className="status-label">Fixed / day</span>
-                <strong>{formatNumber(comparisonMetrics.currentWindow.fixRate, 2)}</strong>
-                <span className="mini-metric-footnote">vs {formatNumber(comparisonMetrics.previousWindow.fixRate, 2)} previous</span>
-              </article>
-              <article className="kpi-card">
-                <span className="status-label">Change in intake</span>
-                <strong>{formatDelta(comparisonMetrics.addRateDelta, 2, true)}</strong>
-                <span className="mini-metric-footnote">positive is lower intake</span>
-              </article>
-              <article className="kpi-card">
-                <span className="status-label">Change in net burn</span>
-                <strong>{formatDelta(comparisonMetrics.netBurnDelta)}</strong>
-                <span className="mini-metric-footnote">positive is better</span>
-              </article>
+                {compareRangeKey === 'custom' && (
+                  <div className="custom-range-grid">
+                    <label className="control-panel control-panel-compact control-panel-inline">
+                      <span className="control-label">From</span>
+                      <input
+                        className="control-input"
+                        max={customToDate}
+                        onChange={(event) => setCustomFromDate(event.target.value)}
+                        type="date"
+                        value={customFromDate}
+                      />
+                    </label>
+
+                    <label className="control-panel control-panel-compact control-panel-inline">
+                      <span className="control-label">To</span>
+                      <input
+                        className="control-input"
+                        min={customFromDate}
+                        onChange={(event) => setCustomToDate(event.target.value)}
+                        type="date"
+                        value={customToDate}
+                      />
+                    </label>
+                  </div>
+                )}
+              </div>
             </section>
 
-            <section className="chart-stack chart-stack-dark">
+            <section className="comparison-summary">
+              <article className={`comparison-banner comparison-banner-${comparisonMetrics.tone}`}>
+                  <div>
+                    <span className="section-kicker">Trend reading</span>
+                    <h2>{comparisonMetrics.headline}</h2>
+                    <p className="hero-panel-copy">{comparisonMetrics.body}</p>
+                  </div>
+              </article>
+
+              <section className="metric-grid">
+                  <article className={`metric-card metric-card-${createdTone}`}>
+                    <span className="status-label">Bugs created</span>
+                    <strong>{formatNumber(comparisonMetrics.currentWindow.created)}</strong>
+                    <span className="mini-metric-footnote">
+                      {comparisonMetrics.previousWindow
+                        ? `${formatSignedNumber(comparisonMetrics.currentWindow.created - comparisonMetrics.previousWindow.created)} vs previous window`
+                        : 'Created in the current selected range'}
+                    </span>
+                  </article>
+                  <article className={`metric-card metric-card-${completedTone}`}>
+                    <span className="status-label">Bugs completed</span>
+                    <strong>{formatNumber(comparisonMetrics.currentWindow.fixed)}</strong>
+                    <span className="mini-metric-footnote">
+                      {comparisonMetrics.previousWindow
+                        ? `${formatSignedNumber(comparisonMetrics.currentWindow.fixed - comparisonMetrics.previousWindow.fixed)} vs previous window`
+                        : 'Completed in the current selected range'}
+                    </span>
+                  </article>
+                  <article className={`metric-card metric-card-${netChangeTone}`}>
+                    <span className="status-label">Net change</span>
+                    <strong>{formatSignedNumber(comparisonMetrics.currentWindow.netChange)}</strong>
+                    <span className="mini-metric-footnote">
+                      {comparisonMetrics.currentWindow.netChange <= 0 ? 'Negative means completions outpaced new bugs.' : 'Positive means backlog grew in this period.'}
+                    </span>
+                  </article>
+                  <article className={`metric-card metric-card-${completionRateTone}`}>
+                    <span className="status-label">Completion rate</span>
+                    <strong>{formatPercent(comparisonMetrics.currentWindow.completionRate, 1)}</strong>
+                    <span className="mini-metric-footnote">
+                      {comparisonMetrics.previousWindow
+                        ? `${formatSignedNumber(comparisonMetrics.currentWindow.completionRate - comparisonMetrics.previousWindow.completionRate, 1)} pts vs previous`
+                        : 'Completed divided by created for the selected range'}
+                    </span>
+                  </article>
+              </section>
+            </section>
+
+            <section className="chart-grid">
               <ChartCard
-                title="Current vs Previous"
-                description="Grouped comparison of intake, fixes, and net burn rate for the current and prior periods."
-                data={buildComparisonChartData(comparisonMetrics)}
+                className="chart-card chart-card-wide"
+                title="Created vs Completed Over Time"
+                description="Use the moving averages to see whether incoming bug pressure is trending above or below completion output."
+                data={buildComparisonTimelineChartData(comparisonMetrics)}
+              />
+              <ChartCard
+                title="Current vs Previous Window"
+                description="A positive net change bar means backlog grew in that period; a higher completion-rate bar means the team cleared work more efficiently."
+                data={buildComparisonSummaryChartData(comparisonMetrics)}
                 variant="bar"
               />
             </section>
-          </section>
+          </>
         )}
       </main>
 
