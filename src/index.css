@@ -94,20 +94,13 @@ input[type='date']::-webkit-calendar-picker-indicator {
   top: var(--bug-y);
   width: var(--bug-size);
   height: var(--bug-size);
-  color: var(--bug-color);
+  border-radius: 999px;
+  background: var(--bug-color);
+  box-shadow: 0 0 8px color-mix(in srgb, var(--bug-color) 82%, transparent), 0 0 18px color-mix(in srgb, var(--bug-color) 44%, transparent);
   opacity: var(--bug-opacity);
-  transform: translate3d(0, 0, 0) rotate(var(--bug-rotate));
-  transform-origin: center;
   animation: bug-drift var(--bug-duration) ease-in-out infinite, bug-fade 5.2s ease-in-out infinite;
   animation-delay: var(--bug-delay), var(--bug-delay);
   will-change: transform, opacity;
-}
-
-.app-bug-icon {
-  display: block;
-  width: 100%;
-  height: 100%;
-  filter: drop-shadow(0 0 8px color-mix(in srgb, var(--bug-color) 80%, transparent));
 }
 
 @keyframes firefly-drift {
@@ -130,19 +123,19 @@ input[type='date']::-webkit-calendar-picker-indicator {
 
 @keyframes bug-drift {
   0% {
-    transform: translate3d(0, 0, 0) rotate(var(--bug-rotate));
+    transform: translate3d(0, 0, 0) scale(1);
   }
 
   35% {
-    transform: translate3d(var(--bug-drift-x), calc(var(--bug-drift-y) * -1), 0) rotate(calc(var(--bug-rotate) + 8deg));
+    transform: translate3d(var(--bug-drift-x), calc(var(--bug-drift-y) * -1), 0) scale(1.08);
   }
 
   70% {
-    transform: translate3d(calc(var(--bug-drift-x) * -0.55), var(--bug-drift-y), 0) rotate(calc(var(--bug-rotate) - 6deg));
+    transform: translate3d(calc(var(--bug-drift-x) * -0.55), var(--bug-drift-y), 0) scale(0.92);
   }
 
   100% {
-    transform: translate3d(0, 0, 0) rotate(var(--bug-rotate));
+    transform: translate3d(0, 0, 0) scale(1);
   }
 }
 

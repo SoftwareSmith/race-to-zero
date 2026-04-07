@@ -11,6 +11,7 @@ import {
   startOfDay,
   subDays,
 } from 'date-fns'
+import { countConfiguredDays } from './workCalendar.js'
 
 const DEADLINE_TREND_WINDOW_DAYS = 30
 
@@ -258,7 +259,7 @@ function getCustomRangeDates(customFromDate, customToDate, today) {
   return { startDate, endDate }
 }
 
-export function getDeadlineMetrics(source, { deadlineDate, trackingStartDate } = {}) {
+export function getDeadlineMetrics(source, { deadlineDate, trackingStartDate, workdaySettings } = {}) {
   const bugs = normalizeBugRecords(source)
   const allCreatedPerDay = buildSeriesFromField(bugs, 'createdAt')
   const allCompletedPerDay = buildSeriesFromField(bugs, 'completedAt')
@@ -272,11 +273,11 @@ export function getDeadlineMetrics(source, { deadlineDate, trackingStartDate } =
   const trackingStart = isBefore(requestedTrackingStartDate, firstBugDate) ? firstBugDate : requestedTrackingStartDate
   const recentCreatedPerDay = filterSeriesByDateRange(allCreatedPerDay, trackingStart, today)
   const recentCompletedPerDay = filterSeriesByDateRange(allCompletedPerDay, trackingStart, today)
-  const trendDayCount = Math.max(differenceInCalendarDays(today, trackingStart) + 1, 1)
+  const trendDayCount = Math.max(countConfiguredDays(trackingStart, today, workdaySettings, { inclusive: true }), 1)
   const currentAddRate = recentCreatedPerDay.reduce((sum, entry) => sum + entry.count, 0) / trendDayCount
   const currentFixRate = recentCompletedPerDay.reduce((sum, entry) => sum + entry.count, 0) / trendDayCount
   const currentNetBurnRate = currentFixRate - currentAddRate
-  const daysUntilDeadline = Math.max(differenceInCalendarDays(deadline, today), 0)
+  const daysUntilDeadline = Math.max(countConfiguredDays(today, deadline, workdaySettings, { inclusive: false }), 0)
   const neededNetBurnRate = daysUntilDeadline > 0 ? remainingBugs / daysUntilDeadline : remainingBugs
   const bugsPerDayRequired = daysUntilDeadline > 0 ? currentAddRate + neededNetBurnRate : remainingBugs
   const status = getDeadlineStatus({
@@ -315,6 +316,7 @@ export function getDeadlineMetrics(source, { deadlineDate, trackingStartDate } =
     }),
     priorityDistribution: buildPriorityDistribution(bugs),
     today,
+    workdaySettings,
   }
 }
 
@@ -334,7 +336,7 @@ export function buildDeadlineBurndownChartData(deadlineMetrics) {
   const actualLookup = new Map(actualHistory.map((entry) => [entry.date, entry.count]))
   const idealStartDate = deadlineMetrics.trackingStartDate
   const idealStartCount = deadlineMetrics.trackingStartBacklog
-  const idealDuration = Math.max(differenceInCalendarDays(deadlineMetrics.deadline, idealStartDate), 1)
+  const idealDuration = Math.max(countConfiguredDays(idealStartDate, deadlineMetrics.deadline, deadlineMetrics.workdaySettings, { inclusive: false }), 1)
 
   return {
     labels: labels.map((entry) => formatLabel(entry)),
@@ -354,7 +356,7 @@ export function buildDeadlineBurndownChartData(deadlineMetrics) {
         label: 'Ideal line',
         data: labels.map((entry) => {
           const currentDate = parseISO(entry)
-          const elapsed = Math.max(differenceInCalendarDays(currentDate, idealStartDate), 0)
+          const elapsed = Math.max(countConfiguredDays(idealStartDate, currentDate, deadlineMetrics.workdaySettings, { inclusive: false }), 0)
           return Math.max(0, Number((idealStartCount - (idealStartCount / idealDuration) * elapsed).toFixed(2)))
         }),
         borderColor: '#34d399',
