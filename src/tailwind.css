@@ -1,0 +1,97 @@
+@import url("https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=IBM+Plex+Mono:wght@400;500&family=Manrope:wght@400;500;600;700;800&display=swap");
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Manrope", sans-serif;
+  --font-mono: "IBM Plex Mono", monospace;
+  --font-display: "Fraunces", serif;
+}
+
+@keyframes firefly-drift {
+  0% {
+    transform: translate3d(0, 0, 0);
+  }
+
+  30% {
+    transform: translate3d(var(--firefly-drift-x), -10px, 0);
+  }
+
+  65% {
+    transform: translate3d(calc(var(--firefly-drift-x) * -0.45), 10px, 0);
+  }
+
+  100% {
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@keyframes firefly-pulse {
+  0%,
+  100% {
+    opacity: 0.2;
+    scale: 0.9;
+  }
+
+  50% {
+    opacity: 0.7;
+    scale: 1.15;
+  }
+}
+
+@keyframes milestone-burst {
+  0% {
+    opacity: 0;
+    transform: scale(0.94);
+  }
+
+  20% {
+    opacity: 1;
+  }
+
+  100% {
+    opacity: 0;
+    transform: scale(1.08);
+  }
+}
+
+@keyframes all-clear-breathe {
+  0%,
+  100% {
+    opacity: 0.55;
+  }
+
+  50% {
+    opacity: 0.95;
+  }
+}
+
+@keyframes hammer-swing {
+  0% {
+    transform: translate3d(-6px, -6px, 0) rotate(0deg) scale(1);
+  }
+
+  40% {
+    transform: translate3d(-4px, -2px, 0) rotate(26deg) scale(1.04);
+  }
+
+  100% {
+    transform: translate3d(-6px, -6px, 0) rotate(0deg) scale(1);
+  }
+}
+
+@keyframes bug-splat {
+  0% {
+    opacity: 0;
+    transform: scale(0.45);
+  }
+
+  35% {
+    opacity: 1;
+    transform: scale(1.08);
+  }
+
+  100% {
+    opacity: 0;
+    transform: scale(1.35);
+  }
+}

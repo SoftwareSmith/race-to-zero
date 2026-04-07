@@ -1,0 +1,785 @@
+import type { ChangeEvent, ReactNode } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { endOfYear, format, subDays } from "date-fns";
+import BackgroundField from "./components/BackgroundField";
+import BugSettingsMenu from "./components/BugSettingsMenu";
+import ChartCard from "./components/ChartCard";
+import CommandCenter from "./components/CommandCenter";
+import MetricCard from "./components/MetricCard";
+import SettingsMenu from "./components/SettingsMenu";
+import TopNav from "./components/TopNav";
+import { STORAGE_KEYS } from "./constants/storageKeys";
+import { useStoredState } from "./hooks/useStoredState";
+import { useMetrics } from "./hooks/useMetrics";
+import type {
+  ActiveTab,
+  BugVisualSettingKey,
+  ChartFocusState,
+  CompareRangeKey,
+  ComparisonMetrics,
+  DeadlineMetrics,
+  MenuSettingsState,
+  SettingToggleKey,
+  StatusBannerKind,
+  SummaryMetrics,
+  Tone,
+  TopMenuKey,
+  WorkdaySettings,
+} from "./types/dashboard";
+import { cn } from "./utils/cn";
+import {
+  formatNumber,
+  formatPercent,
+  formatSignedNumber,
+  getMetricTone,
+  getNetChangeTone,
+} from "./utils/dashboard";
+import {
+  parseStoredBoolean,
+  parseStoredPositiveNumber,
+  parseStoredString,
+} from "./utils/storage";
+import {
+  buildComparisonSummaryChartData,
+  buildComparisonTimelineChartData,
+  buildDeadlineBurndownChartData,
+  buildPriorityChartData,
+  getComparisonMetrics,
+  getDeadlineMetrics,
+  getSummaryMetrics,
+} from "./utils/metrics";
+
+const MILESTONE_THRESHOLDS = [100, 50, 25, 10, 0] as const;
+
+interface MilestoneFlash {
+  threshold: number;
+  token: number;
+}
+
+interface StatusBannerProps {
+  children: ReactNode;
+  kind?: StatusBannerKind;
+}
+
+interface MetricCardDefinition {
+  hint: string;
+  label: string;
+  tone: Tone;
+  value: string;
+}
+
+function getBacklogSummary(
+  summary: SummaryMetrics,
+  deadlineMetrics: DeadlineMetrics,
+) {
+  if (summary.currentNetBurnRate <= 0) {
+    return `The backlog is not trending downward right now. Current net burn is ${formatNumber(summary.currentNetBurnRate, 2)}/day against ${formatNumber(deadlineMetrics.neededNetBurnRate, 2)}/day needed.`;
+  }
+
+  if (summary.currentNetBurnRate >= deadlineMetrics.neededNetBurnRate) {
+    return `The backlog is trending downward, and current net burn of ${formatNumber(summary.currentNetBurnRate, 2)}/day is holding ahead of the target path.`;
+  }
+
+  return `The backlog is trending downward, but current net burn of ${formatNumber(summary.currentNetBurnRate, 2)}/day is still below the ${formatNumber(deadlineMetrics.neededNetBurnRate, 2)}/day needed to close the gap to the target path.`;
+}
+
+function getWorkdayLabelAndHint(
+  isWorkdayMode: boolean,
+  deadlineLabel: string,
+): { hint: string; label: string } {
+  if (isWorkdayMode) {
+    return {
+      hint: `Remaining working days to reach zero by ${deadlineLabel}.`,
+      label: "Workdays left",
+    };
+  }
+
+  return {
+    hint: `Days remaining to reach zero by ${deadlineLabel}.`,
+    label: "Days left",
+  };
+}
+
+function buildOverviewMetricCards(
+  summary: SummaryMetrics,
+  deadlineMetrics: DeadlineMetrics,
+  metricTone: Tone,
+  isWorkdayMode: boolean,
+): MetricCardDefinition[] {
+  const dayMetric = getWorkdayLabelAndHint(
+    isWorkdayMode,
+    summary.deadlineLabel,
+  );
+
+  return [
+    {
+      hint: "Current open backlog size. This same number drives the animated bug field in the background.",
+      label: "Open bugs",
+      tone: metricTone,
+      value: formatNumber(summary.bugCount),
+    },
+    {
+      hint: dayMetric.hint,
+      label: dayMetric.label,
+      tone: metricTone,
+      value: formatNumber(summary.daysUntilDeadline),
+    },
+    {
+      hint: "Recent fixes per day minus recent created bugs per day.",
+      label: "Current net burn",
+      tone: metricTone,
+      value: `${formatNumber(summary.currentNetBurnRate, 2)}/day`,
+    },
+    {
+      hint: "Required daily net backlog reduction to hit zero by the selected deadline.",
+      label: "Required net burn",
+      tone: metricTone,
+      value: `${formatNumber(deadlineMetrics.neededNetBurnRate, 2)}/day`,
+    },
+    {
+      hint: "Confidence rises when current net burn stays above the required burn.",
+      label: "Confidence",
+      tone: metricTone,
+      value: formatPercent(summary.likelihoodScore),
+    },
+  ];
+}
+
+function getCompletedTone(comparisonMetrics: ComparisonMetrics): Tone {
+  if (
+    comparisonMetrics.currentWindow.fixed >
+    comparisonMetrics.currentWindow.created
+  ) {
+    return "positive";
+  }
+
+  if (
+    comparisonMetrics.currentWindow.fixed ===
+    comparisonMetrics.currentWindow.created
+  ) {
+    return "neutral";
+  }
+
+  return getMetricTone(
+    comparisonMetrics.currentWindow.fixed,
+    comparisonMetrics.previousWindow?.fixed ?? null,
+    true,
+  );
+}
+
+function getCompletionRateTone(comparisonMetrics: ComparisonMetrics): Tone {
+  if (comparisonMetrics.currentWindow.completionRate > 100) {
+    return "positive";
+  }
+
+  if (Math.abs(comparisonMetrics.currentWindow.completionRate - 100) < 0.01) {
+    return "neutral";
+  }
+
+  return getMetricTone(
+    comparisonMetrics.currentWindow.completionRate,
+    comparisonMetrics.previousWindow?.completionRate ?? null,
+    true,
+  );
+}
+
+function buildPeriodsMetricCards(
+  comparisonMetrics: ComparisonMetrics,
+  createdTone: Tone,
+  completedTone: Tone,
+  netChangeTone: Tone,
+  completionRateTone: Tone,
+): MetricCardDefinition[] {
+  return [
+    {
+      hint: "New bugs added during the selected period. Lower is better.",
+      label: "Bugs created",
+      tone: createdTone,
+      value: formatNumber(comparisonMetrics.currentWindow.created),
+    },
+    {
+      hint: "Bugs completed during the selected period. Higher is better.",
+      label: "Bugs completed",
+      tone: completedTone,
+      value: formatNumber(comparisonMetrics.currentWindow.fixed),
+    },
+    {
+      hint: "Created minus completed during the selected period.",
+      label: "Net change",
+      tone: netChangeTone,
+      value: formatSignedNumber(comparisonMetrics.currentWindow.netChange),
+    },
+    {
+      hint: "Completion rate helps normalize periods with different intake volume.",
+      label: "Completion rate",
+      tone: completionRateTone,
+      value: formatPercent(comparisonMetrics.currentWindow.completionRate, 1),
+    },
+  ];
+}
+
+function StatusBanner({ kind = "info", children }: StatusBannerProps) {
+  const styles = {
+    error: "border-red-500/30 bg-red-950/30 text-red-100",
+    info: "border-sky-500/30 bg-sky-950/20 text-sky-100",
+  };
+
+  return (
+    <div
+      className={cn(
+        "rounded-[22px] border px-4 py-3 text-sm font-medium shadow-[0_12px_30px_rgba(68,50,30,0.06)]",
+        styles[kind] ?? styles.info,
+      )}
+      role={kind === "error" ? "alert" : "status"}
+    >
+      {children}
+    </div>
+  );
+}
+
+interface OverviewViewProps {
+  deadlineMetrics: DeadlineMetrics;
+  onChartFocusChange: (nextFocus: ChartFocusState | null) => void;
+  summary: SummaryMetrics;
+  workdaySettings: WorkdaySettings;
+}
+
+const OverviewView = memo(function OverviewView({
+  deadlineMetrics,
+  onChartFocusChange,
+  summary,
+  workdaySettings,
+}: OverviewViewProps) {
+  const metricTone = deadlineMetrics.statusTone;
+  const isWorkdayMode =
+    workdaySettings.excludeWeekends || workdaySettings.excludePublicHolidays;
+  const backlogSummary = getBacklogSummary(summary, deadlineMetrics);
+  const deadlineBurndownData = useMemo(
+    () => buildDeadlineBurndownChartData(deadlineMetrics),
+    [deadlineMetrics],
+  );
+  const priorityChartData = useMemo(
+    () => buildPriorityChartData(deadlineMetrics),
+    [deadlineMetrics],
+  );
+  const metricCards = useMemo(
+    () =>
+      buildOverviewMetricCards(
+        summary,
+        deadlineMetrics,
+        metricTone,
+        isWorkdayMode,
+      ),
+    [deadlineMetrics, isWorkdayMode, metricTone, summary],
+  );
+
+  return (
+    <div className="grid gap-6">
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+        {metricCards.map((metricCard) => (
+          <MetricCard
+            key={metricCard.label}
+            hint={metricCard.hint}
+            label={metricCard.label}
+            tone={metricCard.tone}
+            value={metricCard.value}
+          />
+        ))}
+      </div>
+
+      <div className="grid gap-5 xl:grid-cols-[minmax(0,1.35fr)_minmax(340px,0.85fr)]">
+        <ChartCard
+          chartKey="bug-burndown"
+          className="min-h-[420px]"
+          data={deadlineBurndownData}
+          onHoverStateChange={onChartFocusChange}
+          summary={backlogSummary}
+          title="Bug burndown"
+        />
+        <ChartCard
+          chartKey="priority-breakdown"
+          className="min-h-[420px]"
+          data={priorityChartData}
+          description="Breakdown of the open backlog by priority so the biggest risk pockets are visible without hovering."
+          onHoverStateChange={onChartFocusChange}
+          title="Open bugs by priority"
+          variant="bar"
+        />
+      </div>
+    </div>
+  );
+});
+
+interface PeriodsViewProps {
+  comparisonMetrics: ComparisonMetrics;
+  onChartFocusChange: (nextFocus: ChartFocusState | null) => void;
+}
+
+const PeriodsView = memo(function PeriodsView({
+  comparisonMetrics,
+  onChartFocusChange,
+}: PeriodsViewProps) {
+  const createdTone = getMetricTone(
+    comparisonMetrics.currentWindow.created,
+    comparisonMetrics.previousWindow?.created ?? null,
+    false,
+  );
+  const completedTone = getCompletedTone(comparisonMetrics);
+  const netChangeTone = getNetChangeTone(
+    comparisonMetrics.currentWindow.netChange,
+  );
+  const completionRateTone = getCompletionRateTone(comparisonMetrics);
+  const comparisonTimelineData = useMemo(
+    () => buildComparisonTimelineChartData(comparisonMetrics),
+    [comparisonMetrics],
+  );
+  const comparisonSummaryData = useMemo(
+    () => buildComparisonSummaryChartData(comparisonMetrics),
+    [comparisonMetrics],
+  );
+  const metricCards = useMemo(
+    () =>
+      buildPeriodsMetricCards(
+        comparisonMetrics,
+        createdTone,
+        completedTone,
+        netChangeTone,
+        completionRateTone,
+      ),
+    [
+      comparisonMetrics,
+      completionRateTone,
+      completedTone,
+      createdTone,
+      netChangeTone,
+    ],
+  );
+
+  return (
+    <div className="grid gap-6">
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        {metricCards.map((metricCard) => (
+          <MetricCard
+            key={metricCard.label}
+            hint={metricCard.hint}
+            label={metricCard.label}
+            tone={metricCard.tone}
+            value={metricCard.value}
+          />
+        ))}
+      </div>
+
+      <div className="grid gap-5 xl:grid-cols-[minmax(0,1.35fr)_minmax(340px,0.85fr)]">
+        <ChartCard
+          chartKey="comparison-timeline"
+          className="min-h-[420px]"
+          data={comparisonTimelineData}
+          onHoverStateChange={onChartFocusChange}
+          summary="Compare daily intake against completions to see whether recent periods are relieving pressure or letting backlog build."
+          title="Created vs completed over time"
+        />
+        <ChartCard
+          chartKey="comparison-summary"
+          className="min-h-[420px]"
+          data={comparisonSummaryData}
+          description="Each x-axis group is one metric type, with current and previous period bars paired so the change is easy to read."
+          onHoverStateChange={onChartFocusChange}
+          summary="These bars compare the current period with the previous one across intake, completions, net movement, and completion rate."
+          title="Current vs previous window"
+          variant="bar"
+        />
+      </div>
+    </div>
+  );
+});
+
+function App() {
+  const { metrics, error } = useMetrics();
+  const [activeTab, setActiveTab] = useState<ActiveTab>("overview");
+  const [deadlineDate, setDeadlineDate] = useStoredState(
+    STORAGE_KEYS.deadlineDate,
+    format(endOfYear(new Date()), "yyyy-MM-dd"),
+    {
+      parse: parseStoredString,
+    },
+  );
+  const [deadlineFromDate, setDeadlineFromDate] = useStoredState(
+    STORAGE_KEYS.deadlineFromDate,
+    format(subDays(new Date(), 29), "yyyy-MM-dd"),
+    {
+      parse: parseStoredString,
+    },
+  );
+  const [excludeWeekends, setExcludeWeekends] = useStoredState(
+    STORAGE_KEYS.excludeWeekends,
+    false,
+    {
+      parse: parseStoredBoolean,
+    },
+  );
+  const [excludePublicHolidays, setExcludePublicHolidays] = useStoredState(
+    STORAGE_KEYS.excludePublicHolidays,
+    false,
+    {
+      parse: parseStoredBoolean,
+    },
+  );
+  const [showParticleCount, setShowParticleCount] = useStoredState(
+    STORAGE_KEYS.showParticleCount,
+    true,
+    {
+      parse: parseStoredBoolean,
+    },
+  );
+  const [terminatorMode, setTerminatorMode] = useStoredState(
+    STORAGE_KEYS.terminatorMode,
+    false,
+    {
+      parse: parseStoredBoolean,
+    },
+  );
+  const [openTopMenu, setOpenTopMenu] = useState<TopMenuKey>(null);
+  const [bugSizeMultiplier, setBugSizeMultiplier] = useStoredState(
+    STORAGE_KEYS.bugSizeMultiplier,
+    3.5,
+    {
+      parse: parseStoredPositiveNumber,
+    },
+  );
+  const [bugChaosMultiplier, setBugChaosMultiplier] = useStoredState(
+    STORAGE_KEYS.bugChaosMultiplier,
+    2.5,
+    {
+      parse: parseStoredPositiveNumber,
+    },
+  );
+  const [compareRangeKey, setCompareRangeKey] = useState<CompareRangeKey>("30");
+  const [customFromDate, setCustomFromDate] = useState(() =>
+    format(subDays(new Date(), 29), "yyyy-MM-dd"),
+  );
+  const [customToDate, setCustomToDate] = useState(() =>
+    format(new Date(), "yyyy-MM-dd"),
+  );
+  const [chartFocus, setChartFocus] = useState<ChartFocusState | null>(null);
+  const [milestoneFlash, setMilestoneFlash] = useState<MilestoneFlash | null>(
+    null,
+  );
+  const settingsMenuRef = useRef<HTMLDivElement | null>(null);
+  const bugSettingsMenuRef = useRef<HTMLDivElement | null>(null);
+  const previousBugCountRef = useRef<number | null>(null);
+
+  const workdaySettings = useMemo<WorkdaySettings>(
+    () => ({
+      excludePublicHolidays,
+      excludeWeekends,
+    }),
+    [excludePublicHolidays, excludeWeekends],
+  );
+
+  const deadlineMetrics = useMemo(
+    () =>
+      getDeadlineMetrics(metrics, {
+        deadlineDate,
+        trackingStartDate: deadlineFromDate,
+        workdaySettings,
+      }),
+    [deadlineDate, deadlineFromDate, metrics, workdaySettings],
+  );
+  const comparisonMetrics = useMemo(
+    () =>
+      getComparisonMetrics(metrics, {
+        rangeKey: compareRangeKey,
+        customFromDate,
+        customToDate,
+      }),
+    [compareRangeKey, customFromDate, customToDate, metrics],
+  );
+  const summary = useMemo(
+    () => getSummaryMetrics(deadlineMetrics),
+    [deadlineMetrics],
+  );
+  const todayDate = format(new Date(), "yyyy-MM-dd");
+
+  const settings = useMemo<MenuSettingsState>(
+    () => ({
+      excludePublicHolidays,
+      excludeWeekends,
+      showParticleCount,
+    }),
+    [excludePublicHolidays, excludeWeekends, showParticleCount],
+  );
+  const bugVisualSettings = useMemo(
+    () => ({
+      chaosMultiplier: bugChaosMultiplier,
+      sizeMultiplier: bugSizeMultiplier,
+    }),
+    [bugChaosMultiplier, bugSizeMultiplier],
+  );
+
+  const handleToggleSetting = useCallback(
+    (settingKey: SettingToggleKey) => {
+      switch (settingKey) {
+        case "excludeWeekends":
+          setExcludeWeekends((currentValue) => !currentValue);
+          break;
+        case "excludePublicHolidays":
+          setExcludePublicHolidays((currentValue) => !currentValue);
+          break;
+        case "showParticleCount":
+          setShowParticleCount((currentValue) => !currentValue);
+          break;
+        case "terminatorMode":
+          setTerminatorMode((currentValue) => !currentValue);
+          break;
+        default:
+          break;
+      }
+    },
+    [
+      setExcludePublicHolidays,
+      setExcludeWeekends,
+      setShowParticleCount,
+      setTerminatorMode,
+    ],
+  );
+
+  const handleBugVisualSetting = useCallback(
+    (settingKey: BugVisualSettingKey, value: number) => {
+      if (settingKey === "sizeMultiplier") {
+        setBugSizeMultiplier(value);
+      }
+
+      if (settingKey === "chaosMultiplier") {
+        setBugChaosMultiplier(value);
+      }
+    },
+    [setBugChaosMultiplier, setBugSizeMultiplier],
+  );
+
+  const handleTopMenuToggle = useCallback(
+    (menuKey: Exclude<TopMenuKey, null>) => {
+      setOpenTopMenu((currentValue) =>
+        currentValue === menuKey ? null : menuKey,
+      );
+    },
+    [],
+  );
+
+  const handleTopNavInteract = useCallback(() => {
+    setOpenTopMenu(null);
+  }, []);
+
+  const handleCompareRangeChange = useCallback((value: CompareRangeKey) => {
+    setOpenTopMenu(null);
+    setCompareRangeKey(value);
+  }, []);
+
+  const handleCustomFromDateChange = useCallback(
+    (event: ChangeEvent<HTMLInputElement>) => {
+      setOpenTopMenu(null);
+      setCustomFromDate(event.target.value);
+    },
+    [],
+  );
+
+  const handleCustomToDateChange = useCallback(
+    (event: ChangeEvent<HTMLInputElement>) => {
+      setOpenTopMenu(null);
+      setCustomToDate(event.target.value);
+    },
+    [],
+  );
+
+  const handleDeadlineDateChange = useCallback(
+    (event: ChangeEvent<HTMLInputElement>) => {
+      setOpenTopMenu(null);
+      setDeadlineDate(event.target.value);
+    },
+    [setDeadlineDate],
+  );
+
+  const handleDeadlineFromDateChange = useCallback(
+    (event: ChangeEvent<HTMLInputElement>) => {
+      setOpenTopMenu(null);
+      setDeadlineFromDate(event.target.value);
+    },
+    [setDeadlineFromDate],
+  );
+
+  const handleTabChange = useCallback((tabId: ActiveTab) => {
+    setOpenTopMenu(null);
+    setActiveTab(tabId);
+  }, []);
+
+  const handleChartFocusChange = useCallback(
+    (nextFocus: ChartFocusState | null) => {
+      setChartFocus(nextFocus);
+    },
+    [],
+  );
+
+  useEffect(() => {
+    if (!openTopMenu) {
+      return undefined;
+    }
+
+    const activeMenuRef =
+      openTopMenu === "bugs" ? bugSettingsMenuRef : settingsMenuRef;
+
+    const handlePointerDown = (
+      event: globalThis.MouseEvent | globalThis.TouchEvent,
+    ) => {
+      const targetNode = event.target;
+
+      if (!(targetNode instanceof Node)) {
+        return;
+      }
+
+      if (
+        activeMenuRef.current &&
+        !activeMenuRef.current.contains(targetNode)
+      ) {
+        setOpenTopMenu(null);
+      }
+    };
+
+    document.addEventListener("mousedown", handlePointerDown);
+    document.addEventListener("touchstart", handlePointerDown);
+
+    return () => {
+      document.removeEventListener("mousedown", handlePointerDown);
+      document.removeEventListener("touchstart", handlePointerDown);
+    };
+  }, [openTopMenu]);
+
+  useEffect(() => {
+    const currentBugCount = summary.bugCount;
+    const previousBugCount = previousBugCountRef.current;
+
+    if (previousBugCount != null) {
+      const crossedThreshold = MILESTONE_THRESHOLDS.find(
+        (threshold) =>
+          previousBugCount > threshold && currentBugCount <= threshold,
+      );
+      if (crossedThreshold != null) {
+        const sessionKey = `race-to-zero:milestone:${crossedThreshold}`;
+        if (!window.sessionStorage.getItem(sessionKey)) {
+          window.sessionStorage.setItem(sessionKey, "true");
+          setMilestoneFlash({ threshold: crossedThreshold, token: Date.now() });
+        }
+      }
+    }
+
+    previousBugCountRef.current = currentBugCount;
+  }, [summary.bugCount]);
+
+  useEffect(() => {
+    if (!milestoneFlash) {
+      return undefined;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      setMilestoneFlash(null);
+    }, 1800);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [milestoneFlash]);
+
+  const headerEyebrow =
+    summary.bugCount === 0 ? "All clear" : "Operations dashboard";
+  const headerSubtitle =
+    summary.bugCount === 0
+      ? "No open bugs in the current public snapshot."
+      : "Current pace against the zero-bug deadline.";
+
+  return (
+    <div className="relative min-h-screen overflow-hidden bg-[#050608]">
+      <BackgroundField
+        bugCount={summary.bugCount}
+        bugVisualSettings={bugVisualSettings}
+        chartFocus={chartFocus}
+        milestoneFlash={milestoneFlash}
+        showParticleCount={showParticleCount}
+        terminatorMode={terminatorMode}
+        tone={deadlineMetrics.statusTone}
+      />
+
+      <div className="relative mx-auto flex min-h-screen w-full max-w-[1380px] flex-col gap-8 px-4 py-6 sm:px-6 sm:py-8 lg:px-8 lg:py-10">
+        <header className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <div className="max-w-3xl">
+            <p className="text-[0.72rem] font-semibold uppercase tracking-[0.28em] text-stone-500">
+              {headerEyebrow}
+            </p>
+            <h1 className="mt-2 font-display text-4xl leading-[0.94] tracking-[-0.06em] text-stone-50 sm:text-5xl xl:text-6xl">
+              Race to Zero Bugs
+            </h1>
+            <p className="mt-3 max-w-xl text-sm leading-6 text-stone-400 sm:text-base">
+              {headerSubtitle}
+            </p>
+          </div>
+
+          <div className="flex items-center gap-2 self-end lg:self-auto">
+            <SettingsMenu
+              containerRef={settingsMenuRef}
+              onMenuToggle={() => handleTopMenuToggle("settings")}
+              onToggle={handleToggleSetting}
+              open={openTopMenu === "settings"}
+              settings={settings}
+            />
+            <BugSettingsMenu
+              bugVisualSettings={bugVisualSettings}
+              containerRef={bugSettingsMenuRef}
+              onChange={handleBugVisualSetting}
+              onMenuToggle={() => handleTopMenuToggle("bugs")}
+              onToggle={handleToggleSetting}
+              open={openTopMenu === "bugs"}
+              showParticleCount={showParticleCount}
+              terminatorMode={terminatorMode}
+            />
+          </div>
+        </header>
+
+        <TopNav
+          activeTab={activeTab}
+          compareRangeKey={compareRangeKey}
+          customFromDate={customFromDate}
+          customToDate={customToDate}
+          deadlineDate={deadlineDate}
+          deadlineFromDate={deadlineFromDate}
+          onInteract={handleTopNavInteract}
+          onCompareRangeChange={handleCompareRangeChange}
+          onCustomFromDateChange={handleCustomFromDateChange}
+          onCustomToDateChange={handleCustomToDateChange}
+          onDeadlineDateChange={handleDeadlineDateChange}
+          onDeadlineFromDateChange={handleDeadlineFromDateChange}
+          onTabChange={handleTabChange}
+          todayDate={todayDate}
+        />
+
+        <CommandCenter deadlineMetrics={deadlineMetrics} summary={summary} />
+
+        <main className="grid gap-8 pb-10">
+          {activeTab === "overview" ? (
+            <OverviewView
+              deadlineMetrics={deadlineMetrics}
+              onChartFocusChange={handleChartFocusChange}
+              summary={summary}
+              workdaySettings={workdaySettings}
+            />
+          ) : null}
+
+          {activeTab === "periods" ? (
+            <PeriodsView
+              comparisonMetrics={comparisonMetrics}
+              onChartFocusChange={handleChartFocusChange}
+            />
+          ) : null}
+
+          {error ? <StatusBanner kind="error">{error}</StatusBanner> : null}
+        </main>
+      </div>
+    </div>
+  );
+}
+
+export default App;

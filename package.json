@@ -7,10 +7,13 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "lint": "eslint .",
+    "lint": "node --import tsx ./node_modules/eslint/bin/eslint.js .",
+    "prettier": "prettier --write .",
+    "prettier:check": "prettier --check .",
     "preview": "vite preview",
     "deploy": "gh-pages -d dist",
-    "sync:linear": "node scripts/fetch-linear.js"
+    "sync:linear": "tsx scripts/fetch-linear.ts",
+    "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.node.json"
   },
   "dependencies": {
     "chart.js": "^4.5.1",
@@ -25,14 +28,20 @@
   "devDependencies": {
     "@eslint/js": "^9.39.4",
     "@tailwindcss/vite": "^4.2.2",
+    "@types/node": "^24.7.2",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
+    "@typescript-eslint/eslint-plugin": "^8.46.1",
+    "@typescript-eslint/parser": "^8.46.1",
     "@vitejs/plugin-react": "^6.0.1",
     "eslint": "^9.39.4",
     "eslint-plugin-react-hooks": "^7.0.1",
     "eslint-plugin-react-refresh": "^0.5.2",
     "globals": "^17.4.0",
+    "prettier": "^3.6.2",
     "tailwindcss": "^4.2.2",
+    "tsx": "^4.20.6",
+    "typescript": "^5.9.3",
     "vite": "^8.0.4"
   }
 }

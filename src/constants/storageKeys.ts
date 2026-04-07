@@ -1,0 +1,12 @@
+export const STORAGE_KEYS = {
+  bugChaosMultiplier: "race-to-zero:bug-chaos-multiplier",
+  bugSizeMultiplier: "race-to-zero:bug-size-multiplier",
+  deadlineDate: "race-to-zero:deadline-date",
+  deadlineFromDate: "race-to-zero:deadline-from-date",
+  excludePublicHolidays: "race-to-zero:exclude-holidays-awst",
+  excludeWeekends: "race-to-zero:exclude-weekends",
+  showParticleCount: "race-to-zero:show-particle-count",
+  terminatorMode: "race-to-zero:terminator-mode",
+} as const;
+
+export type StorageKey = (typeof STORAGE_KEYS)[keyof typeof STORAGE_KEYS];
