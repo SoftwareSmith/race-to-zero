@@ -46,10 +46,10 @@ function ChartCard({ title, description, data, variant = 'line', className = '' 
           <h3 className="mt-2 font-[family-name:var(--font-display)] text-3xl leading-tight tracking-[-0.04em] text-stone-50">
             {title}
           </h3>
-          <p className="mt-3 w-full text-sm leading-7 text-stone-300">{description}</p>
+          {description ? <p className="mt-3 w-full text-sm leading-7 text-stone-300">{description}</p> : null}
         </div>
 
-        <div className="mt-6 h-[320px] sm:h-[360px]">
+        <div className={cn('h-[320px] sm:h-[360px]', description ? 'mt-6' : 'mt-4')}>
           <ChartComponent data={data} options={getLineChartOptions(variant)} />
         </div>
       </div>
