@@ -145,6 +145,10 @@ export interface FireflyParticle {
   y: string;
 }
 
+export type BugVariant = "low" | "medium" | "high" | "urgent";
+
+export type BugCounts = Record<BugVariant, number>;
+
 export interface BugParticle {
   delay: number;
   driftX: number;
@@ -152,6 +156,7 @@ export interface BugParticle {
   duration: number;
   opacity: number;
   size: number;
+  variant: BugVariant;
   x: number;
   y: number;
 }

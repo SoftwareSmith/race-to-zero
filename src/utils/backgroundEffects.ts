@@ -1,415 +1,125 @@
-import type {
-  BugParticle,
-  EffectPalette,
-  FireflyParticle,
-  MotionProfile,
-  SceneProfile,
-  Tone,
-} from "../types/dashboard";
+import { BUG_VARIANT_CONFIG, getBugVariantColor, normalizeBugCounts } from "../constants/bugs";
+import type { BugCounts, BugParticle, BugVariant } from "../types/dashboard";
+import { drawBugSprite } from "./bugSprite";
 
-export function getEffectPalette(tone: "all-clear" | Tone): EffectPalette {
-  const palettes = {
-    "all-clear": {
-      bug: "rgba(134,239,172,0.18)",
-      fireflies: [
-        "rgba(187,247,208,0.76)",
-        "rgba(125,211,252,0.48)",
-        "rgba(110,231,183,0.42)",
-      ],
-      orbA: "rgba(16,185,129,0.08)",
-      orbB: "rgba(125,211,252,0.06)",
-    },
-    positive: {
-      bug: "rgba(167,243,208,0.42)",
-      fireflies: [
-        "rgba(16,185,129,0.72)",
-        "rgba(56,189,248,0.52)",
-        "rgba(167,243,208,0.42)",
-      ],
-      orbA: "rgba(16,185,129,0.1)",
-      orbB: "rgba(56,189,248,0.08)",
-    },
-    negative: {
-      bug: "rgba(252,165,165,0.52)",
-      fireflies: [
-        "rgba(239,68,68,0.6)",
-        "rgba(56,189,248,0.4)",
-        "rgba(253,186,116,0.34)",
-      ],
-      orbA: "rgba(239,68,68,0.1)",
-      orbB: "rgba(56,189,248,0.07)",
-    },
-    neutral: {
-      bug: "rgba(186,230,253,0.46)",
-      fireflies: [
-        "rgba(56,189,248,0.58)",
-        "rgba(20,184,166,0.42)",
-        "rgba(186,230,253,0.28)",
-      ],
-      orbA: "rgba(56,189,248,0.09)",
-      orbB: "rgba(20,184,166,0.07)",
-    },
-  };
-
-  return palettes[tone] ?? palettes.neutral;
+export interface BugState {
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  size: number;
+  variant: BugVariant;
+  opacity: number;
 }
 
-export function createFireflyParticles(
-  tone: "all-clear" | Tone,
-): FireflyParticle[] {
-  const palette = getEffectPalette(tone).fireflies;
-  const baseParticles = [
-    {
-      x: "10%",
-      y: "16%",
-      size: "5px",
-      duration: "10s",
-      delay: "0s",
-      driftX: "18px",
-      color: palette[0],
-    },
-    {
-      x: "24%",
-      y: "34%",
-      size: "4px",
-      duration: "12s",
-      delay: "2s",
-      driftX: "-22px",
-      color: palette[1],
-    },
-    {
-      x: "72%",
-      y: "12%",
-      size: "6px",
-      duration: "9s",
-      delay: "1s",
-      driftX: "14px",
-      color: palette[0],
-    },
-    {
-      x: "84%",
-      y: "38%",
-      size: "4px",
-      duration: "13s",
-      delay: "4s",
-      driftX: "-18px",
-      color: palette[2],
-    },
-    {
-      x: "18%",
-      y: "72%",
-      size: "5px",
-      duration: "11s",
-      delay: "3s",
-      driftX: "20px",
-      color: palette[2],
-    },
-    {
-      x: "68%",
-      y: "76%",
-      size: "5px",
-      duration: "14s",
-      delay: "5s",
-      driftX: "-16px",
-      color: palette[1],
-    },
-    {
-      x: "33%",
-      y: "18%",
-      size: "4px",
-      duration: "15s",
-      delay: "6s",
-      driftX: "12px",
-      color: palette[2],
-    },
-    {
-      x: "46%",
-      y: "62%",
-      size: "3px",
-      duration: "9s",
-      delay: "1.5s",
-      driftX: "-14px",
-      color: palette[0],
-    },
-    {
-      x: "58%",
-      y: "28%",
-      size: "5px",
-      duration: "12s",
-      delay: "2.5s",
-      driftX: "10px",
-      color: palette[1],
-    },
-    {
-      x: "78%",
-      y: "58%",
-      size: "4px",
-      duration: "16s",
-      delay: "7s",
-      driftX: "-20px",
-      color: palette[0],
-    },
-    {
-      x: "8%",
-      y: "48%",
-      size: "3px",
-      duration: "11s",
-      delay: "2.2s",
-      driftX: "16px",
-      color: palette[1],
-    },
-    {
-      x: "90%",
-      y: "80%",
-      size: "5px",
-      duration: "13s",
-      delay: "5.2s",
-      driftX: "-12px",
-      color: palette[2],
-    },
-    {
-      x: "14%",
-      y: "24%",
-      size: "3px",
-      duration: "14s",
-      delay: "0.8s",
-      driftX: "24px",
-      color: palette[2],
-    },
-    {
-      x: "29%",
-      y: "56%",
-      size: "5px",
-      duration: "17s",
-      delay: "3.5s",
-      driftX: "-12px",
-      color: palette[0],
-    },
-    {
-      x: "41%",
-      y: "10%",
-      size: "4px",
-      duration: "12.5s",
-      delay: "1.8s",
-      driftX: "18px",
-      color: palette[1],
-    },
-    {
-      x: "52%",
-      y: "44%",
-      size: "3px",
-      duration: "15s",
-      delay: "4.4s",
-      driftX: "-24px",
-      color: palette[2],
-    },
-    {
-      x: "63%",
-      y: "68%",
-      size: "6px",
-      duration: "18s",
-      delay: "2.9s",
-      driftX: "14px",
-      color: palette[0],
-    },
-    {
-      x: "74%",
-      y: "22%",
-      size: "3px",
-      duration: "10.5s",
-      delay: "5.6s",
-      driftX: "-10px",
-      color: palette[1],
-    },
-    {
-      x: "86%",
-      y: "52%",
-      size: "4px",
-      duration: "13.5s",
-      delay: "6.1s",
-      driftX: "22px",
-      color: palette[2],
-    },
-    {
-      x: "6%",
-      y: "84%",
-      size: "4px",
-      duration: "16.5s",
-      delay: "2.7s",
-      driftX: "12px",
-      color: palette[0],
-    },
-    {
-      x: "37%",
-      y: "80%",
-      size: "3px",
-      duration: "11.5s",
-      delay: "7.3s",
-      driftX: "-16px",
-      color: palette[1],
-    },
-    {
-      x: "57%",
-      y: "16%",
-      size: "5px",
-      duration: "14.5s",
-      delay: "3.2s",
-      driftX: "20px",
-      color: palette[2],
-    },
-    {
-      x: "69%",
-      y: "88%",
-      size: "3px",
-      duration: "12.8s",
-      delay: "1.1s",
-      driftX: "-18px",
-      color: palette[0],
-    },
-    {
-      x: "94%",
-      y: "32%",
-      size: "4px",
-      duration: "15.8s",
-      delay: "4.9s",
-      driftX: "-14px",
-      color: palette[1],
-    },
-  ];
-
-  if (tone !== "all-clear") {
-    return baseParticles;
-  }
-
-  return [
-    ...baseParticles,
-    {
-      x: "12%",
-      y: "60%",
-      size: "4px",
-      duration: "18s",
-      delay: "1.7s",
-      driftX: "16px",
-      color: palette[2],
-    },
-    {
-      x: "28%",
-      y: "82%",
-      size: "5px",
-      duration: "20s",
-      delay: "3.4s",
-      driftX: "-12px",
-      color: palette[0],
-    },
-    {
-      x: "49%",
-      y: "24%",
-      size: "4px",
-      duration: "17s",
-      delay: "2.3s",
-      driftX: "14px",
-      color: palette[1],
-    },
-    {
-      x: "77%",
-      y: "70%",
-      size: "5px",
-      duration: "21s",
-      delay: "4.1s",
-      driftX: "-18px",
-      color: palette[2],
-    },
-    {
-      x: "91%",
-      y: "18%",
-      size: "3px",
-      duration: "16.8s",
-      delay: "0.9s",
-      driftX: "10px",
-      color: palette[0],
-    },
-  ];
+export interface BugSwarmOptions {
+  counts: BugCounts;
+  width: number;
+  height: number;
 }
 
-export function createBugParticles(bugCount: number): BugParticle[] {
-  const totalBugs = Math.max(0, Math.floor(bugCount));
+/**
+ * BugSwarm manages a swarm of bugs moving around the screen.
+ * Each bug has a variant (low, medium, high, urgent) which affects size, opacity, and color.
+ */
+export class BugSwarm {
+  bugs: BugState[] = [];
+  width: number;
+  height: number;
 
-  return Array.from({ length: totalBugs }, (_, index) => {
-    const x = Number(((index * 37.17) % 100).toFixed(2));
-    const y = Number(
-      ((index * 19.73 + Math.floor(index / 7) * 3.4) % 100).toFixed(2),
-    );
-    const size = 4 + (index % 4);
-    const duration = 14 + (index % 9);
-    const delay = Number(((index % 17) * 0.37).toFixed(2));
-    const driftX = ((index % 9) - 4) * 10;
-    const driftY = ((index % 7) - 3) * 9;
-    const opacity = 0.38 + (index % 5) * 0.06;
+  constructor(options: BugSwarmOptions) {
+    this.width = options.width;
+    this.height = options.height;
 
-    return {
-      delay,
-      driftX,
-      driftY,
-      duration,
-      opacity,
-      size,
-      x,
-      y,
-    };
-  });
+    // create bugs for each variant count
+    Object.entries(normalizeBugCounts(options.counts)).forEach(([variant, count]) => {
+      for (let i = 0; i < count; i++) {
+        const bugVariant = variant as BugVariant;
+        const variantConfig = BUG_VARIANT_CONFIG[bugVariant];
+
+        // randomized swarming velocity
+        const speed = 0.5 + Math.random() * 1;
+        const angle = Math.random() * Math.PI * 2;
+
+        this.bugs.push({
+          variant: bugVariant,
+          x: Math.random() * this.width,
+          y: Math.random() * this.height,
+          vx: Math.cos(angle) * speed,
+          vy: Math.sin(angle) * speed,
+          size: 4 + Math.random() * 4 + variantConfig.sizeBoost,
+          opacity: 0.4 + Math.random() * 0.5,
+        });
+      }
+    });
+  }
+
+  /** Move all bugs and handle simple edge bounce */
+  update() {
+    this.bugs.forEach((b) => {
+      b.x += b.vx;
+      b.y += b.vy;
+
+      // slight random jitter for natural swarm
+      b.vx += (Math.random() - 0.5) * 0.05;
+      b.vy += (Math.random() - 0.5) * 0.05;
+
+      // edge bounce
+      if (b.x < 0) { b.x = 0; b.vx *= -1; }
+      if (b.x > this.width) { b.x = this.width; b.vx *= -1; }
+      if (b.y < 0) { b.y = 0; b.vy *= -1; }
+      if (b.y > this.height) { b.y = this.height; b.vy *= -1; }
+
+      // clamp max speed for smooth motion
+      const maxSpeed = 2;
+      b.vx = Math.max(Math.min(b.vx, maxSpeed), -maxSpeed);
+      b.vy = Math.max(Math.min(b.vy, maxSpeed), -maxSpeed);
+    });
+  }
+
+  /** Draw all bugs to canvas */
+  draw(ctx: CanvasRenderingContext2D) {
+    this.bugs.forEach((b) => {
+      drawBugSprite(ctx, {
+        x: b.x,
+        y: b.y,
+        size: b.size,
+        color: getBugVariantColor(b.variant),
+        opacity: b.opacity,
+        variant: b.variant,
+      });
+    });
+  }
+
+  /** Return bug under click or null */
+  getClickedBug(x: number, y: number): BugState | null {
+    for (const b of this.bugs) {
+      const dx = b.x - x;
+      const dy = b.y - y;
+      const r = b.size / 2;
+      if (dx * dx + dy * dy < r * r) return b;
+    }
+    return null;
+  }
+
+  /** Returns a snapshot of all bugs for game logic */
+  getAllBugs(): BugState[] {
+    return this.bugs;
+  }
 }
 
-export function getMotionProfile(tone: "all-clear" | Tone): MotionProfile {
-  if (tone === "all-clear") {
-    return {
-      durationMultiplier: 1.45,
-      opacityMultiplier: 0.45,
-      scale: 0.82,
-    };
-  }
-
-  if (tone === "positive") {
-    return {
-      durationMultiplier: 1.25,
-      opacityMultiplier: 0.85,
-      scale: 0.95,
-    };
-  }
-
-  if (tone === "negative") {
-    return {
-      durationMultiplier: 0.82,
-      opacityMultiplier: 1.18,
-      scale: 1.1,
-    };
-  }
-
-  return {
-    durationMultiplier: 1,
-    opacityMultiplier: 1,
-    scale: 1,
-  };
-}
-
-export function getSceneProfile(tone: "all-clear" | Tone): SceneProfile {
-  const profiles = {
-    "all-clear": {
-      chartFocusStrength: 0,
-      clusterStrength: -0.16,
-    },
-    positive: {
-      chartFocusStrength: 0.12,
-      clusterStrength: -0.08,
-    },
-    negative: {
-      chartFocusStrength: 0.22,
-      clusterStrength: 0.2,
-    },
-    neutral: {
-      chartFocusStrength: 0.16,
-      clusterStrength: 0.02,
-    },
-  };
-
-  return profiles[tone] ?? profiles.neutral;
+/** Convenience function to generate BugParticles for React state */
+export function createBugParticlesFromCounts(counts: BugCounts): BugParticle[] {
+  const swarm = new BugSwarm({ counts, width: 800, height: 600 });
+  return swarm.getAllBugs().map((b) => ({
+    x: (b.x / 800) * 100,
+    y: (b.y / 600) * 100,
+    size: b.size,
+    variant: b.variant,
+    opacity: b.opacity,
+    driftX: b.vx,
+    driftY: b.vy,
+    delay: Math.random() * 6,
+    duration: 8 + Math.random() * 6,
+  }));
 }

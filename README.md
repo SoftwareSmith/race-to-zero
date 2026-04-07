@@ -9,6 +9,7 @@ Race to Zero Bugs is a React and Vite dashboard that reads a sanitized bug snaps
 - Date handling with `date-fns`
 - Frontend-derived deadline, pace, and time-window calculations
 - GitHub Pages-ready Vite base path at `/race-to-zero/`
+- Standalone `interactive/` canvas game entry for Bug Smash
 
 ## Local Development
 
@@ -25,6 +26,13 @@ Build and publish to the `gh-pages` branch:
 npm run build
 npm run deploy
 ```
+
+## Interactive Game
+
+Bug Smash is exposed as a second static entrypoint at `interactive/index.html`.
+
+- Local dev path: `/interactive/`
+- GitHub Pages path: `/race-to-zero/interactive/`
 
 ## GitHub Action Sync
 

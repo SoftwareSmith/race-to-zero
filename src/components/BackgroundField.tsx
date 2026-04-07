@@ -1,14 +1,23 @@
 import type { CSSProperties } from "react";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  createBugParticles,
+  BUG_VARIANT_CONFIG,
+  getBugCountsKey,
+  getBugTotal,
+  getBugVariantMaxHp,
+} from "../constants/bugs";
+import { createBugParticlesFromCounts } from "../utils/backgroundEffects";
+import {
   createFireflyParticles,
   getEffectPalette,
   getMotionProfile,
   getSceneProfile,
-} from "../utils/backgroundEffects";
+} from "../utils/backgroundScene";
+import { drawBugSprite } from "../utils/bugSprite";
 import type {
+  BugCounts,
   BugParticle,
+  BugVariant,
   BugVisualSettings,
   ChartFocusState,
   FireflyParticle,
@@ -32,55 +41,10 @@ function clampNumber(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max);
 }
 
-function drawBug(
-  ctx: CanvasRenderingContext2D,
-  x: number,
-  y: number,
-  size: number,
-  opacity: number,
-  rotation: number,
-  color: string,
-) {
-  ctx.save();
-  ctx.translate(x, y);
-  ctx.rotate(rotation);
-  ctx.scale(size / 24, size / 24);
-  ctx.globalAlpha = opacity;
-  ctx.strokeStyle = color;
-  ctx.fillStyle = color;
-  ctx.lineWidth = 1.4;
-  ctx.lineCap = "round";
-
-  ctx.beginPath();
-  ctx.moveTo(-3.5, -4.8);
-  ctx.lineTo(-7.5, -7.2);
-  ctx.moveTo(3.5, -4.8);
-  ctx.lineTo(7.5, -7.2);
-  ctx.moveTo(-4.2, -0.8);
-  ctx.lineTo(-8.2, -0.8);
-  ctx.moveTo(4.2, -0.8);
-  ctx.lineTo(8.2, -0.8);
-  ctx.moveTo(-4.4, 3.1);
-  ctx.lineTo(-8, 5.3);
-  ctx.moveTo(4.4, 3.1);
-  ctx.lineTo(8, 5.3);
-  ctx.moveTo(-1.7, 7.7);
-  ctx.lineTo(-3.2, 10.2);
-  ctx.moveTo(1.7, 7.7);
-  ctx.lineTo(3.2, 10.2);
-  ctx.stroke();
-
-  ctx.beginPath();
-  ctx.arc(0, -7.4, 2.4, 0, Math.PI * 2);
-  ctx.fill();
-
-  ctx.beginPath();
-  ctx.ellipse(0, 1.8, 4.4, 7.1, 0, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.restore();
-}
-
 interface BugHitPayload {
+  defeated: boolean;
+  remainingHp: number;
+  variant: BugVariant;
   x: number;
   y: number;
 }
@@ -95,7 +59,23 @@ interface RenderedBugPosition {
 interface GameState {
   remainingTargets: number;
   sessionKey: string;
-  splats: Array<{ id: string; x: number; y: number }>;
+  splats: Array<{ id: string; variant: BugVariant; x: number; y: number }>;
+}
+
+function getSplatClassName(variant: BugVariant) {
+  if (variant === "urgent") {
+    return "fixed z-[80] h-12 w-12 -translate-x-1/2 -translate-y-1/2 rounded-[36%] bg-[radial-gradient(circle_at_35%_35%,rgba(255,200,200,0.26),transparent_18%),radial-gradient(circle_at_center,rgba(185,28,28,0.95),rgba(120,14,14,0.28)_68%,transparent_74%)] [animation:bug-splat_520ms_ease-out_forwards] pointer-events-none";
+  }
+
+  if (variant === "high") {
+    return "fixed z-[80] h-10 w-10 -translate-x-1/2 -translate-y-1/2 rounded-[40%] bg-[radial-gradient(circle_at_38%_36%,rgba(255,180,160,0.22),transparent_18%),radial-gradient(circle_at_center,rgba(244,63,94,0.9),rgba(153,27,27,0.2)_68%,transparent_74%)] [animation:bug-splat_480ms_ease-out_forwards] pointer-events-none";
+  }
+
+  if (variant === "medium") {
+    return "fixed z-[80] h-9 w-9 -translate-x-1/2 -translate-y-1/2 rounded-[45%] bg-[radial-gradient(circle_at_42%_38%,rgba(255,230,200,0.22),transparent_18%),radial-gradient(circle_at_center,rgba(250,130,100,0.86),rgba(160,40,30,0.16)_70%,transparent_76%)] [animation:bug-splat_440ms_ease-out_forwards] pointer-events-none";
+  }
+
+  return "fixed z-[80] h-7 w-7 -translate-x-1/2 -translate-y-1/2 rounded-full bg-[radial-gradient(circle_at_40%_40%,rgba(255,255,255,0.2),transparent_20%),radial-gradient(circle_at_center,rgba(248,113,113,0.82),rgba(185,28,28,0.14)_70%,transparent_75%)] [animation:bug-splat_420ms_ease-out_forwards] pointer-events-none";
 }
 
 type FireflyStyle = CSSProperties &
@@ -111,24 +91,24 @@ type FireflyStyle = CSSProperties &
   >;
 
 interface BugCanvasProps {
-  bugColor: string;
   bugVisualSettings: BugVisualSettings;
   chartFocus: ChartFocusState | null;
   motionProfile: MotionProfile;
   onHit: (payload: BugHitPayload) => void;
   particles: BugParticle[];
   sceneProfile: SceneProfile;
+  sessionKey: string;
   terminatorMode: boolean;
 }
 
 const BugCanvas = memo(function BugCanvas({
-  bugColor,
   bugVisualSettings,
   chartFocus,
   motionProfile,
   onHit,
   particles,
   sceneProfile,
+  sessionKey,
   terminatorMode,
 }: BugCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -136,10 +116,10 @@ const BugCanvas = memo(function BugCanvas({
   const motionProfileRef = useRef(motionProfile);
   const sceneProfileRef = useRef(sceneProfile);
   const chartFocusRef = useRef(chartFocus);
-  const bugColorRef = useRef(bugColor);
   const boundsRef = useRef({ height: 0, left: 0, top: 0, width: 0 });
   const latestBugPositionsRef = useRef<RenderedBugPosition[]>([]);
   const deadBugIndexesRef = useRef<Set<number>>(new Set());
+  const hitPointsRef = useRef<Map<number, number>>(new Map());
   const targetSettingsRef = useRef({
     sizeMultiplier: bugVisualSettings?.sizeMultiplier ?? 1,
     speedMultiplier: Math.max(0.2, bugVisualSettings?.chaosMultiplier ?? 1),
@@ -152,7 +132,23 @@ const BugCanvas = memo(function BugCanvas({
   useEffect(() => {
     particlesRef.current = particles;
     deadBugIndexesRef.current = new Set();
+    hitPointsRef.current = new Map(
+      particles.map((particle, index) => [
+        index,
+        getBugVariantMaxHp(particle.variant),
+      ]),
+    );
   }, [particles]);
+
+  useEffect(() => {
+    deadBugIndexesRef.current = new Set();
+    hitPointsRef.current = new Map(
+      particlesRef.current.map((particle, index) => [
+        index,
+        getBugVariantMaxHp(particle.variant),
+      ]),
+    );
+  }, [sessionKey]);
 
   useEffect(() => {
     motionProfileRef.current = motionProfile;
@@ -165,10 +161,6 @@ const BugCanvas = memo(function BugCanvas({
   useEffect(() => {
     chartFocusRef.current = chartFocus;
   }, [chartFocus]);
-
-  useEffect(() => {
-    bugColorRef.current = bugColor;
-  }, [bugColor]);
 
   useEffect(() => {
     targetSettingsRef.current = {
@@ -267,7 +259,6 @@ const BugCanvas = memo(function BugCanvas({
       const activeMotionProfile = motionProfileRef.current;
       const activeSceneProfile = sceneProfileRef.current;
       const activeChartFocus = chartFocusRef.current;
-      const activeBugColor = bugColorRef.current;
       const deadBugIndexes = deadBugIndexesRef.current;
       const focusX = activeChartFocus?.relativeIndex ?? 0.5;
       const focusStrength = activeChartFocus
@@ -294,6 +285,16 @@ const BugCanvas = memo(function BugCanvas({
         const swayWave = Math.cos(cycleProgress * Math.PI * 2 * 1.35);
         const normalizedX = particle.x / 100;
         const normalizedY = particle.y / 100;
+        const variantConfig = BUG_VARIANT_CONFIG[particle.variant];
+        const variantBob =
+          Math.sin(
+            cycleProgress * Math.PI * variantConfig.bobFrequency + index * 0.12,
+          ) * variantConfig.bobAmplitude;
+        const variantSway =
+          Math.cos(
+            cycleProgress * Math.PI * variantConfig.swayFrequency +
+              index * 0.16,
+          ) * variantConfig.swayAmplitude;
         const clusterShiftX =
           (clusterCenterX - normalizedX) *
           width *
@@ -315,11 +316,13 @@ const BugCanvas = memo(function BugCanvas({
           normalizedX * width +
           clusterShiftX +
           chartShiftX +
-          driftWave * particle.driftX * speedMultiplier;
+          driftWave * particle.driftX * speedMultiplier +
+          variantBob;
         const y =
           normalizedY * height +
           clusterShiftY +
-          swayWave * particle.driftY * speedMultiplier;
+          swayWave * particle.driftY * speedMultiplier +
+          variantSway;
         const opacity = Math.max(
           0.08,
           particle.opacity *
@@ -343,7 +346,14 @@ const BugCanvas = memo(function BugCanvas({
           y,
         });
 
-        drawBug(context, x, y, size, opacity, rotation, activeBugColor);
+        drawBugSprite(context, {
+          opacity,
+          rotation,
+          size,
+          variant: particle.variant,
+          x,
+          y,
+        });
       }
 
       animationFrameId = window.requestAnimationFrame(renderFrame);
@@ -398,8 +408,29 @@ const BugCanvas = memo(function BugCanvas({
           return;
         }
 
-        deadBugIndexesRef.current.add(hitCandidate.index);
-        onHit({ x: event.clientX, y: event.clientY });
+        const particle = particlesRef.current[hitCandidate.index];
+        if (!particle) {
+          return;
+        }
+
+        const currentHp =
+          hitPointsRef.current.get(hitCandidate.index) ??
+          getBugVariantMaxHp(particle.variant);
+        const remainingHp = Math.max(0, currentHp - 1);
+        hitPointsRef.current.set(hitCandidate.index, remainingHp);
+        const defeated = remainingHp === 0;
+
+        if (defeated) {
+          deadBugIndexesRef.current.add(hitCandidate.index);
+        }
+
+        onHit({
+          defeated,
+          remainingHp,
+          variant: particle.variant,
+          x: event.clientX,
+          y: event.clientY,
+        });
       }
     };
 
@@ -464,36 +495,62 @@ const Fireflies = memo(function Fireflies({ tone }: FirefliesProps) {
 });
 
 interface BackgroundFieldProps {
-  bugCount: number;
+  bugCounts: BugCounts;
   bugVisualSettings: BugVisualSettings;
   chartFocus: ChartFocusState | null;
+  interactiveSessionKey?: string | null;
   milestoneFlash: { threshold: number; token: number } | null;
+  onTerminatorHit?: (payload: BugHitPayload) => void;
+  remainingBugCount?: number;
   showParticleCount: boolean;
+  showTerminatorStatusBadge?: boolean;
   terminatorMode: boolean;
   tone: Tone;
 }
 
 const BackgroundField = memo(function BackgroundField({
-  bugCount,
+  bugCounts,
   bugVisualSettings,
   chartFocus,
+  interactiveSessionKey = null,
   milestoneFlash,
+  onTerminatorHit,
+  remainingBugCount,
   showParticleCount,
+  showTerminatorStatusBadge = true,
   terminatorMode,
   tone,
 }: BackgroundFieldProps) {
-  const visualTone = bugCount === 0 ? "all-clear" : tone;
+  const normalizedBugCounts = useMemo(() => bugCounts, [bugCounts]);
+  const totalBugCount = useMemo(
+    () => getBugTotal(normalizedBugCounts),
+    [normalizedBugCounts],
+  );
+  const effectiveBugCount = Math.max(
+    0,
+    Math.floor(remainingBugCount ?? totalBugCount),
+  );
+  const visualTone = effectiveBugCount === 0 ? "all-clear" : tone;
   const colors = useMemo(() => getEffectPalette(visualTone), [visualTone]);
-  const particles = useMemo(() => createBugParticles(bugCount), [bugCount]);
+  const particles = useMemo(
+    () => createBugParticlesFromCounts(normalizedBugCounts),
+    [normalizedBugCounts],
+  );
   const motionProfile = useMemo(
     () => getMotionProfile(visualTone),
     [visualTone],
   );
   const sceneProfile = useMemo(() => getSceneProfile(visualTone), [visualTone]);
-  const totalBugCount = Math.max(0, Math.floor(bugCount ?? 0));
-  const gameSessionKey = `${terminatorMode ? "terminator" : "ambient"}:${totalBugCount}`;
+  const bugCountsKey = useMemo(
+    () => getBugCountsKey(normalizedBugCounts),
+    [normalizedBugCounts],
+  );
+  const gameSessionKey = interactiveSessionKey
+    ? `interactive:${interactiveSessionKey}`
+    : `${terminatorMode ? "terminator" : "ambient"}:${bugCountsKey}`;
   const [hammerPosition, setHammerPosition] = useState({ x: 0, y: 0 });
   const [hammerSwing, setHammerSwing] = useState(false);
+
   const [gameState, setGameState] = useState<GameState>(() => ({
     remainingTargets: totalBugCount,
     sessionKey: gameSessionKey,
@@ -574,6 +631,7 @@ const BackgroundField = memo(function BackgroundField({
   const handleBugHit = useCallback(
     (payload: BugHitPayload) => {
       setHammerSwing(true);
+      onTerminatorHit?.(payload);
       setGameState((currentValue) => {
         const nextState =
           currentValue.sessionKey === gameSessionKey
@@ -591,6 +649,7 @@ const BackgroundField = memo(function BackgroundField({
             ...nextState.splats.slice(-5),
             {
               id: `${payload.x}-${payload.y}-${Date.now()}`,
+              variant: payload.variant,
               x: payload.x,
               y: payload.y,
             },
@@ -598,7 +657,7 @@ const BackgroundField = memo(function BackgroundField({
         };
       });
     },
-    [gameSessionKey, totalBugCount],
+    [gameSessionKey, onTerminatorHit, totalBugCount],
   );
 
   const overlayLabel = terminatorMode
@@ -638,16 +697,16 @@ const BackgroundField = memo(function BackgroundField({
         />
       ) : null}
       <BugCanvas
-        bugColor={colors.bug}
         bugVisualSettings={bugVisualSettings}
         chartFocus={chartFocus}
         motionProfile={motionProfile}
         onHit={handleBugHit}
         particles={particles}
         sceneProfile={sceneProfile}
+        sessionKey={gameSessionKey}
         terminatorMode={terminatorMode}
       />
-      {totalBugCount === 0 ? (
+      {effectiveBugCount === 0 ? (
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_35%,rgba(187,247,208,0.12),transparent_28%),radial-gradient(circle_at_60%_68%,rgba(125,211,252,0.08),transparent_34%)] [animation:all-clear-breathe_6s_ease-in-out_infinite]" />
       ) : null}
       {terminatorMode ? (
@@ -665,11 +724,11 @@ const BackgroundField = memo(function BackgroundField({
       {activeGameState.splats.map((splat) => (
         <div
           key={splat.id}
-          className="fixed z-[80] h-7 w-7 -translate-x-1/2 -translate-y-1/2 rounded-full bg-[radial-gradient(circle_at_40%_40%,rgba(255,255,255,0.2),transparent_20%),radial-gradient(circle_at_center,rgba(248,113,113,0.82),rgba(185,28,28,0.14)_70%,transparent_75%)] [animation:bug-splat_420ms_ease-out_forwards] pointer-events-none"
+          className={getSplatClassName(splat.variant)}
           style={{ left: `${splat.x}px`, top: `${splat.y}px` }}
         />
       ))}
-      {showParticleCount || terminatorMode ? (
+      {showParticleCount || (terminatorMode && showTerminatorStatusBadge) ? (
         <div className="absolute bottom-5 right-5 rounded-full border border-white/8 bg-black/35 px-3 py-1.5 text-[0.68rem] font-semibold uppercase tracking-[0.22em] text-stone-300 backdrop-blur-xl">
           {overlayLabel}
         </div>
