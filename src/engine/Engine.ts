@@ -226,31 +226,9 @@ export class Engine {
         (ent as any).update(dt);
       }
 
-      // keep entities inside the canvas without pinning them to the boundary.
-      if (ent.x < 0) {
-        ent.x = 0;
-        if ((ent as any).vx < 0) {
-          (ent as any).vx = Math.abs((ent as any).vx) * 0.82;
-        }
-      }
-      if (ent.y < 0) {
-        ent.y = 0;
-        if ((ent as any).vy < 0) {
-          (ent as any).vy = Math.abs((ent as any).vy) * 0.82;
-        }
-      }
-      if (ent.x > this.width) {
-        ent.x = this.width;
-        if ((ent as any).vx > 0) {
-          (ent as any).vx = -Math.abs((ent as any).vx) * 0.82;
-        }
-      }
-      if (ent.y > this.height) {
-        ent.y = this.height;
-        if ((ent as any).vy > 0) {
-          (ent as any).vy = -Math.abs((ent as any).vy) * 0.82;
-        }
-      }
+      // Keep a final safety clamp here, but leave edge behavior to the entity.
+      ent.x = Math.min(this.width, Math.max(0, ent.x));
+      ent.y = Math.min(this.height, Math.max(0, ent.y));
 
       // handle dead entities: move to pool and remove from active list once
       if ((ent as any).state === "dead") {
