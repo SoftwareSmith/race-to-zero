@@ -6,9 +6,11 @@ import {
   getBugTotal,
   getBugVariantMaxHp,
 } from "../constants/bugs";
-import { createBugParticlesFromCounts } from "../utils/backgroundEffects";
+import Engine from "../engine/Engine";
+
+// feature flag to toggle the new engine for homepage background only
+const ENABLE_ENTITY_ENGINE = true;
 import {
-  createFireflyParticles,
   getEffectPalette,
   getMotionProfile,
   getSceneProfile,
@@ -20,7 +22,6 @@ import type {
   BugVariant,
   BugVisualSettings,
   ChartFocusState,
-  FireflyParticle,
   MotionProfile,
   SceneProfile,
   Tone,
@@ -78,27 +79,17 @@ function getSplatClassName(variant: BugVariant) {
   return "fixed z-[80] h-7 w-7 -translate-x-1/2 -translate-y-1/2 rounded-full bg-[radial-gradient(circle_at_40%_40%,rgba(255,255,255,0.2),transparent_20%),radial-gradient(circle_at_center,rgba(248,113,113,0.82),rgba(185,28,28,0.14)_70%,transparent_75%)] [animation:bug-splat_420ms_ease-out_forwards] pointer-events-none";
 }
 
-type FireflyStyle = CSSProperties &
-  Record<
-    | "--firefly-color"
-    | "--firefly-delay"
-    | "--firefly-drift-x"
-    | "--firefly-duration"
-    | "--firefly-size"
-    | "--firefly-x"
-    | "--firefly-y",
-    string
-  >;
-
 interface BugCanvasProps {
   bugVisualSettings: BugVisualSettings;
   chartFocus: ChartFocusState | null;
   motionProfile: MotionProfile;
   onHit: (payload: BugHitPayload) => void;
-  particles: BugParticle[];
+  bugCounts: BugCounts;
   sceneProfile: SceneProfile;
   sessionKey: string;
   terminatorMode: boolean;
+  onEntityDeath?: (x: number, y: number, variant: string) => void;
+  cursorPosition?: { x: number; y: number } | null;
 }
 
 const BugCanvas = memo(function BugCanvas({
@@ -106,13 +97,15 @@ const BugCanvas = memo(function BugCanvas({
   chartFocus,
   motionProfile,
   onHit,
-  particles,
+  bugCounts,
   sceneProfile,
   sessionKey,
   terminatorMode,
+  onEntityDeath,
+  cursorPosition,
 }: BugCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const particlesRef = useRef(particles);
+  const swarmRef = useRef<any | null>(null);
   const motionProfileRef = useRef(motionProfile);
   const sceneProfileRef = useRef(sceneProfile);
   const chartFocusRef = useRef(chartFocus);
@@ -128,25 +121,88 @@ const BugCanvas = memo(function BugCanvas({
     sizeMultiplier: bugVisualSettings?.sizeMultiplier ?? 1,
     speedMultiplier: Math.max(0.2, bugVisualSettings?.chaosMultiplier ?? 1),
   });
+  const [reseedInfo, setReseedInfo] = useState<{
+    ts: number;
+    clustered: number;
+    total: number;
+  } | null>(null);
 
   useEffect(() => {
-    particlesRef.current = particles;
+    // when incoming counts change, recreate swarm to match new counts
+    const canvas = canvasRef.current;
+    const w = canvas?.clientWidth || boundsRef.current.width || 800;
+    const h = canvas?.clientHeight || boundsRef.current.height || 600;
+    if (canvas) {
+      // clean up previous engine if present
+      if (
+        swarmRef.current &&
+        typeof (swarmRef.current as any).destroy === "function"
+      ) {
+        try {
+          (swarmRef.current as any).destroy();
+        } catch {
+          void 0;
+        }
+      }
+
+      const engine = new Engine(canvas, {
+        width: w,
+        height: h,
+        onEntityDeath: (x, y, variant) => {
+          try {
+            onEntityDeath?.(
+              Math.round(x + (boundsRef.current.left || 0)),
+              Math.round(y + (boundsRef.current.top || 0)),
+              variant,
+            );
+          } catch {
+            void 0;
+          }
+        },
+      });
+      engine.spawnFromCounts(bugCounts as any);
+      swarmRef.current = engine;
+    }
+    // if many bugs were seeded at (0,0) (canvas not measured yet), reseed
+    const maybeBugs = swarmRef.current.getAllBugs();
+    const clustered = maybeBugs.filter((b) => b.x <= 1 && b.y <= 1).length;
+    if (clustered > 0 && clustered / Math.max(1, maybeBugs.length) > 0.25) {
+      for (const b of maybeBugs) {
+        b.x = Math.random() * w;
+        b.y = Math.random() * h;
+        const speed = 0.6 + Math.random() * 1.4;
+        const angle = Math.random() * Math.PI * 2;
+        b.vx = Math.cos(angle) * speed;
+        b.vy = Math.sin(angle) * speed;
+      }
+      setReseedInfo({ ts: Date.now(), clustered, total: maybeBugs.length });
+    }
     deadBugIndexesRef.current = new Set();
+    const bugs = swarmRef.current.getAllBugs();
     hitPointsRef.current = new Map(
-      particles.map((particle, index) => [
-        index,
-        getBugVariantMaxHp(particle.variant),
-      ]),
+      bugs.map((b, i) => [i, getBugVariantMaxHp(b.variant)]),
     );
-  }, [particles]);
+    return () => {
+      // if effect re-runs or component unmounts, clear engine reference
+      if (
+        swarmRef.current &&
+        typeof (swarmRef.current as any).destroy === "function"
+      ) {
+        try {
+          (swarmRef.current as any).destroy();
+        } catch {
+          void 0;
+        }
+      }
+      swarmRef.current = null;
+    };
+  }, [bugCounts, onEntityDeath]);
 
   useEffect(() => {
     deadBugIndexesRef.current = new Set();
+    const bugs = swarmRef.current?.getAllBugs() ?? [];
     hitPointsRef.current = new Map(
-      particlesRef.current.map((particle, index) => [
-        index,
-        getBugVariantMaxHp(particle.variant),
-      ]),
+      bugs.map((b, i) => [i, getBugVariantMaxHp(b.variant)]),
     );
   }, [sessionKey]);
 
@@ -213,6 +269,34 @@ const BugCanvas = memo(function BugCanvas({
       canvas.height = Math.floor(nextHeight * devicePixelRatio);
       context.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
       context.clearRect(0, 0, width, height);
+
+      // update swarm size to current canvas and reseed if many bugs clustered at 0,0
+      if (swarmRef.current) {
+        swarmRef.current.width = nextWidth;
+        swarmRef.current.height = nextHeight;
+        const bugs = swarmRef.current.getAllBugs();
+        const clustered = bugs.filter((b) => b.x <= 1 && b.y <= 1).length;
+        if (clustered > 0 && clustered / Math.max(1, bugs.length) > 0.2) {
+          // reseed positions and velocities
+          for (const b of bugs) {
+            b.x = Math.random() * nextWidth;
+            b.y = Math.random() * nextHeight;
+            const speed = 0.6 + Math.random() * 1.4;
+            const angle = Math.random() * Math.PI * 2;
+            b.vx = Math.cos(angle) * speed;
+            b.vy = Math.sin(angle) * speed;
+          }
+          // lightweight debug log to help diagnose in dev
+
+          console.debug("Engine reseeded on resize", {
+            nextWidth,
+            nextHeight,
+            clustered,
+            total: bugs.length,
+          });
+          setReseedInfo({ ts: Date.now(), clustered, total: bugs.length });
+        }
+      }
     };
 
     const updateActivity = () => {
@@ -221,6 +305,8 @@ const BugCanvas = memo(function BugCanvas({
         animationFrameId = window.requestAnimationFrame(renderFrame);
       }
     };
+
+    // cursor is forwarded to the engine during update calls below
 
     const renderFrame = (timestamp: number) => {
       animationFrameId = 0;
@@ -234,10 +320,36 @@ const BugCanvas = memo(function BugCanvas({
         return;
       }
 
+      const dtSec = Math.min(0.12, (timestamp - lastDrawTime) / 1000);
       lastDrawTime = timestamp;
+      // advance engine or swarm according to elapsed time to create continuous motion
+      if (swarmRef.current) {
+        const steps = Math.max(1, Math.floor(dtSec * 60));
+        for (let s = 0; s < steps; s++) {
+          if ((swarmRef.current as any).update.length >= 1) {
+            // Engine.update expects dt and optional target
+            const targetX =
+              terminatorMode && cursorPosition
+                ? cursorPosition.x - boundsRef.current.left
+                : null;
+            const targetY =
+              terminatorMode && cursorPosition
+                ? cursorPosition.y - boundsRef.current.top
+                : null;
+            (swarmRef.current as any).update(1 / 60, targetX, targetY);
+          } else {
+            (swarmRef.current as any).update();
+          }
+        }
+      }
       context.clearRect(0, 0, width, height);
 
       const timeSeconds = timestamp / 1000;
+      // ensure width/height are valid before math that divides by them
+      if (!width || !height) {
+        width = canvas.clientWidth || boundsRef.current.width || 800;
+        height = canvas.clientHeight || boundsRef.current.height || 600;
+      }
       const nextSettings = targetSettingsRef.current;
       const animatedState = animatedStateRef.current;
       animatedState.sizeMultiplier = interpolate(
@@ -255,7 +367,9 @@ const BugCanvas = memo(function BugCanvas({
         0.2,
         6,
       );
-      const activeParticles = particlesRef.current;
+      const activeParticles = swarmRef.current
+        ? swarmRef.current.getAllBugs()
+        : [];
       const activeMotionProfile = motionProfileRef.current;
       const activeSceneProfile = sceneProfileRef.current;
       const activeChartFocus = chartFocusRef.current;
@@ -274,27 +388,37 @@ const BugCanvas = memo(function BugCanvas({
         }
 
         const particle = activeParticles[index];
+        const phase = (particle as any).phase ?? 0;
+        const swayPhase = (particle as any).swayPhase ?? 0;
+        const particleDuration = (particle as any).duration ?? 10;
+        const particleDelay = (particle as any).delay ?? 0;
         const cycleDuration = Math.max(
           4,
-          (particle.duration * activeMotionProfile.durationMultiplier) /
+          (particleDuration * activeMotionProfile.durationMultiplier) /
             speedMultiplier,
         );
         const cycleProgress =
-          ((timeSeconds + particle.delay) % cycleDuration) / cycleDuration;
-        const driftWave = Math.sin(cycleProgress * Math.PI * 2);
-        const swayWave = Math.cos(cycleProgress * Math.PI * 2 * 1.35);
-        const normalizedX = particle.x / 100;
-        const normalizedY = particle.y / 100;
+          ((timeSeconds + particleDelay) % cycleDuration) / cycleDuration;
+        const t = cycleProgress * Math.PI * 2;
+        // combine long + short wavelength components for organic drift
+        const longDrift = Math.sin(t + phase);
+        const shortDrift = Math.sin(t * 2 + phase * 0.7);
+        const driftWave = longDrift * 0.66 + shortDrift * 0.34;
+        const longSway = Math.cos(t * 1.1 + swayPhase);
+        const shortSway = Math.cos(t * 2.2 + swayPhase * 0.9);
+        const swayWave = longSway * 0.7 + shortSway * 0.3;
+        // particle.x/y are pixel positions from the entity engine
+        const normalizedX = particle.x / width;
+        const normalizedY = particle.y / height;
         const variantConfig = BUG_VARIANT_CONFIG[particle.variant];
         const variantBob =
-          Math.sin(
-            cycleProgress * Math.PI * variantConfig.bobFrequency + index * 0.12,
-          ) * variantConfig.bobAmplitude;
+          Math.sin(t * variantConfig.bobFrequency + index * 0.12 + phase) *
+          variantConfig.bobAmplitude *
+          0.9;
         const variantSway =
-          Math.cos(
-            cycleProgress * Math.PI * variantConfig.swayFrequency +
-              index * 0.16,
-          ) * variantConfig.swayAmplitude;
+          Math.cos(t * variantConfig.swayFrequency + index * 0.16 + swayPhase) *
+          variantConfig.swayAmplitude *
+          0.9;
         const clusterShiftX =
           (clusterCenterX - normalizedX) *
           width *
@@ -313,31 +437,39 @@ const BugCanvas = memo(function BugCanvas({
           ? (focusX - normalizedX) * width * focusStrength * focusFalloff * 0.2
           : 0;
         const x =
-          normalizedX * width +
+          particle.x +
           clusterShiftX +
           chartShiftX +
-          driftWave * particle.driftX * speedMultiplier +
+          (driftWave * 0.7 + Math.sin(t * 0.37 + phase) * 0.3) *
+            (particle.vx ?? particle.driftX ?? 1) *
+            speedMultiplier +
           variantBob;
         const y =
-          normalizedY * height +
+          particle.y +
           clusterShiftY +
-          swayWave * particle.driftY * speedMultiplier +
+          (swayWave * 0.72 + Math.cos(t * 0.5 + swayPhase) * 0.28) *
+            (particle.vy ?? particle.driftY ?? 1) *
+            speedMultiplier +
           variantSway;
-        const opacity = Math.max(
-          0.08,
-          particle.opacity *
-            activeMotionProfile.opacityMultiplier *
-            (0.76 +
-              0.32 * Math.sin(cycleProgress * Math.PI * 2 + index * 0.2)) *
-            (activeChartFocus ? 0.72 + focusFalloff * 0.6 : 1),
+        // Use fixed opacity from particle profile + motion multiplier. Remove
+        // per-frame sinusoidal modulation so SVGs don't flicker in opacity.
+        const opacity = clampNumber(
+          (particle.opacity ?? 1) * activeMotionProfile.opacityMultiplier,
+          0.06,
+          1,
         );
         const size =
           particle.size *
           activeMotionProfile.scale *
           sizeMultiplier *
           (activeChartFocus ? 0.92 + focusFalloff * 0.26 : 1);
-        const rotation =
-          Math.sin(cycleProgress * Math.PI * 4 + index * 0.12) * 0.22;
+        // Make bugs face their movement direction (crawling forward). Add a
+        // small sway on top of the heading for organic motion.
+        const velX = particle.vx ?? particle.driftX ?? 1;
+        const velY = particle.vy ?? particle.driftY ?? 0;
+        const heading = Math.atan2(velY, velX);
+        const sway = Math.sin(t * 2 + phase) * 0.12;
+        const rotation = heading + sway;
 
         latestBugPositionsRef.current.push({
           index,
@@ -354,6 +486,23 @@ const BugCanvas = memo(function BugCanvas({
           x,
           y,
         });
+      }
+
+      // one-time safety reseed: if many bugs still sit at 0,0, reseed and surface badge
+      if (!reseedInfo && swarmRef.current) {
+        const bugs = swarmRef.current.getAllBugs();
+        const clustered = bugs.filter((b) => b.x <= 1 && b.y <= 1).length;
+        if (clustered > 0 && clustered / Math.max(1, bugs.length) > 0.2) {
+          for (const b of bugs) {
+            b.x = Math.random() * width;
+            b.y = Math.random() * height;
+            const speed = 0.6 + Math.random() * 1.4;
+            const angle = Math.random() * Math.PI * 2;
+            b.vx = Math.cos(angle) * speed;
+            b.vy = Math.sin(angle) * speed;
+          }
+          setReseedInfo({ ts: Date.now(), clustered, total: bugs.length });
+        }
       }
 
       animationFrameId = window.requestAnimationFrame(renderFrame);
@@ -408,11 +557,31 @@ const BugCanvas = memo(function BugCanvas({
           return;
         }
 
-        const particle = particlesRef.current[hitCandidate.index];
+        const particle = swarmRef.current?.getAllBugs()[hitCandidate.index];
         if (!particle) {
           return;
         }
 
+        // If the engine supports handleHit, use it so Enemy manages HP/state
+        if (typeof swarmRef.current?.handleHit === "function") {
+          const result = swarmRef.current.handleHit(hitCandidate.index, 1);
+          if (result) {
+            if (result.defeated) {
+              deadBugIndexesRef.current.add(hitCandidate.index);
+            }
+
+            onHit({
+              defeated: result.defeated,
+              remainingHp: result.remainingHp,
+              variant: result.variant,
+              x: event.clientX,
+              y: event.clientY,
+            });
+            return;
+          }
+        }
+
+        // Fallback to previous local HP tracking
         const currentHp =
           hitPointsRef.current.get(hitCandidate.index) ??
           getBugVariantMaxHp(particle.variant);
@@ -450,49 +619,28 @@ const BugCanvas = memo(function BugCanvas({
         window.cancelAnimationFrame(animationFrameId);
       }
     };
-  }, [onHit, terminatorMode]);
+  }, [onHit, terminatorMode, cursorPosition, reseedInfo]);
 
   return (
-    <canvas
-      ref={canvasRef}
-      className="absolute inset-0 h-full w-full opacity-96"
-      aria-hidden="true"
-    />
+    <>
+      <canvas
+        ref={canvasRef}
+        className="absolute inset-0 h-full w-full opacity-96"
+        aria-hidden="true"
+      />
+      {reseedInfo ? (
+        <div className="pointer-events-none fixed left-3 bottom-3 z-[120] rounded-md bg-black/60 px-2 py-1 text-xs text-white backdrop-blur-sm">
+          <div>Reseeded: {new Date(reseedInfo.ts).toLocaleTimeString()}</div>
+          <div className="opacity-80">
+            clustered: {reseedInfo.clustered} / {reseedInfo.total}
+          </div>
+        </div>
+      ) : null}
+    </>
   );
 });
 
-interface FirefliesProps {
-  tone: "all-clear" | Tone;
-}
-
-const Fireflies = memo(function Fireflies({ tone }: FirefliesProps) {
-  const particles = useMemo(() => createFireflyParticles(tone), [tone]);
-
-  return (
-    <div
-      className="pointer-events-none absolute inset-0 overflow-hidden"
-      aria-hidden="true"
-    >
-      {particles.map((particle, index) => (
-        <span
-          key={index}
-          className="absolute rounded-full bg-[var(--firefly-color)] opacity-[0.55] shadow-[0_0_12px_var(--firefly-color),0_0_24px_color-mix(in_srgb,var(--firefly-color)_55%,transparent)] [animation:firefly-drift_var(--firefly-duration)_ease-in-out_infinite,firefly-pulse_3.2s_ease-in-out_infinite] [animation-delay:var(--firefly-delay),var(--firefly-delay)] [height:var(--firefly-size)] [left:var(--firefly-x)] [top:var(--firefly-y)] [width:var(--firefly-size)]"
-          style={
-            {
-              "--firefly-x": particle.x,
-              "--firefly-y": particle.y,
-              "--firefly-size": particle.size,
-              "--firefly-duration": particle.duration,
-              "--firefly-delay": particle.delay,
-              "--firefly-drift-x": particle.driftX,
-              "--firefly-color": particle.color,
-            } as FireflyStyle
-          }
-        />
-      ))}
-    </div>
-  );
-});
+// Fireflies removed — keep only bug rendering. Palette still provided via getEffectPalette.
 
 interface BackgroundFieldProps {
   bugCounts: BugCounts;
@@ -532,10 +680,7 @@ const BackgroundField = memo(function BackgroundField({
   );
   const visualTone = effectiveBugCount === 0 ? "all-clear" : tone;
   const colors = useMemo(() => getEffectPalette(visualTone), [visualTone]);
-  const particles = useMemo(
-    () => createBugParticlesFromCounts(normalizedBugCounts),
-    [normalizedBugCounts],
-  );
+  // particles are produced and managed by BugCanvas's internal entity engine
   const motionProfile = useMemo(
     () => getMotionProfile(visualTone),
     [visualTone],
@@ -579,7 +724,9 @@ const BackgroundField = memo(function BackgroundField({
     }
 
     const handlePointerMove = (event: globalThis.MouseEvent) => {
-      setHammerPosition({ x: event.clientX, y: event.clientY });
+      const x = event.clientX;
+      const y = event.clientY;
+      setHammerPosition({ x, y });
     };
 
     window.addEventListener("mousemove", handlePointerMove);
@@ -683,7 +830,7 @@ const BackgroundField = memo(function BackgroundField({
         className="absolute bottom-[-8rem] left-[18%] h-72 w-72 rounded-full blur-3xl"
         style={{ backgroundColor: colors.orbB }}
       />
-      <Fireflies tone={visualTone} />
+
       {milestoneFlash ? (
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(255,255,255,0.12),transparent_16%),radial-gradient(circle_at_center,rgba(56,189,248,0.18),transparent_42%),radial-gradient(circle_at_center,rgba(16,185,129,0.14),transparent_62%)] [animation:milestone-burst_1.8s_ease-out_forwards]" />
       ) : null}
@@ -701,10 +848,35 @@ const BackgroundField = memo(function BackgroundField({
         chartFocus={chartFocus}
         motionProfile={motionProfile}
         onHit={handleBugHit}
-        particles={particles}
+        bugCounts={normalizedBugCounts}
         sceneProfile={sceneProfile}
         sessionKey={gameSessionKey}
         terminatorMode={terminatorMode}
+        cursorPosition={terminatorMode ? hammerPosition : null}
+        onEntityDeath={(x, y, variant) => {
+          setGameState((currentValue) => {
+            const nextState =
+              currentValue.sessionKey === gameSessionKey
+                ? currentValue
+                : {
+                    remainingTargets: totalBugCount,
+                    sessionKey: gameSessionKey,
+                    splats: [],
+                  };
+            return {
+              ...nextState,
+              splats: [
+                ...nextState.splats.slice(-5),
+                {
+                  id: `${x}-${y}-${Date.now()}`,
+                  variant: variant as any,
+                  x,
+                  y,
+                },
+              ],
+            };
+          });
+        }}
       />
       {effectiveBugCount === 0 ? (
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_35%,rgba(187,247,208,0.12),transparent_28%),radial-gradient(circle_at_60%_68%,rgba(125,211,252,0.08),transparent_34%)] [animation:all-clear-breathe_6s_ease-in-out_infinite]" />

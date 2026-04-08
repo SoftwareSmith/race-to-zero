@@ -159,6 +159,9 @@ export interface BugParticle {
   variant: BugVariant;
   x: number;
   y: number;
+  // phases for quasi-randomized motion
+  phase?: number;
+  swayPhase?: number;
 }
 
 export interface EffectPalette {

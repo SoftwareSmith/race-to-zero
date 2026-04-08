@@ -1,4 +1,11 @@
-import { createBugParticles } from "../../src/utils/backgroundEffects";
+// lightweight fallback particle generator (replaces createBugParticles from legacy backgroundEffects)
+function createBugParticles(count: number) {
+  const out: Array<{ x: number; y: number }> = [];
+  for (let i = 0; i < count; i++) {
+    out.push({ x: Math.random() * 100, y: Math.random() * 100 });
+  }
+  return out;
+}
 import type { BugBounds, BugSpawnConfig, BugType } from "./Bug";
 
 const BUG_TYPES: BugType[] = ["uiBug", "nullPointer", "http400", "zeroDay"];
