@@ -6,6 +6,7 @@ import {
   getBugVariantMaxHp,
 } from "../constants/bugs";
 import Engine from "../engine/Engine";
+import type { GameConfig } from "../engine/types";
 import { DEFAULT_GAME_CONFIG } from "../engine/types";
 
 // feature flag to toggle the new engine for homepage background only
@@ -90,6 +91,7 @@ interface BugCanvasProps {
   terminatorMode: boolean;
   onEntityDeath?: (x: number, y: number, variant: string) => void;
   cursorPosition?: { x: number; y: number } | null;
+  gameConfig?: GameConfig;
 }
 
 const BugCanvas = memo(function BugCanvas({
@@ -103,6 +105,7 @@ const BugCanvas = memo(function BugCanvas({
   terminatorMode,
   onEntityDeath,
   cursorPosition,
+  gameConfig,
 }: BugCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const swarmRef = useRef<any | null>(null);
@@ -148,6 +151,7 @@ const BugCanvas = memo(function BugCanvas({
       const engine = new Engine(canvas, {
         width: w,
         height: h,
+        config: (gameConfig as any) ?? undefined,
         onEntityDeath: (x, y, variant) => {
           try {
             onEntityDeath?.(
@@ -160,6 +164,12 @@ const BugCanvas = memo(function BugCanvas({
           }
         },
       });
+      // store original baseSpeed so we can apply UI speedMultiplier without compounding
+      try {
+        (engine as any).__baseSpeedOriginal = engine.config.baseSpeed;
+      } catch {
+        // ignore in case shape differs
+      }
       engine.spawnFromCounts(bugCounts as any);
       swarmRef.current = engine;
     }
@@ -170,8 +180,11 @@ const BugCanvas = memo(function BugCanvas({
       for (const b of maybeBugs) {
         b.x = Math.random() * w;
         b.y = Math.random() * h;
+        const base =
+          (swarmRef.current as any)?.__baseSpeedOriginal ??
+          DEFAULT_GAME_CONFIG.baseSpeed;
         const speed =
-          DEFAULT_GAME_CONFIG.baseSpeed *
+          base *
           targetSettingsRef.current.speedMultiplier *
           (0.75 + Math.random() * 0.35);
         const angle = Math.random() * Math.PI * 2;
@@ -351,8 +364,12 @@ const BugCanvas = memo(function BugCanvas({
       // advance engine or swarm according to elapsed time to create continuous motion
       if (swarmRef.current) {
         if ((swarmRef.current as any).config) {
-          (swarmRef.current as any).config.baseSpeed =
-            DEFAULT_GAME_CONFIG.baseSpeed * speedMultiplier;
+          const engine = swarmRef.current as any;
+          const base =
+            engine.__baseSpeedOriginal ??
+            engine.config.baseSpeed ??
+            DEFAULT_GAME_CONFIG.baseSpeed;
+          engine.config.baseSpeed = base * speedMultiplier;
         }
         const steps = Math.max(1, Math.floor(dtSec * 60));
         for (let s = 0; s < steps; s++) {
@@ -443,8 +460,11 @@ const BugCanvas = memo(function BugCanvas({
           for (const b of bugs) {
             b.x = Math.random() * width;
             b.y = Math.random() * height;
+            const base =
+              (swarmRef.current as any)?.__baseSpeedOriginal ??
+              DEFAULT_GAME_CONFIG.baseSpeed;
             const speed =
-              DEFAULT_GAME_CONFIG.baseSpeed *
+              base *
               targetSettingsRef.current.speedMultiplier *
               (0.75 + Math.random() * 0.35);
             const angle = Math.random() * Math.PI * 2;
@@ -621,6 +641,7 @@ interface BackgroundFieldProps {
   showTerminatorStatusBadge?: boolean;
   terminatorMode: boolean;
   tone: Tone;
+  gameConfig?: GameConfig;
 }
 
 const BackgroundField = memo(function BackgroundField({
@@ -634,6 +655,7 @@ const BackgroundField = memo(function BackgroundField({
   showParticleCount,
   showTerminatorStatusBadge = true,
   terminatorMode,
+  gameConfig,
   tone,
 }: BackgroundFieldProps) {
   const normalizedBugCounts = useMemo(() => bugCounts, [bugCounts]);

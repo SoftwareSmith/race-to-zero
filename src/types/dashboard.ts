@@ -1,6 +1,6 @@
 export type Tone = "positive" | "negative" | "neutral";
 export type StatusBannerKind = "error" | "info";
-export type TopMenuKey = "bugs" | "settings" | null;
+export type TopMenuKey = "bugs" | "codex" | "settings" | null;
 export type SettingToggleKey =
   | "excludePublicHolidays"
   | "excludeWeekends"

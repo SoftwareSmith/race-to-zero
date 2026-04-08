@@ -95,7 +95,7 @@ function colorizeSvg(raw: string, color: string) {
 const urlCache = new Map<string, string>();
 const imageCache = new Map<string, HTMLImageElement>();
 
-function getColoredSvgUrl(variant: BugVariant, baseColor: string) {
+export function getColoredSvgUrl(variant: BugVariant, baseColor: string) {
   const config = BUG_VARIANT_CONFIG[variant];
 
   const finalColor = darkenColor(baseColor, config.darken);
@@ -109,6 +109,10 @@ function getColoredSvgUrl(variant: BugVariant, baseColor: string) {
 
   urlCache.set(key, url);
   return url;
+}
+
+export function getRawSvgForVariant(variant: BugVariant) {
+  return BUG_RAW_SVGS[variant];
 }
 
 function getCachedImage(variant: BugVariant, color: string) {

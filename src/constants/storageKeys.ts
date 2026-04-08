@@ -7,6 +7,8 @@ export const STORAGE_KEYS = {
   excludeWeekends: "race-to-zero:exclude-weekends",
   showParticleCount: "race-to-zero:show-particle-count",
   terminatorMode: "race-to-zero:terminator-mode",
+  gameConfig: "race-to-zero:game-config",
+  bugCodex: "race-to-zero:bug-codex",
 } as const;
 
 export type StorageKey = (typeof STORAGE_KEYS)[keyof typeof STORAGE_KEYS];

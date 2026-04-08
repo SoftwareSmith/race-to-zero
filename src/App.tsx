@@ -2,6 +2,10 @@ import type { ChangeEvent, ReactNode } from "react";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { endOfYear, format, subDays } from "date-fns";
 import BackgroundField from "./components/BackgroundField";
+import ConfigPanel from "./components/ConfigPanel";
+import CodexPanel from "./components/CodexPanel";
+import { DEFAULT_GAME_CONFIG } from "./engine/types";
+
 import BugSettingsMenu from "./components/BugSettingsMenu";
 import ChartCard from "./components/ChartCard";
 import CommandCenter from "./components/CommandCenter";
@@ -474,6 +478,7 @@ function App() {
   );
   const settingsMenuRef = useRef<HTMLDivElement | null>(null);
   const bugSettingsMenuRef = useRef<HTMLDivElement | null>(null);
+  const codexMenuRef = useRef<HTMLDivElement | null>(null);
   const previousBugCountRef = useRef<number | null>(null);
   const [interactiveMode, setInteractiveMode] = useState(false);
   const [interactiveInitialBugCounts, setInteractiveInitialBugCounts] =
@@ -484,6 +489,21 @@ function App() {
   const [interactiveSessionKey, setInteractiveSessionKey] = useState<
     string | null
   >(null);
+
+  const [gameConfig, setGameConfig] = useStoredState(
+    STORAGE_KEYS.gameConfig,
+    DEFAULT_GAME_CONFIG,
+    {
+      parse: (raw: string) => {
+        try {
+          return JSON.parse(raw) as typeof DEFAULT_GAME_CONFIG;
+        } catch {
+          return null;
+        }
+      },
+      serialize: (v: typeof DEFAULT_GAME_CONFIG) => JSON.stringify(v),
+    } as any,
+  );
 
   const workdaySettings = useMemo<WorkdaySettings>(
     () => ({
@@ -671,7 +691,11 @@ function App() {
     }
 
     const activeMenuRef =
-      openTopMenu === "bugs" ? bugSettingsMenuRef : settingsMenuRef;
+      openTopMenu === "bugs"
+        ? bugSettingsMenuRef
+        : openTopMenu === "codex"
+          ? codexMenuRef
+          : settingsMenuRef;
 
     const handlePointerDown = (
       event: globalThis.MouseEvent | globalThis.TouchEvent,
@@ -815,7 +839,10 @@ function App() {
         showTerminatorStatusBadge={!interactiveMode}
         terminatorMode={interactiveMode || terminatorMode}
         tone={deadlineMetrics.statusTone}
+        gameConfig={gameConfig}
       />
+
+      <ConfigPanel onChange={setGameConfig} />
 
       {interactiveMode ? (
         <div className="relative min-h-screen">
@@ -1003,6 +1030,11 @@ function App() {
                 open={openTopMenu === "bugs"}
                 showParticleCount={showParticleCount}
                 terminatorMode={terminatorMode}
+              />
+              <CodexPanel
+                containerRef={codexMenuRef}
+                onMenuToggle={() => handleTopMenuToggle("codex")}
+                open={openTopMenu === "codex"}
               />
             </div>
           </header>

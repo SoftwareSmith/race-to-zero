@@ -1,6 +1,7 @@
 import { Entity } from "./Entity";
 import type { Vec2 } from "./types";
 import { DEFAULT_GAME_CONFIG } from "./types";
+import { getCodex, CrawlProfile, BugType } from "./bugCodex";
 
 function clamp(v: number, a: number, b: number) {
   return Math.max(a, Math.min(b, v));
@@ -71,97 +72,9 @@ interface BugUpdateContext {
   bounds?: { width: number; height: number };
 }
 
-interface CrawlProfile {
-  behavior: "skitter" | "patrol" | "stalk" | "panic";
-  anchorDriftInterval: [number, number];
-  anchorBias: "any" | "interior" | "perimeter";
-  edgePreference: number;
-  noiseFrequency: number;
-  noiseForwardStrength: number;
-  noiseLateralStrength: number;
-  noiseTurnStrength: number;
-  regionWeights: {
-    edge: number;
-    interior: number;
-    middle: number;
-  };
-  roamRadius: number;
-  separationMultiplier: number;
-  speedMultiplier: number;
-  turnMultiplier: number;
-  wanderMultiplier: number;
-  wideRoamChance: number;
-}
-
-export const CRAWL_PROFILES: Record<Entity["variant"], CrawlProfile> = {
-  low: {
-    behavior: "skitter",
-    anchorDriftInterval: [8, 14],
-    anchorBias: "perimeter",
-    edgePreference: 1,
-    noiseFrequency: 0.9,
-    noiseForwardStrength: 0.2,
-    noiseLateralStrength: 0.72,
-    noiseTurnStrength: 1.05,
-    regionWeights: { edge: 0.6, middle: 0.3, interior: 0.1 },
-    roamRadius: 150,
-    separationMultiplier: 1.35,
-    speedMultiplier: 0.82,
-    turnMultiplier: 1.18,
-    wanderMultiplier: 1.2,
-    wideRoamChance: 0.18,
-  },
-  medium: {
-    behavior: "patrol",
-    anchorDriftInterval: [7, 12],
-    anchorBias: "any",
-    edgePreference: 0.12,
-    noiseFrequency: 0.64,
-    noiseForwardStrength: 0.14,
-    noiseLateralStrength: 0.38,
-    noiseTurnStrength: 0.6,
-    regionWeights: { edge: 0.35, middle: 0.45, interior: 0.2 },
-    roamRadius: 180,
-    separationMultiplier: 1.1,
-    speedMultiplier: 0.95,
-    turnMultiplier: 1,
-    wanderMultiplier: 0.85,
-    wideRoamChance: 0.28,
-  },
-  high: {
-    behavior: "stalk",
-    anchorDriftInterval: [6, 10],
-    anchorBias: "interior",
-    edgePreference: -0.28,
-    noiseFrequency: 0.42,
-    noiseForwardStrength: 0.08,
-    noiseLateralStrength: 0.14,
-    noiseTurnStrength: 0.26,
-    regionWeights: { edge: 0.15, middle: 0.45, interior: 0.4 },
-    roamRadius: 220,
-    separationMultiplier: 0.9,
-    speedMultiplier: 1.06,
-    turnMultiplier: 0.86,
-    wanderMultiplier: 0.55,
-    wideRoamChance: 0.36,
-  },
-  urgent: {
-    behavior: "panic",
-    anchorDriftInterval: [4, 8],
-    anchorBias: "perimeter",
-    edgePreference: 0.62,
-    noiseFrequency: 1.18,
-    noiseForwardStrength: 0.28,
-    noiseLateralStrength: 0.88,
-    noiseTurnStrength: 1.22,
-    regionWeights: { edge: 0.55, middle: 0.3, interior: 0.15 },
-    roamRadius: 280,
-    separationMultiplier: 0.75,
-    speedMultiplier: 1.2,
-    turnMultiplier: 1.28,
-    wanderMultiplier: 1,
-    wideRoamChance: 0.52,
-  },
+export const getProfileForVariant = (variant: Entity["variant"]) => {
+  const entry = getCodex()[variant as string];
+  return entry ? (entry.profile as CrawlProfile) : undefined;
 };
 
 export class BugEntity extends Entity {
@@ -181,6 +94,8 @@ export class BugEntity extends Entity {
   homeAnchor: Vec2 | null;
   anchorDriftTimer: number;
   motionTime: number;
+  typeSpec: BugType | null;
+  stuckTimer: number;
 
   constructor(opts: Partial<Entity> & { id?: string } = {}) {
     super(opts as any);
@@ -201,10 +116,12 @@ export class BugEntity extends Entity {
     this.homeAnchor = null;
     this.anchorDriftTimer = 0;
     this.motionTime = Math.random() * 100;
+    this.typeSpec = null;
+    this.stuckTimer = 0;
   }
 
   private getCrawlProfile() {
-    return CRAWL_PROFILES[this.variant];
+    return getProfileForVariant(this.variant) ?? ({} as CrawlProfile);
   }
 
   private resetAnchorDriftTimer() {
@@ -236,6 +153,13 @@ export class BugEntity extends Entity {
     const centerY = bounds.height * 0.5;
 
     if (region === "edge") {
+      // small chance to include true corners so they are not permanently empty
+      if (Math.random() < 0.08) {
+        return {
+          x: clamp(Math.random() < 0.5 ? padding : bounds.width - padding, padding, bounds.width - padding),
+          y: clamp(Math.random() < 0.5 ? padding : bounds.height - padding, padding, bounds.height - padding),
+        };
+      }
       const side = Math.floor(Math.random() * 4);
       if (side === 0) {
         return {
@@ -321,8 +245,10 @@ export class BugEntity extends Entity {
     if (this.homeAnchor) {
       return;
     }
-
-    const weightedPoint = this.samplePointInRegion(bounds, this.chooseWeightedRegion());
+    const weightedPoint = this.samplePointInRegion(
+      bounds,
+      this.chooseWeightedRegion(),
+    );
     this.homeAnchor = {
       x: weightedPoint.x,
       y: weightedPoint.y,
@@ -398,11 +324,13 @@ export class BugEntity extends Entity {
         config.crowdAvoidRadius,
         this,
       );
+      const affinity = this.typeSpec?.socialAffinity ?? 0;
+      const affinityScale = 1 - affinity; // positive affinity reduces crowd penalty
       const score =
         travelDistance * 0.42 -
         anchorDistance * 0.18 +
         edgeScore * Math.abs(profile.edgePreference) * 42 +
-        -(crowding?.score ?? 0) * config.crowdTargetPenalty +
+        -(crowding?.score ?? 0) * config.crowdTargetPenalty * affinityScale +
         Math.random() * 18;
 
       if (travelDistance >= minDistance * 0.5 && score > bestScore) {
@@ -520,6 +448,32 @@ export class BugEntity extends Entity {
     desired.x += wallAvoidance.x;
     desired.y += wallAvoidance.y;
 
+    // detect if the entity is being pushed hard into a wall and not making progress
+    const wallMag = Math.hypot(wallAvoidance.x, wallAvoidance.y);
+    const speedNow = getLength(this.vx, this.vy);
+    const speedThreshold = Math.max(6, config.baseSpeed * 0.22);
+    if (wallMag > 0.45 && speedNow < speedThreshold) {
+      this.stuckTimer += dt;
+    } else {
+      this.stuckTimer = Math.max(0, this.stuckTimer - dt * 2);
+    }
+
+    if (this.stuckTimer > 0.18) {
+      // rotate by a right-angle multiple and move on
+      const choices = [Math.PI / 2, Math.PI, (Math.PI * 3) / 2];
+      const rot = choices[Math.floor(Math.random() * choices.length)];
+      this.heading = normalizeAngle(this.heading + rot);
+      const desiredSpeed = config.baseSpeed * this.cruiseSpeed * 0.6;
+      this.vx = Math.cos(this.heading) * desiredSpeed;
+      this.vy = Math.sin(this.heading) * desiredSpeed;
+      // nudge slightly inside bounds
+      this.x = clamp(this.x + Math.cos(this.heading) * 8, 4, bounds.width - 4);
+      this.y = clamp(this.y + Math.sin(this.heading) * 8, 4, bounds.height - 4);
+      this.roamTarget = null;
+      this.retargetTimer = 0.25;
+      this.stuckTimer = 0;
+    }
+
     const crowding = ctx.getCrowdingAt?.(
       this.x,
       this.y,
@@ -531,8 +485,10 @@ export class BugEntity extends Entity {
         this.x - crowding.centerX,
         this.y - crowding.centerY,
       );
-      desired.x += awayFromCrowd.x * config.crowdSteerStrength * crowding.score;
-      desired.y += awayFromCrowd.y * config.crowdSteerStrength * crowding.score;
+      const affinity = this.typeSpec?.socialAffinity ?? 0;
+      const steerScale = config.crowdSteerStrength * crowding.score * (1 - affinity);
+      desired.x += awayFromCrowd.x * steerScale;
+      desired.y += awayFromCrowd.y * steerScale;
 
       if (
         crowding.score > config.crowdRepathThreshold &&
@@ -654,6 +610,7 @@ export class BugEntity extends Entity {
     this.fleeTimer = 0.9 + Math.random() * 0.8;
     this.roamTarget = null;
     this.retargetTimer = 0;
+    this.typeSpec = getCodex()[this.variant as string] ?? null;
     return { defeated: false, remainingHp: this.hp };
   }
 
@@ -676,5 +633,6 @@ export class BugEntity extends Entity {
     this.motionTime = Math.random() * 100;
     this.opacity = 1;
     this.size = this.baseSize;
+    this.typeSpec = getCodex()[this.variant as string] ?? null;
   }
 }
