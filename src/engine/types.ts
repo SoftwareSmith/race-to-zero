@@ -9,15 +9,35 @@ export interface GameConfig {
   chaseRadius: number;
   fleeRadius: number;
   followStrength: number;
+  roamTargetMinDistance: number;
+  targetReachRadius: number;
+  turnSpeed: number;
+  wallAvoidDistance: number;
+  wallAvoidStrength: number;
+  crowdAvoidRadius: number;
+  crowdRepathDelay: number;
+  crowdRepathThreshold: number;
+  crowdSteerStrength: number;
+  crowdTargetPenalty: number;
 }
 
 export const DEFAULT_GAME_CONFIG: GameConfig = {
   separationRadius: 28,
-  separationStrength: 0.5,
-  wanderStrength: 0.06,
-  baseSpeed: 0.95,
+  separationStrength: 0.14,
+  wanderStrength: 0.2,
+  baseSpeed: 34,
   sizeMultiplier: 1,
   chaseRadius: 160,
-  fleeRadius: 60,
+  fleeRadius: 84,
   followStrength: 0.18,
+  roamTargetMinDistance: 180,
+  targetReachRadius: 24,
+  turnSpeed: 3.8,
+  wallAvoidDistance: 22,
+  wallAvoidStrength: 0.32,
+  crowdAvoidRadius: 96,
+  crowdRepathDelay: 0.2,
+  crowdRepathThreshold: 1.05,
+  crowdSteerStrength: 1.55,
+  crowdTargetPenalty: 68,
 };

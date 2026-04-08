@@ -1,12 +1,12 @@
 import type { CSSProperties } from "react";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  BUG_VARIANT_CONFIG,
   getBugCountsKey,
   getBugTotal,
   getBugVariantMaxHp,
 } from "../constants/bugs";
 import Engine from "../engine/Engine";
+import { DEFAULT_GAME_CONFIG } from "../engine/types";
 
 // feature flag to toggle the new engine for homepage background only
 const ENABLE_ENTITY_ENGINE = true;
@@ -164,23 +164,27 @@ const BugCanvas = memo(function BugCanvas({
       swarmRef.current = engine;
     }
     // if many bugs were seeded at (0,0) (canvas not measured yet), reseed
-    const maybeBugs = swarmRef.current.getAllBugs();
-    const clustered = maybeBugs.filter((b) => b.x <= 1 && b.y <= 1).length;
+    const maybeBugs = swarmRef.current.getAllBugs() as Array<any>;
+    const clustered = maybeBugs.filter((b: any) => b.x <= 1 && b.y <= 1).length;
     if (clustered > 0 && clustered / Math.max(1, maybeBugs.length) > 0.25) {
       for (const b of maybeBugs) {
         b.x = Math.random() * w;
         b.y = Math.random() * h;
-        const speed = 0.6 + Math.random() * 1.4;
+        const speed =
+          DEFAULT_GAME_CONFIG.baseSpeed *
+          targetSettingsRef.current.speedMultiplier *
+          (0.75 + Math.random() * 0.35);
         const angle = Math.random() * Math.PI * 2;
         b.vx = Math.cos(angle) * speed;
         b.vy = Math.sin(angle) * speed;
+        b.heading = angle;
       }
       setReseedInfo({ ts: Date.now(), clustered, total: maybeBugs.length });
     }
     deadBugIndexesRef.current = new Set();
-    const bugs = swarmRef.current.getAllBugs();
+    const bugs = swarmRef.current.getAllBugs() as Array<any>;
     hitPointsRef.current = new Map(
-      bugs.map((b, i) => [i, getBugVariantMaxHp(b.variant)]),
+      bugs.map((b: any, i: number) => [i, getBugVariantMaxHp(b.variant)]),
     );
     return () => {
       // if effect re-runs or component unmounts, clear engine reference
@@ -200,9 +204,9 @@ const BugCanvas = memo(function BugCanvas({
 
   useEffect(() => {
     deadBugIndexesRef.current = new Set();
-    const bugs = swarmRef.current?.getAllBugs() ?? [];
+    const bugs = (swarmRef.current?.getAllBugs() ?? []) as Array<any>;
     hitPointsRef.current = new Map(
-      bugs.map((b, i) => [i, getBugVariantMaxHp(b.variant)]),
+      bugs.map((b: any, i: number) => [i, getBugVariantMaxHp(b.variant)]),
     );
   }, [sessionKey]);
 
@@ -274,17 +278,21 @@ const BugCanvas = memo(function BugCanvas({
       if (swarmRef.current) {
         swarmRef.current.width = nextWidth;
         swarmRef.current.height = nextHeight;
-        const bugs = swarmRef.current.getAllBugs();
-        const clustered = bugs.filter((b) => b.x <= 1 && b.y <= 1).length;
+        const bugs = swarmRef.current.getAllBugs() as Array<any>;
+        const clustered = bugs.filter((b: any) => b.x <= 1 && b.y <= 1).length;
         if (clustered > 0 && clustered / Math.max(1, bugs.length) > 0.2) {
           // reseed positions and velocities
           for (const b of bugs) {
             b.x = Math.random() * nextWidth;
             b.y = Math.random() * nextHeight;
-            const speed = 0.6 + Math.random() * 1.4;
+            const speed =
+              DEFAULT_GAME_CONFIG.baseSpeed *
+              targetSettingsRef.current.speedMultiplier *
+              (0.75 + Math.random() * 0.35);
             const angle = Math.random() * Math.PI * 2;
             b.vx = Math.cos(angle) * speed;
             b.vy = Math.sin(angle) * speed;
+            b.heading = angle;
           }
           // lightweight debug log to help diagnose in dev
 
@@ -322,8 +330,30 @@ const BugCanvas = memo(function BugCanvas({
 
       const dtSec = Math.min(0.12, (timestamp - lastDrawTime) / 1000);
       lastDrawTime = timestamp;
+      const nextSettings = targetSettingsRef.current;
+      const animatedState = animatedStateRef.current;
+      animatedState.sizeMultiplier = interpolate(
+        animatedState.sizeMultiplier,
+        nextSettings.sizeMultiplier,
+      );
+      animatedState.speedMultiplier = interpolate(
+        animatedState.speedMultiplier,
+        nextSettings.speedMultiplier,
+      );
+
+      const sizeMultiplier = animatedState.sizeMultiplier;
+      const speedMultiplier = clampNumber(
+        animatedState.speedMultiplier,
+        0.2,
+        6,
+      );
+
       // advance engine or swarm according to elapsed time to create continuous motion
       if (swarmRef.current) {
+        if ((swarmRef.current as any).config) {
+          (swarmRef.current as any).config.baseSpeed =
+            DEFAULT_GAME_CONFIG.baseSpeed * speedMultiplier;
+        }
         const steps = Math.max(1, Math.floor(dtSec * 60));
         for (let s = 0; s < steps; s++) {
           if ((swarmRef.current as any).update.length >= 1) {
@@ -344,42 +374,18 @@ const BugCanvas = memo(function BugCanvas({
       }
       context.clearRect(0, 0, width, height);
 
-      const timeSeconds = timestamp / 1000;
       // ensure width/height are valid before math that divides by them
       if (!width || !height) {
         width = canvas.clientWidth || boundsRef.current.width || 800;
         height = canvas.clientHeight || boundsRef.current.height || 600;
       }
-      const nextSettings = targetSettingsRef.current;
-      const animatedState = animatedStateRef.current;
-      animatedState.sizeMultiplier = interpolate(
-        animatedState.sizeMultiplier,
-        nextSettings.sizeMultiplier,
-      );
-      animatedState.speedMultiplier = interpolate(
-        animatedState.speedMultiplier,
-        nextSettings.speedMultiplier,
-      );
-
-      const sizeMultiplier = animatedState.sizeMultiplier;
-      const speedMultiplier = clampNumber(
-        animatedState.speedMultiplier,
-        0.2,
-        6,
-      );
       const activeParticles = swarmRef.current
         ? swarmRef.current.getAllBugs()
         : [];
       const activeMotionProfile = motionProfileRef.current;
-      const activeSceneProfile = sceneProfileRef.current;
       const activeChartFocus = chartFocusRef.current;
       const deadBugIndexes = deadBugIndexesRef.current;
       const focusX = activeChartFocus?.relativeIndex ?? 0.5;
-      const focusStrength = activeChartFocus
-        ? activeSceneProfile.chartFocusStrength
-        : 0;
-      const clusterCenterX = 0.5;
-      const clusterCenterY = 0.48;
       latestBugPositionsRef.current = [];
 
       for (let index = 0; index < activeParticles.length; index += 1) {
@@ -388,71 +394,13 @@ const BugCanvas = memo(function BugCanvas({
         }
 
         const particle = activeParticles[index];
-        const phase = (particle as any).phase ?? 0;
-        const swayPhase = (particle as any).swayPhase ?? 0;
-        const particleDuration = (particle as any).duration ?? 10;
-        const particleDelay = (particle as any).delay ?? 0;
-        const cycleDuration = Math.max(
-          4,
-          (particleDuration * activeMotionProfile.durationMultiplier) /
-            speedMultiplier,
-        );
-        const cycleProgress =
-          ((timeSeconds + particleDelay) % cycleDuration) / cycleDuration;
-        const t = cycleProgress * Math.PI * 2;
-        // combine long + short wavelength components for organic drift
-        const longDrift = Math.sin(t + phase);
-        const shortDrift = Math.sin(t * 2 + phase * 0.7);
-        const driftWave = longDrift * 0.66 + shortDrift * 0.34;
-        const longSway = Math.cos(t * 1.1 + swayPhase);
-        const shortSway = Math.cos(t * 2.2 + swayPhase * 0.9);
-        const swayWave = longSway * 0.7 + shortSway * 0.3;
-        // particle.x/y are pixel positions from the entity engine
         const normalizedX = particle.x / width;
-        const normalizedY = particle.y / height;
-        const variantConfig = BUG_VARIANT_CONFIG[particle.variant];
-        const variantBob =
-          Math.sin(t * variantConfig.bobFrequency + index * 0.12 + phase) *
-          variantConfig.bobAmplitude *
-          0.9;
-        const variantSway =
-          Math.cos(t * variantConfig.swayFrequency + index * 0.16 + swayPhase) *
-          variantConfig.swayAmplitude *
-          0.9;
-        const clusterShiftX =
-          (clusterCenterX - normalizedX) *
-          width *
-          activeSceneProfile.clusterStrength *
-          0.22;
-        const clusterShiftY =
-          (clusterCenterY - normalizedY) *
-          height *
-          activeSceneProfile.clusterStrength *
-          0.12;
         const focusDistance = Math.abs(normalizedX - focusX);
         const focusFalloff = activeChartFocus
           ? Math.max(0, 1 - focusDistance * 3.1)
           : 0;
-        const chartShiftX = activeChartFocus
-          ? (focusX - normalizedX) * width * focusStrength * focusFalloff * 0.2
-          : 0;
-        const x =
-          particle.x +
-          clusterShiftX +
-          chartShiftX +
-          (driftWave * 0.7 + Math.sin(t * 0.37 + phase) * 0.3) *
-            (particle.vx ?? particle.driftX ?? 1) *
-            speedMultiplier +
-          variantBob;
-        const y =
-          particle.y +
-          clusterShiftY +
-          (swayWave * 0.72 + Math.cos(t * 0.5 + swayPhase) * 0.28) *
-            (particle.vy ?? particle.driftY ?? 1) *
-            speedMultiplier +
-          variantSway;
-        // Use fixed opacity from particle profile + motion multiplier. Remove
-        // per-frame sinusoidal modulation so SVGs don't flicker in opacity.
+        const x = particle.x;
+        const y = particle.y;
         const opacity = clampNumber(
           (particle.opacity ?? 1) * activeMotionProfile.opacityMultiplier,
           0.06,
@@ -463,13 +411,12 @@ const BugCanvas = memo(function BugCanvas({
           activeMotionProfile.scale *
           sizeMultiplier *
           (activeChartFocus ? 0.92 + focusFalloff * 0.26 : 1);
-        // Make bugs face their movement direction (crawling forward). Add a
-        // small sway on top of the heading for organic motion.
         const velX = particle.vx ?? particle.driftX ?? 1;
         const velY = particle.vy ?? particle.driftY ?? 0;
-        const heading = Math.atan2(velY, velX);
-        const sway = Math.sin(t * 2 + phase) * 0.12;
-        const rotation = heading + sway;
+        const rotation =
+          typeof particle.heading === "number"
+            ? particle.heading
+            : Math.atan2(velY, velX);
 
         latestBugPositionsRef.current.push({
           index,
@@ -490,16 +437,20 @@ const BugCanvas = memo(function BugCanvas({
 
       // one-time safety reseed: if many bugs still sit at 0,0, reseed and surface badge
       if (!reseedInfo && swarmRef.current) {
-        const bugs = swarmRef.current.getAllBugs();
-        const clustered = bugs.filter((b) => b.x <= 1 && b.y <= 1).length;
+        const bugs = swarmRef.current.getAllBugs() as Array<any>;
+        const clustered = bugs.filter((b: any) => b.x <= 1 && b.y <= 1).length;
         if (clustered > 0 && clustered / Math.max(1, bugs.length) > 0.2) {
           for (const b of bugs) {
             b.x = Math.random() * width;
             b.y = Math.random() * height;
-            const speed = 0.6 + Math.random() * 1.4;
+            const speed =
+              DEFAULT_GAME_CONFIG.baseSpeed *
+              targetSettingsRef.current.speedMultiplier *
+              (0.75 + Math.random() * 0.35);
             const angle = Math.random() * Math.PI * 2;
             b.vx = Math.cos(angle) * speed;
             b.vy = Math.sin(angle) * speed;
+            b.heading = angle;
           }
           setReseedInfo({ ts: Date.now(), clustered, total: bugs.length });
         }
@@ -539,16 +490,32 @@ const BugCanvas = memo(function BugCanvas({
       const clickY = event.clientY - bounds.top;
       let hitCandidate: { distance: number; index: number } | null = null;
 
-      for (const bugPosition of latestBugPositionsRef.current) {
-        const distance = Math.hypot(
-          clickX - bugPosition.x,
-          clickY - bugPosition.y,
-        );
-        if (
-          distance <= bugPosition.radius &&
-          (!hitCandidate || distance < hitCandidate.distance)
-        ) {
-          hitCandidate = { distance, index: bugPosition.index };
+      // Prefer engine-provided hitTest when available
+      try {
+        const engine = swarmRef.current;
+        if (engine && typeof engine.hitTest === "function") {
+          const res = engine.hitTest(clickX, clickY);
+          if (res) {
+            hitCandidate = { distance: res.distance, index: res.index };
+          }
+        }
+      } catch {
+        void 0;
+      }
+
+      // fallback: check last computed positions
+      if (!hitCandidate) {
+        for (const bugPosition of latestBugPositionsRef.current) {
+          const distance = Math.hypot(
+            clickX - bugPosition.x,
+            clickY - bugPosition.y,
+          );
+          if (
+            distance <= bugPosition.radius &&
+            (!hitCandidate || distance < hitCandidate.distance)
+          ) {
+            hitCandidate = { distance, index: bugPosition.index };
+          }
         }
       }
 

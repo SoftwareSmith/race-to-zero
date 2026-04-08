@@ -2,6 +2,7 @@ import type { GameConfig } from "./types";
 import { DEFAULT_GAME_CONFIG } from "./types";
 import { BugEntity } from "./BugEntity";
 import { Entity } from "./Entity";
+import { getBugVariantMaxHp } from "../constants/bugs";
 
 export interface EngineOptions {
   width: number;
@@ -44,27 +45,59 @@ export class Engine {
       const n = counts[v] ?? 0;
       for (let i = 0; i < n; i++) {
         let be: BugEntity | undefined = undefined;
+        // spawn uniformly across the canvas with random initial headings
+        const spawnX = Math.random() * this.width;
+        const spawnY = Math.random() * this.height;
+        const heading = Math.random() * Math.PI * 2;
+        const speed = this.config.baseSpeed * (0.8 + Math.random() * 0.6);
+
         if (this.pool.length > 0) {
           be = this.pool.pop()!;
           be.revive(this.width, this.height);
           be.variant = (v as any) || "low";
           be.size = (6 + Math.random() * 2) * this.config.sizeMultiplier;
+          be.baseSize = be.size;
+          be.maxHp = getBugVariantMaxHp(be.variant as any);
+          be.hp = be.maxHp;
+          be.x = spawnX;
+          be.y = spawnY;
+          be.vx = Math.cos(heading) * speed;
+          be.vy = Math.sin(heading) * speed;
+          be.heading = heading;
         } else {
-          const angle = Math.random() * Math.PI * 2;
-          const speed = 1.2 + Math.random() * 0.8;
           be = new BugEntity({
-            x: Math.random() * this.width,
-            y: Math.random() * this.height,
-            vx: Math.cos(angle) * speed,
-            vy: Math.sin(angle) * speed,
+            x: spawnX,
+            y: spawnY,
+            vx: Math.cos(heading) * speed,
+            vy: Math.sin(heading) * speed,
             size: (6 + Math.random() * 2) * this.config.sizeMultiplier,
             opacity: 1,
             variant: (v as any) || "low",
+            heading,
           } as any);
+          be.baseSize = be.size;
+          be.maxHp = getBugVariantMaxHp(be.variant as any);
+          be.hp = be.maxHp;
         }
         this.entities.push(be);
       }
     }
+  }
+
+  // hit-test in canvas-local coordinates (x,y) -> returns nearest entity index within radius
+  hitTest(x: number, y: number) {
+    let best: { index: number; distance: number } | null = null;
+    for (let i = 0; i < this.entities.length; i++) {
+      const e = this.entities[i] as any;
+      const dx = x - e.x;
+      const dy = y - e.y;
+      const dist = Math.hypot(dx, dy);
+      const radius = Math.max((e.size ?? 12) * 0.5, 12);
+      if (dist <= radius && (!best || dist < best.distance)) {
+        best = { index: i, distance: dist };
+      }
+    }
+    return best;
   }
 
   addEntity(e: Entity) {
@@ -88,6 +121,36 @@ export class Engine {
     return out;
   }
 
+  getCrowdingAt(x: number, y: number, radius: number, exclude?: Entity) {
+    const r2 = radius * radius;
+    let count = 0;
+    let weightedCount = 0;
+    let centerX = 0;
+    let centerY = 0;
+
+    for (const entity of this.entities) {
+      if (entity === exclude) continue;
+      const dx = entity.x - x;
+      const dy = entity.y - y;
+      const distanceSquared = dx * dx + dy * dy;
+      if (distanceSquared > r2) continue;
+
+      const distance = Math.max(1, Math.sqrt(distanceSquared));
+      const weight = 1 - distance / radius;
+      count += 1;
+      weightedCount += weight;
+      centerX += entity.x * weight;
+      centerY += entity.y * weight;
+    }
+
+    return {
+      centerX: weightedCount > 0 ? centerX / weightedCount : x,
+      centerY: weightedCount > 0 ? centerY / weightedCount : y,
+      count,
+      score: weightedCount,
+    };
+  }
+
   update(dt: number, targetX?: number | null, targetY?: number | null) {
     // simple fixed-step update called by the host render loop
     for (const ent of this.entities) {
@@ -101,9 +164,12 @@ export class Engine {
         // pass context expected by BugEntity
         (ent as any).update(dt, {
           getNeighbors: (e: any, r: number) => this.getNeighbors(e, r),
+          getCrowdingAt: (x: number, y: number, r: number, exclude?: any) =>
+            this.getCrowdingAt(x, y, r, exclude),
           targetX,
           targetY,
           config: this.config,
+          bounds: { width: this.width, height: this.height },
         });
       } else {
         (ent as any).update(dt);

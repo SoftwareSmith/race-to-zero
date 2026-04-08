@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import BackgroundField from "../src/components/BackgroundField";
 import Surface from "../src/components/Surface";
-import type { BugVisualSettings } from "../src/types/dashboard";
+import type { BugCounts, BugVisualSettings } from "../src/types/dashboard";
 
 interface InteractiveAppProps {
   initialBugCount: number;
@@ -50,6 +50,16 @@ function InteractiveApp({ initialBugCount }: InteractiveAppProps) {
 
     return "Minimal interactive mode using the same terminator field as the dashboard.";
   }, [remainingBugCount]);
+
+  const bugCounts = useMemo<BugCounts>(
+    () => ({
+      high: 0,
+      low: remainingBugCount,
+      medium: 0,
+      urgent: 0,
+    }),
+    [remainingBugCount],
+  );
 
   return (
     <div className="relative min-h-screen overflow-hidden">
@@ -125,7 +135,7 @@ function InteractiveApp({ initialBugCount }: InteractiveAppProps) {
           ].join(" ")}
         >
           <BackgroundField
-            bugCount={remainingBugCount}
+            bugCounts={bugCounts}
             bugVisualSettings={DEFAULT_BUG_VISUAL_SETTINGS}
             chartFocus={null}
             milestoneFlash={null}
@@ -138,6 +148,7 @@ function InteractiveApp({ initialBugCount }: InteractiveAppProps) {
             showParticleCount={false}
             showTerminatorStatusBadge={false}
             terminatorMode
+            remainingBugCount={remainingBugCount}
             tone="negative"
           />
         </Surface>

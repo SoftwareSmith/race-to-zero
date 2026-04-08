@@ -7,7 +7,7 @@ import highRaw from "../assets/bugs/high.svg?raw";
 import urgentRaw from "../assets/bugs/urgent.svg?raw";
 
 export interface BugSpriteOptions {
-  color: string;
+  color?: string;
   opacity?: number;
   rotation?: number;
   size: number;
@@ -22,6 +22,8 @@ const BUG_RAW_SVGS: Record<BugVariant, string> = {
   medium: mediumRaw,
   urgent: urgentRaw,
 };
+
+const SPRITE_FORWARD_ROTATION_OFFSET = Math.PI / 2 + Math.PI / 18;
 
 /* ---------------------------------- */
 /* Utilities */
@@ -165,7 +167,7 @@ export function drawBugSprite(
     ctx.save();
 
     ctx.translate(x, y);
-    ctx.rotate(rotation);
+    ctx.rotate(rotation + SPRITE_FORWARD_ROTATION_OFFSET);
     ctx.globalAlpha = finalOpacity;
 
     ctx.drawImage(
