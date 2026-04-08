@@ -72,7 +72,7 @@ function BugSettingsMenu({
             value={bugVisualSettings.sizeMultiplier}
           />
           <RangeField
-            description="Increase how fast and how aggressively bugs scuttle around the screen."
+            description="Increase the crawl pace. Higher values still move faster, but the curve is now intentionally less extreme."
             label="Bug speed"
             max={3.5}
             min={0.6}

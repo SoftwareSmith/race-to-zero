@@ -37,7 +37,59 @@ export class Engine {
     this.height = h;
   }
 
-  spawnFromCounts(counts: Record<string, number>) {
+  spawnFromCounts(
+    counts: Record<string, number>,
+    spawnZones: Array<{
+      height: number;
+      left: number;
+      top: number;
+      width: number;
+    }> = [],
+  ) {
+    const usableZones = spawnZones.filter(
+      (zone) => zone.width > 24 && zone.height > 24,
+    );
+    const totalZoneArea = usableZones.reduce(
+      (total, zone) => total + zone.width * zone.height,
+      0,
+    );
+    const getSpawnPoint = () => {
+      const padding = 18;
+      if (!usableZones.length || Math.random() > 0.84 || totalZoneArea <= 0) {
+        return {
+          x: padding + Math.random() * Math.max(1, this.width - padding * 2),
+          y: padding + Math.random() * Math.max(1, this.height - padding * 2),
+        };
+      }
+
+      let roll = Math.random() * totalZoneArea;
+      let selectedZone = usableZones[0];
+      for (const zone of usableZones) {
+        roll -= zone.width * zone.height;
+        if (roll <= 0) {
+          selectedZone = zone;
+          break;
+        }
+      }
+
+      return {
+        x: Math.min(
+          this.width - padding,
+          Math.max(
+            padding,
+            selectedZone.left + Math.random() * selectedZone.width,
+          ),
+        ),
+        y: Math.min(
+          this.height - padding,
+          Math.max(
+            padding,
+            selectedZone.top + Math.random() * selectedZone.height,
+          ),
+        ),
+      };
+    };
+
     // reuse pool when possible
     this.entities = [];
     const variants = Object.keys(counts);
@@ -46,8 +98,7 @@ export class Engine {
       for (let i = 0; i < n; i++) {
         let be: BugEntity | undefined = undefined;
         // spawn uniformly across the canvas with random initial headings
-        const spawnX = Math.random() * this.width;
-        const spawnY = Math.random() * this.height;
+        const { x: spawnX, y: spawnY } = getSpawnPoint();
         const heading = Math.random() * Math.PI * 2;
         const speed = this.config.baseSpeed * (0.8 + Math.random() * 0.6);
 
@@ -175,11 +226,31 @@ export class Engine {
         (ent as any).update(dt);
       }
 
-      // clamp inside canvas
-      if (ent.x < 0) ent.x = 0;
-      if (ent.y < 0) ent.y = 0;
-      if (ent.x > this.width) ent.x = this.width;
-      if (ent.y > this.height) ent.y = this.height;
+      // keep entities inside the canvas without pinning them to the boundary.
+      if (ent.x < 0) {
+        ent.x = 0;
+        if ((ent as any).vx < 0) {
+          (ent as any).vx = Math.abs((ent as any).vx) * 0.82;
+        }
+      }
+      if (ent.y < 0) {
+        ent.y = 0;
+        if ((ent as any).vy < 0) {
+          (ent as any).vy = Math.abs((ent as any).vy) * 0.82;
+        }
+      }
+      if (ent.x > this.width) {
+        ent.x = this.width;
+        if ((ent as any).vx > 0) {
+          (ent as any).vx = -Math.abs((ent as any).vx) * 0.82;
+        }
+      }
+      if (ent.y > this.height) {
+        ent.y = this.height;
+        if ((ent as any).vy > 0) {
+          (ent as any).vy = -Math.abs((ent as any).vy) * 0.82;
+        }
+      }
 
       // handle dead entities: move to pool and remove from active list once
       if ((ent as any).state === "dead") {
@@ -201,7 +272,11 @@ export class Engine {
     if (!e) return null;
     if (typeof (e as any).onHit === "function") {
       const res = (e as any).onHit(damage);
-      return { defeated: res.defeated, remainingHp: res.remainingHp, variant: (e as any).variant };
+      return {
+        defeated: res.defeated,
+        remainingHp: res.remainingHp,
+        variant: (e as any).variant,
+      };
     }
     return null;
   }

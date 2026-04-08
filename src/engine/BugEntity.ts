@@ -31,6 +31,10 @@ function normalizeVector(x: number, y: number) {
   return { x: x / length, y: y / length };
 }
 
+function reflectHeading(heading: number, axis: "x" | "y") {
+  return normalizeAngle(axis === "x" ? Math.PI - heading : -heading);
+}
+
 function fade(t: number) {
   return t * t * t * (t * (t * 6 - 15) + 10);
 }
@@ -123,6 +127,11 @@ export class BugEntity extends Entity {
 
   private getCrawlProfile() {
     return getProfileForVariant(this.variant) ?? ({} as CrawlProfile);
+  }
+
+  private syncTypeSpec() {
+    this.typeSpec = getCodex()[this.variant as string] ?? null;
+    return this.typeSpec;
   }
 
   private resetAnchorDriftTimer() {
@@ -278,6 +287,7 @@ export class BugEntity extends Entity {
     getCrowdingAt?: BugUpdateContext["getCrowdingAt"],
   ) {
     const profile = this.getCrawlProfile();
+    const typeSpec = this.syncTypeSpec();
     this.ensureHomeAnchor(bounds);
     const padding = 8;
     const minDistance = Math.min(
@@ -325,12 +335,12 @@ export class BugEntity extends Entity {
         config.crowdAvoidRadius,
         this,
       );
-      const affinity = this.typeSpec?.socialAffinity ?? 0;
+      const affinity = typeSpec?.socialAffinity ?? 0;
       const affinityScale = 1 - affinity; // positive affinity reduces crowd penalty
       const score =
         travelDistance * 0.42 -
         anchorDistance * 0.18 +
-        edgeScore * Math.abs(profile.edgePreference) * 42 +
+        edgeScore * Math.abs(profile.edgePreference) * 16 +
         -(crowding?.score ?? 0) * config.crowdTargetPenalty * affinityScale +
         Math.random() * 18;
 
@@ -377,6 +387,7 @@ export class BugEntity extends Entity {
     const config = ctx.config ?? DEFAULT_GAME_CONFIG;
     const bounds = ctx.bounds ?? { width: 800, height: 600 };
     const crawlProfile = this.getCrawlProfile();
+    const typeSpec = this.syncTypeSpec();
 
     if (this.state === "dying") {
       this.deathProgress += dt / this.deathDuration;
@@ -486,7 +497,7 @@ export class BugEntity extends Entity {
         this.x - crowding.centerX,
         this.y - crowding.centerY,
       );
-      const affinity = this.typeSpec?.socialAffinity ?? 0;
+      const affinity = typeSpec?.socialAffinity ?? 0;
       const steerScale = config.crowdSteerStrength * crowding.score * (1 - affinity);
       desired.x += awayFromCrowd.x * steerScale;
       desired.y += awayFromCrowd.y * steerScale;
@@ -572,21 +583,39 @@ export class BugEntity extends Entity {
     this.y += this.vy * dt;
 
     const margin = 6;
+    let bouncedX = false;
+    let bouncedY = false;
     if (this.x < margin) {
       this.x = margin;
-      this.chooseRoamTarget(bounds, config, ctx.getCrowdingAt);
+      this.vx = Math.abs(this.vx) * 0.82;
+      bouncedX = true;
     }
     if (this.x > bounds.width - margin) {
       this.x = bounds.width - margin;
-      this.chooseRoamTarget(bounds, config, ctx.getCrowdingAt);
+      this.vx = -Math.abs(this.vx) * 0.82;
+      bouncedX = true;
     }
     if (this.y < margin) {
       this.y = margin;
-      this.chooseRoamTarget(bounds, config, ctx.getCrowdingAt);
+      this.vy = Math.abs(this.vy) * 0.82;
+      bouncedY = true;
     }
     if (this.y > bounds.height - margin) {
       this.y = bounds.height - margin;
+      this.vy = -Math.abs(this.vy) * 0.82;
+      bouncedY = true;
+    }
+
+    if (bouncedX) {
+      this.heading = reflectHeading(this.heading, "x");
+    }
+    if (bouncedY) {
+      this.heading = reflectHeading(this.heading, "y");
+    }
+    if (bouncedX || bouncedY) {
       this.chooseRoamTarget(bounds, config, ctx.getCrowdingAt);
+      this.retargetTimer = Math.min(this.retargetTimer, 0.35);
+      this.stuckTimer = 0;
     }
 
     this.opacity = 1;
@@ -611,7 +640,7 @@ export class BugEntity extends Entity {
     this.fleeTimer = 0.9 + Math.random() * 0.8;
     this.roamTarget = null;
     this.retargetTimer = 0;
-    this.typeSpec = getCodex()[this.variant as string] ?? null;
+    this.syncTypeSpec();
     return { defeated: false, remainingHp: this.hp };
   }
 
@@ -634,14 +663,15 @@ export class BugEntity extends Entity {
     this.motionTime = Math.random() * 100;
     this.opacity = 1;
     this.size = this.baseSize;
-    this.typeSpec = getCodex()[this.variant as string] ?? null;
+    this.syncTypeSpec();
   }
 
   render(ctx2d: CanvasRenderingContext2D, alpha = 1) {
     const renderX = this.prevX * (1 - alpha) + this.x * alpha;
     const renderY = this.prevY * (1 - alpha) + this.y * alpha;
-    const color = this.typeSpec?.color;
-    const sizeMultiplier = this.typeSpec?.size ?? 1;
+    const typeSpec = this.syncTypeSpec();
+    const color = typeSpec?.color;
+    const sizeMultiplier = typeSpec?.size ?? 1;
     drawBugSprite(ctx2d, {
       x: renderX,
       y: renderY,

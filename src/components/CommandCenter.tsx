@@ -12,6 +12,7 @@ import type { DeadlineMetrics, SummaryMetrics } from "../types/dashboard";
 
 interface CommandCenterProps {
   deadlineMetrics: DeadlineMetrics;
+  siegeMode?: boolean;
   summary: SummaryMetrics;
 }
 
@@ -36,7 +37,11 @@ function getCommandCenterSubtitle(
   return `${paceDirection} required pace for ${deadlineLabel}.`;
 }
 
-function CommandCenter({ deadlineMetrics, summary }: CommandCenterProps) {
+function CommandCenter({
+  deadlineMetrics,
+  siegeMode = false,
+  summary,
+}: CommandCenterProps) {
   const paceGap = summary.currentFixRate - summary.bugsPerDayRequired;
   const paceTone = getDeltaTone(paceGap);
   const title = getCommandCenterTitle(summary.bugCount);
@@ -58,12 +63,21 @@ function CommandCenter({ deadlineMetrics, summary }: CommandCenterProps) {
 
   return (
     <Surface
+      data-siege-panel="command-center"
       className={cn(
         "relative border-white/10 p-5 before:pointer-events-none before:absolute before:inset-0 before:rounded-[28px] before:opacity-100 after:pointer-events-none after:absolute after:inset-0 after:rounded-[28px] after:opacity-100",
+        siegeMode
+          ? "overflow-hidden border-red-500/18 before:bg-[radial-gradient(circle_at_top_left,rgba(248,113,113,0.16),transparent_42%)] after:bg-[linear-gradient(180deg,transparent,rgba(12,14,20,0.34))]"
+          : "",
         glowStyles,
       )}
       tone="strong"
     >
+      {siegeMode ? (
+        <div className="pointer-events-none absolute right-5 top-5 rounded-full border border-red-200/20 bg-red-500/10 px-2 py-1 text-[0.54rem] font-semibold uppercase tracking-[0.22em] text-red-100/78">
+          Threat focus
+        </div>
+      ) : null}
       <div className="relative">
         <div className="border-b border-white/8 pb-5">
           <div className="w-full">

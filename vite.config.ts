@@ -10,9 +10,31 @@ export default defineConfig({
   plugins: [react(), tailwindcss()],
   base: "/race-to-zero/",
   build: {
+    chunkSizeWarningLimit: 650,
     rollupOptions: {
       input: {
         main: path.resolve(__dirname, "index.html"),
+      },
+      output: {
+        manualChunks(id) {
+          if (
+            id.includes("chart.js") ||
+            id.includes("chartjs-plugin-datalabels") ||
+            id.includes("react-chartjs-2")
+          ) {
+            return "charts";
+          }
+
+          if (id.includes("react") || id.includes("scheduler")) {
+            return "react";
+          }
+
+          if (id.includes("date-fns")) {
+            return "vendor";
+          }
+
+          return undefined;
+        },
       },
     },
   },

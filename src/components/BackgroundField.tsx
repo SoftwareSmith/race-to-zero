@@ -6,17 +6,20 @@ import {
   getBugVariantMaxHp,
 } from "../constants/bugs";
 import Engine from "../engine/Engine";
+import { getCodex } from "../engine/bugCodex";
 import type { GameConfig } from "../engine/types";
 import { DEFAULT_GAME_CONFIG } from "../engine/types";
-
-// feature flag to toggle the new engine for homepage background only
-const ENABLE_ENTITY_ENGINE = true;
 import {
   getEffectPalette,
   getMotionProfile,
   getSceneProfile,
 } from "../utils/backgroundScene";
+import { cn } from "../utils/cn";
 import { drawBugSprite } from "../utils/bugSprite";
+import type {
+  SiegeCombatStats,
+  SiegeZoneRect,
+} from "../features/background-game/types";
 import type {
   BugCounts,
   BugParticle,
@@ -41,6 +44,10 @@ function interpolate(
 
 function clampNumber(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max);
+}
+
+function getSpeedMultiplier(chaosMultiplier?: number) {
+  return clampNumber(Math.sqrt(Math.max(0.2, chaosMultiplier ?? 1)), 0.45, 2.2);
 }
 
 interface BugHitPayload {
@@ -83,28 +90,30 @@ function getSplatClassName(variant: BugVariant) {
 interface BugCanvasProps {
   bugVisualSettings: BugVisualSettings;
   chartFocus: ChartFocusState | null;
+  combatStats?: SiegeCombatStats | null;
   motionProfile: MotionProfile;
   onHit: (payload: BugHitPayload) => void;
   bugCounts: BugCounts;
   sceneProfile: SceneProfile;
   sessionKey: string;
+  siegeZones?: SiegeZoneRect[];
   terminatorMode: boolean;
   onEntityDeath?: (x: number, y: number, variant: string) => void;
-  cursorPosition?: { x: number; y: number } | null;
   gameConfig?: GameConfig;
 }
 
 const BugCanvas = memo(function BugCanvas({
   bugVisualSettings,
   chartFocus,
+  combatStats,
   motionProfile,
   onHit,
   bugCounts,
   sceneProfile,
   sessionKey,
+  siegeZones = [],
   terminatorMode,
   onEntityDeath,
-  cursorPosition,
   gameConfig,
 }: BugCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -112,23 +121,101 @@ const BugCanvas = memo(function BugCanvas({
   const motionProfileRef = useRef(motionProfile);
   const sceneProfileRef = useRef(sceneProfile);
   const chartFocusRef = useRef(chartFocus);
+  const combatStatsRef = useRef<SiegeCombatStats | null>(combatStats ?? null);
+  const onHitRef = useRef(onHit);
+  const reseedInfoRef = useRef<{
+    ts: number;
+    clustered: number;
+    total: number;
+  } | null>(null);
+  const siegeZonesRef = useRef<SiegeZoneRect[]>(siegeZones);
   const boundsRef = useRef({ height: 0, left: 0, top: 0, width: 0 });
   const latestBugPositionsRef = useRef<RenderedBugPosition[]>([]);
   const deadBugIndexesRef = useRef<Set<number>>(new Set());
   const hitPointsRef = useRef<Map<number, number>>(new Map());
   const targetSettingsRef = useRef({
     sizeMultiplier: bugVisualSettings?.sizeMultiplier ?? 1,
-    speedMultiplier: Math.max(0.2, bugVisualSettings?.chaosMultiplier ?? 1),
+    speedMultiplier: getSpeedMultiplier(bugVisualSettings?.chaosMultiplier),
   });
   const animatedStateRef = useRef({
     sizeMultiplier: bugVisualSettings?.sizeMultiplier ?? 1,
-    speedMultiplier: Math.max(0.2, bugVisualSettings?.chaosMultiplier ?? 1),
+    speedMultiplier: getSpeedMultiplier(bugVisualSettings?.chaosMultiplier),
   });
   const [reseedInfo, setReseedInfo] = useState<{
     ts: number;
     clustered: number;
     total: number;
   } | null>(null);
+
+  const getLocalSiegeZones = useCallback(() => {
+    const canvasBounds = canvasRef.current?.getBoundingClientRect();
+    const left = canvasBounds?.left ?? boundsRef.current.left;
+    const top = canvasBounds?.top ?? boundsRef.current.top;
+
+    return siegeZonesRef.current
+      .map((zone) => ({
+        height: zone.height,
+        left: zone.left - left,
+        top: zone.top - top,
+        width: zone.width,
+      }))
+      .filter((zone) => zone.width > 0 && zone.height > 0);
+  }, []);
+
+  const triggerAutoHits = useCallback(
+    (damage: number, volleyCount: number, preferZones: boolean) => {
+      const engine = swarmRef.current;
+      if (!engine || volleyCount <= 0) {
+        return;
+      }
+
+      const localZones = getLocalSiegeZones();
+      const candidates = latestBugPositionsRef.current
+        .filter((position) => !deadBugIndexesRef.current.has(position.index))
+        .map((position) => ({
+          ...position,
+          inZone: localZones.some(
+            (zone) =>
+              position.x >= zone.left &&
+              position.x <= zone.left + zone.width &&
+              position.y >= zone.top &&
+              position.y <= zone.top + zone.height,
+          ),
+        }))
+        .sort((leftCandidate, rightCandidate) => {
+          if (leftCandidate.inZone !== rightCandidate.inZone) {
+            return leftCandidate.inZone ? -1 : 1;
+          }
+
+          return leftCandidate.y - rightCandidate.y;
+        });
+
+      const orderedCandidates =
+        preferZones && candidates.some((candidate) => candidate.inZone)
+          ? candidates
+          : candidates;
+
+      for (const candidate of orderedCandidates.slice(0, volleyCount)) {
+        const result = engine.handleHit(candidate.index, damage);
+        if (!result) {
+          continue;
+        }
+
+        if (result.defeated) {
+          deadBugIndexesRef.current.add(candidate.index);
+        }
+
+        onHitRef.current({
+          defeated: result.defeated,
+          remainingHp: result.remainingHp,
+          variant: result.variant,
+          x: Math.round(candidate.x + boundsRef.current.left),
+          y: Math.round(candidate.y + boundsRef.current.top),
+        });
+      }
+    },
+    [getLocalSiegeZones],
+  );
 
   useEffect(() => {
     // when incoming counts change, recreate swarm to match new counts
@@ -170,7 +257,10 @@ const BugCanvas = memo(function BugCanvas({
       } catch {
         // ignore in case shape differs
       }
-      engine.spawnFromCounts(bugCounts as any);
+      engine.spawnFromCounts(
+        bugCounts as any,
+        terminatorMode ? getLocalSiegeZones() : [],
+      );
       swarmRef.current = engine;
     }
     // if many bugs were seeded at (0,0) (canvas not measured yet), reseed
@@ -213,7 +303,13 @@ const BugCanvas = memo(function BugCanvas({
       }
       swarmRef.current = null;
     };
-  }, [bugCounts, onEntityDeath]);
+  }, [
+    bugCounts,
+    gameConfig,
+    getLocalSiegeZones,
+    onEntityDeath,
+    terminatorMode,
+  ]);
 
   useEffect(() => {
     deadBugIndexesRef.current = new Set();
@@ -236,9 +332,25 @@ const BugCanvas = memo(function BugCanvas({
   }, [chartFocus]);
 
   useEffect(() => {
+    onHitRef.current = onHit;
+  }, [onHit]);
+
+  useEffect(() => {
+    combatStatsRef.current = combatStats ?? null;
+  }, [combatStats]);
+
+  useEffect(() => {
+    reseedInfoRef.current = reseedInfo;
+  }, [reseedInfo]);
+
+  useEffect(() => {
+    siegeZonesRef.current = siegeZones;
+  }, [siegeZones]);
+
+  useEffect(() => {
     targetSettingsRef.current = {
       sizeMultiplier: bugVisualSettings?.sizeMultiplier ?? 1,
-      speedMultiplier: Math.max(0.2, bugVisualSettings?.chaosMultiplier ?? 1),
+      speedMultiplier: getSpeedMultiplier(bugVisualSettings?.chaosMultiplier),
     };
   }, [bugVisualSettings]);
 
@@ -247,6 +359,64 @@ const BugCanvas = memo(function BugCanvas({
       deadBugIndexesRef.current = new Set();
     }
   }, [terminatorMode]);
+
+  useEffect(() => {
+    if (!terminatorMode) {
+      return undefined;
+    }
+
+    const intervalIds: number[] = [];
+    const initialStats = combatStatsRef.current;
+
+    if (initialStats?.pulseUnlocked) {
+      intervalIds.push(
+        window.setInterval(() => {
+          const nextStats = combatStatsRef.current;
+          if (!nextStats?.pulseUnlocked) {
+            return;
+          }
+
+          triggerAutoHits(
+            nextStats.pulseDamage,
+            nextStats.pulseVolleyCount,
+            true,
+          );
+        }, initialStats.pulseInterval),
+      );
+    }
+
+    if (initialStats?.laserUnlocked) {
+      intervalIds.push(
+        window.setInterval(() => {
+          const nextStats = combatStatsRef.current;
+          if (!nextStats?.laserUnlocked) {
+            return;
+          }
+
+          triggerAutoHits(
+            nextStats.laserDamage,
+            nextStats.laserVolleyCount,
+            false,
+          );
+        }, initialStats.laserInterval),
+      );
+    }
+
+    return () => {
+      for (const intervalId of intervalIds) {
+        window.clearInterval(intervalId);
+      }
+    };
+  }, [
+    combatStats?.laserInterval,
+    combatStats?.laserUnlocked,
+    gameConfig,
+    combatStats?.pulseInterval,
+    combatStats?.pulseUnlocked,
+    sessionKey,
+    terminatorMode,
+    triggerAutoHits,
+  ]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -315,7 +485,13 @@ const BugCanvas = memo(function BugCanvas({
             clustered,
             total: bugs.length,
           });
-          setReseedInfo({ ts: Date.now(), clustered, total: bugs.length });
+          const nextReseedInfo = {
+            ts: Date.now(),
+            clustered,
+            total: bugs.length,
+          };
+          reseedInfoRef.current = nextReseedInfo;
+          setReseedInfo(nextReseedInfo);
         }
       }
     };
@@ -374,16 +550,7 @@ const BugCanvas = memo(function BugCanvas({
         const steps = Math.max(1, Math.floor(dtSec * 60));
         for (let s = 0; s < steps; s++) {
           if ((swarmRef.current as any).update.length >= 1) {
-            // Engine.update expects dt and optional target
-            const targetX =
-              terminatorMode && cursorPosition
-                ? cursorPosition.x - boundsRef.current.left
-                : null;
-            const targetY =
-              terminatorMode && cursorPosition
-                ? cursorPosition.y - boundsRef.current.top
-                : null;
-            (swarmRef.current as any).update(1 / 60, targetX, targetY);
+            (swarmRef.current as any).update(1 / 60, null, null);
           } else {
             (swarmRef.current as any).update();
           }
@@ -427,6 +594,7 @@ const BugCanvas = memo(function BugCanvas({
           particle.size *
           activeMotionProfile.scale *
           sizeMultiplier *
+          (getCodex()[particle.variant as BugVariant]?.size ?? 1) *
           (activeChartFocus ? 0.92 + focusFalloff * 0.26 : 1);
         const velX = particle.vx ?? particle.driftX ?? 1;
         const velY = particle.vy ?? particle.driftY ?? 0;
@@ -443,6 +611,7 @@ const BugCanvas = memo(function BugCanvas({
         });
 
         drawBugSprite(context, {
+          color: getCodex()[particle.variant as BugVariant]?.color,
           opacity,
           rotation,
           size,
@@ -453,7 +622,7 @@ const BugCanvas = memo(function BugCanvas({
       }
 
       // one-time safety reseed: if many bugs still sit at 0,0, reseed and surface badge
-      if (!reseedInfo && swarmRef.current) {
+      if (!reseedInfoRef.current && swarmRef.current) {
         const bugs = swarmRef.current.getAllBugs() as Array<any>;
         const clustered = bugs.filter((b: any) => b.x <= 1 && b.y <= 1).length;
         if (clustered > 0 && clustered / Math.max(1, bugs.length) > 0.2) {
@@ -472,7 +641,13 @@ const BugCanvas = memo(function BugCanvas({
             b.vy = Math.sin(angle) * speed;
             b.heading = angle;
           }
-          setReseedInfo({ ts: Date.now(), clustered, total: bugs.length });
+          const nextReseedInfo = {
+            ts: Date.now(),
+            clustered,
+            total: bugs.length,
+          };
+          reseedInfoRef.current = nextReseedInfo;
+          setReseedInfo(nextReseedInfo);
         }
       }
 
@@ -495,7 +670,7 @@ const BugCanvas = memo(function BugCanvas({
         event.target instanceof Element ? event.target : null;
       if (
         targetElement?.closest(
-          "button, a, input, select, textarea, label, summary",
+          "[data-no-hammer], button, a, input, select, textarea, label, summary",
         )
       ) {
         return;
@@ -557,7 +732,7 @@ const BugCanvas = memo(function BugCanvas({
               deadBugIndexesRef.current.add(hitCandidate.index);
             }
 
-            onHit({
+            onHitRef.current({
               defeated: result.defeated,
               remainingHp: result.remainingHp,
               variant: result.variant,
@@ -580,7 +755,7 @@ const BugCanvas = memo(function BugCanvas({
           deadBugIndexesRef.current.add(hitCandidate.index);
         }
 
-        onHit({
+        onHitRef.current({
           defeated,
           remainingHp,
           variant: particle.variant,
@@ -606,7 +781,7 @@ const BugCanvas = memo(function BugCanvas({
         window.cancelAnimationFrame(animationFrameId);
       }
     };
-  }, [onHit, terminatorMode, cursorPosition, reseedInfo]);
+  }, [terminatorMode]);
 
   return (
     <>
@@ -633,12 +808,15 @@ interface BackgroundFieldProps {
   bugCounts: BugCounts;
   bugVisualSettings: BugVisualSettings;
   chartFocus: ChartFocusState | null;
+  className?: string;
+  combatStats?: SiegeCombatStats | null;
   interactiveSessionKey?: string | null;
   milestoneFlash: { threshold: number; token: number } | null;
   onTerminatorHit?: (payload: BugHitPayload) => void;
   remainingBugCount?: number;
   showParticleCount: boolean;
   showTerminatorStatusBadge?: boolean;
+  siegeZones?: SiegeZoneRect[];
   terminatorMode: boolean;
   tone: Tone;
   gameConfig?: GameConfig;
@@ -648,12 +826,15 @@ const BackgroundField = memo(function BackgroundField({
   bugCounts,
   bugVisualSettings,
   chartFocus,
+  className = "",
+  combatStats = null,
   interactiveSessionKey = null,
   milestoneFlash,
   onTerminatorHit,
   remainingBugCount,
   showParticleCount,
   showTerminatorStatusBadge = true,
+  siegeZones = [],
   terminatorMode,
   gameConfig,
   tone,
@@ -684,6 +865,9 @@ const BackgroundField = memo(function BackgroundField({
     : `${terminatorMode ? "terminator" : "ambient"}:${bugCountsKey}`;
   const [hammerPosition, setHammerPosition] = useState({ x: 0, y: 0 });
   const [hammerSwing, setHammerSwing] = useState(false);
+  const hammerPositionRef = useRef({ x: 0, y: 0 });
+  const hammerCursorRef = useRef<HTMLDivElement | null>(null);
+  const hammerMoveFrameRef = useRef<number | null>(null);
 
   const [gameState, setGameState] = useState<GameState>(() => ({
     remainingTargets: totalBugCount,
@@ -709,17 +893,41 @@ const BackgroundField = memo(function BackgroundField({
 
   useEffect(() => {
     if (!terminatorMode) {
+      hammerPositionRef.current = { x: 0, y: 0 };
+      if (hammerCursorRef.current) {
+        hammerCursorRef.current.style.transform = "translate3d(0px, 0px, 0)";
+      }
       return undefined;
     }
 
     const handlePointerMove = (event: globalThis.MouseEvent) => {
-      const x = event.clientX;
-      const y = event.clientY;
-      setHammerPosition({ x, y });
+      hammerPositionRef.current = {
+        x: event.clientX,
+        y: event.clientY,
+      };
+
+      if (hammerMoveFrameRef.current != null) {
+        return;
+      }
+
+      hammerMoveFrameRef.current = window.requestAnimationFrame(() => {
+        hammerMoveFrameRef.current = null;
+        const cursor = hammerCursorRef.current;
+        if (!cursor) {
+          return;
+        }
+
+        const { x, y } = hammerPositionRef.current;
+        cursor.style.transform = `translate3d(${x}px, ${y}px, 0)`;
+      });
     };
 
     window.addEventListener("mousemove", handlePointerMove);
     return () => {
+      if (hammerMoveFrameRef.current != null) {
+        window.cancelAnimationFrame(hammerMoveFrameRef.current);
+        hammerMoveFrameRef.current = null;
+      }
       window.removeEventListener("mousemove", handlePointerMove);
     };
   }, [terminatorMode]);
@@ -766,6 +974,7 @@ const BackgroundField = memo(function BackgroundField({
 
   const handleBugHit = useCallback(
     (payload: BugHitPayload) => {
+      setHammerPosition(hammerPositionRef.current);
       setHammerSwing(true);
       onTerminatorHit?.(payload);
       setGameState((currentValue) => {
@@ -779,17 +988,21 @@ const BackgroundField = memo(function BackgroundField({
               };
 
         return {
-          remainingTargets: Math.max(0, nextState.remainingTargets - 1),
+          remainingTargets: payload.defeated
+            ? Math.max(0, nextState.remainingTargets - 1)
+            : nextState.remainingTargets,
           sessionKey: gameSessionKey,
-          splats: [
-            ...nextState.splats.slice(-5),
-            {
-              id: `${payload.x}-${payload.y}-${Date.now()}`,
-              variant: payload.variant,
-              x: payload.x,
-              y: payload.y,
-            },
-          ],
+          splats: payload.defeated
+            ? [
+                ...nextState.splats.slice(-5),
+                {
+                  id: `${payload.x}-${payload.y}-${Date.now()}`,
+                  variant: payload.variant,
+                  x: payload.x,
+                  y: payload.y,
+                },
+              ]
+            : nextState.splats,
         };
       });
     },
@@ -804,7 +1017,10 @@ const BackgroundField = memo(function BackgroundField({
 
   return (
     <div
-      className="pointer-events-none absolute inset-0 overflow-hidden"
+      className={cn(
+        "pointer-events-none absolute inset-0 overflow-hidden",
+        className,
+      )}
       aria-hidden="true"
     >
       <div
@@ -835,13 +1051,15 @@ const BackgroundField = memo(function BackgroundField({
       <BugCanvas
         bugVisualSettings={bugVisualSettings}
         chartFocus={chartFocus}
+        combatStats={combatStats}
         motionProfile={motionProfile}
         onHit={handleBugHit}
         bugCounts={normalizedBugCounts}
         sceneProfile={sceneProfile}
         sessionKey={gameSessionKey}
+        siegeZones={siegeZones}
         terminatorMode={terminatorMode}
-        cursorPosition={terminatorMode ? hammerPosition : null}
+        gameConfig={gameConfig}
         onEntityDeath={(x, y, variant) => {
           setGameState((currentValue) => {
             const nextState =
@@ -872,6 +1090,7 @@ const BackgroundField = memo(function BackgroundField({
       ) : null}
       {terminatorMode ? (
         <div
+          ref={hammerCursorRef}
           className={`pointer-events-none fixed left-0 top-0 z-[90] [transform-origin:18px_14px] ${hammerSwing ? "[&>span]:animate-[hammer-swing_180ms_ease-out]" : ""}`}
           style={{
             transform: `translate3d(${hammerPosition.x}px, ${hammerPosition.y}px, 0)`,
