@@ -4,6 +4,7 @@ import { MenuIconButton } from "./MenuControls";
 import { getCodex, loadCodexFromStorage, setCodex } from "../engine/bugCodex";
 import type { BugType } from "../engine/bugCodex";
 import { getColoredSvgUrl } from "../utils/bugSprite";
+import { getBugVariantColor } from "../constants/bugs";
 import type { BugVariant } from "../types/dashboard";
 import { cn } from "../utils/cn";
 
@@ -39,13 +40,13 @@ function getTabIconSrc(entry: BugType, id: string) {
   if (entry.iconUrl) {
     return entry.iconUrl;
   }
-
   const variant = (entry.iconVariant ?? id) as BugVariant;
+  const baseColor = entry.color ?? getBugVariantColor(variant);
   if (BUILTIN_ICON_VARIANTS.includes(variant)) {
-    return getColoredSvgUrl(variant, "#f5f5f4");
+    return getColoredSvgUrl(variant, baseColor);
   }
 
-  return getColoredSvgUrl("low", "#f5f5f4");
+  return getColoredSvgUrl("low", baseColor);
 }
 
 export default function CodexPanel({
@@ -94,22 +95,7 @@ export default function CodexPanel({
     [],
   );
 
-  const addType = useCallback(() => {
-    const id = `custom-${Date.now()}`;
-    const baseProfile = codex.low?.profile ?? getCodex().low.profile;
-    const entry: BugType = {
-      id,
-      name: "New bug",
-      description: "",
-      profile: cloneProfile(baseProfile),
-      socialAffinity: 0,
-      preferredRegion: "middle",
-      iconVariant: "low",
-    };
-
-    setLocalCodex((prev) => ({ ...prev, [id]: entry }));
-    setActiveId(id);
-  }, [codex]);
+  // addType removed per QA; creation of new types is disabled for now
 
   const handleMenuButtonClick = useCallback(() => {
     if (!open) {
@@ -168,13 +154,7 @@ export default function CodexPanel({
                 </p>
                 <p className="mt-1 text-sm text-stone-300">Type profiles</p>
               </div>
-              <button
-                className="rounded-full border border-white/10 px-2 py-1 text-[0.7rem] font-semibold text-stone-300 transition hover:border-white/20 hover:text-stone-100"
-                onClick={addType}
-                type="button"
-              >
-                Add
-              </button>
+              {/* add disabled */}
             </div>
 
             <div className="flex-1 space-y-2 overflow-y-auto pr-1">
@@ -315,6 +295,40 @@ export default function CodexPanel({
                         value={activeEntry.iconUrl ?? ""}
                       />
                     </label>
+                    <div className="mt-2 grid gap-3 sm:grid-cols-2">
+                      <label className="grid gap-1 text-xs font-semibold uppercase tracking-[0.16em] text-stone-500">
+                        Color
+                        <input
+                          type="color"
+                          value={
+                            activeEntry.color ??
+                            getBugVariantColor(activeId as BugVariant)
+                          }
+                          onChange={(ev) =>
+                            setField(activeId, "color", ev.target.value)
+                          }
+                          className="h-10 w-14 rounded"
+                        />
+                      </label>
+                      <label className="grid gap-1 text-xs font-semibold uppercase tracking-[0.16em] text-stone-500">
+                        Size
+                        <input
+                          type="range"
+                          min={0.5}
+                          max={2}
+                          step={0.05}
+                          value={activeEntry.size ?? 1}
+                          onChange={(ev) =>
+                            setField(activeId, "size", Number(ev.target.value))
+                          }
+                          style={{
+                            accentColor:
+                              activeEntry.color ??
+                              getBugVariantColor(activeId as BugVariant),
+                          }}
+                        />
+                      </label>
+                    </div>
                   </div>
                 </section>
 
@@ -390,154 +404,221 @@ export default function CodexPanel({
                     <label className="grid gap-1 text-xs font-semibold uppercase tracking-[0.16em] text-stone-500">
                       Noise frequency
                       <input
-                        className="rounded-[16px] border border-white/8 bg-zinc-950/70 px-3 py-2 text-sm normal-case tracking-normal text-stone-100 outline-none transition focus:border-sky-300/40"
+                        type="range"
+                        min={0.1}
+                        max={2}
+                        step={0.01}
+                        value={activeEntry.profile.noiseFrequency}
                         onChange={(event) =>
                           updateProfile(activeId, {
                             noiseFrequency: Number(event.target.value),
                           })
                         }
-                        step="0.01"
-                        type="number"
-                        value={activeEntry.profile.noiseFrequency}
+                        style={{
+                          accentColor:
+                            activeEntry.color ??
+                            getBugVariantColor(activeId as BugVariant),
+                        }}
                       />
                     </label>
                     <label className="grid gap-1 text-xs font-semibold uppercase tracking-[0.16em] text-stone-500">
                       Roam radius
                       <input
-                        className="rounded-[16px] border border-white/8 bg-zinc-950/70 px-3 py-2 text-sm normal-case tracking-normal text-stone-100 outline-none transition focus:border-sky-300/40"
+                        type="range"
+                        min={20}
+                        max={500}
+                        step={5}
+                        value={activeEntry.profile.roamRadius}
                         onChange={(event) =>
                           updateProfile(activeId, {
                             roamRadius: Number(event.target.value),
                           })
                         }
-                        type="number"
-                        value={activeEntry.profile.roamRadius}
+                        style={{
+                          accentColor:
+                            activeEntry.color ??
+                            getBugVariantColor(activeId as BugVariant),
+                        }}
                       />
                     </label>
                     <label className="grid gap-1 text-xs font-semibold uppercase tracking-[0.16em] text-stone-500">
                       Forward noise
                       <input
-                        className="rounded-[16px] border border-white/8 bg-zinc-950/70 px-3 py-2 text-sm normal-case tracking-normal text-stone-100 outline-none transition focus:border-sky-300/40"
+                        type="range"
+                        min={0}
+                        max={2}
+                        step={0.01}
+                        value={activeEntry.profile.noiseForwardStrength}
                         onChange={(event) =>
                           updateProfile(activeId, {
                             noiseForwardStrength: Number(event.target.value),
                           })
                         }
-                        step="0.01"
-                        type="number"
-                        value={activeEntry.profile.noiseForwardStrength}
+                        style={{
+                          accentColor:
+                            activeEntry.color ??
+                            getBugVariantColor(activeId as BugVariant),
+                        }}
                       />
                     </label>
                     <label className="grid gap-1 text-xs font-semibold uppercase tracking-[0.16em] text-stone-500">
                       Lateral noise
                       <input
-                        className="rounded-[16px] border border-white/8 bg-zinc-950/70 px-3 py-2 text-sm normal-case tracking-normal text-stone-100 outline-none transition focus:border-sky-300/40"
+                        type="range"
+                        min={0}
+                        max={2}
+                        step={0.01}
+                        value={activeEntry.profile.noiseLateralStrength}
                         onChange={(event) =>
                           updateProfile(activeId, {
                             noiseLateralStrength: Number(event.target.value),
                           })
                         }
-                        step="0.01"
-                        type="number"
-                        value={activeEntry.profile.noiseLateralStrength}
+                        style={{
+                          accentColor:
+                            activeEntry.color ??
+                            getBugVariantColor(activeId as BugVariant),
+                        }}
                       />
                     </label>
                     <label className="grid gap-1 text-xs font-semibold uppercase tracking-[0.16em] text-stone-500">
                       Turn noise
                       <input
-                        className="rounded-[16px] border border-white/8 bg-zinc-950/70 px-3 py-2 text-sm normal-case tracking-normal text-stone-100 outline-none transition focus:border-sky-300/40"
+                        type="range"
+                        min={0}
+                        max={2}
+                        step={0.01}
+                        value={activeEntry.profile.noiseTurnStrength}
                         onChange={(event) =>
                           updateProfile(activeId, {
                             noiseTurnStrength: Number(event.target.value),
                           })
                         }
-                        step="0.01"
-                        type="number"
-                        value={activeEntry.profile.noiseTurnStrength}
+                        style={{
+                          accentColor:
+                            activeEntry.color ??
+                            getBugVariantColor(activeId as BugVariant),
+                        }}
                       />
                     </label>
                     <label className="grid gap-1 text-xs font-semibold uppercase tracking-[0.16em] text-stone-500">
                       Speed multiplier
                       <input
-                        className="rounded-[16px] border border-white/8 bg-zinc-950/70 px-3 py-2 text-sm normal-case tracking-normal text-stone-100 outline-none transition focus:border-sky-300/40"
+                        type="range"
+                        min={0.2}
+                        max={2}
+                        step={0.01}
+                        value={activeEntry.profile.speedMultiplier}
                         onChange={(event) =>
                           updateProfile(activeId, {
                             speedMultiplier: Number(event.target.value),
                           })
                         }
-                        step="0.01"
-                        type="number"
-                        value={activeEntry.profile.speedMultiplier}
+                        style={{
+                          accentColor:
+                            activeEntry.color ??
+                            getBugVariantColor(activeId as BugVariant),
+                        }}
                       />
                     </label>
                     <label className="grid gap-1 text-xs font-semibold uppercase tracking-[0.16em] text-stone-500">
                       Turn multiplier
                       <input
-                        className="rounded-[16px] border border-white/8 bg-zinc-950/70 px-3 py-2 text-sm normal-case tracking-normal text-stone-100 outline-none transition focus:border-sky-300/40"
+                        type="range"
+                        min={0}
+                        max={2}
+                        step={0.01}
+                        value={activeEntry.profile.turnMultiplier}
                         onChange={(event) =>
                           updateProfile(activeId, {
                             turnMultiplier: Number(event.target.value),
                           })
                         }
-                        step="0.01"
-                        type="number"
-                        value={activeEntry.profile.turnMultiplier}
+                        style={{
+                          accentColor:
+                            activeEntry.color ??
+                            getBugVariantColor(activeId as BugVariant),
+                        }}
                       />
                     </label>
                     <label className="grid gap-1 text-xs font-semibold uppercase tracking-[0.16em] text-stone-500">
                       Separation multiplier
                       <input
-                        className="rounded-[16px] border border-white/8 bg-zinc-950/70 px-3 py-2 text-sm normal-case tracking-normal text-stone-100 outline-none transition focus:border-sky-300/40"
+                        type="range"
+                        min={0}
+                        max={2}
+                        step={0.01}
+                        value={activeEntry.profile.separationMultiplier}
                         onChange={(event) =>
                           updateProfile(activeId, {
                             separationMultiplier: Number(event.target.value),
                           })
                         }
-                        step="0.01"
-                        type="number"
-                        value={activeEntry.profile.separationMultiplier}
+                        style={{
+                          accentColor:
+                            activeEntry.color ??
+                            getBugVariantColor(activeId as BugVariant),
+                        }}
                       />
                     </label>
                     <label className="grid gap-1 text-xs font-semibold uppercase tracking-[0.16em] text-stone-500">
                       Wander multiplier
                       <input
-                        className="rounded-[16px] border border-white/8 bg-zinc-950/70 px-3 py-2 text-sm normal-case tracking-normal text-stone-100 outline-none transition focus:border-sky-300/40"
+                        type="range"
+                        min={0}
+                        max={2}
+                        step={0.01}
+                        value={activeEntry.profile.wanderMultiplier}
                         onChange={(event) =>
                           updateProfile(activeId, {
                             wanderMultiplier: Number(event.target.value),
                           })
                         }
-                        step="0.01"
-                        type="number"
-                        value={activeEntry.profile.wanderMultiplier}
+                        style={{
+                          accentColor:
+                            activeEntry.color ??
+                            getBugVariantColor(activeId as BugVariant),
+                        }}
                       />
                     </label>
                     <label className="grid gap-1 text-xs font-semibold uppercase tracking-[0.16em] text-stone-500">
                       Wide roam chance
                       <input
-                        className="rounded-[16px] border border-white/8 bg-zinc-950/70 px-3 py-2 text-sm normal-case tracking-normal text-stone-100 outline-none transition focus:border-sky-300/40"
+                        type="range"
+                        min={0}
+                        max={1}
+                        step={0.01}
+                        value={activeEntry.profile.wideRoamChance}
                         onChange={(event) =>
                           updateProfile(activeId, {
                             wideRoamChance: Number(event.target.value),
                           })
                         }
-                        step="0.01"
-                        type="number"
-                        value={activeEntry.profile.wideRoamChance}
+                        style={{
+                          accentColor:
+                            activeEntry.color ??
+                            getBugVariantColor(activeId as BugVariant),
+                        }}
                       />
                     </label>
                     <label className="grid gap-1 text-xs font-semibold uppercase tracking-[0.16em] text-stone-500">
                       Edge preference
                       <input
-                        className="rounded-[16px] border border-white/8 bg-zinc-950/70 px-3 py-2 text-sm normal-case tracking-normal text-stone-100 outline-none transition focus:border-sky-300/40"
+                        type="range"
+                        min={-1}
+                        max={1}
+                        step={0.01}
+                        value={activeEntry.profile.edgePreference}
                         onChange={(event) =>
                           updateProfile(activeId, {
                             edgePreference: Number(event.target.value),
                           })
                         }
-                        step="0.01"
-                        type="number"
-                        value={activeEntry.profile.edgePreference}
+                        style={{
+                          accentColor:
+                            activeEntry.color ??
+                            getBugVariantColor(activeId as BugVariant),
+                        }}
                       />
                     </label>
                   </div>
@@ -551,7 +632,11 @@ export default function CodexPanel({
                     <label className="grid gap-1 text-xs font-semibold uppercase tracking-[0.16em] text-stone-500">
                       Edge weight
                       <input
-                        className="rounded-[16px] border border-white/8 bg-zinc-950/70 px-3 py-2 text-sm normal-case tracking-normal text-stone-100 outline-none transition focus:border-sky-300/40"
+                        type="range"
+                        min={0}
+                        max={1}
+                        step={0.01}
+                        value={activeEntry.profile.regionWeights.edge}
                         onChange={(event) =>
                           updateProfile(activeId, {
                             regionWeights: {
@@ -560,15 +645,21 @@ export default function CodexPanel({
                             },
                           })
                         }
-                        step="0.01"
-                        type="number"
-                        value={activeEntry.profile.regionWeights.edge}
+                        style={{
+                          accentColor:
+                            activeEntry.color ??
+                            getBugVariantColor(activeId as BugVariant),
+                        }}
                       />
                     </label>
                     <label className="grid gap-1 text-xs font-semibold uppercase tracking-[0.16em] text-stone-500">
                       Middle weight
                       <input
-                        className="rounded-[16px] border border-white/8 bg-zinc-950/70 px-3 py-2 text-sm normal-case tracking-normal text-stone-100 outline-none transition focus:border-sky-300/40"
+                        type="range"
+                        min={0}
+                        max={1}
+                        step={0.01}
+                        value={activeEntry.profile.regionWeights.middle}
                         onChange={(event) =>
                           updateProfile(activeId, {
                             regionWeights: {
@@ -577,15 +668,21 @@ export default function CodexPanel({
                             },
                           })
                         }
-                        step="0.01"
-                        type="number"
-                        value={activeEntry.profile.regionWeights.middle}
+                        style={{
+                          accentColor:
+                            activeEntry.color ??
+                            getBugVariantColor(activeId as BugVariant),
+                        }}
                       />
                     </label>
                     <label className="grid gap-1 text-xs font-semibold uppercase tracking-[0.16em] text-stone-500">
                       Interior weight
                       <input
-                        className="rounded-[16px] border border-white/8 bg-zinc-950/70 px-3 py-2 text-sm normal-case tracking-normal text-stone-100 outline-none transition focus:border-sky-300/40"
+                        type="range"
+                        min={0}
+                        max={1}
+                        step={0.01}
+                        value={activeEntry.profile.regionWeights.interior}
                         onChange={(event) =>
                           updateProfile(activeId, {
                             regionWeights: {
@@ -594,9 +691,11 @@ export default function CodexPanel({
                             },
                           })
                         }
-                        step="0.01"
-                        type="number"
-                        value={activeEntry.profile.regionWeights.interior}
+                        style={{
+                          accentColor:
+                            activeEntry.color ??
+                            getBugVariantColor(activeId as BugVariant),
+                        }}
                       />
                     </label>
                   </div>

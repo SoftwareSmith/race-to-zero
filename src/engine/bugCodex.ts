@@ -104,6 +104,8 @@ export interface BugType {
   preferredRegion?: CrawlRegion;
   iconVariant?: string; // reference to a built-in svg variant
   iconUrl?: string; // custom icon URL
+  color?: string; // optional override color for this type
+  size?: number; // optional size multiplier for this type
 }
 
 export const BUG_CODEX: Record<string, BugType> = {

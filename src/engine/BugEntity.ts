@@ -1,4 +1,5 @@
 import { Entity } from "./Entity";
+import { drawBugSprite } from "../utils/bugSprite";
 import type { Vec2 } from "./types";
 import { DEFAULT_GAME_CONFIG } from "./types";
 import { getCodex, CrawlProfile, BugType } from "./bugCodex";
@@ -634,5 +635,21 @@ export class BugEntity extends Entity {
     this.opacity = 1;
     this.size = this.baseSize;
     this.typeSpec = getCodex()[this.variant as string] ?? null;
+  }
+
+  render(ctx2d: CanvasRenderingContext2D, alpha = 1) {
+    const renderX = this.prevX * (1 - alpha) + this.x * alpha;
+    const renderY = this.prevY * (1 - alpha) + this.y * alpha;
+    const color = this.typeSpec?.color;
+    const sizeMultiplier = this.typeSpec?.size ?? 1;
+    drawBugSprite(ctx2d, {
+      x: renderX,
+      y: renderY,
+      size: this.size * sizeMultiplier,
+      rotation: this.heading,
+      opacity: this.opacity,
+      variant: this.variant,
+      color: color ?? undefined,
+    });
   }
 }

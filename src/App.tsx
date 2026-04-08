@@ -2,7 +2,7 @@ import type { ChangeEvent, ReactNode } from "react";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { endOfYear, format, subDays } from "date-fns";
 import BackgroundField from "./components/BackgroundField";
-import ConfigPanel from "./components/ConfigPanel";
+// ConfigPanel UI removed in favor of per-type settings in Codex
 import CodexPanel from "./components/CodexPanel";
 import { DEFAULT_GAME_CONFIG } from "./engine/types";
 
@@ -842,7 +842,7 @@ function App() {
         gameConfig={gameConfig}
       />
 
-      <ConfigPanel onChange={setGameConfig} />
+      {/* Engine config removed; per-type settings available in Codex */}
 
       {interactiveMode ? (
         <div className="relative min-h-screen">
