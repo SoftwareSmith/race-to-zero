@@ -16,27 +16,6 @@ interface CommandCenterProps {
   summary: SummaryMetrics;
 }
 
-function getCommandCenterTitle(bugCount: number) {
-  if (bugCount === 0) {
-    return "The bug queue is clear.";
-  }
-
-  return "Are we clearing bugs fast enough to reach zero?";
-}
-
-function getCommandCenterSubtitle(
-  bugCount: number,
-  deadlineLabel: string,
-  paceGap: number,
-) {
-  if (bugCount === 0) {
-    return `Current snapshot is at zero open bugs for ${deadlineLabel}.`;
-  }
-
-  const paceDirection = paceGap >= 0 ? "Ahead of" : "Behind";
-  return `${paceDirection} required pace for ${deadlineLabel}.`;
-}
-
 function CommandCenter({
   deadlineMetrics,
   siegeMode = false,
@@ -44,12 +23,6 @@ function CommandCenter({
 }: CommandCenterProps) {
   const paceGap = summary.currentFixRate - summary.bugsPerDayRequired;
   const paceTone = getDeltaTone(paceGap);
-  const title = getCommandCenterTitle(summary.bugCount);
-  const subtitle = getCommandCenterSubtitle(
-    summary.bugCount,
-    summary.deadlineLabel,
-    paceGap,
-  );
   const glowStyles =
     {
       positive:
@@ -79,22 +52,14 @@ function CommandCenter({
         </div>
       ) : null}
       <div className="relative">
-        <div className="border-b border-white/8 pb-5">
-          <div className="w-full">
-            <div className="flex flex-wrap items-center gap-3">
-              <p className="text-[0.72rem] font-semibold uppercase tracking-[0.28em] text-stone-500">
-                Delivery outlook
-              </p>
-              <StatusTag tone={deadlineMetrics.statusTone}>
-                {getStatusTagText(deadlineMetrics.statusTone)}
-              </StatusTag>
-            </div>
-            <h2 className="mt-3 font-display text-3xl leading-tight tracking-[-0.04em] text-stone-50 sm:text-[2.8rem]">
-              {title}
-            </h2>
-            <p className="mt-3 w-full text-sm leading-6 text-stone-300 sm:text-base">
-              {subtitle}
+        <div className="w-full">
+          <div className="flex flex-wrap items-center gap-3">
+            <p className="text-[0.72rem] font-semibold uppercase tracking-[0.28em] text-stone-500">
+              Delivery outlook
             </p>
+            <StatusTag tone={deadlineMetrics.statusTone}>
+              {getStatusTagText(deadlineMetrics.statusTone)}
+            </StatusTag>
           </div>
         </div>
 

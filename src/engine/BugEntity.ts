@@ -31,10 +31,6 @@ function normalizeVector(x: number, y: number) {
   return { x: x / length, y: y / length };
 }
 
-function reflectHeading(heading: number, axis: "x" | "y") {
-  return normalizeAngle(axis === "x" ? Math.PI - heading : -heading);
-}
-
 function fade(t: number) {
   return t * t * t * (t * (t * 6 - 15) + 10);
 }
@@ -101,6 +97,9 @@ export class BugEntity extends Entity {
   motionTime: number;
   typeSpec: BugType | null;
   stuckTimer: number;
+  edgeOrbitTimer: number;
+  edgeEscapeCooldown: number;
+  edgeRecoveryTimer: number;
 
   constructor(opts: Partial<Entity> & { id?: string } = {}) {
     super(opts as any);
@@ -123,6 +122,9 @@ export class BugEntity extends Entity {
     this.motionTime = Math.random() * 100;
     this.typeSpec = null;
     this.stuckTimer = 0;
+    this.edgeOrbitTimer = 0;
+    this.edgeEscapeCooldown = 0;
+    this.edgeRecoveryTimer = 0;
   }
 
   private getCrawlProfile() {
@@ -298,7 +300,9 @@ export class BugEntity extends Entity {
     let chosen: Vec2 | null = null;
     let bestScore = Number.NEGATIVE_INFINITY;
     const anchor = this.homeAnchor!;
-    for (let attempt = 0; attempt < 8; attempt += 1) {
+    const centerX = bounds.width * 0.5;
+    const centerY = bounds.height * 0.5;
+    for (let attempt = 0; attempt < 10; attempt += 1) {
       const useWideRoam = Math.random() < profile.wideRoamChance;
       const radius = useWideRoam
         ? Math.max(bounds.width, bounds.height) * (0.28 + Math.random() * 0.22)
@@ -329,6 +333,9 @@ export class BugEntity extends Entity {
       const edgeNormalized = clamp(edgeDistance / maxEdgeDistance, 0, 1);
       const edgeScore =
         profile.edgePreference >= 0 ? 1 - edgeNormalized : edgeNormalized;
+      const centerDistance = getLength(candidate.x - centerX, candidate.y - centerY);
+      const maxCenterDistance = Math.max(1, getLength(centerX, centerY));
+      const centerBiasScore = 1 - clamp(centerDistance / maxCenterDistance, 0, 1);
       const crowding = getCrowdingAt?.(
         candidate.x,
         candidate.y,
@@ -338,11 +345,12 @@ export class BugEntity extends Entity {
       const affinity = typeSpec?.socialAffinity ?? 0;
       const affinityScale = 1 - affinity; // positive affinity reduces crowd penalty
       const score =
-        travelDistance * 0.42 -
-        anchorDistance * 0.18 +
-        edgeScore * Math.abs(profile.edgePreference) * 16 +
+        travelDistance * 0.24 -
+        anchorDistance * 0.08 +
+        edgeScore * Math.abs(profile.edgePreference) * 8 +
+        centerBiasScore * 4.5 +
         -(crowding?.score ?? 0) * config.crowdTargetPenalty * affinityScale +
-        Math.random() * 18;
+        Math.random() * 32;
 
       if (travelDistance >= minDistance * 0.5 && score > bestScore) {
         chosen = candidate;
@@ -361,25 +369,131 @@ export class BugEntity extends Entity {
   private getWallAvoidance(bounds: { width: number; height: number }, config: typeof DEFAULT_GAME_CONFIG) {
     let x = 0;
     let y = 0;
-    const distance = config.wallAvoidDistance;
+    // proactive avoidance: use a larger sensing band so entities steer before touching the wall
+    const distance = Math.max(config.wallAvoidDistance * 1.6, 24);
+    const push = (amount: number) => amount * amount;
 
     if (this.x < distance) {
-      x += 1 - this.x / distance;
+      x += push(1 - this.x / distance);
     }
     if (this.x > bounds.width - distance) {
-      x -= 1 - (bounds.width - this.x) / distance;
+      x -= push(1 - (bounds.width - this.x) / distance);
     }
     if (this.y < distance) {
-      y += 1 - this.y / distance;
+      y += push(1 - this.y / distance);
     }
     if (this.y > bounds.height - distance) {
-      y -= 1 - (bounds.height - this.y) / distance;
+      y -= push(1 - (bounds.height - this.y) / distance);
     }
 
     const normalized = normalizeVector(x, y);
+    // slightly amplify the returned avoidance so bugs begin turning earlier
+    const amplify = 1.25;
     return {
-      x: normalized.x * config.wallAvoidStrength,
-      y: normalized.y * config.wallAvoidStrength,
+      x: normalized.x * config.wallAvoidStrength * Math.max(Math.abs(x), 0.2) * amplify,
+      y: normalized.y * config.wallAvoidStrength * Math.max(Math.abs(y), 0.2) * amplify,
+    };
+  }
+
+  private getBoundaryRecovery(bounds: { width: number; height: number }, config: typeof DEFAULT_GAME_CONFIG) {
+    const margin = 10;
+    const safeBand = Math.max(44, config.wallAvoidDistance * 2.1);
+    const horizontalRange = Math.max(1, safeBand - margin);
+    const verticalRange = Math.max(1, safeBand - margin);
+    const leftPressure = this.x <= safeBand ? 1 - clamp((this.x - margin) / horizontalRange, 0, 1) : 0;
+    const rightPressure = this.x >= bounds.width - safeBand
+      ? 1 - clamp((bounds.width - margin - this.x) / horizontalRange, 0, 1)
+      : 0;
+    const topPressure = this.y <= safeBand ? 1 - clamp((this.y - margin) / verticalRange, 0, 1) : 0;
+    const bottomPressure = this.y >= bounds.height - safeBand
+      ? 1 - clamp((bounds.height - margin - this.y) / verticalRange, 0, 1)
+      : 0;
+
+    const inwardX = leftPressure * leftPressure * 2.8 - rightPressure * rightPressure * 2.8;
+    const inwardY = topPressure * topPressure * 2.8 - bottomPressure * bottomPressure * 2.8;
+    const pressure = Math.max(leftPressure, rightPressure, topPressure, bottomPressure);
+
+    return {
+      x: inwardX,
+      y: inwardY,
+      pressure,
+    };
+  }
+
+  private getAnchorInfluence(bounds: { width: number; height: number }) {
+    this.ensureHomeAnchor(bounds);
+    if (!this.homeAnchor) {
+      return { x: 0, y: 0 };
+    }
+
+    const toAnchor = normalizeVector(
+      this.homeAnchor.x - this.x,
+      this.homeAnchor.y - this.y,
+    );
+    const distanceToAnchor = getLength(
+      this.homeAnchor.x - this.x,
+      this.homeAnchor.y - this.y,
+    );
+    const profile = this.getCrawlProfile();
+    const radius = Math.max(profile.roamRadius, 48);
+    const pull = clamp(distanceToAnchor / radius, 0.08, 0.9);
+
+    return {
+      x: toAnchor.x * pull,
+      y: toAnchor.y * pull,
+    };
+  }
+
+  private getPreferredRegionInfluence(bounds: { width: number; height: number }) {
+    const typeSpec = this.syncTypeSpec();
+    const preferredRegion = typeSpec?.preferredRegion ?? "middle";
+    const centerX = bounds.width * 0.5;
+    const centerY = bounds.height * 0.5;
+    const toCenter = normalizeVector(centerX - this.x, centerY - this.y);
+
+    if (preferredRegion === "interior") {
+      return {
+        x: toCenter.x * 0.3,
+        y: toCenter.y * 0.3,
+      };
+    }
+
+    if (preferredRegion === "edge") {
+      const edgeInset = Math.max(42, Math.min(bounds.width, bounds.height) * 0.14);
+      const distances = [
+        { wall: "left", value: this.x },
+        { wall: "right", value: bounds.width - this.x },
+        { wall: "top", value: this.y },
+        { wall: "bottom", value: bounds.height - this.y },
+      ] as const;
+      const nearestWall = distances.reduce((closest, entry) =>
+        entry.value < closest.value ? entry : closest,
+      );
+      const target = { x: this.x, y: this.y };
+
+      if (nearestWall.wall === "left") {
+        target.x = edgeInset;
+      }
+      if (nearestWall.wall === "right") {
+        target.x = bounds.width - edgeInset;
+      }
+      if (nearestWall.wall === "top") {
+        target.y = edgeInset;
+      }
+      if (nearestWall.wall === "bottom") {
+        target.y = bounds.height - edgeInset;
+      }
+
+      const toEdgeLane = normalizeVector(target.x - this.x, target.y - this.y);
+      return {
+        x: toEdgeLane.x * 0.28,
+        y: toEdgeLane.y * 0.28,
+      };
+    }
+
+    return {
+      x: toCenter.x * 0.12,
+      y: toCenter.y * 0.12,
     };
   }
 
@@ -421,15 +535,14 @@ export class BugEntity extends Entity {
       }
     }
 
-    if (!this.roamTarget || this.retargetTimer <= 0) {
-      this.chooseRoamTarget(bounds, config, ctx.getCrowdingAt);
+    if (this.retargetTimer <= 0) {
+      this.homeAnchor = this.samplePointInRegion(bounds, this.chooseWeightedRegion());
+      this.retargetTimer = 3.8 + Math.random() * 4.2;
     }
 
-    const distanceToTarget = this.roamTarget
-      ? getLength(this.roamTarget.x - this.x, this.roamTarget.y - this.y)
-      : 0;
-    if (distanceToTarget <= config.targetReachRadius) {
-      this.chooseRoamTarget(bounds, config, ctx.getCrowdingAt);
+    // decay any temporary edge-recovery bias
+    if (this.edgeRecoveryTimer > 0) {
+      this.edgeRecoveryTimer = Math.max(0, this.edgeRecoveryTimer - dt);
     }
 
     const targetX = ctx.targetX ?? null;
@@ -440,51 +553,31 @@ export class BugEntity extends Entity {
       getLength(this.x - targetX, this.y - targetY) <= config.fleeRadius * 1.8;
 
     const desired = { x: 0, y: 0 };
+    const boundaryRecovery = this.getBoundaryRecovery(bounds, config);
     if (hasThreat) {
       this.state = "flee";
       this.fleeTimer = 0.45;
       const away = normalizeVector(this.x - targetX, this.y - targetY);
       desired.x += away.x * 1.8;
       desired.y += away.y * 1.8;
-    } else if (this.roamTarget) {
+    } else {
       this.state = this.fleeTimer ? "flee" : "patrol";
-      const toTarget = normalizeVector(
-        this.roamTarget.x - this.x,
-        this.roamTarget.y - this.y,
-      );
-      desired.x += toTarget.x;
-      desired.y += toTarget.y;
+      const anchorInfluence = this.getAnchorInfluence(bounds);
+      const regionInfluence = this.getPreferredRegionInfluence(bounds);
+      const forwardWeight = boundaryRecovery.pressure > 0.2 ? 0.12 : 0.38;
+      desired.x += Math.cos(this.heading) * forwardWeight;
+      desired.y += Math.sin(this.heading) * forwardWeight;
+      desired.x += anchorInfluence.x * 1.05;
+      desired.y += anchorInfluence.y * 1.05;
+      desired.x += regionInfluence.x;
+      desired.y += regionInfluence.y;
     }
 
     const wallAvoidance = this.getWallAvoidance(bounds, config);
+    desired.x += boundaryRecovery.x;
+    desired.y += boundaryRecovery.y;
     desired.x += wallAvoidance.x;
     desired.y += wallAvoidance.y;
-
-    // detect if the entity is being pushed hard into a wall and not making progress
-    const wallMag = Math.hypot(wallAvoidance.x, wallAvoidance.y);
-    const speedNow = getLength(this.vx, this.vy);
-    const speedThreshold = Math.max(6, config.baseSpeed * 0.22);
-    if (wallMag > 0.45 && speedNow < speedThreshold) {
-      this.stuckTimer += dt;
-    } else {
-      this.stuckTimer = Math.max(0, this.stuckTimer - dt * 2);
-    }
-
-    if (this.stuckTimer > 0.18) {
-      // rotate by a right-angle multiple and move on
-      const choices = [Math.PI / 2, Math.PI, (Math.PI * 3) / 2];
-      const rot = choices[Math.floor(Math.random() * choices.length)];
-      this.heading = normalizeAngle(this.heading + rot);
-      const desiredSpeed = config.baseSpeed * this.cruiseSpeed * 0.6;
-      this.vx = Math.cos(this.heading) * desiredSpeed;
-      this.vy = Math.sin(this.heading) * desiredSpeed;
-      // nudge slightly inside bounds
-      this.x = clamp(this.x + Math.cos(this.heading) * 8, 4, bounds.width - 4);
-      this.y = clamp(this.y + Math.sin(this.heading) * 8, 4, bounds.height - 4);
-      this.roamTarget = null;
-      this.retargetTimer = 0.25;
-      this.stuckTimer = 0;
-    }
 
     const crowding = ctx.getCrowdingAt?.(
       this.x,
@@ -501,14 +594,6 @@ export class BugEntity extends Entity {
       const steerScale = config.crowdSteerStrength * crowding.score * (1 - affinity);
       desired.x += awayFromCrowd.x * steerScale;
       desired.y += awayFromCrowd.y * steerScale;
-
-      if (
-        crowding.score > config.crowdRepathThreshold &&
-        this.state === "patrol" &&
-        this.retargetTimer > config.crowdRepathDelay
-      ) {
-        this.retargetTimer = config.crowdRepathDelay;
-      }
     }
 
     const neighbors = ctx.getNeighbors(this, config.separationRadius);
@@ -533,18 +618,26 @@ export class BugEntity extends Entity {
     const headingNoise = perlin1D(noiseTime + this.seed * 11.7, this.seed * 19.3);
     const lateralNoise = perlin1D(noiseTime + this.seed * 23.1 + 17.4, this.seed * 7.9);
     const forwardNoise = perlin1D(noiseTime * 0.73 + this.seed * 5.3 + 41.2, this.seed * 13.7);
+    const roamNoiseX = perlin1D(noiseTime * 0.51 + this.seed * 29.4, this.seed * 3.7);
+    const roamNoiseY = perlin1D(noiseTime * 0.61 + this.seed * 37.2, this.seed * 5.1);
 
     this.wanderAngle = headingNoise * crawlProfile.noiseTurnStrength;
     desired.x +=
-      Math.cos(this.heading + this.wanderAngle) * 0.22 * crawlProfile.wanderMultiplier;
+      Math.cos(this.heading + this.wanderAngle) *
+      (0.22 + config.wanderStrength * 0.35) *
+      crawlProfile.wanderMultiplier;
     desired.y +=
-      Math.sin(this.heading + this.wanderAngle) * 0.22 * crawlProfile.wanderMultiplier;
+      Math.sin(this.heading + this.wanderAngle) *
+      (0.22 + config.wanderStrength * 0.35) *
+      crawlProfile.wanderMultiplier;
 
     const lateralAngle = this.heading + Math.PI / 2;
     desired.x += Math.cos(lateralAngle) * lateralNoise * crawlProfile.noiseLateralStrength;
     desired.y += Math.sin(lateralAngle) * lateralNoise * crawlProfile.noiseLateralStrength;
     desired.x += Math.cos(this.heading) * forwardNoise * crawlProfile.noiseForwardStrength;
     desired.y += Math.sin(this.heading) * forwardNoise * crawlProfile.noiseForwardStrength;
+    desired.x += roamNoiseX * 0.18;
+    desired.y += roamNoiseY * 0.18;
 
     const desiredDirection = normalizeVector(desired.x, desired.y);
     const desiredHeading =
@@ -559,20 +652,19 @@ export class BugEntity extends Entity {
     );
     this.heading = normalizeAngle(this.heading);
 
-    const arrivalDistance = this.roamTarget
-      ? getLength(this.roamTarget.x - this.x, this.roamTarget.y - this.y)
-      : config.targetReachRadius * 2;
-    const arrivalScale = clamp(
-      arrivalDistance / Math.max(config.targetReachRadius * 3, 1),
-      0.55,
-      1,
+    const edgeDistance = Math.min(
+      this.x,
+      this.y,
+      bounds.width - this.x,
+      bounds.height - this.y,
     );
+    const edgeSlowdown = clamp(edgeDistance / Math.max(config.wallAvoidDistance * 1.4, 1), 0.9, 1);
     const speedBoost = this.state === "flee" ? 1.28 : 1;
     const desiredSpeed =
       config.baseSpeed *
       this.cruiseSpeed *
       crawlProfile.speedMultiplier *
-      arrivalScale *
+      edgeSlowdown *
       speedBoost;
     const currentSpeed = getLength(this.vx, this.vy);
     const nextSpeed = currentSpeed + (desiredSpeed - currentSpeed) * Math.min(1, dt * 4.5);
@@ -582,40 +674,71 @@ export class BugEntity extends Entity {
     this.x += this.vx * dt;
     this.y += this.vy * dt;
 
-    const margin = 6;
-    let bouncedX = false;
-    let bouncedY = false;
+    const margin = 10;
+    let clampedToBoundary = false;
     if (this.x < margin) {
       this.x = margin;
-      this.vx = Math.abs(this.vx) * 0.82;
-      bouncedX = true;
+      clampedToBoundary = true;
     }
     if (this.x > bounds.width - margin) {
       this.x = bounds.width - margin;
-      this.vx = -Math.abs(this.vx) * 0.82;
-      bouncedX = true;
+      clampedToBoundary = true;
     }
     if (this.y < margin) {
       this.y = margin;
-      this.vy = Math.abs(this.vy) * 0.82;
-      bouncedY = true;
+      clampedToBoundary = true;
     }
     if (this.y > bounds.height - margin) {
       this.y = bounds.height - margin;
-      this.vy = -Math.abs(this.vy) * 0.82;
-      bouncedY = true;
+      clampedToBoundary = true;
     }
 
-    if (bouncedX) {
-      this.heading = reflectHeading(this.heading, "x");
+    if (clampedToBoundary || boundaryRecovery.pressure > 0.72) {
+      // Choose the nearest wall and pick a heading that points away from it with some randomized jitter.
+      const distLeft = this.x;
+      const distRight = bounds.width - this.x;
+      const distTop = this.y;
+      const distBottom = bounds.height - this.y;
+      const minDist = Math.min(distLeft, distRight, distTop, distBottom);
+      let baseDir = Math.PI / 2; // default down
+      if (minDist === distLeft) baseDir = 0; // point right
+      else if (minDist === distRight) baseDir = Math.PI; // point left
+      else if (minDist === distTop) baseDir = Math.PI / 2; // point down
+      else if (minDist === distBottom) baseDir = -Math.PI / 2; // point up
+
+      // jitter +/- 30 degrees (smaller turns) so we head more inward and avoid large arcs
+      const jitter = (Math.random() - 0.5) * (Math.PI / 6);
+      this.heading = normalizeAngle(baseDir + jitter);
+
+      // set a longer recovery window so the entity biases toward the field center
+      this.edgeRecoveryTimer = 3.2 + Math.random() * 2.8;
+
+      // bias the entity's home anchor toward the interior temporarily to avoid repeated wall arcs
+      this.homeAnchor = { x: bounds.width * 0.5, y: bounds.height * 0.5 };
+      this.retargetTimer = 4 + Math.random() * 3;
+      this.edgeEscapeCooldown = 1.8;
+
+      const recoverySpeed = Math.max(desiredSpeed * 0.92, config.baseSpeed * 0.8);
+      this.vx = Math.cos(this.heading) * recoverySpeed;
+      this.vy = Math.sin(this.heading) * recoverySpeed;
+
+      // nudge position so entities don't stay exactly on the edge
+      this.x = clamp(this.x + this.vx * dt * 1.2, margin, bounds.width - margin);
+      this.y = clamp(this.y + this.vy * dt * 1.2, margin, bounds.height - margin);
     }
-    if (bouncedY) {
-      this.heading = reflectHeading(this.heading, "y");
-    }
-    if (bouncedX || bouncedY) {
-      this.chooseRoamTarget(bounds, config, ctx.getCrowdingAt);
-      this.retargetTimer = Math.min(this.retargetTimer, 0.35);
-      this.stuckTimer = 0;
+
+    // while in edge-recovery, add a smooth inward bias plus Perlin jitter so entities move toward center for a while
+    if (this.edgeRecoveryTimer > 0) {
+      const toCenter = normalizeVector(bounds.width * 0.5 - this.x, bounds.height * 0.5 - this.y);
+      const recoveryStrength = Math.min(1, this.edgeRecoveryTimer / 4.2);
+      const inwardBias = 1.2 * recoveryStrength; // stronger inward bias while recovering
+      desired.x += toCenter.x * inwardBias;
+      desired.y += toCenter.y * inwardBias;
+
+      // Perlin-based gentle wander while recovering to avoid strict straight-line movement
+      const recoverNoise = perlin1D(this.motionTime * 0.7 + this.seed * 13.7, this.seed * 7.3) * 0.26;
+      desired.x += Math.cos(this.heading + recoverNoise) * 0.14 * recoveryStrength;
+      desired.y += Math.sin(this.heading + recoverNoise) * 0.14 * recoveryStrength;
     }
 
     this.opacity = 1;
@@ -645,8 +768,9 @@ export class BugEntity extends Entity {
   }
 
   revive(width: number, height: number) {
-    this.x = Math.random() * width;
-    this.y = Math.random() * height;
+    const padding = 18;
+    this.x = padding + Math.random() * Math.max(1, width - padding * 2);
+    this.y = padding + Math.random() * Math.max(1, height - padding * 2);
     const angle = Math.random() * Math.PI * 2;
     const speed = DEFAULT_GAME_CONFIG.baseSpeed * (0.75 + Math.random() * 0.35);
     this.vx = Math.cos(angle) * speed;
@@ -663,6 +787,8 @@ export class BugEntity extends Entity {
     this.motionTime = Math.random() * 100;
     this.opacity = 1;
     this.size = this.baseSize;
+    this.edgeOrbitTimer = 0;
+    this.edgeEscapeCooldown = 0;
     this.syncTypeSpec();
   }
 

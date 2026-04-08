@@ -29,12 +29,12 @@ export const CRAWL_PROFILES: Record<string, CrawlProfile> = {
     behavior: "skitter",
     anchorDriftInterval: [8, 14],
     anchorBias: "any",
-    edgePreference: 0.18,
+    edgePreference: 0.04,
     noiseFrequency: 0.9,
     noiseForwardStrength: 0.2,
     noiseLateralStrength: 0.72,
     noiseTurnStrength: 1.05,
-    regionWeights: { edge: 0.24, middle: 0.48, interior: 0.28 },
+    regionWeights: { edge: 0.12, middle: 0.56, interior: 0.32 },
     roamRadius: 150,
     separationMultiplier: 1.35,
     speedMultiplier: 0.82,
@@ -46,12 +46,12 @@ export const CRAWL_PROFILES: Record<string, CrawlProfile> = {
     behavior: "patrol",
     anchorDriftInterval: [7, 12],
     anchorBias: "any",
-    edgePreference: 0,
+    edgePreference: -0.02,
     noiseFrequency: 0.64,
     noiseForwardStrength: 0.14,
     noiseLateralStrength: 0.38,
     noiseTurnStrength: 0.6,
-    regionWeights: { edge: 0.22, middle: 0.5, interior: 0.28 },
+    regionWeights: { edge: 0.1, middle: 0.54, interior: 0.36 },
     roamRadius: 180,
     separationMultiplier: 1.1,
     speedMultiplier: 0.95,
@@ -63,12 +63,12 @@ export const CRAWL_PROFILES: Record<string, CrawlProfile> = {
     behavior: "stalk",
     anchorDriftInterval: [6, 10],
     anchorBias: "any",
-    edgePreference: -0.06,
+    edgePreference: -0.08,
     noiseFrequency: 0.42,
     noiseForwardStrength: 0.08,
     noiseLateralStrength: 0.14,
     noiseTurnStrength: 0.26,
-    regionWeights: { edge: 0.18, middle: 0.44, interior: 0.38 },
+    regionWeights: { edge: 0.08, middle: 0.4, interior: 0.52 },
     roamRadius: 220,
     separationMultiplier: 0.9,
     speedMultiplier: 1.06,
@@ -80,12 +80,12 @@ export const CRAWL_PROFILES: Record<string, CrawlProfile> = {
     behavior: "panic",
     anchorDriftInterval: [4, 8],
     anchorBias: "any",
-    edgePreference: 0.12,
+    edgePreference: 0,
     noiseFrequency: 1.18,
     noiseForwardStrength: 0.28,
     noiseLateralStrength: 0.88,
     noiseTurnStrength: 1.22,
-    regionWeights: { edge: 0.24, middle: 0.46, interior: 0.3 },
+    regionWeights: { edge: 0.14, middle: 0.54, interior: 0.32 },
     roamRadius: 280,
     separationMultiplier: 0.75,
     speedMultiplier: 1,
@@ -112,7 +112,7 @@ export const BUG_CODEX: Record<string, BugType> = {
   low: {
     id: "low",
     name: "Skitter",
-    description: "Small, quick bugs that like to cluster along edges.",
+    description: "Small, quick bugs that weave around the outer lanes without sticking to walls.",
     profile: CRAWL_PROFILES.low,
     socialAffinity: 0.6,
     preferredRegion: "middle",
@@ -136,7 +136,7 @@ export const BUG_CODEX: Record<string, BugType> = {
   urgent: {
     id: "urgent",
     name: "Panic",
-    description: "Fast and skittish; darts widely and avoids crowds.",
+    description: "Fast and skittish; darts widely across the field and avoids crowds.",
     profile: CRAWL_PROFILES.urgent,
     socialAffinity: -0.1,
     preferredRegion: "middle",
@@ -144,15 +144,31 @@ export const BUG_CODEX: Record<string, BugType> = {
   },
 };
 
+export function cloneCodex(source: Record<string, BugType>) {
+  return Object.fromEntries(
+    Object.entries(source).map(([key, entry]) => [
+      key,
+      {
+        ...entry,
+        profile: {
+          ...entry.profile,
+          anchorDriftInterval: [...entry.profile.anchorDriftInterval] as [number, number],
+          regionWeights: { ...entry.profile.regionWeights },
+        },
+      },
+    ]),
+  ) as Record<string, BugType>;
+}
+
 // runtime codex that can be replaced by persisted edits
-let CURRENT_CODEX: Record<string, BugType> = { ...BUG_CODEX };
+let CURRENT_CODEX: Record<string, BugType> = cloneCodex(BUG_CODEX);
 
 export function getCodex() {
   return CURRENT_CODEX;
 }
 
 export function setCodex(next: Record<string, BugType>) {
-  CURRENT_CODEX = { ...next };
+  CURRENT_CODEX = cloneCodex(next);
   try {
     if (typeof window !== "undefined" && window.localStorage) {
       window.localStorage.setItem("race-to-zero:bug-codex", JSON.stringify(CURRENT_CODEX));
@@ -169,11 +185,17 @@ export function loadCodexFromStorage() {
     if (!raw) return;
     const parsed = JSON.parse(raw);
     if (parsed && typeof parsed === "object") {
-      CURRENT_CODEX = parsed as Record<string, BugType>;
+      CURRENT_CODEX = cloneCodex(parsed as Record<string, BugType>);
     }
   } catch {
     // ignore
   }
+}
+
+export function resetCodexToDefaults() {
+  const nextCodex = cloneCodex(BUG_CODEX);
+  setCodex(nextCodex);
+  return nextCodex;
 }
 
 export default BUG_CODEX;

@@ -7,28 +7,13 @@ vi.mock("../utils/bugSprite", () => ({
 import { drawBugSprite } from "../utils/bugSprite";
 import { BugEntity } from "./BugEntity";
 import BUG_CODEX, {
+  cloneCodex,
   getCodex,
   loadCodexFromStorage,
+  resetCodexToDefaults,
   setCodex,
-  type BugType,
 } from "./bugCodex";
 import { DEFAULT_GAME_CONFIG } from "./types";
-
-function cloneCodex(source: Record<string, BugType>) {
-  return Object.fromEntries(
-    Object.entries(source).map(([key, value]) => [
-      key,
-      {
-        ...value,
-        profile: {
-          ...value.profile,
-          anchorDriftInterval: [...value.profile.anchorDriftInterval] as [number, number],
-          regionWeights: { ...value.profile.regionWeights },
-        },
-      },
-    ]),
-  ) as Record<string, BugType>;
-}
 
 describe("bug codex", () => {
   beforeEach(() => {
@@ -90,5 +75,18 @@ describe("bug codex", () => {
     const [, payload] = vi.mocked(drawBugSprite).mock.calls.at(-1) ?? [];
     expect(payload?.color).toBe("#ff5500");
     expect(payload?.size).toBeCloseTo(18);
+  });
+
+  it("restores the factory codex when reset", () => {
+    const nextCodex = cloneCodex(getCodex());
+    nextCodex.low.color = "#00ffaa";
+    nextCodex.low.name = "Custom Low";
+    setCodex(nextCodex);
+
+    const resetCodex = resetCodexToDefaults();
+
+    expect(resetCodex.low.color).toBe(BUG_CODEX.low.color);
+    expect(resetCodex.low.name).toBe(BUG_CODEX.low.name);
+    expect(getCodex().low.name).toBe(BUG_CODEX.low.name);
   });
 });

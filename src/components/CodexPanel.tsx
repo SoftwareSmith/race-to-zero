@@ -1,7 +1,13 @@
 import type { RefObject } from "react";
 import { useCallback, useMemo, useState } from "react";
 import { MenuIconButton } from "./MenuControls";
-import { getCodex, loadCodexFromStorage, setCodex } from "../engine/bugCodex";
+import {
+  cloneCodex,
+  getCodex,
+  loadCodexFromStorage,
+  resetCodexToDefaults,
+  setCodex,
+} from "../engine/bugCodex";
 import type { BugType } from "../engine/bugCodex";
 import { getColoredSvgUrl } from "../utils/bugSprite";
 import { getBugVariantColor } from "../constants/bugs";
@@ -15,26 +21,6 @@ interface CodexPanelProps {
 }
 
 const BUILTIN_ICON_VARIANTS: BugVariant[] = ["low", "medium", "high", "urgent"];
-
-function cloneProfile(profile: BugType["profile"]): BugType["profile"] {
-  return {
-    ...profile,
-    anchorDriftInterval: [...profile.anchorDriftInterval] as [number, number],
-    regionWeights: { ...profile.regionWeights },
-  };
-}
-
-function cloneCodex(source: Record<string, BugType>) {
-  return Object.fromEntries(
-    Object.entries(source).map(([key, entry]) => [
-      key,
-      {
-        ...entry,
-        profile: cloneProfile(entry.profile),
-      },
-    ]),
-  ) as Record<string, BugType>;
-}
 
 function getTabIconSrc(entry: BugType, id: string) {
   if (entry.iconUrl) {
@@ -71,6 +57,18 @@ export default function CodexPanel({
     setCodex(nextCodex);
     setLocalCodex(nextCodex);
   }, [codex]);
+
+  const reset = useCallback(() => {
+    const nextCodex = resetCodexToDefaults();
+    setLocalCodex(nextCodex);
+    setActiveId((currentValue) => {
+      if (currentValue && nextCodex[currentValue]) {
+        return currentValue;
+      }
+
+      return Object.keys(nextCodex)[0] ?? currentValue;
+    });
+  }, []);
 
   const setField = useCallback(
     (id: string, key: keyof BugType, value: unknown) => {
@@ -145,8 +143,8 @@ export default function CodexPanel({
       </MenuIconButton>
 
       {open ? (
-        <div className="fixed inset-y-6 right-6 z-40 flex w-[min(34rem,calc(100vw-1.5rem))] max-w-full overflow-hidden rounded-[28px] border border-white/10 bg-zinc-950/95 shadow-[0_30px_80px_rgba(0,0,0,0.45)] backdrop-blur-xl">
-          <div className="flex w-44 shrink-0 flex-col border-r border-white/8 bg-white/[0.03] p-3">
+        <div className="fixed inset-y-6 right-6 z-40 flex w-[min(42rem,calc(100vw-1.5rem))] max-w-full flex-col overflow-hidden rounded-[28px] border border-white/10 bg-zinc-950/95 shadow-[0_30px_80px_rgba(0,0,0,0.45)] backdrop-blur-xl sm:flex-row">
+          <div className="flex max-h-[13rem] w-full shrink-0 flex-col border-b border-white/8 bg-white/[0.03] p-3 sm:max-h-none sm:w-44 sm:border-b-0 sm:border-r">
             <div className="mb-3 flex items-center justify-between gap-2 px-1">
               <div>
                 <p className="text-[0.65rem] font-semibold uppercase tracking-[0.22em] text-stone-500">
@@ -192,7 +190,7 @@ export default function CodexPanel({
           </div>
 
           <div className="flex min-w-0 flex-1 flex-col">
-            <div className="flex items-center justify-between border-b border-white/8 px-5 py-4">
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/8 px-5 py-4">
               <div className="min-w-0">
                 <p className="text-[0.68rem] font-semibold uppercase tracking-[0.22em] text-stone-500">
                   Species Editor
@@ -201,13 +199,20 @@ export default function CodexPanel({
                   {activeEntry?.name ?? "Bug type"}
                 </h2>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center justify-end gap-2">
                 <button
                   className="rounded-full border border-white/10 px-3 py-1.5 text-xs font-semibold text-stone-300 transition hover:border-white/20 hover:text-stone-100"
                   onClick={onMenuToggle}
                   type="button"
                 >
                   Close
+                </button>
+                <button
+                  className="rounded-full border border-red-300/18 bg-red-400/8 px-3 py-1.5 text-xs font-semibold text-red-100 transition hover:border-red-300/28 hover:bg-red-400/14"
+                  onClick={reset}
+                  type="button"
+                >
+                  Reset
                 </button>
                 <button
                   className="rounded-full bg-sky-400/14 px-3 py-1.5 text-xs font-semibold text-sky-100 transition hover:bg-sky-400/20"
@@ -231,20 +236,20 @@ export default function CodexPanel({
                       />
                     </div>
                     <div className="grid min-w-0 flex-1 gap-3">
-                      <label className="grid gap-1 text-xs font-semibold uppercase tracking-[0.16em] text-stone-500">
+                      <label className="grid min-w-0 gap-1 text-xs font-semibold uppercase tracking-[0.16em] text-stone-500">
                         Name
                         <input
-                          className="rounded-[16px] border border-white/8 bg-zinc-950/70 px-3 py-2 text-sm font-medium normal-case tracking-normal text-stone-100 outline-none transition focus:border-sky-300/40"
+                          className="w-full min-w-0 rounded-[16px] border border-white/8 bg-zinc-950/70 px-3 py-2 text-sm font-medium normal-case tracking-normal text-stone-100 outline-none transition focus:border-sky-300/40"
                           onChange={(event) =>
                             setField(activeId, "name", event.target.value)
                           }
                           value={activeEntry.name}
                         />
                       </label>
-                      <label className="grid gap-1 text-xs font-semibold uppercase tracking-[0.16em] text-stone-500">
+                      <label className="grid min-w-0 gap-1 text-xs font-semibold uppercase tracking-[0.16em] text-stone-500">
                         Description
                         <textarea
-                          className="min-h-24 rounded-[16px] border border-white/8 bg-zinc-950/70 px-3 py-2 text-sm normal-case tracking-normal text-stone-200 outline-none transition focus:border-sky-300/40"
+                          className="min-h-24 w-full min-w-0 rounded-[16px] border border-white/8 bg-zinc-950/70 px-3 py-2 text-sm normal-case tracking-normal text-stone-200 outline-none transition focus:border-sky-300/40"
                           onChange={(event) =>
                             setField(
                               activeId,
@@ -259,10 +264,10 @@ export default function CodexPanel({
                   </div>
 
                   <div className="grid gap-3 sm:grid-cols-2">
-                    <label className="grid gap-1 text-xs font-semibold uppercase tracking-[0.16em] text-stone-500">
+                    <label className="grid min-w-0 gap-1 text-xs font-semibold uppercase tracking-[0.16em] text-stone-500">
                       Built-in icon
                       <select
-                        className="rounded-[16px] border border-white/8 bg-zinc-950/70 px-3 py-2 text-sm normal-case tracking-normal text-stone-100 outline-none transition focus:border-sky-300/40"
+                        className="w-full min-w-0 rounded-[16px] border border-white/8 bg-zinc-950/70 px-3 py-2 text-sm normal-case tracking-normal text-stone-100 outline-none transition focus:border-sky-300/40"
                         onChange={(event) =>
                           setField(
                             activeId,
@@ -280,10 +285,10 @@ export default function CodexPanel({
                         ))}
                       </select>
                     </label>
-                    <label className="grid gap-1 text-xs font-semibold uppercase tracking-[0.16em] text-stone-500">
+                    <label className="grid min-w-0 gap-1 text-xs font-semibold uppercase tracking-[0.16em] text-stone-500">
                       Custom icon URL
                       <input
-                        className="rounded-[16px] border border-white/8 bg-zinc-950/70 px-3 py-2 text-sm normal-case tracking-normal text-stone-100 outline-none transition focus:border-sky-300/40"
+                        className="w-full min-w-0 rounded-[16px] border border-white/8 bg-zinc-950/70 px-3 py-2 text-sm normal-case tracking-normal text-stone-100 outline-none transition focus:border-sky-300/40"
                         onChange={(event) =>
                           setField(
                             activeId,
@@ -295,8 +300,8 @@ export default function CodexPanel({
                         value={activeEntry.iconUrl ?? ""}
                       />
                     </label>
-                    <div className="mt-2 grid gap-3 sm:grid-cols-2">
-                      <label className="grid gap-1 text-xs font-semibold uppercase tracking-[0.16em] text-stone-500">
+                    <div className="mt-2 grid gap-3 sm:col-span-2 sm:grid-cols-2">
+                      <label className="grid min-w-0 gap-1 text-xs font-semibold uppercase tracking-[0.16em] text-stone-500">
                         Color
                         <input
                           type="color"
@@ -310,7 +315,7 @@ export default function CodexPanel({
                           className="h-10 w-14 rounded"
                         />
                       </label>
-                      <label className="grid gap-1 text-xs font-semibold uppercase tracking-[0.16em] text-stone-500">
+                      <label className="grid min-w-0 gap-1 text-xs font-semibold uppercase tracking-[0.16em] text-stone-500">
                         Size
                         <input
                           type="range"
@@ -333,6 +338,15 @@ export default function CodexPanel({
                 </section>
 
                 <section className="grid gap-4 rounded-[22px] border border-white/8 bg-white/[0.03] p-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <h3 className="text-sm font-semibold text-stone-100">
+                      Behavior
+                    </h3>
+                    <p className="text-[0.68rem] uppercase tracking-[0.16em] text-stone-500">
+                      High-level only
+                    </p>
+                  </div>
+
                   <div className="grid gap-3 sm:grid-cols-[1fr_auto] sm:items-center">
                     <label className="grid gap-2 text-xs font-semibold uppercase tracking-[0.16em] text-stone-500">
                       Social affinity
@@ -358,10 +372,10 @@ export default function CodexPanel({
                   </div>
 
                   <div className="grid gap-3 sm:grid-cols-2">
-                    <label className="grid gap-1 text-xs font-semibold uppercase tracking-[0.16em] text-stone-500">
-                      Preferred region
+                    <label className="grid min-w-0 gap-1 text-xs font-semibold uppercase tracking-[0.16em] text-stone-500">
+                      Habitat
                       <select
-                        className="rounded-[16px] border border-white/8 bg-zinc-950/70 px-3 py-2 text-sm normal-case tracking-normal text-stone-100 outline-none transition focus:border-sky-300/40"
+                        className="w-full min-w-0 rounded-[16px] border border-white/8 bg-zinc-950/70 px-3 py-2 text-sm normal-case tracking-normal text-stone-100 outline-none transition focus:border-sky-300/40"
                         onChange={(event) =>
                           setField(
                             activeId,
@@ -371,142 +385,17 @@ export default function CodexPanel({
                         }
                         value={activeEntry.preferredRegion}
                       >
-                        <option value="edge">edge</option>
-                        <option value="middle">middle</option>
-                        <option value="interior">interior</option>
+                        <option value="edge">near the outer lanes</option>
+                        <option value="middle">balanced field</option>
+                        <option value="interior">closer to center</option>
                       </select>
                     </label>
                     <label className="grid gap-1 text-xs font-semibold uppercase tracking-[0.16em] text-stone-500">
-                      Anchor bias
-                      <select
-                        className="rounded-[16px] border border-white/8 bg-zinc-950/70 px-3 py-2 text-sm normal-case tracking-normal text-stone-100 outline-none transition focus:border-sky-300/40"
-                        onChange={(event) =>
-                          updateProfile(activeId, {
-                            anchorBias: event.target
-                              .value as BugType["profile"]["anchorBias"],
-                          })
-                        }
-                        value={activeEntry.profile.anchorBias}
-                      >
-                        <option value="any">any</option>
-                        <option value="interior">interior</option>
-                        <option value="perimeter">perimeter</option>
-                      </select>
-                    </label>
-                  </div>
-                </section>
-
-                <section className="grid gap-4 rounded-[22px] border border-white/8 bg-white/[0.03] p-4">
-                  <h3 className="text-sm font-semibold text-stone-100">
-                    Motion profile
-                  </h3>
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <label className="grid gap-1 text-xs font-semibold uppercase tracking-[0.16em] text-stone-500">
-                      Noise frequency
+                      Pace
                       <input
                         type="range"
-                        min={0.1}
-                        max={2}
-                        step={0.01}
-                        value={activeEntry.profile.noiseFrequency}
-                        onChange={(event) =>
-                          updateProfile(activeId, {
-                            noiseFrequency: Number(event.target.value),
-                          })
-                        }
-                        style={{
-                          accentColor:
-                            activeEntry.color ??
-                            getBugVariantColor(activeId as BugVariant),
-                        }}
-                      />
-                    </label>
-                    <label className="grid gap-1 text-xs font-semibold uppercase tracking-[0.16em] text-stone-500">
-                      Roam radius
-                      <input
-                        type="range"
-                        min={20}
-                        max={500}
-                        step={5}
-                        value={activeEntry.profile.roamRadius}
-                        onChange={(event) =>
-                          updateProfile(activeId, {
-                            roamRadius: Number(event.target.value),
-                          })
-                        }
-                        style={{
-                          accentColor:
-                            activeEntry.color ??
-                            getBugVariantColor(activeId as BugVariant),
-                        }}
-                      />
-                    </label>
-                    <label className="grid gap-1 text-xs font-semibold uppercase tracking-[0.16em] text-stone-500">
-                      Forward noise
-                      <input
-                        type="range"
-                        min={0}
-                        max={2}
-                        step={0.01}
-                        value={activeEntry.profile.noiseForwardStrength}
-                        onChange={(event) =>
-                          updateProfile(activeId, {
-                            noiseForwardStrength: Number(event.target.value),
-                          })
-                        }
-                        style={{
-                          accentColor:
-                            activeEntry.color ??
-                            getBugVariantColor(activeId as BugVariant),
-                        }}
-                      />
-                    </label>
-                    <label className="grid gap-1 text-xs font-semibold uppercase tracking-[0.16em] text-stone-500">
-                      Lateral noise
-                      <input
-                        type="range"
-                        min={0}
-                        max={2}
-                        step={0.01}
-                        value={activeEntry.profile.noiseLateralStrength}
-                        onChange={(event) =>
-                          updateProfile(activeId, {
-                            noiseLateralStrength: Number(event.target.value),
-                          })
-                        }
-                        style={{
-                          accentColor:
-                            activeEntry.color ??
-                            getBugVariantColor(activeId as BugVariant),
-                        }}
-                      />
-                    </label>
-                    <label className="grid gap-1 text-xs font-semibold uppercase tracking-[0.16em] text-stone-500">
-                      Turn noise
-                      <input
-                        type="range"
-                        min={0}
-                        max={2}
-                        step={0.01}
-                        value={activeEntry.profile.noiseTurnStrength}
-                        onChange={(event) =>
-                          updateProfile(activeId, {
-                            noiseTurnStrength: Number(event.target.value),
-                          })
-                        }
-                        style={{
-                          accentColor:
-                            activeEntry.color ??
-                            getBugVariantColor(activeId as BugVariant),
-                        }}
-                      />
-                    </label>
-                    <label className="grid gap-1 text-xs font-semibold uppercase tracking-[0.16em] text-stone-500">
-                      Speed multiplier
-                      <input
-                        type="range"
-                        min={0.2}
-                        max={2}
+                        min={0.6}
+                        max={1.4}
                         step={0.01}
                         value={activeEntry.profile.speedMultiplier}
                         onChange={(event) =>
@@ -521,219 +410,13 @@ export default function CodexPanel({
                         }}
                       />
                     </label>
-                    <label className="grid gap-1 text-xs font-semibold uppercase tracking-[0.16em] text-stone-500">
-                      Turn multiplier
-                      <input
-                        type="range"
-                        min={0}
-                        max={2}
-                        step={0.01}
-                        value={activeEntry.profile.turnMultiplier}
-                        onChange={(event) =>
-                          updateProfile(activeId, {
-                            turnMultiplier: Number(event.target.value),
-                          })
-                        }
-                        style={{
-                          accentColor:
-                            activeEntry.color ??
-                            getBugVariantColor(activeId as BugVariant),
-                        }}
-                      />
-                    </label>
-                    <label className="grid gap-1 text-xs font-semibold uppercase tracking-[0.16em] text-stone-500">
-                      Separation multiplier
-                      <input
-                        type="range"
-                        min={0}
-                        max={2}
-                        step={0.01}
-                        value={activeEntry.profile.separationMultiplier}
-                        onChange={(event) =>
-                          updateProfile(activeId, {
-                            separationMultiplier: Number(event.target.value),
-                          })
-                        }
-                        style={{
-                          accentColor:
-                            activeEntry.color ??
-                            getBugVariantColor(activeId as BugVariant),
-                        }}
-                      />
-                    </label>
-                    <label className="grid gap-1 text-xs font-semibold uppercase tracking-[0.16em] text-stone-500">
-                      Wander multiplier
-                      <input
-                        type="range"
-                        min={0}
-                        max={2}
-                        step={0.01}
-                        value={activeEntry.profile.wanderMultiplier}
-                        onChange={(event) =>
-                          updateProfile(activeId, {
-                            wanderMultiplier: Number(event.target.value),
-                          })
-                        }
-                        style={{
-                          accentColor:
-                            activeEntry.color ??
-                            getBugVariantColor(activeId as BugVariant),
-                        }}
-                      />
-                    </label>
-                    <label className="grid gap-1 text-xs font-semibold uppercase tracking-[0.16em] text-stone-500">
-                      Wide roam chance
-                      <input
-                        type="range"
-                        min={0}
-                        max={1}
-                        step={0.01}
-                        value={activeEntry.profile.wideRoamChance}
-                        onChange={(event) =>
-                          updateProfile(activeId, {
-                            wideRoamChance: Number(event.target.value),
-                          })
-                        }
-                        style={{
-                          accentColor:
-                            activeEntry.color ??
-                            getBugVariantColor(activeId as BugVariant),
-                        }}
-                      />
-                    </label>
-                    <label className="grid gap-1 text-xs font-semibold uppercase tracking-[0.16em] text-stone-500">
-                      Edge preference
-                      <input
-                        type="range"
-                        min={-1}
-                        max={1}
-                        step={0.01}
-                        value={activeEntry.profile.edgePreference}
-                        onChange={(event) =>
-                          updateProfile(activeId, {
-                            edgePreference: Number(event.target.value),
-                          })
-                        }
-                        style={{
-                          accentColor:
-                            activeEntry.color ??
-                            getBugVariantColor(activeId as BugVariant),
-                        }}
-                      />
-                    </label>
-                  </div>
-                </section>
-
-                <section className="grid gap-4 rounded-[22px] border border-white/8 bg-white/[0.03] p-4">
-                  <h3 className="text-sm font-semibold text-stone-100">
-                    Roaming weights
-                  </h3>
-                  <div className="grid gap-3 sm:grid-cols-3">
-                    <label className="grid gap-1 text-xs font-semibold uppercase tracking-[0.16em] text-stone-500">
-                      Edge weight
-                      <input
-                        type="range"
-                        min={0}
-                        max={1}
-                        step={0.01}
-                        value={activeEntry.profile.regionWeights.edge}
-                        onChange={(event) =>
-                          updateProfile(activeId, {
-                            regionWeights: {
-                              ...activeEntry.profile.regionWeights,
-                              edge: Number(event.target.value),
-                            },
-                          })
-                        }
-                        style={{
-                          accentColor:
-                            activeEntry.color ??
-                            getBugVariantColor(activeId as BugVariant),
-                        }}
-                      />
-                    </label>
-                    <label className="grid gap-1 text-xs font-semibold uppercase tracking-[0.16em] text-stone-500">
-                      Middle weight
-                      <input
-                        type="range"
-                        min={0}
-                        max={1}
-                        step={0.01}
-                        value={activeEntry.profile.regionWeights.middle}
-                        onChange={(event) =>
-                          updateProfile(activeId, {
-                            regionWeights: {
-                              ...activeEntry.profile.regionWeights,
-                              middle: Number(event.target.value),
-                            },
-                          })
-                        }
-                        style={{
-                          accentColor:
-                            activeEntry.color ??
-                            getBugVariantColor(activeId as BugVariant),
-                        }}
-                      />
-                    </label>
-                    <label className="grid gap-1 text-xs font-semibold uppercase tracking-[0.16em] text-stone-500">
-                      Interior weight
-                      <input
-                        type="range"
-                        min={0}
-                        max={1}
-                        step={0.01}
-                        value={activeEntry.profile.regionWeights.interior}
-                        onChange={(event) =>
-                          updateProfile(activeId, {
-                            regionWeights: {
-                              ...activeEntry.profile.regionWeights,
-                              interior: Number(event.target.value),
-                            },
-                          })
-                        }
-                        style={{
-                          accentColor:
-                            activeEntry.color ??
-                            getBugVariantColor(activeId as BugVariant),
-                        }}
-                      />
-                    </label>
                   </div>
 
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <label className="grid gap-1 text-xs font-semibold uppercase tracking-[0.16em] text-stone-500">
-                      Anchor drift min
-                      <input
-                        className="rounded-[16px] border border-white/8 bg-zinc-950/70 px-3 py-2 text-sm normal-case tracking-normal text-stone-100 outline-none transition focus:border-sky-300/40"
-                        onChange={(event) =>
-                          updateProfile(activeId, {
-                            anchorDriftInterval: [
-                              Number(event.target.value),
-                              activeEntry.profile.anchorDriftInterval[1],
-                            ],
-                          })
-                        }
-                        type="number"
-                        value={activeEntry.profile.anchorDriftInterval[0]}
-                      />
-                    </label>
-                    <label className="grid gap-1 text-xs font-semibold uppercase tracking-[0.16em] text-stone-500">
-                      Anchor drift max
-                      <input
-                        className="rounded-[16px] border border-white/8 bg-zinc-950/70 px-3 py-2 text-sm normal-case tracking-normal text-stone-100 outline-none transition focus:border-sky-300/40"
-                        onChange={(event) =>
-                          updateProfile(activeId, {
-                            anchorDriftInterval: [
-                              activeEntry.profile.anchorDriftInterval[0],
-                              Number(event.target.value),
-                            ],
-                          })
-                        }
-                        type="number"
-                        value={activeEntry.profile.anchorDriftInterval[1]}
-                      />
-                    </label>
-                  </div>
+                  <p className="text-sm leading-6 text-stone-400">
+                    Advanced crawl tuning is hidden for now. The runtime is
+                    using a smaller steering model so only the controls that
+                    stay stable in-game remain exposed.
+                  </p>
                 </section>
               </div>
             ) : null}

@@ -123,6 +123,7 @@ const BugCanvas = memo(function BugCanvas({
   const chartFocusRef = useRef(chartFocus);
   const combatStatsRef = useRef<SiegeCombatStats | null>(combatStats ?? null);
   const onHitRef = useRef(onHit);
+  const onEntityDeathRef = useRef(onEntityDeath);
   const reseedInfoRef = useRef<{
     ts: number;
     clustered: number;
@@ -241,7 +242,7 @@ const BugCanvas = memo(function BugCanvas({
         config: (gameConfig as any) ?? undefined,
         onEntityDeath: (x, y, variant) => {
           try {
-            onEntityDeath?.(
+            onEntityDeathRef.current?.(
               Math.round(x + (boundsRef.current.left || 0)),
               Math.round(y + (boundsRef.current.top || 0)),
               variant,
@@ -334,6 +335,10 @@ const BugCanvas = memo(function BugCanvas({
   useEffect(() => {
     onHitRef.current = onHit;
   }, [onHit]);
+
+  useEffect(() => {
+    onEntityDeathRef.current = onEntityDeath;
+  }, [onEntityDeath]);
 
   useEffect(() => {
     combatStatsRef.current = combatStats ?? null;

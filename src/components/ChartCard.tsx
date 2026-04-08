@@ -120,9 +120,6 @@ const ChartCard = memo(function ChartCard({
       <div className="absolute inset-x-8 top-0 h-px bg-gradient-to-r from-transparent via-white/35 to-transparent opacity-0 transition duration-200 group-hover:opacity-100" />
       <div className="relative">
         <div>
-          <p className="text-[0.72rem] font-semibold uppercase tracking-[0.26em] text-stone-400">
-            Chart
-          </p>
           <h3 className="mt-2 font-display text-3xl leading-tight tracking-[-0.04em] text-stone-50">
             {title}
           </h3>
