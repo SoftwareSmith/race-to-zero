@@ -99,6 +99,13 @@ export interface BugType {
   id: string;
   name: string;
   description: string;
+  dossier: {
+    encounter: string;
+    pressure: string;
+    strength: string;
+    susceptibility: string;
+    weakness: string;
+  };
   profile: CrawlProfile;
   socialAffinity?: number; // positive likes groups, negative prefers solitude
   preferredRegion?: CrawlRegion;
@@ -106,56 +113,196 @@ export interface BugType {
   iconUrl?: string; // custom icon URL
   color?: string; // optional override color for this type
   size?: number; // optional size multiplier for this type
+  weaponMatchups: BugWeaponMatchups;
+}
+
+export type BugWeaponId = "hammer" | "laser" | "pulse";
+
+export type BugWeaponMatchupState = "favored" | "steady" | "risky";
+
+export interface BugWeaponMatchup {
+  note: string;
+  state: BugWeaponMatchupState;
+}
+
+export type BugWeaponMatchups = Record<BugWeaponId, BugWeaponMatchup>;
+
+function createWeaponMatchups(
+  overrides: Partial<BugWeaponMatchups> = {},
+): BugWeaponMatchups {
+  return {
+    hammer: {
+      note: "Serviceable cleanup, but not the primary answer.",
+      state: "steady",
+      ...overrides.hammer,
+    },
+    laser: {
+      note: "Useful once the lane is stable enough to stay on target.",
+      state: "steady",
+      ...overrides.laser,
+    },
+    pulse: {
+      note: "Helps manage spread, but timing matters more than raw output.",
+      state: "steady",
+      ...overrides.pulse,
+    },
+  };
 }
 
 export const BUG_CODEX: Record<string, BugType> = {
   low: {
     id: "low",
-    name: "Skitter",
-    description: "Small, quick bugs that weave around the outer lanes without sticking to walls.",
+    name: "Glitchling",
+    description: "A noisy entry-level defect that slips through gaps, crowds screens, and clutters the lanes before anyone notices.",
+    dossier: {
+      encounter: "Usually appears as the first visible spreader when the board starts to fill and small defects begin leaking into active areas.",
+      pressure: "Builds pressure through numbers rather than resilience.",
+      strength: "Shows up in clusters and spreads visual noise quickly across open lanes.",
+      susceptibility: "Low vitality means any direct damage removes it immediately.",
+      weakness: "Falls apart fast once attention is focused on it.",
+    },
     profile: CRAWL_PROFILES.low,
     socialAffinity: 0.6,
     preferredRegion: "middle",
+    weaponMatchups: createWeaponMatchups({
+      hammer: {
+        note: "Fine for single cleanup once a straggler is already isolated.",
+        state: "steady",
+      },
+      laser: {
+        note: "Keeps lanes tidy, but it is usually more precision than you need.",
+        state: "steady",
+      },
+      pulse: {
+        note: "Best answer when Glitchlings are flooding in clusters and visual noise is building.",
+        state: "favored",
+      },
+    }),
   },
   medium: {
     id: "medium",
-    name: "Crawler",
-    description: "Moderate speed, balanced roaming across the field.",
+    name: "Throttler",
+    description: "A steady pressure bug that slows the board down, patrols broad routes, and keeps resurfacing in active paths.",
+    dossier: {
+      encounter: "Most common during sustained backlog pressure, where medium-priority defects keep reappearing across the board.",
+      pressure: "Applies consistent drag and occupies space longer than low-tier bugs.",
+      strength: "Balanced route coverage lets it persist across multiple active zones.",
+      susceptibility: "Can absorb some damage, but still folds once isolated and hit directly.",
+      weakness: "Lacks the burst movement or resilience of higher-severity classes.",
+    },
     profile: CRAWL_PROFILES.medium,
     socialAffinity: 0.2,
     preferredRegion: "middle",
+    weaponMatchups: createWeaponMatchups({
+      hammer: {
+        note: "Can get stuck trading one-for-one while the patrol route keeps pressure alive.",
+        state: "risky",
+      },
+      laser: {
+        note: "Strongest option for shaving down steady route pressure before it loops back around.",
+        state: "favored",
+      },
+      pulse: {
+        note: "Useful when the board is getting crowded, but not a hard counter by itself.",
+        state: "steady",
+      },
+    }),
   },
   high: {
     id: "high",
-    name: "Stalker",
-    description: "Faster, prefers interior regions and loner behavior.",
+    name: "Nullify",
+    description: "A focused breaker that cuts through the interior, isolates targets, and removes breathing room from the dashboard.",
+    dossier: {
+      encounter: "Shows up when concentrated risk starts forming around the center of the board and high-pressure zones stop clearing cleanly.",
+      pressure: "Creates concentrated pressure and steals safe space from the interior.",
+      strength: "Prefers interior routes and turns open space into narrow operating windows.",
+      susceptibility: "More durable than lower classes, but still predictable once its line is identified.",
+      weakness: "Can be isolated and cleared if engaged before other classes stack around it.",
+    },
     profile: CRAWL_PROFILES.high,
     socialAffinity: -0.3,
     preferredRegion: "interior",
+    weaponMatchups: createWeaponMatchups({
+      hammer: {
+        note: "Closing distance gives Nullify too much room to steal the center lane back.",
+        state: "risky",
+      },
+      laser: {
+        note: "Best tool once its line is identified, letting you pin the interior before it stacks pressure.",
+        state: "favored",
+      },
+      pulse: {
+        note: "Good for softening interior pressure, but it still needs follow-up focus.",
+        state: "steady",
+      },
+    }),
   },
   urgent: {
     id: "urgent",
-    name: "Panic",
-    description: "Fast and skittish; darts widely across the field and avoids crowds.",
+    name: "ZeroDay",
+    description: "A critical outbreak class that spreads unpredictably, spikes pressure instantly, and refuses to stay pinned for long.",
+    dossier: {
+      encounter: "Appears during peak escalation, when the board is already stressed and a critical failure class breaks containment.",
+      pressure: "Creates immediate crisis pressure through speed, survivability, and erratic movement.",
+      strength: "Hard to pin down, hard to outpace, and dangerous if left alive while the field is busy.",
+      susceptibility: "No special weapon counter is assumed; the advantage comes from early focus and space control.",
+      weakness: "Most manageable before it stacks with additional pressure waves or surrounding bugs.",
+    },
     profile: CRAWL_PROFILES.urgent,
     socialAffinity: -0.1,
     preferredRegion: "middle",
     iconVariant: "urgent",
+    weaponMatchups: createWeaponMatchups({
+      hammer: {
+        note: "Too volatile to rely on close-range cleanup alone once the outbreak is moving.",
+        state: "risky",
+      },
+      laser: {
+        note: "Worth using only when you already created a stable lane and can keep focus on target.",
+        state: "steady",
+      },
+      pulse: {
+        note: "Helps stabilize surrounding pressure, but it does not directly solve the outbreak.",
+        state: "steady",
+      },
+    }),
   },
 };
+
+function cloneWeaponMatchups(
+  source: Partial<BugWeaponMatchups> | undefined,
+  fallback: BugWeaponMatchups,
+) {
+  return {
+    hammer: { ...fallback.hammer, ...source?.hammer },
+    laser: { ...fallback.laser, ...source?.laser },
+    pulse: { ...fallback.pulse, ...source?.pulse },
+  } satisfies BugWeaponMatchups;
+}
 
 export function cloneCodex(source: Record<string, BugType>) {
   return Object.fromEntries(
     Object.entries(source).map(([key, entry]) => [
       key,
-      {
-        ...entry,
-        profile: {
-          ...entry.profile,
-          anchorDriftInterval: [...entry.profile.anchorDriftInterval] as [number, number],
-          regionWeights: { ...entry.profile.regionWeights },
-        },
-      },
+      (() => {
+        const defaultEntry = BUG_CODEX[key] ?? entry;
+
+        return {
+          ...entry,
+          profile: {
+            ...entry.profile,
+            anchorDriftInterval: [
+              ...entry.profile.anchorDriftInterval,
+            ] as [number, number],
+            regionWeights: { ...entry.profile.regionWeights },
+          },
+          dossier: { ...defaultEntry.dossier, ...entry.dossier },
+          weaponMatchups: cloneWeaponMatchups(
+            entry.weaponMatchups,
+            defaultEntry.weaponMatchups,
+          ),
+        };
+      })(),
     ]),
   ) as Record<string, BugType>;
 }

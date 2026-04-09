@@ -404,13 +404,7 @@ const BugCanvas = memo(function BugCanvas({
       }
       swarmRef.current = null;
     };
-  }, [
-    bugCounts,
-    gameConfig,
-    getLocalSiegeZones,
-    onEntityDeath,
-    terminatorMode,
-  ]);
+  }, [bugCounts, gameConfig, getLocalSiegeZones, terminatorMode]);
 
   useEffect(() => {
     deadBugIndexesRef.current = new Set();
@@ -1130,6 +1124,35 @@ const BackgroundField = memo(function BackgroundField({
     [gameSessionKey, onTerminatorHit, totalBugCount],
   );
 
+  const handleEntityDeath = useCallback(
+    (x: number, y: number, variant: string) => {
+      setGameState((currentValue) => {
+        const nextState =
+          currentValue.sessionKey === gameSessionKey
+            ? currentValue
+            : {
+                remainingTargets: totalBugCount,
+                sessionKey: gameSessionKey,
+                splats: [],
+              };
+
+        return {
+          ...nextState,
+          splats: [
+            ...nextState.splats.slice(-5),
+            {
+              id: `${x}-${y}-${Date.now()}`,
+              variant: variant as BugVariant,
+              x,
+              y,
+            },
+          ],
+        };
+      });
+    },
+    [gameSessionKey, totalBugCount],
+  );
+
   const overlayLabel = terminatorMode
     ? activeGameState.remainingTargets === 0
       ? "Target neutralized"
@@ -1165,30 +1188,7 @@ const BackgroundField = memo(function BackgroundField({
         siegeZones={siegeZones}
         terminatorMode={terminatorMode}
         gameConfig={gameConfig}
-        onEntityDeath={(x, y, variant) => {
-          setGameState((currentValue) => {
-            const nextState =
-              currentValue.sessionKey === gameSessionKey
-                ? currentValue
-                : {
-                    remainingTargets: totalBugCount,
-                    sessionKey: gameSessionKey,
-                    splats: [],
-                  };
-            return {
-              ...nextState,
-              splats: [
-                ...nextState.splats.slice(-5),
-                {
-                  id: `${x}-${y}-${Date.now()}`,
-                  variant: variant as any,
-                  x,
-                  y,
-                },
-              ],
-            };
-          });
-        }}
+        onEntityDeath={handleEntityDeath}
       />
       {effectiveBugCount === 0 ? (
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_35%,rgba(187,247,208,0.12),transparent_28%),radial-gradient(circle_at_60%_68%,rgba(125,211,252,0.08),transparent_34%)] [animation:all-clear-breathe_6s_ease-in-out_infinite]" />

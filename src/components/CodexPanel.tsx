@@ -1,18 +1,22 @@
-import type { RefObject } from "react";
-import { useCallback, useMemo, useState } from "react";
+import type { CSSProperties, RefObject } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { MenuIconButton } from "./MenuControls";
-import {
-  cloneCodex,
-  getCodex,
-  loadCodexFromStorage,
-  resetCodexToDefaults,
-  setCodex,
+import { getCodex } from "../engine/bugCodex";
+import type {
+  BugType,
+  BugWeaponId,
+  BugWeaponMatchup,
+  BugWeaponMatchupState,
 } from "../engine/bugCodex";
-import type { BugType } from "../engine/bugCodex";
-import { getColoredSvgUrl } from "../utils/bugSprite";
-import { getBugVariantColor } from "../constants/bugs";
+import {
+  BUG_VARIANT_CONFIG,
+  getBugVariantColor,
+  getBugVariantMaxHp,
+} from "../constants/bugs";
 import type { BugVariant } from "../types/dashboard";
+import { getColoredSvgUrl } from "../utils/bugSprite";
 import { cn } from "../utils/cn";
+import WeaponGlyph from "./WeaponGlyph";
 
 interface CodexPanelProps {
   containerRef: RefObject<HTMLDivElement | null>;
@@ -26,9 +30,527 @@ function getTabIconSrc(entry: BugType, id: string) {
   if (entry.iconUrl) return entry.iconUrl;
   const variant = (entry.iconVariant ?? id) as BugVariant;
   const baseColor = entry.color ?? getBugVariantColor(variant);
-  if (BUILTIN_ICON_VARIANTS.includes(variant))
+  if (BUILTIN_ICON_VARIANTS.includes(variant)) {
     return getColoredSvgUrl(variant, baseColor);
+  }
   return getColoredSvgUrl("low", baseColor);
+}
+
+function getAffinityLabel(affinity = 0) {
+  if (affinity >= 0.35) return "Tends to hunt in packs";
+  if (affinity <= -0.2) return "Prefers to hunt alone";
+  return "Flexible hunting style";
+}
+
+function getThreatLabel(variant: BugVariant) {
+  if (variant === "urgent") return "Critical";
+  if (variant === "high") return "High";
+  if (variant === "medium") return "Medium";
+  return "Low";
+}
+
+function getBehaviorLabel(behavior: BugType["profile"]["behavior"]) {
+  if (behavior === "panic") return "Erratic";
+  if (behavior === "stalk") return "Hunter";
+  if (behavior === "patrol") return "Patrol";
+  return "Skitter";
+}
+
+function getSpeedLabel(entry: BugType) {
+  if (entry.profile.speedMultiplier >= 1.02) return "Moves quickly";
+  if (entry.profile.speedMultiplier <= 0.86) return "Slow mover";
+  return "Steady pace";
+}
+
+function getResilienceLabel(hp: number) {
+  if (hp >= 4) return "Very tanky";
+  if (hp >= 3) return "Tough";
+  if (hp >= 2) return "Moderately durable";
+  return "Fragile";
+}
+
+function getPresenceLabel(presence: number) {
+  if (presence >= 88) return "Very visible";
+  if (presence >= 72) return "Notable on the board";
+  if (presence >= 56) return "Easily missed at a glance";
+  return "Low presence";
+}
+
+function getWeaponStateLabel(state: BugWeaponMatchupState) {
+  if (state === "favored") return "Best Tool";
+  if (state === "risky") return "Watch Out";
+  return "Usable";
+}
+
+function getWeaponStateClasses(state: BugWeaponMatchupState) {
+  if (state === "favored") {
+    return {
+      badge: "border-emerald-400/24 bg-emerald-500/12 text-emerald-100",
+      panel: "border-emerald-400/16 bg-emerald-500/8",
+      tile: "border-emerald-300/16 bg-emerald-400/10 text-emerald-50",
+    };
+  }
+
+  if (state === "risky") {
+    return {
+      badge: "border-amber-400/24 bg-amber-500/12 text-amber-100",
+      panel: "border-amber-400/16 bg-amber-500/8",
+      tile: "border-amber-300/16 bg-amber-400/10 text-amber-50",
+    };
+  }
+
+  return {
+    badge: "border-sky-400/18 bg-sky-500/10 text-sky-100",
+    panel: "border-white/8 bg-white/[0.03]",
+    tile: "border-white/8 bg-white/[0.04] text-stone-100",
+  };
+}
+
+type VariantAccent = ReturnType<typeof getVariantAccent>;
+
+function getVariantAccent(variant: BugVariant) {
+  if (variant === "urgent") {
+    return {
+      badgeClass:
+        "border-violet-400/30 bg-violet-500/14 text-violet-100 shadow-[0_0_22px_rgba(167,139,250,0.18)]",
+      behaviorClass: "border-fuchsia-400/20 bg-fuchsia-500/10 text-fuchsia-100",
+      cardClass: "from-violet-500/12 via-fuchsia-500/6 to-black/20",
+      iconHalo: "rgba(167,139,250,0.34)",
+      iconPanel: "from-violet-500/18 via-fuchsia-500/8 to-red-500/12",
+      washA: "rgba(139,92,246,0.09)",
+      washB: "rgba(244,63,94,0.06)",
+    };
+  }
+
+  if (variant === "high") {
+    return {
+      badgeClass:
+        "border-red-400/28 bg-red-500/14 text-red-100 shadow-[0_0_22px_rgba(248,113,113,0.16)]",
+      behaviorClass: "border-orange-400/20 bg-orange-500/10 text-orange-100",
+      cardClass: "from-red-500/12 via-orange-500/6 to-black/20",
+      iconHalo: "rgba(248,113,113,0.28)",
+      iconPanel: "from-red-500/18 via-orange-500/8 to-sky-400/10",
+      washA: "rgba(248,113,113,0.08)",
+      washB: "rgba(251,146,60,0.05)",
+    };
+  }
+
+  if (variant === "medium") {
+    return {
+      badgeClass:
+        "border-amber-400/28 bg-amber-500/12 text-amber-100 shadow-[0_0_22px_rgba(251,191,36,0.15)]",
+      behaviorClass: "border-orange-300/18 bg-orange-400/10 text-orange-100",
+      cardClass: "from-amber-500/12 via-orange-500/6 to-black/20",
+      iconHalo: "rgba(251,191,36,0.22)",
+      iconPanel: "from-amber-500/16 via-orange-500/8 to-sky-400/10",
+      washA: "rgba(251,191,36,0.07)",
+      washB: "rgba(249,115,22,0.04)",
+    };
+  }
+
+  return {
+    badgeClass:
+      "border-emerald-400/22 bg-emerald-500/10 text-emerald-100 shadow-[0_0_18px_rgba(16,185,129,0.12)]",
+    behaviorClass: "border-sky-400/16 bg-sky-500/8 text-sky-100",
+    cardClass: "from-emerald-500/12 via-cyan-500/6 to-black/20",
+    iconHalo: "rgba(45,212,191,0.18)",
+    iconPanel: "from-emerald-500/14 via-cyan-500/6 to-white/8",
+    washA: "rgba(45,212,191,0.06)",
+    washB: "rgba(56,189,248,0.04)",
+  };
+}
+
+function Badge({
+  children,
+  className,
+}: {
+  children: string;
+  className?: string;
+}) {
+  return (
+    <span
+      className={cn(
+        "inline-flex items-center rounded-full border px-2.5 py-1 text-[0.64rem] font-semibold uppercase tracking-[0.18em]",
+        className,
+      )}
+    >
+      {children}
+    </span>
+  );
+}
+
+function SectionEyebrow({ children }: { children: string }) {
+  return (
+    <p className="text-[0.62rem] font-semibold uppercase tracking-[0.2em] text-stone-500">
+      {children}
+    </p>
+  );
+}
+
+function SectionHeading({
+  eyebrow,
+  title,
+  subtitle,
+}: {
+  eyebrow: string;
+  subtitle?: string;
+  title: string;
+}) {
+  return (
+    <div>
+      <SectionEyebrow>{eyebrow}</SectionEyebrow>
+      <h4 className="mt-1 text-[1.08rem] font-semibold tracking-[-0.03em] text-stone-50">
+        {title}
+      </h4>
+      {subtitle ? (
+        <p className="mt-1 text-sm leading-6 text-stone-400">{subtitle}</p>
+      ) : null}
+    </div>
+  );
+}
+
+function SignalMeter({
+  label,
+  subLabel,
+  toneClass,
+  value,
+}: {
+  label: string;
+  subLabel?: string;
+  toneClass: string;
+  value: number;
+}) {
+  return (
+    <div>
+      <div className="mb-1.5 flex items-center justify-between text-[0.62rem] font-semibold uppercase tracking-[0.16em] text-stone-500">
+        <span>{label}</span>
+        <span>{Math.round(value)}%</span>
+      </div>
+      {subLabel ? (
+        <div className="text-[0.62rem] font-semibold uppercase tracking-[0.16em] text-stone-400 mb-1.5">
+          {subLabel}
+        </div>
+      ) : null}
+      <div className="h-2 overflow-hidden rounded-full bg-white/6">
+        <div
+          className={cn("h-full rounded-full", toneClass)}
+          style={{ width: `${value}%` }}
+        />
+      </div>
+    </div>
+  );
+}
+
+function CompactReadoutCard({
+  accent,
+  metricLabel,
+  signalLabel,
+  signalValue,
+}: {
+  accent: VariantAccent;
+  metricLabel: string;
+  signalLabel: string;
+  signalValue: number;
+}) {
+  return (
+    <div className="rounded-[20px] border border-white/8 bg-black/18 p-4 shadow-[0_10px_24px_rgba(0,0,0,0.18)]">
+      <div className="p-2">
+        <SignalMeter
+          label={signalLabel}
+          subLabel={metricLabel}
+          toneClass={accent.badgeClass}
+          value={signalValue}
+        />
+      </div>
+    </div>
+  );
+}
+
+function WeaponIntelCard({
+  matchup,
+  weaponId,
+}: {
+  matchup: BugWeaponMatchup;
+  weaponId: BugWeaponId;
+}) {
+  const tone = getWeaponStateClasses(matchup.state);
+
+  return (
+    <div className={cn("rounded-[18px] border p-3", tone.panel)}>
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex min-w-0 items-center gap-3">
+          <div
+            className={cn(
+              "flex h-10 w-10 shrink-0 items-center justify-center rounded-[12px] border",
+              tone.tile,
+            )}
+          >
+            <WeaponGlyph className="h-5 w-5" id={weaponId} />
+          </div>
+          <div className="min-w-0">
+            <div className="text-sm font-semibold capitalize text-stone-100">
+              {weaponId}
+            </div>
+            <div className="text-[0.62rem] font-semibold uppercase tracking-[0.16em] text-stone-500">
+              {getWeaponStateLabel(matchup.state)}
+            </div>
+          </div>
+        </div>
+        <span
+          className={cn(
+            "inline-flex rounded-full border px-2 py-1 text-[0.6rem] font-semibold uppercase tracking-[0.16em]",
+            tone.badge,
+          )}
+        >
+          {getWeaponStateLabel(matchup.state)}
+        </span>
+      </div>
+      <p className="mt-2 text-xs leading-5 text-stone-400">{matchup.note}</p>
+    </div>
+  );
+}
+
+function DossierStats({
+  activeEntry,
+  activeMaxHp,
+  activeVariantConfig,
+  accent,
+}: {
+  activeEntry: BugType;
+  activeMaxHp: number;
+  activeVariantConfig: (typeof BUG_VARIANT_CONFIG)[BugVariant] | null;
+  accent: VariantAccent;
+}) {
+  const visibility = Math.round(
+    (activeVariantConfig?.defaultOpacity ?? 1) * 100,
+  );
+
+  return (
+    <div className="space-y-2 p-2">
+      <SectionHeading eyebrow="Core Readout" title="Tactical Profile" />
+
+      <div className="grid gap-3 sm:grid-cols-2">
+        <CompactReadoutCard
+          accent={accent}
+          metricLabel={getResilienceLabel(activeMaxHp)}
+          signalLabel="Durability"
+          signalValue={(activeMaxHp / 4) * 100}
+        />
+        <CompactReadoutCard
+          accent={accent}
+          metricLabel={getSpeedLabel(activeEntry)}
+          signalLabel="Mobility"
+          signalValue={Math.min(
+            100,
+            Math.max(24, activeEntry.profile.speedMultiplier * 72),
+          )}
+        />
+        <CompactReadoutCard
+          accent={accent}
+          metricLabel={getAffinityLabel(activeEntry.socialAffinity)}
+          signalLabel="Social affinity"
+          signalValue={Math.min(
+            100,
+            Math.max(
+              18,
+              100 - Math.abs(activeEntry.profile.turnMultiplier - 1) * 64,
+            ),
+          )}
+        />
+        <CompactReadoutCard
+          accent={accent}
+          metricLabel={getPresenceLabel(visibility)}
+          signalLabel="Presence"
+          signalValue={visibility}
+        />
+      </div>
+    </div>
+  );
+}
+
+function FieldNotes({ activeEntry }: { activeEntry: BugType }) {
+  const bestTools = (
+    Object.entries(activeEntry.weaponMatchups) as Array<
+      [BugWeaponId, BugWeaponMatchup]
+    >
+  ).filter(([, matchup]) => matchup.state === "favored");
+  const riskyTools = (
+    Object.entries(activeEntry.weaponMatchups) as Array<
+      [BugWeaponId, BugWeaponMatchup]
+    >
+  ).filter(([, matchup]) => matchup.state === "risky");
+  const workableTools = (
+    Object.entries(activeEntry.weaponMatchups) as Array<
+      [BugWeaponId, BugWeaponMatchup]
+    >
+  ).filter(([, matchup]) => matchup.state === "steady");
+
+  return (
+    <div className="space-y-4 rounded-[24px] border border-white/8 bg-black/18 p-4 shadow-[0_16px_34px_rgba(0,0,0,0.24)]">
+      <SectionHeading
+        eyebrow="Field Notes"
+        title="Matchup Notes"
+        subtitle="Quick tells for where pressure shows up and what loadout wins tempo."
+      />
+
+      <div className="grid gap-3 lg:grid-cols-[0.9fr_1.1fr]">
+        <div className="space-y-3 rounded-[22px] border border-white/8 bg-white/[0.03] p-4">
+          <SectionEyebrow>Board Story</SectionEyebrow>
+          <div className="grid gap-2">
+            <div className="rounded-[16px] border border-white/8 bg-black/16 px-3 py-2.5">
+              <div className="text-[0.58rem] font-semibold uppercase tracking-[0.16em] text-stone-500">
+                Pressure
+              </div>
+              <p className="mt-1 text-sm leading-5 text-stone-200">
+                {activeEntry.dossier.pressure}
+              </p>
+            </div>
+            <div className="rounded-[16px] border border-white/8 bg-black/16 px-3 py-2.5">
+              <div className="text-[0.58rem] font-semibold uppercase tracking-[0.16em] text-stone-500">
+                Strength
+              </div>
+              <p className="mt-1 text-sm leading-5 text-stone-200">
+                {activeEntry.dossier.strength}
+              </p>
+            </div>
+            <div className="rounded-[16px] border border-white/8 bg-black/16 px-3 py-2.5">
+              <div className="text-[0.58rem] font-semibold uppercase tracking-[0.16em] text-stone-500">
+                Opening
+              </div>
+              <p className="mt-1 text-sm leading-5 text-stone-200">
+                {activeEntry.dossier.weakness}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="space-y-3 rounded-[22px] border border-white/8 bg-white/[0.03] p-4">
+          <SectionEyebrow>Loadout</SectionEyebrow>
+          <div className="grid gap-3 sm:grid-cols-3">
+            {(
+              Object.entries(activeEntry.weaponMatchups) as Array<
+                [BugWeaponId, BugWeaponMatchup]
+              >
+            ).map(([weaponId, matchup]) => (
+              <WeaponIntelCard
+                key={weaponId}
+                matchup={matchup}
+                weaponId={weaponId}
+              />
+            ))}
+          </div>
+
+          {bestTools.length > 0 ||
+          riskyTools.length > 0 ||
+          workableTools.length > 0 ? (
+            <div className="flex flex-wrap gap-2 pt-1">
+              {bestTools.map(([weaponId]) => (
+                <span
+                  key={`best-${weaponId}`}
+                  className="inline-flex items-center gap-2 rounded-full border border-emerald-400/20 bg-emerald-500/10 px-3 py-1.5 text-xs font-semibold text-emerald-100"
+                >
+                  <WeaponGlyph className="h-4 w-4" id={weaponId} />
+                  <span className="capitalize">{weaponId} strong</span>
+                </span>
+              ))}
+              {riskyTools.map(([weaponId]) => (
+                <span
+                  key={`risk-${weaponId}`}
+                  className="inline-flex items-center gap-2 rounded-full border border-amber-400/20 bg-amber-500/10 px-3 py-1.5 text-xs font-semibold text-amber-100"
+                >
+                  <WeaponGlyph className="h-4 w-4" id={weaponId} />
+                  <span className="capitalize">{weaponId} risky</span>
+                </span>
+              ))}
+              {workableTools.map(([weaponId]) => (
+                <span
+                  key={`steady-${weaponId}`}
+                  className="inline-flex items-center gap-2 rounded-full border border-white/8 bg-white/[0.04] px-3 py-1.5 text-xs font-semibold text-stone-200"
+                >
+                  <WeaponGlyph className="h-4 w-4" id={weaponId} />
+                  <span className="capitalize">{weaponId} okay</span>
+                </span>
+              ))}
+            </div>
+          ) : null}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SummaryCard({
+  id,
+  entry,
+  onSelect,
+}: {
+  id: string;
+  entry: BugType;
+  onSelect: (id: string) => void;
+}) {
+  const variant = (entry.iconVariant ?? id) as BugVariant;
+  const accent = getVariantAccent(variant);
+
+  return (
+    <button
+      type="button"
+      onClick={() => onSelect(id)}
+      className={cn(
+        "group relative overflow-hidden rounded-[24px] border border-white/10 bg-gradient-to-br p-4 text-left transition duration-200 hover:-translate-y-1 hover:border-white/18 hover:bg-white/[0.05]",
+        accent.cardClass,
+      )}
+    >
+      <div className="pointer-events-none absolute inset-0 opacity-90">
+        <div
+          className="absolute left-2 top-2 h-20 w-20 rounded-full blur-3xl"
+          style={{ background: accent.washA }}
+        />
+        <div
+          className="absolute right-2 bottom-2 h-16 w-16 rounded-full blur-3xl"
+          style={{ background: accent.washB }}
+        />
+      </div>
+
+      <div className="relative flex h-full flex-col gap-4">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex min-w-0 items-center gap-3">
+            <div
+              className={cn(
+                "flex h-14 w-14 shrink-0 items-center justify-center rounded-[18px] border border-white/10 bg-gradient-to-br p-3 shadow-[0_0_24px_rgba(0,0,0,0.18)]",
+                accent.iconPanel,
+              )}
+              style={{ boxShadow: `0 0 28px ${accent.iconHalo}` }}
+            >
+              <img
+                alt=""
+                className="h-8 w-8 object-contain transition duration-200 group-hover:scale-110"
+                src={getTabIconSrc(entry, id)}
+              />
+            </div>
+
+            <h3 className="min-w-0 truncate text-[1.4rem] font-semibold tracking-[-0.03em] text-stone-50">
+              {entry.name}
+            </h3>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <div className="flex-shrink-0">
+              <Badge className={accent.badgeClass}>
+                {getThreatLabel(variant)}
+              </Badge>
+            </div>
+            <div className="flex-shrink-0">
+              <Badge className={accent.behaviorClass}>
+                {getBehaviorLabel(entry.profile.behavior)}
+              </Badge>
+            </div>
+          </div>
+        </div>
+
+        <p className="text-sm leading-6 text-stone-200">{entry.description}</p>
+      </div>
+    </button>
+  );
 }
 
 export default function CodexPanel({
@@ -36,74 +558,66 @@ export default function CodexPanel({
   onMenuToggle,
   open,
 }: CodexPanelProps) {
-  const initial = useMemo(() => {
-    loadCodexFromStorage();
-    return cloneCodex(getCodex());
-  }, []);
+  const codex = useMemo(() => getCodex(), []);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
 
-  const [codex, setLocalCodex] = useState<Record<string, BugType>>(initial);
-  const [activeId, setActiveId] = useState<string>(
-    () => Object.keys(initial)[0] ?? "low",
-  );
+  useEffect(() => {
+    if (open) {
+      // When the codex is opened, reset any previous selection so it
+      // always starts on the list view. Defer to avoid synchronous
+      // setState inside an effect.
+      const t = setTimeout(() => setSelectedId(null), 0);
+      return () => clearTimeout(t);
+    }
+    // don't reset when already open and a selection changes
+  }, [open]);
 
   const entries = useMemo(() => Object.entries(codex), [codex]);
-  const activeEntry = activeId ? codex[activeId] : undefined;
-
-  const save = useCallback(() => {
-    const nextCodex = cloneCodex(codex);
-    setCodex(nextCodex);
-    setLocalCodex(nextCodex);
-  }, [codex]);
-
-  const reset = useCallback(() => {
-    const nextCodex = resetCodexToDefaults();
-    setLocalCodex(nextCodex);
-    setActiveId((currentValue) =>
-      currentValue && nextCodex[currentValue]
-        ? currentValue
-        : (Object.keys(nextCodex)[0] ?? currentValue),
-    );
-  }, []);
-
-  const setField = useCallback(
-    (id: string, key: keyof BugType, value: unknown) => {
-      setLocalCodex((prev) => ({
-        ...prev,
-        [id]: { ...prev[id], [key]: value },
-      }));
-    },
-    [],
-  );
-
-  const updateProfile = useCallback(
-    (id: string, patch: Partial<BugType["profile"]>) => {
-      setLocalCodex((prev) => ({
-        ...prev,
-        [id]: { ...prev[id], profile: { ...prev[id].profile, ...patch } },
-      }));
-    },
-    [],
-  );
+  const fallbackId = entries[0]?.[0] ?? "low";
+  const backdropId = selectedId ?? fallbackId;
+  const backdropEntry = codex[backdropId];
+  const selectedEntry = selectedId ? codex[selectedId] : null;
 
   const handleMenuButtonClick = useCallback(() => {
-    if (!open) {
-      const nextCodex = cloneCodex(getCodex());
-      setLocalCodex(nextCodex);
-      setActiveId((currentValue) =>
-        currentValue && nextCodex[currentValue]
-          ? currentValue
-          : (Object.keys(nextCodex)[0] ?? currentValue),
-      );
-    }
     onMenuToggle();
-  }, [onMenuToggle, open]);
+  }, [onMenuToggle]);
+
+  const handleSelectEntry = useCallback((id: string) => {
+    setSelectedId(id);
+  }, []);
+
+  const handleBackToGrid = useCallback(() => {
+    setSelectedId(null);
+  }, []);
+
+  const backdropVariant = (backdropEntry?.iconVariant ??
+    backdropId) as BugVariant;
+  const backdropAccent = getVariantAccent(backdropVariant);
+  const selectedVariant = selectedEntry
+    ? ((selectedEntry.iconVariant ?? selectedId) as BugVariant)
+    : null;
+  const selectedAccent = selectedVariant
+    ? getVariantAccent(selectedVariant)
+    : backdropAccent;
+  const selectedMaxHp =
+    selectedEntry && selectedVariant ? getBugVariantMaxHp(selectedVariant) : 0;
+  const selectedVariantConfig = selectedVariant
+    ? (BUG_VARIANT_CONFIG[selectedVariant] ?? null)
+    : null;
+
+  const backdropStyle = useMemo<CSSProperties>(
+    () => ({
+      background: `radial-gradient(circle at 24% 28%, ${backdropAccent.washA}, transparent 32%), radial-gradient(circle at 74% 30%, ${backdropAccent.washB}, transparent 30%), radial-gradient(circle at 52% 82%, rgba(255,255,255,0.02), transparent 28%), linear-gradient(180deg, rgba(12,14,20,0.985), rgba(16,19,27,0.985))`,
+    }),
+    [backdropAccent],
+  );
 
   return (
     <div className="relative" ref={containerRef}>
       <MenuIconButton
         ariaLabel="Open bug codex"
         onClick={handleMenuButtonClick}
-        tooltip="Open the bug codex and tune each bug type."
+        tooltip="Open the bug codex and review bug types."
       >
         <svg
           aria-hidden="true"
@@ -129,247 +643,142 @@ export default function CodexPanel({
         </svg>
       </MenuIconButton>
 
-      {open && (
-        <div className="fixed right-6 bottom-6 z-40 w-[min(28rem,calc(100vw-1.5rem))] max-h-[72vh] max-w-full overflow-hidden rounded-lg border border-white/10 bg-zinc-950/95 shadow-[0_18px_48px_rgba(0,0,0,0.45)] backdrop-blur-md">
-          <div className="flex h-full w-full flex-col sm:flex-row">
-            <aside className="flex h-28 w-full shrink-0 flex-col border-b border-white/8 bg-white/[0.02] p-2 sm:h-auto sm:w-40 sm:border-b-0 sm:border-r">
-              <div className="mb-1 px-1">
-                <p className="text-[0.6rem] font-semibold uppercase tracking-[0.18em] text-stone-500">
-                  Bug Codex
-                </p>
-                <p className="mt-1 text-xs text-stone-300">Type profiles</p>
-              </div>
+      {open ? (
+        <>
+          <button
+            aria-label="Close bug codex"
+            className="fixed inset-0 z-40 bg-black/45 backdrop-blur-[2px]"
+            onClick={onMenuToggle}
+            type="button"
+          />
+          <div
+            className="fixed inset-x-4 top-[8vh] z-50 mx-auto flex max-h-[78vh] w-full max-w-[58rem] overflow-hidden rounded-[28px] border border-white/10 shadow-[0_30px_90px_rgba(0,0,0,0.52)] backdrop-blur-xl"
+            style={backdropStyle}
+          >
+            <div className="pointer-events-none absolute inset-0 overflow-hidden">
+              <div
+                className="absolute left-[14%] top-[14%] h-40 w-40 rounded-full blur-3xl transition duration-500"
+                style={{ background: backdropAccent.washA }}
+              />
+              <div
+                className="absolute right-[10%] top-[24%] h-32 w-32 rounded-full blur-3xl transition duration-500"
+                style={{ background: backdropAccent.washB }}
+              />
+              <div className="absolute inset-0 opacity-[0.06] [background-image:radial-gradient(circle_at_1px_1px,rgba(255,255,255,0.7)_1px,transparent_0)] [background-size:20px_20px]" />
+            </div>
 
-              <div className="flex-1 space-y-2 overflow-y-auto pr-1">
-                {entries.map(([id, entry]) => {
-                  const isActive = id === activeId;
-                  return (
-                    <button
-                      key={id}
-                      type="button"
-                      onClick={() => setActiveId(id)}
-                      className={cn(
-                        "flex w-full items-center gap-2 rounded-[14px] border px-2 py-2 text-left transition duration-200",
-                        isActive
-                          ? "border-sky-400/24 bg-sky-400/10 text-sky-50 shadow-[inset_0_0_0_1px_rgba(56,189,248,0.14)]"
-                          : "border-white/6 bg-white/[0.03] text-stone-300 hover:border-white/10 hover:bg-white/[0.05] hover:text-stone-100",
-                      )}
-                    >
-                      <img
-                        alt=""
-                        className="h-4 w-4 shrink-0 object-contain"
-                        src={getTabIconSrc(entry, id)}
-                      />
-                      <div className="min-w-0">
-                        <div className="truncate text-sm font-semibold">
-                          {entry.name}
+            <div className="relative flex min-w-0 flex-1 flex-col">
+              <div className="relative flex items-start justify-between gap-4 border-b border-white/8 px-5 py-4">
+                <div className="min-w-0 flex-1 pr-28">
+                  {selectedEntry && selectedVariant ? (
+                    <>
+                      <div className="flex min-w-0 flex-wrap items-center gap-3">
+                        <div className="flex min-w-0 items-center gap-3">
+                          <div
+                            className={cn(
+                              "flex h-14 w-14 shrink-0 items-center justify-center rounded-[14px] border border-white/10 bg-gradient-to-br p-3",
+                              selectedAccent.iconPanel,
+                            )}
+                            style={{
+                              boxShadow: `0 0 28px ${selectedAccent.iconHalo}`,
+                            }}
+                          >
+                            <img
+                              alt=""
+                              className="h-8 w-8 object-contain"
+                              src={getTabIconSrc(
+                                selectedEntry,
+                                selectedId ?? fallbackId,
+                              )}
+                            />
+                          </div>
+
+                          <h3 className="min-w-0 truncate text-[1.4rem] font-semibold tracking-[-0.03em] text-stone-50">
+                            {selectedEntry.name}
+                          </h3>
                         </div>
-                        <div className="truncate text-[0.62rem] uppercase tracking-[0.14em] text-stone-500">
-                          {id}
+
+                        <div className="flex flex-wrap items-center gap-2">
+                          <Badge className={selectedAccent.badgeClass}>
+                            {getThreatLabel(selectedVariant)}
+                          </Badge>
+                          <Badge className={selectedAccent.behaviorClass}>
+                            {getBehaviorLabel(selectedEntry.profile.behavior)}
+                          </Badge>
                         </div>
                       </div>
-                    </button>
-                  );
-                })}
-              </div>
-            </aside>
 
-            <div className="flex min-w-0 flex-1 flex-col">
-              <div className="flex items-center justify-between gap-2 border-b border-white/8 px-4 py-3">
-                <div className="min-w-0">
-                  <p className="text-[0.64rem] font-semibold uppercase tracking-[0.18em] text-stone-500">
-                    Species Editor
-                  </p>
-                  <h2 className="mt-1 truncate text-base font-semibold text-stone-100">
-                    {activeEntry?.name ?? "Bug type"}
-                  </h2>
+                      <div className="mt-2 px-1">
+                        <p className="max-w-[44rem] text-sm leading-6 text-stone-300">
+                          {selectedEntry.description}
+                        </p>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <SectionEyebrow>Bug Codex</SectionEyebrow>
+                      <h2 className="mt-1 text-[1.55rem] font-semibold tracking-[-0.04em] text-stone-50">
+                        {selectedEntry ? selectedEntry.name : "Bug Index"}
+                      </h2>
+                      <p className="mt-2 max-w-[40rem] text-sm leading-6 text-stone-300">
+                        {selectedEntry
+                          ? "Review full encounter details, pressure profile, and field notes for the selected bug."
+                          : "Scout the swarm, a pocket catalog of the midnight bugs that keep engineers up."}
+                      </p>
+                    </>
+                  )}
                 </div>
-                <div className="flex items-center gap-2">
+
+                <div className="absolute right-5 top-4 z-20 flex items-center gap-2">
+                  {selectedEntry ? (
+                    <button
+                      className="rounded-full border border-white/10 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.14em] text-stone-300 transition hover:border-white/20 hover:text-stone-100"
+                      onClick={handleBackToGrid}
+                      type="button"
+                    >
+                      Back
+                    </button>
+                  ) : null}
                   <button
-                    className="rounded-md border border-white/10 px-2 py-1 text-xs font-semibold text-stone-300 transition hover:border-white/20 hover:text-stone-100"
+                    className="rounded-full border border-white/10 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.14em] text-stone-300 transition hover:border-white/20 hover:text-stone-100"
                     onClick={onMenuToggle}
                     type="button"
                   >
                     Close
                   </button>
-                  <button
-                    className="rounded-md border border-red-300/18 bg-red-400/8 px-2 py-1 text-xs font-semibold text-red-100 transition hover:border-red-300/28 hover:bg-red-400/14"
-                    onClick={reset}
-                    type="button"
-                  >
-                    Reset
-                  </button>
-                  <button
-                    className="rounded-md bg-sky-400/14 px-2 py-1 text-xs font-semibold text-sky-100 transition hover:bg-sky-400/20"
-                    onClick={save}
-                    type="button"
-                  >
-                    Save
-                  </button>
                 </div>
               </div>
 
-              {activeEntry ? (
-                <div className="grid flex-1 gap-4 overflow-y-auto p-4">
-                  <section className="grid gap-3 rounded-lg border border-white/8 bg-white/[0.03] p-3">
-                    <div className="flex items-start gap-3">
-                      <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-md border border-white/10 bg-zinc-900/70">
-                        <img
-                          alt=""
-                          className="h-8 w-8 object-contain"
-                          src={getTabIconSrc(activeEntry, activeId)}
-                        />
-                      </div>
-
-                      <div className="grid min-w-0 flex-1 gap-2">
-                        <label className="grid min-w-0 gap-1 text-xs font-semibold uppercase tracking-[0.14em] text-stone-500">
-                          Name
-                          <input
-                            className="w-full min-w-0 rounded-[12px] border border-white/8 bg-zinc-950/70 px-2 py-1 text-sm font-medium normal-case tracking-normal text-stone-100 outline-none transition focus:border-sky-300/40"
-                            value={activeEntry.name}
-                            onChange={(e) =>
-                              setField(activeId, "name", e.target.value)
-                            }
-                          />
-                        </label>
-
-                        <label className="grid min-w-0 gap-1 text-xs font-semibold uppercase tracking-[0.14em] text-stone-500">
-                          Description
-                          <textarea
-                            className="min-h-20 w-full min-w-0 rounded-[12px] border border-white/8 bg-zinc-950/70 px-2 py-1 text-sm normal-case tracking-normal text-stone-200 outline-none transition focus:border-sky-300/40"
-                            value={activeEntry.description}
-                            onChange={(e) =>
-                              setField(activeId, "description", e.target.value)
-                            }
-                          />
-                        </label>
-                      </div>
-                    </div>
-
-                    <div className="grid gap-2 sm:grid-cols-2">
-                      <label className="grid min-w-0 gap-1 text-xs font-semibold uppercase tracking-[0.14em] text-stone-500">
-                        Built-in icon
-                        <select
-                          className="w-full min-w-0 rounded-[12px] border border-white/8 bg-zinc-950/70 px-2 py-1 text-sm normal-case tracking-normal text-stone-100 outline-none transition focus:border-sky-300/40"
-                          value={activeEntry.iconVariant ?? ""}
-                          onChange={(e) =>
-                            setField(
-                              activeId,
-                              "iconVariant",
-                              e.target.value || undefined,
-                            )
-                          }
-                        >
-                          <option value="">Auto</option>
-                          {BUILTIN_ICON_VARIANTS.map((variant) => (
-                            <option key={variant} value={variant}>
-                              {variant}
-                            </option>
-                          ))}
-                        </select>
-                      </label>
-
-                      <label className="grid min-w-0 gap-1 text-xs font-semibold uppercase tracking-[0.14em] text-stone-500">
-                        Custom icon URL
-                        <input
-                          className="w-full min-w-0 rounded-[12px] border border-white/8 bg-zinc-950/70 px-2 py-1 text-sm normal-case tracking-normal text-stone-100 outline-none transition focus:border-sky-300/40"
-                          placeholder="https://...svg"
-                          value={activeEntry.iconUrl ?? ""}
-                          onChange={(e) =>
-                            setField(
-                              activeId,
-                              "iconUrl",
-                              e.target.value || undefined,
-                            )
-                          }
-                        />
-                      </label>
-                    </div>
-                  </section>
-
-                  <section className="grid gap-3 rounded-lg border border-white/8 bg-white/[0.03] p-3">
-                    <div className="flex items-center justify-between gap-2">
-                      <h3 className="text-sm font-semibold text-stone-100">
-                        Behavior
-                      </h3>
-                      <p className="text-[0.62rem] uppercase tracking-[0.14em] text-stone-500">
-                        High-level only
-                      </p>
-                    </div>
-
-                    <div className="grid gap-2 sm:grid-cols-[1fr_auto] sm:items-center">
-                      <label className="grid gap-1 text-xs font-semibold uppercase tracking-[0.14em] text-stone-500">
-                        Social affinity
-                        <input
-                          className="accent-sky-300"
-                          type="range"
-                          min={-1}
-                          max={1}
-                          step={0.05}
-                          value={activeEntry.socialAffinity ?? 0}
-                          onChange={(e) =>
-                            setField(
-                              activeId,
-                              "socialAffinity",
-                              Number(e.target.value),
-                            )
-                          }
-                        />
-                      </label>
-
-                      <div className="rounded-full border border-white/8 px-2 py-1 text-xs font-semibold text-stone-200">
-                        {(activeEntry.socialAffinity ?? 0).toFixed(2)}
-                      </div>
-                    </div>
-
-                    <div className="grid gap-2 sm:grid-cols-2">
-                      <label className="grid min-w-0 gap-1 text-xs font-semibold uppercase tracking-[0.14em] text-stone-500">
-                        Habitat
-                        <select
-                          className="w-full min-w-0 rounded-[12px] border border-white/8 bg-zinc-950/70 px-2 py-1 text-sm normal-case tracking-normal text-stone-100 outline-none transition focus:border-sky-300/40"
-                          value={activeEntry.preferredRegion}
-                          onChange={(e) =>
-                            setField(
-                              activeId,
-                              "preferredRegion",
-                              e.target.value,
-                            )
-                          }
-                        >
-                          <option value="edge">near the outer lanes</option>
-                          <option value="middle">balanced field</option>
-                          <option value="interior">closer to center</option>
-                        </select>
-                      </label>
-
-                      <label className="grid gap-1 text-xs font-semibold uppercase tracking-[0.14em] text-stone-500">
-                        Pace
-                        <input
-                          type="range"
-                          min={0.6}
-                          max={1.4}
-                          step={0.01}
-                          value={activeEntry.profile.speedMultiplier}
-                          onChange={(e) =>
-                            updateProfile(activeId, {
-                              speedMultiplier: Number(e.target.value),
-                            })
-                          }
-                          style={{
-                            accentColor:
-                              activeEntry.color ??
-                              getBugVariantColor(activeId as BugVariant),
-                          }}
-                        />
-                      </label>
-                    </div>
-                  </section>
+              {selectedEntry && selectedVariant ? (
+                <div className="flex-1 overflow-hidden px-5 py-4">
+                  <div className="mx-auto flex h-full w-full max-w-[46rem] flex-col gap-4">
+                    <DossierStats
+                      accent={selectedAccent}
+                      activeEntry={selectedEntry}
+                      activeMaxHp={selectedMaxHp}
+                      activeVariantConfig={selectedVariantConfig}
+                    />
+                    <FieldNotes activeEntry={selectedEntry} />
+                  </div>
                 </div>
-              ) : null}
+              ) : (
+                <div className="flex-1 overflow-y-auto px-5 py-5">
+                  <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-2">
+                    {entries.map(([id, entry]) => (
+                      <SummaryCard
+                        key={id}
+                        id={id}
+                        entry={entry}
+                        onSelect={handleSelectEntry}
+                      />
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
-        </div>
-      )}
+        </>
+      ) : null}
     </div>
   );
 }

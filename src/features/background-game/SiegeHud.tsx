@@ -1,4 +1,5 @@
 import Tooltip from "../../components/Tooltip";
+import WeaponGlyph from "../../components/WeaponGlyph";
 import type { WeaponProgressSnapshot } from "./types";
 
 interface SiegeHudProps {
@@ -23,44 +24,6 @@ function getWeaponButtonClassName(snapshot?: WeaponProgressSnapshot) {
   }
 
   return "inline-flex h-9 w-9 items-center justify-center rounded-xl border border-emerald-400/20 bg-emerald-500/8 text-emerald-100";
-}
-
-function renderWeaponGlyph(id: WeaponProgressSnapshot["id"]) {
-  if (id === "hammer") {
-    return <span className="text-lg leading-none">🔨</span>;
-  }
-
-  if (id === "pulse") {
-    return (
-      <svg
-        className="h-5 w-5"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth="1.6"
-      >
-        <circle cx="12" cy="12" r="3.2" />
-        <path d="M4 12h2.4M17.6 12H20M12 4v2.4M12 17.6V20" />
-      </svg>
-    );
-  }
-
-  return (
-    <svg
-      className="h-5 w-5"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      strokeWidth="1.6"
-    >
-      <path d="M3 12h18" />
-      <path d="M12 3v18" />
-    </svg>
-  );
 }
 
 export default function SiegeHud({
@@ -123,7 +86,7 @@ export default function SiegeHud({
                   className="rounded-[14px] border border-white/8 bg-black/18 p-1.5 text-sm text-stone-200"
                 >
                   <div className={getWeaponButtonClassName(snapshot)}>
-                    {renderWeaponGlyph(snapshot.id)}
+                    <WeaponGlyph className="h-5 w-5" id={snapshot.id} />
                   </div>
                 </div>
               </Tooltip>
