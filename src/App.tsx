@@ -49,20 +49,25 @@ function App() {
   const headerModeSubtitle = siegeGame.interactiveMode
     ? "Panels are frozen into the battlefield. Bugs now reclaim cards, charts, and surfaces directly."
     : dashboard.headerSubtitle;
+  const backgroundChartFocus = siegeGame.interactiveMode
+    ? dashboard.chartFocus
+    : null;
+  const chartFocusHandler = siegeGame.interactiveMode
+    ? dashboard.handleChartFocusChange
+    : undefined;
 
   return (
     <div className="relative min-h-screen overflow-hidden bg-[#050608]">
       <BackgroundField
         bugCounts={siegeGame.displayedBugCounts}
         bugVisualSettings={dashboard.bugVisualSettings}
-        chartFocus={dashboard.chartFocus}
+        chartFocus={backgroundChartFocus}
         className={siegeGame.interactiveMode ? "z-30" : "z-0"}
         combatStats={siegeGame.interactiveMode ? siegeGame.combatStats : null}
         gameConfig={dashboard.gameConfig}
         interactiveSessionKey={
           siegeGame.interactiveMode ? siegeGame.interactiveSessionKey : null
         }
-        milestoneFlash={dashboard.milestoneFlash}
         onTerminatorHit={
           siegeGame.interactiveMode ? siegeGame.handleInteractiveHit : undefined
         }
@@ -201,7 +206,7 @@ function App() {
           {dashboard.activeTab === "overview" ? (
             <OverviewView
               deadlineMetrics={dashboard.deadlineMetrics}
-              onChartFocusChange={dashboard.handleChartFocusChange}
+              onChartFocusChange={chartFocusHandler}
               siegeMode={siegeGame.interactiveMode}
               summary={dashboard.summary}
               workdaySettings={dashboard.workdaySettings}
@@ -211,7 +216,7 @@ function App() {
           {dashboard.activeTab === "periods" ? (
             <PeriodsView
               comparisonMetrics={dashboard.comparisonMetrics}
-              onChartFocusChange={dashboard.handleChartFocusChange}
+              onChartFocusChange={chartFocusHandler}
               siegeMode={siegeGame.interactiveMode}
             />
           ) : null}

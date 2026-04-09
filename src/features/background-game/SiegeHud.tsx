@@ -117,6 +117,9 @@ export default function SiegeHud({
               >
                 <div
                   aria-label={`${snapshot.title} weapon status`}
+                  data-current={snapshot.current ? "true" : "false"}
+                  data-locked={snapshot.locked ? "true" : "false"}
+                  data-testid={`weapon-${snapshot.id}`}
                   className="rounded-[14px] border border-white/8 bg-black/18 p-1.5 text-sm text-stone-200"
                 >
                   <div className={getWeaponButtonClassName(snapshot)}>

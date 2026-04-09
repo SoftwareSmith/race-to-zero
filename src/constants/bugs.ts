@@ -57,7 +57,7 @@ export const BUG_VARIANT_CONFIG: Record<BugVariant, BugVariantConfig> = {
     swayFrequency: 3.4,
   },
   urgent: {
-    baseColor: "#9b111e",
+    baseColor: "#fff",
     baseScale: 1.4,
     bobAmplitude: 14,
     bobFrequency: 2.8,

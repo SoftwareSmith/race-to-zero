@@ -30,12 +30,7 @@ import {
   getSummaryMetrics,
 } from "../../utils/metrics";
 
-const MILESTONE_THRESHOLDS = [100, 50, 25, 10, 0] as const;
-
-export interface MilestoneFlash {
-  threshold: number;
-  token: number;
-}
+// Milestone flashes removed — milestone logic deprecated
 
 export function useDashboardController() {
   const { metrics, error } = useMetrics();
@@ -85,7 +80,7 @@ export function useDashboardController() {
   const [openTopMenu, setOpenTopMenu] = useState<TopMenuKey>(null);
   const [bugSizeMultiplier, setBugSizeMultiplier] = useStoredState(
     STORAGE_KEYS.bugSizeMultiplier,
-    3.5,
+    2.5,
     {
       parse: parseStoredPositiveNumber,
     },
@@ -105,9 +100,7 @@ export function useDashboardController() {
     format(new Date(), "yyyy-MM-dd"),
   );
   const [chartFocus, setChartFocus] = useState<ChartFocusState | null>(null);
-  const [milestoneFlash, setMilestoneFlash] = useState<MilestoneFlash | null>(
-    null,
-  );
+  // milestoneFlash state removed
   const settingsMenuRef = useRef<HTMLDivElement | null>(null);
   const bugSettingsMenuRef = useRef<HTMLDivElement | null>(null);
   const codexMenuRef = useRef<HTMLDivElement | null>(null);
@@ -285,8 +278,23 @@ export function useDashboardController() {
     setActiveTab(tabId);
   }, []);
 
+  // avoid thrashing chart focus state from rapid Chart.js hover events
+  const lastChartFocusRef = useRef<ChartFocusState | null>(null);
   const handleChartFocusChange = useCallback(
     (nextFocus: ChartFocusState | null) => {
+      const prev = lastChartFocusRef.current;
+      const same =
+        (prev === null && nextFocus === null) ||
+        (prev !== null && nextFocus !== null &&
+          prev.chartKey === nextFocus.chartKey &&
+          prev.dataIndex === nextFocus.dataIndex &&
+          prev.datasetIndex === nextFocus.datasetIndex);
+
+      if (same) {
+        return;
+      }
+
+      lastChartFocusRef.current = nextFocus;
       setChartFocus(nextFocus);
     },
     [],
@@ -330,37 +338,7 @@ export function useDashboardController() {
     };
   }, [openTopMenu]);
 
-  useEffect(() => {
-    const nextBugCount = summary.bugCount;
-    const previousBugCount = previousBugCountRef.current;
-
-    if (previousBugCount != null) {
-      const crossedThreshold = MILESTONE_THRESHOLDS.find(
-        (threshold) => previousBugCount > threshold && nextBugCount <= threshold,
-      );
-      if (crossedThreshold != null) {
-        const sessionKey = `race-to-zero:milestone:${crossedThreshold}`;
-        if (!window.sessionStorage.getItem(sessionKey)) {
-          window.sessionStorage.setItem(sessionKey, "true");
-          setMilestoneFlash({ threshold: crossedThreshold, token: Date.now() });
-        }
-      }
-    }
-
-    previousBugCountRef.current = nextBugCount;
-  }, [summary.bugCount]);
-
-  useEffect(() => {
-    if (!milestoneFlash) {
-      return undefined;
-    }
-
-    const timeoutId = window.setTimeout(() => {
-      setMilestoneFlash(null);
-    }, 1800);
-
-    return () => window.clearTimeout(timeoutId);
-  }, [milestoneFlash]);
+  // milestone detection removed
 
   const headerEyebrow =
     summary.bugCount === 0 ? "All clear" : "Operations dashboard";
@@ -400,7 +378,7 @@ export function useDashboardController() {
     handleTopNavInteract,
     headerEyebrow,
     headerSubtitle,
-    milestoneFlash,
+    // milestoneFlash removed
     openTopMenu,
     settings,
     settingsMenuRef,

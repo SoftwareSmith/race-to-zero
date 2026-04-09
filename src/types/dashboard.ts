@@ -166,9 +166,6 @@ export interface BugParticle {
 
 export interface EffectPalette {
   bug: string;
-  fireflies: string[];
-  orbA: string;
-  orbB: string;
 }
 
 export interface MotionProfile {

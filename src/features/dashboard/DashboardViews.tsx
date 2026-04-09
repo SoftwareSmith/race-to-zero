@@ -223,7 +223,7 @@ export function StatusBanner({ kind = "info", children }: StatusBannerProps) {
 
 interface OverviewViewProps {
   deadlineMetrics: DeadlineMetrics;
-  onChartFocusChange: (nextFocus: ChartFocusState | null) => void;
+  onChartFocusChange?: (nextFocus: ChartFocusState | null) => void;
   siegeMode?: boolean;
   summary: SummaryMetrics;
   workdaySettings: WorkdaySettings;
@@ -305,7 +305,7 @@ export const OverviewView = memo(function OverviewView({
 
 interface PeriodsViewProps {
   comparisonMetrics: ComparisonMetrics;
-  onChartFocusChange: (nextFocus: ChartFocusState | null) => void;
+  onChartFocusChange?: (nextFocus: ChartFocusState | null) => void;
   siegeMode?: boolean;
 }
 

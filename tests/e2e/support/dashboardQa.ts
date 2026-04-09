@@ -1,0 +1,376 @@
+import { expect, type Page } from "@playwright/test";
+import { readFileSync } from "node:fs";
+import { format } from "date-fns";
+import { STORAGE_KEYS } from "../../../src/constants/storageKeys";
+import { DEFAULT_GAME_CONFIG, type GameConfig } from "../../../src/engine/types";
+import {
+  formatNumber,
+  formatPercent,
+  formatSignedNumber,
+} from "../../../src/utils/dashboard";
+import {
+  getComparisonMetrics,
+  getDeadlineMetrics,
+  getSummaryMetrics,
+} from "../../../src/utils/metrics";
+import type { MetricsSource, WorkdaySettings } from "../../../src/types/dashboard";
+
+export const QA_TODAY_ISO = "2026-04-09T12:00:00.000Z";
+export const QA_DEADLINE_FROM = "2026-03-11";
+export const QA_DEADLINE_DATE = "2026-12-31";
+export const QA_CUSTOM_FROM = "2026-03-01";
+export const QA_CUSTOM_TO = "2026-03-31";
+
+const metricsPath = new URL("../../../public/data/metrics.json", import.meta.url);
+const metricsText = readFileSync(metricsPath, "utf8");
+
+export const qaMetrics = JSON.parse(metricsText) as MetricsSource;
+
+export const qaWorkdaySettings: WorkdaySettings = {
+  excludePublicHolidays: false,
+  excludeWeekends: false,
+};
+
+interface DashboardSeedOptions {
+  clearStorage?: boolean;
+  deadlineDate?: string;
+  deadlineFromDate?: string;
+  excludePublicHolidays?: boolean;
+  excludeWeekends?: boolean;
+  frozenDateIso?: string;
+  gameConfig?: Partial<GameConfig>;
+  showParticleCount?: boolean;
+  terminatorMode?: boolean;
+}
+
+interface OverviewMetricOptions {
+  deadlineDate?: string;
+  deadlineFromDate?: string;
+  workdaySettings?: WorkdaySettings;
+}
+
+function withFrozenDate<T>(isoString: string, callback: () => T): T {
+  const RealDate = Date;
+  const frozenTime = new RealDate(isoString).valueOf();
+
+  class MockDate extends RealDate {
+    constructor(...args: ConstructorParameters<typeof Date>) {
+      if (args.length === 0) {
+        super(frozenTime);
+        return;
+      }
+
+      super(...args);
+    }
+
+    static now() {
+      return frozenTime;
+    }
+  }
+
+  // Node-side metric helpers use the global Date constructor directly.
+  globalThis.Date = MockDate as DateConstructor;
+
+  try {
+    return callback();
+  } finally {
+    globalThis.Date = RealDate;
+  }
+}
+
+export function getExpectedOverviewMetrics(
+  options: OverviewMetricOptions = {},
+) {
+  const {
+    deadlineDate = QA_DEADLINE_DATE,
+    deadlineFromDate = QA_DEADLINE_FROM,
+    workdaySettings = qaWorkdaySettings,
+  } = options;
+
+  return withFrozenDate(QA_TODAY_ISO, () => {
+    const deadlineMetrics = getDeadlineMetrics(qaMetrics, {
+      deadlineDate,
+      trackingStartDate: deadlineFromDate,
+      workdaySettings,
+    });
+    const summary = getSummaryMetrics(deadlineMetrics);
+    const paceGap = summary.currentFixRate - summary.bugsPerDayRequired;
+
+    return {
+      commandCenter: {
+        fixVelocity: `${formatNumber(summary.currentFixRate, 2)}/day`,
+        netDifference: `${formatSignedNumber(paceGap, 2)}/day`,
+        requiredPace: `${formatNumber(summary.bugsPerDayRequired, 2)}/day`,
+      },
+      deadlineMetrics,
+      overlayLabel: `${formatNumber(summary.bugCount)} bugs rendered`,
+      summary,
+      viewMetrics: {
+        confidence: formatPercent(summary.likelihoodScore),
+        currentNetBurn: `${formatNumber(summary.currentNetBurnRate, 2)}/day`,
+        daysLeft: formatNumber(summary.daysUntilDeadline),
+        openBugs: formatNumber(summary.bugCount),
+        requiredNetBurn: `${formatNumber(deadlineMetrics.neededNetBurnRate, 2)}/day`,
+      },
+    };
+  });
+}
+
+export function getExpectedPeriodsMetrics(rangeKey: "7" | "30" | "90" | "all" | "custom" = "30") {
+  return withFrozenDate(QA_TODAY_ISO, () => {
+    const comparisonMetrics = getComparisonMetrics(qaMetrics, {
+      customFromDate: QA_CUSTOM_FROM,
+      customToDate: QA_CUSTOM_TO,
+      rangeKey,
+    });
+
+    return {
+      comparisonMetrics,
+      viewMetrics: {
+        bugsCompleted: formatNumber(comparisonMetrics.currentWindow.fixed),
+        bugsCreated: formatNumber(comparisonMetrics.currentWindow.created),
+        completionRate: formatPercent(comparisonMetrics.currentWindow.completionRate, 1),
+        netChange: formatSignedNumber(comparisonMetrics.currentWindow.netChange),
+      },
+    };
+  });
+}
+
+export async function seedDashboardState(
+  page: Page,
+  options: DashboardSeedOptions = {},
+) {
+  const {
+    deadlineDate = QA_DEADLINE_DATE,
+    deadlineFromDate = QA_DEADLINE_FROM,
+    excludePublicHolidays = false,
+    excludeWeekends = false,
+    frozenDateIso = QA_TODAY_ISO,
+    gameConfig,
+    clearStorage = true,
+    showParticleCount = true,
+    terminatorMode = false,
+  } = options;
+
+  await page.addInitScript(
+    ({
+      clearStorage,
+      deadlineDate,
+      deadlineFromDate,
+      excludePublicHolidays,
+      excludeWeekends,
+      frozenDateIso,
+      gameConfig,
+      showParticleCount,
+      storageKeys,
+      terminatorMode,
+    }) => {
+      const NativeDate = Date;
+      const frozenTimestamp = new NativeDate(frozenDateIso).valueOf();
+
+      class FrozenDate extends NativeDate {
+        constructor(...args: ConstructorParameters<typeof Date>) {
+          if (args.length === 0) {
+            super(frozenTimestamp);
+            return;
+          }
+
+          super(...args);
+        }
+
+        static now() {
+          return frozenTimestamp;
+        }
+      }
+
+      window.Date = FrozenDate as DateConstructor;
+      if (clearStorage) {
+        window.localStorage.clear();
+        window.sessionStorage.clear();
+      }
+
+      if (!window.localStorage.getItem(storageKeys.deadlineDate)) {
+        window.localStorage.setItem(storageKeys.deadlineDate, deadlineDate);
+      }
+
+      if (!window.localStorage.getItem(storageKeys.deadlineFromDate)) {
+        window.localStorage.setItem(storageKeys.deadlineFromDate, deadlineFromDate);
+      }
+
+      if (!window.localStorage.getItem(storageKeys.excludePublicHolidays)) {
+        window.localStorage.setItem(
+          storageKeys.excludePublicHolidays,
+          String(excludePublicHolidays),
+        );
+      }
+
+      if (!window.localStorage.getItem(storageKeys.excludeWeekends)) {
+        window.localStorage.setItem(
+          storageKeys.excludeWeekends,
+          String(excludeWeekends),
+        );
+      }
+
+      if (!window.localStorage.getItem(storageKeys.showParticleCount)) {
+        window.localStorage.setItem(
+          storageKeys.showParticleCount,
+          String(showParticleCount),
+        );
+      }
+
+      if (!window.localStorage.getItem(storageKeys.terminatorMode)) {
+        window.localStorage.setItem(storageKeys.terminatorMode, String(terminatorMode));
+      }
+
+      if (gameConfig) {
+        if (clearStorage || !window.localStorage.getItem(storageKeys.gameConfig)) {
+          window.localStorage.setItem(storageKeys.gameConfig, JSON.stringify(gameConfig));
+        }
+      }
+    },
+    {
+      clearStorage,
+      deadlineDate,
+      deadlineFromDate,
+      excludePublicHolidays,
+      excludeWeekends,
+      frozenDateIso,
+      gameConfig,
+      showParticleCount,
+      storageKeys: STORAGE_KEYS,
+      terminatorMode,
+    },
+  );
+}
+
+export async function mockMetrics(page: Page, metrics: MetricsSource) {
+  await page.route("**/data/metrics.json**", async (route) => {
+    await route.fulfill({
+      body: JSON.stringify(metrics),
+      contentType: "application/json",
+      status: 200,
+    });
+  });
+}
+
+export async function enableCanvasQa(page: Page) {
+  await page.addInitScript(() => {
+    (window as Window & { __RTZ_QA__?: { enabled: boolean } }).__RTZ_QA__ = {
+      enabled: true,
+    };
+  });
+}
+
+export async function waitForQaBugPositions(page: Page) {
+  await page.waitForFunction(() => {
+    const qaState = (window as Window & {
+      __RTZ_QA__?: { bugPositions?: Array<unknown>; enabled?: boolean };
+    }).__RTZ_QA__;
+    return Boolean(qaState?.enabled && qaState.bugPositions?.length);
+  });
+}
+
+export async function getQaBugPositions(page: Page) {
+  return page.evaluate(() => {
+    const qaState = (window as Window & {
+      __RTZ_QA__?: {
+        bugPositions?: Array<{ index: number; radius: number; x: number; y: number }>;
+      };
+    }).__RTZ_QA__;
+    return qaState?.bugPositions ?? [];
+  });
+}
+
+export async function getQaLastHit(page: Page) {
+  return page.evaluate(() => {
+    const qaState = (window as Window & {
+      __RTZ_QA__?: {
+        lastHit?: {
+          defeated: boolean;
+          remainingHp: number;
+          variant: string;
+          x: number;
+          y: number;
+        };
+      };
+    }).__RTZ_QA__;
+    return qaState?.lastHit ?? null;
+  });
+}
+
+export function getStaticSiegeGameConfig(): GameConfig {
+  return {
+    ...DEFAULT_GAME_CONFIG,
+    baseSpeed: 0,
+    sizeMultiplier: 4,
+  };
+}
+
+export async function clickQaBug(page: Page, repeatCount = 1) {
+  const [bug] = await getQaBugPositions(page);
+  expect(bug, "expected at least one QA bug position").toBeTruthy();
+
+  const canvas = page.locator("canvas").first();
+  const canvasBox = await canvas.boundingBox();
+  expect(canvasBox, "expected bug canvas bounding box").toBeTruthy();
+
+  const position = {
+    x: bug.x - (canvasBox?.x ?? 0),
+    y: bug.y - (canvasBox?.y ?? 0),
+  };
+
+  for (let index = 0; index < repeatCount; index += 1) {
+    await canvas.click({ force: true, position });
+  }
+}
+
+export function createConsoleCollectors(page: Page) {
+  const consoleErrors: string[] = [];
+  const pageErrors: string[] = [];
+
+  page.on("console", (message) => {
+    if (message.type() === "error") {
+      consoleErrors.push(message.text());
+    }
+  });
+
+  page.on("pageerror", (error) => {
+    pageErrors.push(error.message);
+  });
+
+  return {
+    expectNoClientErrors: async () => {
+      expect(consoleErrors, "browser console errors").toEqual([]);
+      expect(pageErrors, "browser runtime errors").toEqual([]);
+    },
+  };
+}
+
+export function getMetricCard(page: Page, label: string) {
+  const slug = label.toLowerCase().replace(/[^a-z0-9]+/g, "-");
+  return page.locator(`[data-siege-panel="${slug}"]`).first();
+}
+
+export async function expectMetricValue(page: Page, label: string, expectedValue: string) {
+  await expect(getMetricCard(page, label)).toContainText(label);
+  await expect(getMetricCard(page, label).locator("strong")).toHaveText(expectedValue);
+}
+
+export async function gotoDashboard(page: Page) {
+  await page.setViewportSize({ height: 1200, width: 1440 });
+  await seedDashboardState(page);
+  await page.goto("./");
+  await expect(page.getByRole("heading", { level: 1, name: "Race to Zero Bugs" })).toBeVisible();
+  await expect(page.getByText("Delivery outlook")).toBeVisible();
+}
+
+export async function chooseCustomPeriod(page: Page) {
+  await page.getByRole("button", { name: "Custom" }).click();
+  const dateInputs = page.locator('input[type="date"]');
+  await dateInputs.nth(0).fill(QA_CUSTOM_FROM);
+  await dateInputs.nth(1).fill(QA_CUSTOM_TO);
+}
+
+export function getFrozenTodayLabel() {
+  return format(new Date(QA_TODAY_ISO), "yyyy-MM-dd");
+}

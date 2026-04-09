@@ -71,6 +71,97 @@ interface GameState {
   splats: Array<{ id: string; variant: BugVariant; x: number; y: number }>;
 }
 
+interface QaWindowState {
+  enabled?: boolean;
+  bugPositions?: Array<{ index: number; x: number; y: number; radius: number }>;
+  lastHit?: {
+    defeated: boolean;
+    remainingHp: number;
+    variant: BugVariant;
+    x: number;
+    y: number;
+  };
+}
+
+function updateQaBugPositions(
+  bugPositions: RenderedBugPosition[],
+  bounds: { left: number; top: number },
+) {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  const qaState = (window as Window & { __RTZ_QA__?: QaWindowState })
+    .__RTZ_QA__;
+  if (!qaState?.enabled) {
+    return;
+  }
+
+  qaState.bugPositions = bugPositions.map((position) => ({
+    index: position.index,
+    radius: position.radius,
+    x: position.x + bounds.left,
+    y: position.y + bounds.top,
+  }));
+}
+
+function syncQaBugPositionsFromEngine(
+  engine: { getAllBugs: () => Array<any> } | null,
+  bounds: { left: number; top: number },
+) {
+  if (!engine) {
+    return;
+  }
+
+  updateQaBugPositions(
+    engine.getAllBugs().map((bug, index) => ({
+      index,
+      radius: Math.max((bug.size ?? 12) * 0.7, 12),
+      x: bug.x,
+      y: bug.y,
+    })),
+    bounds,
+  );
+}
+
+function updateQaLastHit(payload: BugHitPayload) {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  const qaState = (window as Window & { __RTZ_QA__?: QaWindowState })
+    .__RTZ_QA__;
+  if (!qaState?.enabled) {
+    return;
+  }
+
+  qaState.lastHit = payload;
+}
+
+function stabilizeQaEngine(
+  engine: { getAllBugs: () => Array<any> } | null,
+  width: number,
+  height: number,
+) {
+  if (typeof window === "undefined" || !engine) {
+    return;
+  }
+
+  const qaState = (window as Window & { __RTZ_QA__?: QaWindowState })
+    .__RTZ_QA__;
+  if (!qaState?.enabled) {
+    return;
+  }
+
+  const bugs = engine.getAllBugs();
+  for (const bug of bugs) {
+    bug.x = width * 0.5;
+    bug.y = height * 0.5;
+    bug.vx = 0;
+    bug.vy = 0;
+  }
+}
+
 function getSplatClassName(variant: BugVariant) {
   if (variant === "urgent") {
     return "fixed z-[80] h-12 w-12 -translate-x-1/2 -translate-y-1/2 rounded-[36%] bg-[radial-gradient(circle_at_35%_35%,rgba(255,200,200,0.26),transparent_18%),radial-gradient(circle_at_center,rgba(185,28,28,0.95),rgba(120,14,14,0.28)_68%,transparent_74%)] [animation:bug-splat_520ms_ease-out_forwards] pointer-events-none";
@@ -213,6 +304,13 @@ const BugCanvas = memo(function BugCanvas({
           x: Math.round(candidate.x + boundsRef.current.left),
           y: Math.round(candidate.y + boundsRef.current.top),
         });
+        updateQaLastHit({
+          defeated: result.defeated,
+          remainingHp: result.remainingHp,
+          variant: result.variant,
+          x: Math.round(candidate.x + boundsRef.current.left),
+          y: Math.round(candidate.y + boundsRef.current.top),
+        });
       }
     },
     [getLocalSiegeZones],
@@ -262,7 +360,9 @@ const BugCanvas = memo(function BugCanvas({
         bugCounts as any,
         terminatorMode ? getLocalSiegeZones() : [],
       );
+      stabilizeQaEngine(engine, w, h);
       swarmRef.current = engine;
+      syncQaBugPositionsFromEngine(engine, boundsRef.current);
     }
     // if many bugs were seeded at (0,0) (canvas not measured yet), reseed
     const maybeBugs = swarmRef.current.getAllBugs() as Array<any>;
@@ -466,6 +566,8 @@ const BugCanvas = memo(function BugCanvas({
       if (swarmRef.current) {
         swarmRef.current.width = nextWidth;
         swarmRef.current.height = nextHeight;
+        stabilizeQaEngine(swarmRef.current, nextWidth, nextHeight);
+        syncQaBugPositionsFromEngine(swarmRef.current, boundsRef.current);
         const bugs = swarmRef.current.getAllBugs() as Array<any>;
         const clustered = bugs.filter((b: any) => b.x <= 1 && b.y <= 1).length;
         if (clustered > 0 && clustered / Math.max(1, bugs.length) > 0.2) {
@@ -626,6 +728,8 @@ const BugCanvas = memo(function BugCanvas({
         });
       }
 
+      updateQaBugPositions(latestBugPositionsRef.current, boundsRef.current);
+
       // one-time safety reseed: if many bugs still sit at 0,0, reseed and surface badge
       if (!reseedInfoRef.current && swarmRef.current) {
         const bugs = swarmRef.current.getAllBugs() as Array<any>;
@@ -744,6 +848,13 @@ const BugCanvas = memo(function BugCanvas({
               x: event.clientX,
               y: event.clientY,
             });
+            updateQaLastHit({
+              defeated: result.defeated,
+              remainingHp: result.remainingHp,
+              variant: result.variant,
+              x: event.clientX,
+              y: event.clientY,
+            });
             return;
           }
         }
@@ -761,6 +872,13 @@ const BugCanvas = memo(function BugCanvas({
         }
 
         onHitRef.current({
+          defeated,
+          remainingHp,
+          variant: particle.variant,
+          x: event.clientX,
+          y: event.clientY,
+        });
+        updateQaLastHit({
           defeated,
           remainingHp,
           variant: particle.variant,
@@ -816,7 +934,6 @@ interface BackgroundFieldProps {
   className?: string;
   combatStats?: SiegeCombatStats | null;
   interactiveSessionKey?: string | null;
-  milestoneFlash: { threshold: number; token: number } | null;
   onTerminatorHit?: (payload: BugHitPayload) => void;
   remainingBugCount?: number;
   showParticleCount: boolean;
@@ -834,7 +951,6 @@ const BackgroundField = memo(function BackgroundField({
   className = "",
   combatStats = null,
   interactiveSessionKey = null,
-  milestoneFlash,
   onTerminatorHit,
   remainingBugCount,
   showParticleCount,
@@ -1028,28 +1144,12 @@ const BackgroundField = memo(function BackgroundField({
       )}
       aria-hidden="true"
     >
-      <div
-        className="absolute left-[-10rem] top-[8rem] h-72 w-72 rounded-full blur-3xl"
-        style={{ backgroundColor: colors.orbA }}
-      />
-      <div
-        className="absolute right-[-8rem] top-[24rem] h-80 w-80 rounded-full blur-3xl"
-        style={{ backgroundColor: colors.orbB }}
-      />
-      <div
-        className="absolute bottom-[-8rem] left-[18%] h-72 w-72 rounded-full blur-3xl"
-        style={{ backgroundColor: colors.orbB }}
-      />
-
-      {milestoneFlash ? (
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(255,255,255,0.12),transparent_16%),radial-gradient(circle_at_center,rgba(56,189,248,0.18),transparent_42%),radial-gradient(circle_at_center,rgba(16,185,129,0.14),transparent_62%)] [animation:milestone-burst_1.8s_ease-out_forwards]" />
-      ) : null}
       {chartFocus ? (
         <div
           className="absolute inset-y-0 w-48 -translate-x-1/2 blur-3xl opacity-[0.22]"
           style={{
             left: `${(chartFocus.relativeIndex ?? 0.5) * 100}%`,
-            background: colors.orbA,
+            background: colors.bug,
           }}
         />
       ) : null}
