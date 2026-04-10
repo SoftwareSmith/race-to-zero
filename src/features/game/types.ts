@@ -8,6 +8,19 @@ export interface SiegeZoneRect {
 
 export type SiegeWeaponId = "hammer" | "laser" | "pulse";
 
+export type SiegePhase = "idle" | "entering" | "active" | "exiting";
+
+export interface WeaponEffectEvent {
+  id: string;
+  weapon: SiegeWeaponId;
+  /** Viewport x coordinate */
+  x: number;
+  /** Viewport y coordinate */
+  y: number;
+  /** performance.now() timestamp when fired */
+  startedAt: number;
+}
+
 export interface WeaponProgressSnapshot {
   current: boolean;
   detail: string;

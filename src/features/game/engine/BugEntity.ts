@@ -74,6 +74,7 @@ export class BugEntity extends Entity {
   wanderAngle: number;
   hp: number;
   maxHp: number;
+  lastHitTime: number;
   state: BugState;
   deathProgress: number;
   deathDuration: number;
@@ -90,6 +91,7 @@ export class BugEntity extends Entity {
     this.wanderAngle = Math.random() * Math.PI * 2;
     this.maxHp = 1;
     this.hp = this.maxHp;
+    this.lastHitTime = 0;
     this.state = "patrol";
     this.deathProgress = 0;
     this.deathDuration = 0.6;
@@ -329,6 +331,7 @@ export class BugEntity extends Entity {
       return { defeated: false, remainingHp: 0 };
     }
 
+    this.lastHitTime = performance.now();
     this.hp = Math.max(0, this.hp - damage);
     if (this.hp === 0) {
       this.state = "dying";
@@ -354,6 +357,7 @@ export class BugEntity extends Entity {
     this.vy = Math.sin(angle) * speed;
     this.heading = angle;
     this.hp = this.maxHp;
+    this.lastHitTime = 0;
     this.state = "patrol";
     this.deathProgress = 0;
     this.fleeTimer = null;

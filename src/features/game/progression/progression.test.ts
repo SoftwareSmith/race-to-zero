@@ -15,7 +15,7 @@ describe("siege progression", () => {
 
   it("unlocks pulse before laser", () => {
     const stats = getSiegeCombatStats(18);
-    const snapshots = getSiegeWeaponSnapshots(18);
+    const snapshots = getSiegeWeaponSnapshots(18, "pulse");
 
     expect(stats.pulseUnlocked).toBe(true);
     expect(stats.laserUnlocked).toBe(false);

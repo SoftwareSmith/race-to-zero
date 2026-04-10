@@ -1,5 +1,6 @@
 import type {
   SiegeCombatStats,
+  SiegeWeaponId,
   WeaponProgressSnapshot,
 } from "@game/types";
 import { WEAPON_DEFS, WEAPON_UNLOCK_THRESHOLDS } from "@config/weaponConfig";
@@ -28,16 +29,12 @@ export function getSiegeCombatStats(totalFixed: number): SiegeCombatStats {
 
 export function getSiegeWeaponSnapshots(
   totalFixed: number,
+  selectedId: SiegeWeaponId,
 ): WeaponProgressSnapshot[] {
   const stats = getSiegeCombatStats(totalFixed);
   const unlockedMap: Record<string, boolean> = {
     hammer: true,
     pulse: stats.pulseUnlocked,
-    laser: stats.laserUnlocked,
-  };
-  const currentMap: Record<string, boolean> = {
-    hammer: !stats.pulseUnlocked,
-    pulse: stats.pulseUnlocked && !stats.laserUnlocked,
     laser: stats.laserUnlocked,
   };
 
@@ -48,7 +45,7 @@ export function getSiegeWeaponSnapshots(
       id: weapon.id,
       title: weapon.title,
       locked: !unlocked,
-      current: currentMap[weapon.id] ?? false,
+      current: weapon.id === selectedId,
       detail: weapon.detail,
       progressText:
         weapon.unlockKills === 0

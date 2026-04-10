@@ -1,21 +1,22 @@
 import Tooltip from "@shared/components/Tooltip";
 import WeaponGlyph from "@shared/components/icons/WeaponGlyph";
-import type { WeaponProgressSnapshot } from "@game/types";
+import type { SiegeWeaponId, WeaponProgressSnapshot } from "@game/types";
 
 interface SiegeHudProps {
   className?: string;
   interactiveKills: number;
   interactiveRemainingBugs: number;
   onExit: () => void;
+  onSelectWeapon: (id: SiegeWeaponId) => void;
+  selectedWeaponId: SiegeWeaponId;
   weaponSnapshots: WeaponProgressSnapshot[];
 }
 
-function getWeaponButtonClassName(snapshot?: WeaponProgressSnapshot) {
-  if (!snapshot) {
-    return "inline-flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-stone-200";
-  }
-
-  if (snapshot.current) {
+function getWeaponButtonClassName(
+  snapshot: WeaponProgressSnapshot,
+  isSelected: boolean,
+) {
+  if (isSelected) {
     return "inline-flex h-9 w-9 items-center justify-center rounded-xl border border-sky-300/40 bg-sky-400/16 text-sky-50 shadow-[0_0_20px_rgba(56,189,248,0.18)]";
   }
 
@@ -23,7 +24,7 @@ function getWeaponButtonClassName(snapshot?: WeaponProgressSnapshot) {
     return "inline-flex h-9 w-9 items-center justify-center rounded-xl border border-white/6 bg-white/4 text-stone-500 opacity-65";
   }
 
-  return "inline-flex h-9 w-9 items-center justify-center rounded-xl border border-emerald-400/20 bg-emerald-500/8 text-emerald-100";
+  return "inline-flex h-9 w-9 items-center justify-center rounded-xl border border-emerald-400/20 bg-emerald-500/8 text-emerald-100 transition-colors duration-150 hover:border-sky-400/30 hover:bg-sky-500/10 hover:text-sky-100";
 }
 
 export default function SiegeHud({
@@ -31,6 +32,8 @@ export default function SiegeHud({
   interactiveKills,
   interactiveRemainingBugs,
   onExit,
+  onSelectWeapon,
+  selectedWeaponId,
   weaponSnapshots,
 }: SiegeHudProps) {
   return (
@@ -72,25 +75,53 @@ export default function SiegeHud({
           <div className="mb-2 px-0.5 text-[0.55rem] font-semibold uppercase tracking-[0.16em] text-stone-500">
             Weapons
           </div>
-          <div data-no-hammer className="flex flex-wrap items-center gap-2">
-            {weaponSnapshots.map((snapshot) => (
-              <Tooltip
-                key={snapshot.id}
-                content={`${snapshot.title}: ${snapshot.progressText}`}
-              >
-                <div
-                  aria-label={`${snapshot.title} weapon status`}
-                  data-current={snapshot.current ? "true" : "false"}
-                  data-locked={snapshot.locked ? "true" : "false"}
-                  data-testid={`weapon-${snapshot.id}`}
-                  className="rounded-[14px] border border-white/8 bg-black/18 p-1.5 text-sm text-stone-200"
+          <div
+            data-no-hammer
+            className="flex flex-wrap items-center gap-2"
+            role="radiogroup"
+            aria-label="Select weapon"
+          >
+            {weaponSnapshots.map((snapshot) => {
+              const isSelected = snapshot.id === selectedWeaponId;
+              return (
+                <Tooltip
+                  key={snapshot.id}
+                  content={`${snapshot.title}: ${snapshot.progressText}`}
                 >
-                  <div className={getWeaponButtonClassName(snapshot)}>
-                    <WeaponGlyph className="h-5 w-5" id={snapshot.id} />
+                  <div
+                    className="rounded-[14px] border border-white/8 bg-black/18 p-1.5 text-sm text-stone-200"
+                    data-current={isSelected ? "true" : "false"}
+                    data-locked={snapshot.locked ? "true" : "false"}
+                    data-testid={`weapon-${snapshot.id}`}
+                  >
+                    {snapshot.locked ? (
+                      <div
+                        aria-label={`${snapshot.title} weapon (locked)`}
+                        aria-checked={false}
+                        role="radio"
+                        className={getWeaponButtonClassName(snapshot, false)}
+                      >
+                        <WeaponGlyph className="h-5 w-5" id={snapshot.id} />
+                      </div>
+                    ) : (
+                      <button
+                        aria-label={`Select ${snapshot.title} weapon`}
+                        aria-checked={isSelected}
+                        role="radio"
+                        type="button"
+                        className={getWeaponButtonClassName(
+                          snapshot,
+                          isSelected,
+                        )}
+                        onClick={() => onSelectWeapon(snapshot.id)}
+                      >
+                        <WeaponGlyph className="h-5 w-5" id={snapshot.id} />
+                      </button>
+                    )}
                   </div>
-                </div>
-              </Tooltip>
-            ))}
+                </Tooltip>
+              );
+            })}
           </div>
         </div>
       </div>

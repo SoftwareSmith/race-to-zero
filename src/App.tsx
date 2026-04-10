@@ -79,6 +79,9 @@ function AppContent() {
             ? siegeGame.interactiveRemainingBugs
             : undefined
         }
+        selectedWeaponId={
+          siegeGame.interactiveMode ? siegeGame.selectedWeaponId : undefined
+        }
         showParticleCount={
           siegeGame.interactiveMode ? false : dashboard.showParticleCount
         }
@@ -87,6 +90,9 @@ function AppContent() {
         terminatorMode={siegeGame.interactiveMode || dashboard.terminatorMode}
         tone={dashboard.deadlineMetrics.statusTone}
       />
+      {siegeGame.siegePhase === "entering" ? (
+        <div className="pointer-events-none fixed inset-0 z-[100] [animation:siege-flash_700ms_ease-out_forwards]" />
+      ) : null}
 
       <div
         ref={dashboardRef}
@@ -120,6 +126,8 @@ function AppContent() {
                 interactiveKills={siegeGame.interactiveKills}
                 interactiveRemainingBugs={siegeGame.interactiveRemainingBugs}
                 onExit={handleExitInteractiveMode}
+                onSelectWeapon={siegeGame.selectWeapon}
+                selectedWeaponId={siegeGame.selectedWeaponId}
                 weaponSnapshots={siegeGame.weaponSnapshots}
               />
             ) : (

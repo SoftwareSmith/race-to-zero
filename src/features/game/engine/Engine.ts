@@ -151,6 +151,58 @@ export class Engine {
     return best;
   }
 
+  /**
+   * Returns indexes of all active entities whose bounding circle intersects
+   * the line segment from (x1,y1) to (x2,y2). Used by the laser weapon.
+   * @param hitRadius - extra tolerance added to each entity's size radius
+   */
+  lineHitTest(x1: number, y1: number, x2: number, y2: number, hitRadius = 12): number[] {
+    const result: number[] = [];
+    const dx = x2 - x1;
+    const dy = y2 - y1;
+    const lenSq = dx * dx + dy * dy;
+
+    for (let i = 0; i < this.entities.length; i++) {
+      const e = this.entities[i] as any;
+      if (e.state === "dead" || e.state === "dying") continue;
+
+      // Closest point on segment to entity center
+      let t = 0;
+      if (lenSq > 0) {
+        t = Math.max(0, Math.min(1, ((e.x - x1) * dx + (e.y - y1) * dy) / lenSq));
+      }
+      const closestX = x1 + t * dx;
+      const closestY = y1 + t * dy;
+      const dist = Math.hypot(e.x - closestX, e.y - closestY);
+
+      if (dist <= Math.max((e.size ?? 12) * 0.5, 8) + hitRadius) {
+        result.push(i);
+      }
+    }
+
+    return result;
+  }
+
+  /**
+   * Returns indexes of all active entities within the given radius from (cx, cy).
+   * Used by the pulse weapon.
+   */
+  radiusHitTest(cx: number, cy: number, radius: number): number[] {
+    const result: number[] = [];
+
+    for (let i = 0; i < this.entities.length; i++) {
+      const e = this.entities[i] as any;
+      if (e.state === "dead" || e.state === "dying") continue;
+
+      const dist = Math.hypot(e.x - cx, e.y - cy);
+      if (dist <= radius + Math.max((e.size ?? 12) * 0.5, 8)) {
+        result.push(i);
+      }
+    }
+
+    return result;
+  }
+
   addEntity(e: Entity) {
     this.entities.push(e);
   }
