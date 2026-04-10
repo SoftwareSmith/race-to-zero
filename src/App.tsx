@@ -1,24 +1,27 @@
 import { useCallback, useRef } from "react";
-import BackgroundField from "./components/BackgroundField";
-import BugSettingsMenu from "./components/BugSettingsMenu";
-import CodexPanel from "./components/CodexPanel";
-import CommandCenter from "./components/CommandCenter";
-import SettingsMenu from "./components/SettingsMenu";
-import TopNav from "./components/TopNav";
-import Tooltip from "./components/Tooltip";
+import BackgroundField from "@game/components/BackgroundField";
+import BugSettingsMenu from "@dashboard/components/BugSettingsMenu";
+import CodexPanel from "@game/components/CodexPanel";
+import CommandCenter from "@dashboard/components/CommandCenter";
+import SettingsMenu from "@dashboard/components/SettingsMenu";
+import TopNav from "@dashboard/components/TopNav";
+import Tooltip from "@shared/components/Tooltip";
 import {
   OverviewView,
   PeriodsView,
   StatusBanner,
 } from "./features/dashboard/DashboardViews";
-import { useDashboardController } from "./features/dashboard/useDashboardController";
-import SiegeHud from "./features/background-game/SiegeHud";
-import { useSiegeGame } from "./features/background-game/useSiegeGame";
-import { useSiegeZones } from "./features/background-game/useSiegeZones";
-import { cn } from "./utils/cn";
+import {
+  DashboardProvider,
+  useDashboardContext,
+} from "./features/dashboard/context/DashboardContext";
+import SiegeHud from "@game/components/SiegeHud";
+import { useSiegeGame } from "@game/hooks/useSiegeGame";
+import { useSiegeZones } from "@game/hooks/useSiegeZones";
+import { cn } from "@shared/utils/cn";
 
-function App() {
-  const dashboard = useDashboardController();
+function AppContent() {
+  const dashboard = useDashboardContext();
   const siegeGame = useSiegeGame({
     currentBugCount: dashboard.currentBugCount,
     currentBugCounts: dashboard.currentBugCounts,
@@ -230,4 +233,10 @@ function App() {
   );
 }
 
-export default App;
+export default function App() {
+  return (
+    <DashboardProvider>
+      <AppContent />
+    </DashboardProvider>
+  );
+}

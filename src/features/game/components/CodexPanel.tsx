@@ -1,22 +1,24 @@
 import type { CSSProperties, RefObject } from "react";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { MenuIconButton } from "./MenuControls";
-import { getCodex } from "../engine/bugCodex";
+import { MenuIconButton } from "@shared/components/MenuControls";
+import { getCodex } from "@game/engine/bugCodex";
 import type {
   BugType,
   BugWeaponId,
   BugWeaponMatchup,
   BugWeaponMatchupState,
-} from "../engine/bugCodex";
+} from "@game/engine/bugCodex";
 import {
   BUG_VARIANT_CONFIG,
   getBugVariantColor,
   getBugVariantMaxHp,
-} from "../constants/bugs";
-import type { BugVariant } from "../types/dashboard";
-import { getColoredSvgUrl } from "../utils/bugSprite";
-import { cn } from "../utils/cn";
-import WeaponGlyph from "./WeaponGlyph";
+} from "../../../constants/bugs";
+import type { BugVariant } from "../../../types/dashboard";
+import { getColoredSvgUrl } from "@game/utils/bugSprite";
+import { cn } from "@shared/utils/cn";
+import WeaponGlyph from "@shared/components/icons/WeaponGlyph";
+import Tooltip from "@shared/components/Tooltip";
+import MetricInfoCard from "@dashboard/components/MetricInfoCard";
 
 interface CodexPanelProps {
   containerRef: RefObject<HTMLDivElement | null>;
@@ -76,10 +78,10 @@ function getPresenceLabel(presence: number) {
   return "Low presence";
 }
 
-function getWeaponStateLabel(state: BugWeaponMatchupState) {
-  if (state === "favored") return "Best Tool";
-  if (state === "risky") return "Watch Out";
-  return "Usable";
+function getWeaponEffectiveness(state: BugWeaponMatchupState) {
+  if (state === "favored") return 88;
+  if (state === "risky") return 28;
+  return 58;
 }
 
 function getWeaponStateClasses(state: BugWeaponMatchupState) {
@@ -88,6 +90,8 @@ function getWeaponStateClasses(state: BugWeaponMatchupState) {
       badge: "border-emerald-400/24 bg-emerald-500/12 text-emerald-100",
       panel: "border-emerald-400/16 bg-emerald-500/8",
       tile: "border-emerald-300/16 bg-emerald-400/10 text-emerald-50",
+      fill: "bg-emerald-500/90",
+      glow: "0 0 18px rgba(52,211,153,0.45)",
     };
   }
 
@@ -96,6 +100,8 @@ function getWeaponStateClasses(state: BugWeaponMatchupState) {
       badge: "border-amber-400/24 bg-amber-500/12 text-amber-100",
       panel: "border-amber-400/16 bg-amber-500/8",
       tile: "border-amber-300/16 bg-amber-400/10 text-amber-50",
+      fill: "bg-amber-500/90",
+      glow: "0 0 18px rgba(251,191,36,0.4)",
     };
   }
 
@@ -103,22 +109,52 @@ function getWeaponStateClasses(state: BugWeaponMatchupState) {
     badge: "border-sky-400/18 bg-sky-500/10 text-sky-100",
     panel: "border-white/8 bg-white/[0.03]",
     tile: "border-white/8 bg-white/[0.04] text-stone-100",
+    fill: "bg-sky-400/90",
+    glow: "0 0 16px rgba(56,189,248,0.38)",
   };
 }
 
 type VariantAccent = ReturnType<typeof getVariantAccent>;
 
 function getVariantAccent(variant: BugVariant) {
+  function hexToRgb(hex: string) {
+    const cleaned = hex.replace("#", "");
+    const bigint = parseInt(cleaned, 16);
+    const r = (bigint >> 16) & 255;
+    const g = (bigint >> 8) & 255;
+    const b = bigint & 255;
+    return `${r},${g},${b}`;
+  }
+
+  // Explicit hex mapping per visual variant to ensure the progress gradient
+  // matches the accent colors (avoid using BUG_VARIANT_CONFIG which may
+  // contain sprite/base colors that aren't the UI accent colors).
+  const VARIANT_HEX: Record<BugVariant, string> = {
+    low: "#10b981", // emerald-500
+    medium: "#f59e0b", // amber-500
+    high: "#ef4444", // red-500
+    urgent: "#a78bfa", // violet-400/500
+  };
+
+  const baseRgb = hexToRgb(VARIANT_HEX[variant]);
+  const fullGradient = `linear-gradient(90deg, rgba(${baseRgb},1) 0%, rgba(${baseRgb},0) 100%)`;
   if (variant === "urgent") {
     return {
       badgeClass:
         "border-violet-400/30 bg-violet-500/14 text-violet-100 shadow-[0_0_22px_rgba(167,139,250,0.18)]",
+      iconBorderClass: "border-violet-400/30",
+      metricValueClass:
+        "border-violet-400/36 bg-violet-500/36 text-violet-100 shadow-[0_0_20px_rgba(167,139,250,0.18)]",
+      metricFillClass: "bg-violet-500",
+      metricGlow: "0 0 32px rgba(167,139,250,0.52)",
+      metricGlowStrong: "0 0 44px rgba(167,139,250,0.68)",
       behaviorClass: "border-fuchsia-400/20 bg-fuchsia-500/10 text-fuchsia-100",
       cardClass: "from-violet-500/12 via-fuchsia-500/6 to-black/20",
       iconHalo: "rgba(167,139,250,0.34)",
       iconPanel: "from-violet-500/18 via-fuchsia-500/8 to-red-500/12",
-      washA: "rgba(139,92,246,0.09)",
-      washB: "rgba(244,63,94,0.06)",
+      washA: "rgba(167,139,250,0.18)",
+      washB: "rgba(244,63,94,0.14)",
+      metricFillGradient: fullGradient,
     };
   }
 
@@ -126,12 +162,19 @@ function getVariantAccent(variant: BugVariant) {
     return {
       badgeClass:
         "border-red-400/28 bg-red-500/14 text-red-100 shadow-[0_0_22px_rgba(248,113,113,0.16)]",
+      iconBorderClass: "border-red-400/28",
+      metricValueClass:
+        "border-red-400/36 bg-red-500/36 text-red-100 shadow-[0_0_20px_rgba(248,113,113,0.18)]",
+      metricFillClass: "bg-red-500",
+      metricGlow: "0 0 32px rgba(248,113,113,0.52)",
+      metricGlowStrong: "0 0 44px rgba(248,113,113,0.68)",
       behaviorClass: "border-orange-400/20 bg-orange-500/10 text-orange-100",
       cardClass: "from-red-500/12 via-orange-500/6 to-black/20",
       iconHalo: "rgba(248,113,113,0.28)",
       iconPanel: "from-red-500/18 via-orange-500/8 to-sky-400/10",
-      washA: "rgba(248,113,113,0.08)",
-      washB: "rgba(251,146,60,0.05)",
+      washA: "rgba(248,113,113,0.16)",
+      washB: "rgba(251,146,60,0.12)",
+      metricFillGradient: fullGradient,
     };
   }
 
@@ -139,24 +182,38 @@ function getVariantAccent(variant: BugVariant) {
     return {
       badgeClass:
         "border-amber-400/28 bg-amber-500/12 text-amber-100 shadow-[0_0_22px_rgba(251,191,36,0.15)]",
+      iconBorderClass: "border-amber-400/28",
+      metricValueClass:
+        "border-amber-400/36 bg-amber-500/36 text-amber-100 shadow-[0_0_20px_rgba(251,191,36,0.18)]",
+      metricFillClass: "bg-amber-500",
+      metricGlow: "0 0 30px rgba(251,191,36,0.5)",
+      metricGlowStrong: "0 0 42px rgba(251,191,36,0.64)",
       behaviorClass: "border-orange-300/18 bg-orange-400/10 text-orange-100",
       cardClass: "from-amber-500/12 via-orange-500/6 to-black/20",
       iconHalo: "rgba(251,191,36,0.22)",
       iconPanel: "from-amber-500/16 via-orange-500/8 to-sky-400/10",
-      washA: "rgba(251,191,36,0.07)",
-      washB: "rgba(249,115,22,0.04)",
+      washA: "rgba(251,191,36,0.16)",
+      washB: "rgba(249,115,22,0.10)",
+      metricFillGradient: fullGradient,
     };
   }
 
   return {
     badgeClass:
       "border-emerald-400/22 bg-emerald-500/10 text-emerald-100 shadow-[0_0_18px_rgba(16,185,129,0.12)]",
+    iconBorderClass: "border-emerald-400/22",
+    metricValueClass:
+      "border-emerald-400/32 bg-emerald-500/32 text-emerald-100 shadow-[0_0_18px_rgba(16,185,129,0.16)]",
+    metricFillClass: "bg-emerald-500",
+    metricGlow: "0 0 30px rgba(45,212,191,0.5)",
+    metricGlowStrong: "0 0 42px rgba(45,212,191,0.66)",
     behaviorClass: "border-sky-400/16 bg-sky-500/8 text-sky-100",
     cardClass: "from-emerald-500/12 via-cyan-500/6 to-black/20",
     iconHalo: "rgba(45,212,191,0.18)",
     iconPanel: "from-emerald-500/14 via-cyan-500/6 to-white/8",
-    washA: "rgba(45,212,191,0.06)",
-    washB: "rgba(56,189,248,0.04)",
+    washA: "rgba(45,212,191,0.14)",
+    washB: "rgba(56,189,248,0.10)",
+    metricFillGradient: fullGradient,
   };
 }
 
@@ -209,38 +266,6 @@ function SectionHeading({
   );
 }
 
-function SignalMeter({
-  label,
-  subLabel,
-  toneClass,
-  value,
-}: {
-  label: string;
-  subLabel?: string;
-  toneClass: string;
-  value: number;
-}) {
-  return (
-    <div>
-      <div className="mb-1.5 flex items-center justify-between text-[0.62rem] font-semibold uppercase tracking-[0.16em] text-stone-500">
-        <span>{label}</span>
-        <span>{Math.round(value)}%</span>
-      </div>
-      {subLabel ? (
-        <div className="text-[0.62rem] font-semibold uppercase tracking-[0.16em] text-stone-400 mb-1.5">
-          {subLabel}
-        </div>
-      ) : null}
-      <div className="h-2 overflow-hidden rounded-full bg-white/6">
-        <div
-          className={cn("h-full rounded-full", toneClass)}
-          style={{ width: `${value}%` }}
-        />
-      </div>
-    </div>
-  );
-}
-
 function CompactReadoutCard({
   accent,
   metricLabel,
@@ -253,60 +278,57 @@ function CompactReadoutCard({
   signalValue: number;
 }) {
   return (
-    <div className="rounded-[20px] border border-white/8 bg-black/18 p-4 shadow-[0_10px_24px_rgba(0,0,0,0.18)]">
-      <div className="p-2">
-        <SignalMeter
-          label={signalLabel}
-          subLabel={metricLabel}
-          toneClass={accent.badgeClass}
-          value={signalValue}
-        />
-      </div>
-    </div>
+    <MetricInfoCard
+      label={signalLabel}
+      subLabel={metricLabel}
+      value={signalValue}
+      progressClassName={accent.metricFillClass}
+      progressGlow={accent.metricGlowStrong}
+      progressStyle={{
+        background: accent.metricFillGradient,
+      }}
+      valueClassName={accent.metricValueClass}
+      valueAccentClass={accent.metricValueClass}
+      className="min-h-[5.9rem]"
+    />
   );
 }
 
-function WeaponIntelCard({
+function WeaponEffectivenessRow({
   matchup,
   weaponId,
+  accent,
 }: {
   matchup: BugWeaponMatchup;
   weaponId: BugWeaponId;
+  accent: VariantAccent;
 }) {
   const tone = getWeaponStateClasses(matchup.state);
+  const effectiveness = getWeaponEffectiveness(matchup.state);
 
   return (
-    <div className={cn("rounded-[18px] border p-3", tone.panel)}>
-      <div className="flex items-center justify-between gap-3">
-        <div className="flex min-w-0 items-center gap-3">
-          <div
-            className={cn(
-              "flex h-10 w-10 shrink-0 items-center justify-center rounded-[12px] border",
-              tone.tile,
-            )}
-          >
-            <WeaponGlyph className="h-5 w-5" id={weaponId} />
-          </div>
-          <div className="min-w-0">
-            <div className="text-sm font-semibold capitalize text-stone-100">
-              {weaponId}
-            </div>
-            <div className="text-[0.62rem] font-semibold uppercase tracking-[0.16em] text-stone-500">
-              {getWeaponStateLabel(matchup.state)}
-            </div>
-          </div>
-        </div>
-        <span
-          className={cn(
-            "inline-flex rounded-full border px-2 py-1 text-[0.6rem] font-semibold uppercase tracking-[0.16em]",
-            tone.badge,
-          )}
-        >
-          {getWeaponStateLabel(matchup.state)}
-        </span>
-      </div>
-      <p className="mt-2 text-xs leading-5 text-stone-400">{matchup.note}</p>
-    </div>
+    <Tooltip
+      content={
+        <p className="text-sm leading-6 text-stone-200">{matchup.note}</p>
+      }
+      triggerClassName="block w-full"
+    >
+      <MetricInfoCard
+        icon={<WeaponGlyph className="h-5 w-5" id={weaponId} />}
+        iconClassName={cn(tone.tile)}
+        label={weaponId}
+        value={effectiveness}
+        progressClassName={tone.fill}
+        progressGlow={accent.metricGlowStrong}
+        progressStyle={{
+          background: accent.metricFillGradient,
+        }}
+        isHighlighted={matchup.state === "favored"}
+        valueClassName={accent.metricValueClass}
+        valueAccentClass={accent.metricValueClass}
+        className={cn("min-h-[5.9rem]", tone.panel)}
+      />
+    </Tooltip>
   );
 }
 
@@ -368,112 +390,30 @@ function DossierStats({
   );
 }
 
-function FieldNotes({ activeEntry }: { activeEntry: BugType }) {
-  const bestTools = (
-    Object.entries(activeEntry.weaponMatchups) as Array<
-      [BugWeaponId, BugWeaponMatchup]
-    >
-  ).filter(([, matchup]) => matchup.state === "favored");
-  const riskyTools = (
-    Object.entries(activeEntry.weaponMatchups) as Array<
-      [BugWeaponId, BugWeaponMatchup]
-    >
-  ).filter(([, matchup]) => matchup.state === "risky");
-  const workableTools = (
-    Object.entries(activeEntry.weaponMatchups) as Array<
-      [BugWeaponId, BugWeaponMatchup]
-    >
-  ).filter(([, matchup]) => matchup.state === "steady");
-
+function FieldNotes({
+  activeEntry,
+  accent,
+}: {
+  activeEntry: BugType;
+  accent: VariantAccent;
+}) {
   return (
-    <div className="space-y-4 rounded-[24px] border border-white/8 bg-black/18 p-4 shadow-[0_16px_34px_rgba(0,0,0,0.24)]">
-      <SectionHeading
-        eyebrow="Field Notes"
-        title="Matchup Notes"
-        subtitle="Quick tells for where pressure shows up and what loadout wins tempo."
-      />
+    <div className="space-y-2 p-2">
+      <SectionHeading eyebrow="Field Notes" title="Strengths + Weaknesses" />
 
-      <div className="grid gap-3 lg:grid-cols-[0.9fr_1.1fr]">
-        <div className="space-y-3 rounded-[22px] border border-white/8 bg-white/[0.03] p-4">
-          <SectionEyebrow>Board Story</SectionEyebrow>
-          <div className="grid gap-2">
-            <div className="rounded-[16px] border border-white/8 bg-black/16 px-3 py-2.5">
-              <div className="text-[0.58rem] font-semibold uppercase tracking-[0.16em] text-stone-500">
-                Pressure
-              </div>
-              <p className="mt-1 text-sm leading-5 text-stone-200">
-                {activeEntry.dossier.pressure}
-              </p>
-            </div>
-            <div className="rounded-[16px] border border-white/8 bg-black/16 px-3 py-2.5">
-              <div className="text-[0.58rem] font-semibold uppercase tracking-[0.16em] text-stone-500">
-                Strength
-              </div>
-              <p className="mt-1 text-sm leading-5 text-stone-200">
-                {activeEntry.dossier.strength}
-              </p>
-            </div>
-            <div className="rounded-[16px] border border-white/8 bg-black/16 px-3 py-2.5">
-              <div className="text-[0.58rem] font-semibold uppercase tracking-[0.16em] text-stone-500">
-                Opening
-              </div>
-              <p className="mt-1 text-sm leading-5 text-stone-200">
-                {activeEntry.dossier.weakness}
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <div className="space-y-3 rounded-[22px] border border-white/8 bg-white/[0.03] p-4">
-          <SectionEyebrow>Loadout</SectionEyebrow>
-          <div className="grid gap-3 sm:grid-cols-3">
-            {(
-              Object.entries(activeEntry.weaponMatchups) as Array<
-                [BugWeaponId, BugWeaponMatchup]
-              >
-            ).map(([weaponId, matchup]) => (
-              <WeaponIntelCard
-                key={weaponId}
-                matchup={matchup}
-                weaponId={weaponId}
-              />
-            ))}
-          </div>
-
-          {bestTools.length > 0 ||
-          riskyTools.length > 0 ||
-          workableTools.length > 0 ? (
-            <div className="flex flex-wrap gap-2 pt-1">
-              {bestTools.map(([weaponId]) => (
-                <span
-                  key={`best-${weaponId}`}
-                  className="inline-flex items-center gap-2 rounded-full border border-emerald-400/20 bg-emerald-500/10 px-3 py-1.5 text-xs font-semibold text-emerald-100"
-                >
-                  <WeaponGlyph className="h-4 w-4" id={weaponId} />
-                  <span className="capitalize">{weaponId} strong</span>
-                </span>
-              ))}
-              {riskyTools.map(([weaponId]) => (
-                <span
-                  key={`risk-${weaponId}`}
-                  className="inline-flex items-center gap-2 rounded-full border border-amber-400/20 bg-amber-500/10 px-3 py-1.5 text-xs font-semibold text-amber-100"
-                >
-                  <WeaponGlyph className="h-4 w-4" id={weaponId} />
-                  <span className="capitalize">{weaponId} risky</span>
-                </span>
-              ))}
-              {workableTools.map(([weaponId]) => (
-                <span
-                  key={`steady-${weaponId}`}
-                  className="inline-flex items-center gap-2 rounded-full border border-white/8 bg-white/[0.04] px-3 py-1.5 text-xs font-semibold text-stone-200"
-                >
-                  <WeaponGlyph className="h-4 w-4" id={weaponId} />
-                  <span className="capitalize">{weaponId} okay</span>
-                </span>
-              ))}
-            </div>
-          ) : null}
-        </div>
+      <div className="grid gap-3 sm:grid-cols-2">
+        {(
+          Object.entries(activeEntry.weaponMatchups) as Array<
+            [BugWeaponId, BugWeaponMatchup]
+          >
+        ).map(([weaponId, matchup]) => (
+          <WeaponEffectivenessRow
+            key={weaponId}
+            matchup={matchup}
+            weaponId={weaponId}
+            accent={accent}
+          />
+        ))}
       </div>
     </div>
   );
@@ -516,10 +456,9 @@ function SummaryCard({
           <div className="flex min-w-0 items-center gap-3">
             <div
               className={cn(
-                "flex h-14 w-14 shrink-0 items-center justify-center rounded-[18px] border border-white/10 bg-gradient-to-br p-3 shadow-[0_0_24px_rgba(0,0,0,0.18)]",
+                "flex h-14 w-14 shrink-0 items-center justify-center rounded-[18px] border border-white/20 bg-gradient-to-br p-3 shadow-[0_0_24px_rgba(0,0,0,0.18)]",
                 accent.iconPanel,
               )}
-              style={{ boxShadow: `0 0 28px ${accent.iconHalo}` }}
             >
               <img
                 alt=""
@@ -676,12 +615,10 @@ export default function CodexPanel({
                         <div className="flex min-w-0 items-center gap-3">
                           <div
                             className={cn(
-                              "flex h-14 w-14 shrink-0 items-center justify-center rounded-[14px] border border-white/10 bg-gradient-to-br p-3",
+                              "flex h-14 w-14 shrink-0 items-center justify-center rounded-[18px] border bg-gradient-to-br p-3 shadow-[0_0_24px_rgba(0,0,0,0.18)]",
                               selectedAccent.iconPanel,
+                              selectedAccent.iconBorderClass,
                             )}
-                            style={{
-                              boxShadow: `0 0 28px ${selectedAccent.iconHalo}`,
-                            }}
                           >
                             <img
                               alt=""
@@ -716,9 +653,9 @@ export default function CodexPanel({
                     </>
                   ) : (
                     <>
-                      <SectionEyebrow>Bug Codex</SectionEyebrow>
+                      {/* eyebrow intentionally hidden on list view */}
                       <h2 className="mt-1 text-[1.55rem] font-semibold tracking-[-0.04em] text-stone-50">
-                        {selectedEntry ? selectedEntry.name : "Bug Index"}
+                        {selectedEntry ? selectedEntry.name : "Bug Codex"}
                       </h2>
                       <p className="mt-2 max-w-[40rem] text-sm leading-6 text-stone-300">
                         {selectedEntry
@@ -750,7 +687,7 @@ export default function CodexPanel({
               </div>
 
               {selectedEntry && selectedVariant ? (
-                <div className="flex-1 overflow-hidden px-5 py-4">
+                <div className="flex-1 overflow-hidden px-5 py-4 mb-6">
                   <div className="mx-auto flex h-full w-full max-w-[46rem] flex-col gap-4">
                     <DossierStats
                       accent={selectedAccent}
@@ -758,7 +695,10 @@ export default function CodexPanel({
                       activeMaxHp={selectedMaxHp}
                       activeVariantConfig={selectedVariantConfig}
                     />
-                    <FieldNotes activeEntry={selectedEntry} />
+                    <FieldNotes
+                      activeEntry={selectedEntry}
+                      accent={selectedAccent}
+                    />
                   </div>
                 </div>
               ) : (

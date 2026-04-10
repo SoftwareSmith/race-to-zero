@@ -4,71 +4,17 @@ import type {
   PriorityDistributionEntry,
 } from "../types/dashboard";
 
+// BugVariantConfig, BUG_VARIANT_CONFIG, and visual accessors now live in
+// src/config/bugVariants.ts.  Re-exported here so existing callers are
+// unaffected without importing from two places.
+export type { BugVariantConfig } from "@config/bugVariants";
+export {
+  BUG_VARIANT_CONFIG,
+  getBugVariantColor,
+  getBugVariantMaxHp,
+} from "@config/bugVariants";
+
 export const BUG_VARIANTS = ["low", "medium", "high", "urgent"] as const;
-
-export interface BugVariantConfig {
-  baseColor: string;
-  baseScale: number;
-  bobAmplitude: number;
-  bobFrequency: number;
-  darken: number;
-  defaultOpacity: number;
-  maxHp: number;
-  sizeBoost: number;
-  swayAmplitude: number;
-  swayFrequency: number;
-}
-
-export const BUG_VARIANT_CONFIG: Record<BugVariant, BugVariantConfig> = {
-  low: {
-    baseColor: "#7c7c7c",
-    baseScale: 0.8,
-    bobAmplitude: 8,
-    bobFrequency: 6,
-    darken: 0.6,
-    defaultOpacity: 0.6,
-    maxHp: 1,
-    sizeBoost: 0,
-    swayAmplitude: 7,
-    swayFrequency: 5.6,
-  },
-  medium: {
-    baseColor: "#c86428",
-    baseScale: 1,
-    bobAmplitude: 10,
-    bobFrequency: 4.8,
-    darken: 0.8,
-    defaultOpacity: 0.75,
-    maxHp: 2,
-    sizeBoost: 1,
-    swayAmplitude: 8,
-    swayFrequency: 4.2,
-  },
-  high: {
-    baseColor: "#dc3232",
-    baseScale: 1.2,
-    bobAmplitude: 12,
-    bobFrequency: 3.6,
-    darken: 0.9,
-    defaultOpacity: 0.9,
-    maxHp: 3,
-    sizeBoost: 2,
-    swayAmplitude: 10,
-    swayFrequency: 3.4,
-  },
-  urgent: {
-    baseColor: "#fff",
-    baseScale: 1.4,
-    bobAmplitude: 14,
-    bobFrequency: 2.8,
-    darken: 1,
-    defaultOpacity: 1,
-    maxHp: 4,
-    sizeBoost: 3,
-    swayAmplitude: 12,
-    swayFrequency: 2.8,
-  },
-};
 
 const PRIORITY_LABEL_TO_VARIANT: Record<string, BugVariant> = {
   High: "high",
@@ -125,12 +71,4 @@ export function getBugCountsKey(counts: Partial<BugCounts> | null | undefined) {
 export function getBugTotal(counts: Partial<BugCounts> | null | undefined) {
   const normalized = normalizeBugCounts(counts);
   return BUG_VARIANTS.reduce((total, variant) => total + normalized[variant], 0);
-}
-
-export function getBugVariantColor(variant: BugVariant) {
-  return BUG_VARIANT_CONFIG[variant].baseColor;
-}
-
-export function getBugVariantMaxHp(variant: BugVariant) {
-  return BUG_VARIANT_CONFIG[variant].maxHp;
 }

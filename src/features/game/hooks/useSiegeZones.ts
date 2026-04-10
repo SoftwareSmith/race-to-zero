@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import type { RefObject } from "react";
-import type { SiegeZoneRect } from "./types";
+import type { SiegeZoneRect } from "@game/types";
 
 interface UseSiegeZonesOptions {
   active: boolean;

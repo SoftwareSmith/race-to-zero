@@ -4,12 +4,12 @@ import {
   MenuPanel,
   RangeField,
   ToggleField,
-} from "./MenuControls";
+} from "@shared/components/MenuControls";
 import type {
   BugVisualSettingKey,
   BugVisualSettings,
   SettingToggleKey,
-} from "../types/dashboard";
+} from "../../../types/dashboard";
 
 interface BugSettingsMenuProps {
   bugVisualSettings: BugVisualSettings;

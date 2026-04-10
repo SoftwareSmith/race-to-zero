@@ -16,9 +16,9 @@ import {
 } from "chart.js";
 import ChartDataLabels from "chartjs-plugin-datalabels";
 import { Bar, Line } from "react-chartjs-2";
-import { getLineChartOptions } from "../utils/chartConfig";
-import { cn } from "../utils/cn";
-import type { ChartFocusState } from "../types/dashboard";
+import { getLineChartOptions } from "@dashboard/utils/chartConfig";
+import { cn } from "@shared/utils/cn";
+import type { ChartFocusState } from "../../../types/dashboard";
 
 ChartJS.register(
   BarElement,

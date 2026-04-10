@@ -1,10 +1,10 @@
-import { BUG_VARIANT_CONFIG, getBugVariantColor } from "../constants/bugs";
-import type { BugVariant } from "../types/dashboard";
+import { BUG_VARIANT_CONFIG, getBugVariantColor } from "../../../constants/bugs";
+import type { BugVariant } from "../../../types/dashboard";
 
-import lowRaw from "../assets/bugs/low.svg?raw";
-import mediumRaw from "../assets/bugs/medium.svg?raw";
-import highRaw from "../assets/bugs/high.svg?raw";
-import urgentRaw from "../assets/bugs/urgent.svg?raw";
+import lowRaw from "../../../assets/bugs/low.svg?raw";
+import mediumRaw from "../../../assets/bugs/medium.svg?raw";
+import highRaw from "../../../assets/bugs/high.svg?raw";
+import urgentRaw from "../../../assets/bugs/urgent.svg?raw";
 
 export interface BugSpriteOptions {
   color?: string;

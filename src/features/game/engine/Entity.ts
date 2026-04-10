@@ -1,5 +1,5 @@
 import type { Vec2 } from "./types";
-import { drawBugSprite } from "../utils/bugSprite";
+import { drawBugSprite } from "@game/utils/bugSprite";
 
 export type Variant = "low" | "medium" | "high" | "urgent";
 

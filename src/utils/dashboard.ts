@@ -1,5 +1,13 @@
 import type { CompareRangeOption, TabItem, Tone } from "../types/dashboard";
 
+// formatNumber, formatSignedNumber, formatPercent are now in @shared/utils/formatters.
+// Re-exported here so existing callers continue to work.
+export {
+  formatNumber,
+  formatSignedNumber,
+  formatPercent,
+} from "@shared/utils/formatters";
+
 export const TAB_ITEMS: TabItem[] = [
   { id: "overview", label: "Overview" },
   { id: "periods", label: "Periods" },
@@ -12,49 +20,6 @@ export const COMPARE_RANGE_OPTIONS: CompareRangeOption[] = [
   { label: "All time", value: "all" },
   { label: "Custom", value: "custom" },
 ];
-
-export function readStoredDate(key: string, fallbackValue: string) {
-  if (typeof window === "undefined") {
-    return fallbackValue;
-  }
-
-  const storedValue = window.localStorage.getItem(key);
-  return storedValue || fallbackValue;
-}
-
-export function readStoredFlag(key: string, fallbackValue = false) {
-  if (typeof window === "undefined") {
-    return fallbackValue;
-  }
-
-  const storedValue = window.localStorage.getItem(key);
-
-  if (storedValue == null) {
-    return fallbackValue;
-  }
-
-  return storedValue === "true";
-}
-
-export function formatNumber(value: number, digits = 0) {
-  if (!Number.isFinite(value)) {
-    return "0";
-  }
-
-  return new Intl.NumberFormat("en-US", {
-    maximumFractionDigits: digits,
-    minimumFractionDigits: digits,
-  }).format(value);
-}
-
-export function formatSignedNumber(value: number, digits = 0) {
-  const prefix = value > 0 ? "+" : "";
-  return `${prefix}${formatNumber(value, digits)}`;
-}
-
-export function formatPercent(value: number, digits = 0) {
-  return `${formatNumber(value, digits)}%`;
-}
 
 export function getNetChangeTone(netChange: number): Tone {
   if (netChange > 0) {

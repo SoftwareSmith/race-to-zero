@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import Tooltip from "./Tooltip";
+import Tooltip from "@shared/components/Tooltip";
 
 interface MenuIconButtonProps {
   ariaLabel: string;

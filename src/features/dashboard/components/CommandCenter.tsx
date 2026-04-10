@@ -1,14 +1,14 @@
-import MetricCard from "./MetricCard";
-import StatusTag from "./StatusTag";
-import Surface from "./Surface";
-import { cn } from "../utils/cn";
+import MetricCard from "@dashboard/components/MetricCard";
+import StatusTag from "@shared/components/StatusTag";
+import Surface from "@shared/components/Surface";
+import { cn } from "@shared/utils/cn";
 import {
   formatNumber,
   formatSignedNumber,
   getDeltaTone,
   getStatusTagText,
-} from "../utils/dashboard";
-import type { DeadlineMetrics, SummaryMetrics } from "../types/dashboard";
+} from "../../../utils/dashboard";
+import type { DeadlineMetrics, SummaryMetrics } from "../../../types/dashboard";
 
 interface CommandCenterProps {
   deadlineMetrics: DeadlineMetrics;

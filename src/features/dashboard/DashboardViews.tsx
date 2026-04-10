@@ -1,7 +1,7 @@
-import type { ReactNode } from "react";
 import { Suspense, lazy, memo, useMemo } from "react";
-import MetricCard from "../../components/MetricCard";
-import { cn } from "../../utils/cn";
+import MetricCard from "@dashboard/components/MetricCard";
+import { cn } from "@shared/utils/cn";
+import StatusBanner from "@shared/components/StatusBanner";
 import {
   formatNumber,
   formatPercent,
@@ -19,18 +19,12 @@ import type {
   ChartFocusState,
   ComparisonMetrics,
   DeadlineMetrics,
-  StatusBannerKind,
   SummaryMetrics,
   Tone,
   WorkdaySettings,
 } from "../../types/dashboard";
 
-const ChartCard = lazy(() => import("../../components/ChartCard"));
-
-interface StatusBannerProps {
-  children: ReactNode;
-  kind?: StatusBannerKind;
-}
+const ChartCard = lazy(() => import("@dashboard/components/ChartCard"));
 
 interface MetricCardDefinition {
   hint: string;
@@ -202,24 +196,9 @@ function ChartFallback({ className = "" }: { className?: string }) {
   );
 }
 
-export function StatusBanner({ kind = "info", children }: StatusBannerProps) {
-  const styles = {
-    error: "border-red-500/30 bg-red-950/30 text-red-100",
-    info: "border-sky-500/30 bg-sky-950/20 text-sky-100",
-  };
-
-  return (
-    <div
-      className={cn(
-        "rounded-[22px] border px-4 py-3 text-sm font-medium shadow-[0_12px_30px_rgba(68,50,30,0.06)]",
-        styles[kind] ?? styles.info,
-      )}
-      role={kind === "error" ? "alert" : "status"}
-    >
-      {children}
-    </div>
-  );
-}
+// StatusBanner is now a shared component — re-export so existing consumers
+// that import it from here continue to work.
+export { default as StatusBanner } from "@shared/components/StatusBanner";
 
 interface OverviewViewProps {
   deadlineMetrics: DeadlineMetrics;

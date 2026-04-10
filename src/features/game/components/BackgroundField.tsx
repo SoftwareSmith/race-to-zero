@@ -4,22 +4,22 @@ import {
   getBugCountsKey,
   getBugTotal,
   getBugVariantMaxHp,
-} from "../constants/bugs";
-import Engine from "../engine/Engine";
-import { getCodex } from "../engine/bugCodex";
-import type { GameConfig } from "../engine/types";
-import { DEFAULT_GAME_CONFIG } from "../engine/types";
+} from "../../../constants/bugs";
+import Engine from "@game/engine/Engine";
+import { getCodex } from "@game/engine/bugCodex";
+import type { GameConfig } from "@game/engine/types";
+import { DEFAULT_GAME_CONFIG } from "@game/engine/types";
 import {
   getEffectPalette,
   getMotionProfile,
   getSceneProfile,
-} from "../utils/backgroundScene";
-import { cn } from "../utils/cn";
-import { drawBugSprite } from "../utils/bugSprite";
+} from "@game/utils/backgroundScene";
+import { cn } from "@shared/utils/cn";
+import { drawBugSprite } from "@game/utils/bugSprite";
 import type {
   SiegeCombatStats,
   SiegeZoneRect,
-} from "../features/background-game/types";
+} from "@game/types";
 import type {
   BugCounts,
   BugParticle,
@@ -29,7 +29,7 @@ import type {
   MotionProfile,
   SceneProfile,
   Tone,
-} from "../types/dashboard";
+} from "../../../types/dashboard";
 
 const TARGET_FRAME_MS = 1000 / 24;
 const TRANSITION_EASING = 0.08;

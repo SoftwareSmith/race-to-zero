@@ -1,7 +1,7 @@
 import type { MouseEvent } from "react";
 import { memo, useCallback } from "react";
-import { cn } from "../utils/cn";
-import type { ActiveTab, TabItem } from "../types/dashboard";
+import { cn } from "@shared/utils/cn";
+import type { ActiveTab, TabItem } from "../../types/dashboard";
 
 interface TabsProps {
   activeTab: ActiveTab;

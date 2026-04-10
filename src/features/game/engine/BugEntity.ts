@@ -1,5 +1,5 @@
 import { Entity } from "./Entity";
-import { drawBugSprite } from "../utils/bugSprite";
+import { drawBugSprite } from "@game/utils/bugSprite";
 import { DEFAULT_GAME_CONFIG } from "./types";
 import { getCodex, type CrawlProfile, type BugType } from "./bugCodex";
 

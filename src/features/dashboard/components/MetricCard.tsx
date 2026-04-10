@@ -1,27 +1,7 @@
-import Tooltip from "./Tooltip";
-import { cn } from "../utils/cn";
-import type { Tone } from "../types/dashboard";
-
-const TONE_STYLES = {
-  positive: {
-    card: "border-emerald-500/26 bg-emerald-950/18",
-    eyebrow: "text-emerald-300",
-    value: "text-emerald-200",
-    copy: "text-emerald-100/70",
-  },
-  negative: {
-    card: "border-red-500/26 bg-red-950/18",
-    eyebrow: "text-red-300",
-    value: "text-red-200",
-    copy: "text-red-100/70",
-  },
-  neutral: {
-    card: "border-sky-500/24 bg-sky-950/12",
-    eyebrow: "text-sky-200",
-    value: "text-sky-100",
-    copy: "text-sky-50/70",
-  },
-};
+import Tooltip from "@shared/components/Tooltip";
+import { cn } from "@shared/utils/cn";
+import { CARD_TONE_STYLES, CARD_GLOW_CLASSES } from "@shared/styles/toneClasses";
+import type { Tone } from "../../../types/dashboard";
 
 interface MetricCardProps {
   className?: string;
@@ -33,15 +13,7 @@ interface MetricCardProps {
 }
 
 function getGlowClassName(tone: Tone) {
-  if (tone === "positive") {
-    return "bg-emerald-400/18";
-  }
-
-  if (tone === "negative") {
-    return "bg-red-400/16";
-  }
-
-  return "bg-sky-400/16";
+  return CARD_GLOW_CLASSES[tone] ?? CARD_GLOW_CLASSES.neutral;
 }
 
 function MetricCard({
@@ -52,7 +24,7 @@ function MetricCard({
   tone = "neutral",
   value,
 }: MetricCardProps) {
-  const styles = TONE_STYLES[tone] ?? TONE_STYLES.neutral;
+  const styles = CARD_TONE_STYLES[tone] ?? CARD_TONE_STYLES.neutral;
   const card = (
     <article
       data-siege-panel={label.toLowerCase().replace(/[^a-z0-9]+/g, "-")}

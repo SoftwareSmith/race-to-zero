@@ -1,10 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("../utils/bugSprite", () => ({
+vi.mock("@game/utils/bugSprite", () => ({
   drawBugSprite: vi.fn(),
 }));
 
-import { drawBugSprite } from "../utils/bugSprite";
+import { drawBugSprite } from "@game/utils/bugSprite";
 import { BugEntity } from "./BugEntity";
 import BUG_CODEX, {
   cloneCodex,

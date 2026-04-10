@@ -1,5 +1,5 @@
 import { addDays, eachDayOfInterval, format, isWeekend } from "date-fns";
-import type { WorkdaySettings } from "../types/dashboard";
+import type { WorkdaySettings } from "../../types/dashboard";
 
 const WA_PUBLIC_HOLIDAYS: Record<number, string[]> = {
   2024: [

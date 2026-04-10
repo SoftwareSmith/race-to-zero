@@ -1,17 +1,12 @@
 import type {
   SiegeCombatStats,
   WeaponProgressSnapshot,
-} from "./types";
-
-const UNLOCK_THRESHOLDS = {
-  hammer: 0,
-  laser: 60,
-  pulse: 15,
-} as const;
+} from "@game/types";
+import { WEAPON_DEFS, WEAPON_UNLOCK_THRESHOLDS } from "@config/weaponConfig";
 
 export function getSiegeCombatStats(totalFixed: number): SiegeCombatStats {
-  const pulseUnlocked = totalFixed >= UNLOCK_THRESHOLDS.pulse;
-  const laserUnlocked = totalFixed >= UNLOCK_THRESHOLDS.laser;
+  const pulseUnlocked = totalFixed >= WEAPON_UNLOCK_THRESHOLDS.pulse;
+  const laserUnlocked = totalFixed >= WEAPON_UNLOCK_THRESHOLDS.laser;
 
   return {
     hammerDamage: 1,
@@ -35,37 +30,34 @@ export function getSiegeWeaponSnapshots(
   totalFixed: number,
 ): WeaponProgressSnapshot[] {
   const stats = getSiegeCombatStats(totalFixed);
+  const unlockedMap: Record<string, boolean> = {
+    hammer: true,
+    pulse: stats.pulseUnlocked,
+    laser: stats.laserUnlocked,
+  };
+  const currentMap: Record<string, boolean> = {
+    hammer: !stats.pulseUnlocked,
+    pulse: stats.pulseUnlocked && !stats.laserUnlocked,
+    laser: stats.laserUnlocked,
+  };
 
-  return [
-    {
-      id: "hammer",
-      title: "Hammer",
-      locked: false,
-      current: !stats.pulseUnlocked,
-      detail: "Direct fixes for any bug you can reach.",
-      progressText: "Online from first click",
-    },
-    {
-      id: "pulse",
-      title: "Pulse",
-      locked: !stats.pulseUnlocked,
-      current: stats.pulseUnlocked && !stats.laserUnlocked,
-      detail: "Periodic reclaim pulse that clears bugs crawling over frozen panels.",
-      progressText: stats.pulseUnlocked
-        ? `Unlocked at ${UNLOCK_THRESHOLDS.pulse} bugs fixed`
-        : `${Math.max(0, UNLOCK_THRESHOLDS.pulse - totalFixed)} fixes to unlock`,
-    },
-    {
-      id: "laser",
-      title: "Laser",
-      locked: !stats.laserUnlocked,
-      current: stats.laserUnlocked,
-      detail: "Wide reclaim sweep that strips clustered bugs off occupied dashboard zones.",
-      progressText: stats.laserUnlocked
-        ? `Unlocked at ${UNLOCK_THRESHOLDS.laser} bugs fixed`
-        : `${Math.max(0, UNLOCK_THRESHOLDS.laser - totalFixed)} fixes to unlock`,
-    },
-  ];
+  return WEAPON_DEFS.map((weapon) => {
+    const unlocked = unlockedMap[weapon.id] ?? false;
+    const remaining = Math.max(0, weapon.unlockKills - totalFixed);
+    return {
+      id: weapon.id,
+      title: weapon.title,
+      locked: !unlocked,
+      current: currentMap[weapon.id] ?? false,
+      detail: weapon.detail,
+      progressText:
+        weapon.unlockKills === 0
+          ? "Online from first click"
+          : unlocked
+            ? `Unlocked at ${weapon.unlockKills} bugs fixed`
+            : `${remaining} fixes to unlock`,
+    };
+  });
 }
 
-export { UNLOCK_THRESHOLDS as SIEGE_UNLOCK_THRESHOLDS };
+export { WEAPON_UNLOCK_THRESHOLDS as SIEGE_UNLOCK_THRESHOLDS };

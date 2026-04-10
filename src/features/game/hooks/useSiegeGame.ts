@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import type { BugCounts } from "../../types/dashboard";
+import type { BugCounts } from "../../../types/dashboard";
 import {
   getSiegeCombatStats,
   getSiegeWeaponSnapshots,
-} from "./progression";
+} from "@game/progression/progression";
 
 interface UseSiegeGameOptions {
   currentBugCount: number;

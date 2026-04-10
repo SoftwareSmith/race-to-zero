@@ -1,5 +1,5 @@
-import type { MotionProfile, SceneProfile, Tone } from "../types/dashboard";
-import TONE_CONFIG from "../constants/tones";
+import type { MotionProfile, SceneProfile, Tone } from "../../../types/dashboard";
+import TONE_CONFIG from "../../../constants/tones";
 
 /** Motion profile for moving bugs */
 export function getMotionProfile(tone: "all-clear" | Tone): MotionProfile {

@@ -1,4 +1,4 @@
-import type { StorageKey } from "../constants/storageKeys";
+import type { StorageKey } from "../../constants/storageKeys";
 
 type StorageParser<T> = (rawValue: string) => T | null;
 type StorageSerializer<T> = (value: T) => string;

@@ -2,7 +2,7 @@ import type { GameConfig } from "./types";
 import { DEFAULT_GAME_CONFIG } from "./types";
 import { BugEntity } from "./BugEntity";
 import { Entity } from "./Entity";
-import { getBugVariantMaxHp } from "../constants/bugs";
+import { getBugVariantMaxHp } from "../../../constants/bugs";
 
 export interface EngineOptions {
   width: number;

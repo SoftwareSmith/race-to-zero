@@ -6,7 +6,7 @@ import {
   getBugTotal,
 } from "../../constants/bugs";
 import { STORAGE_KEYS } from "../../constants/storageKeys";
-import { DEFAULT_GAME_CONFIG } from "../../engine/types";
+import { DEFAULT_GAME_CONFIG } from "@game/engine/types";
 import { useMetrics } from "../../hooks/useMetrics";
 import { useStoredState } from "../../hooks/useStoredState";
 import type {
@@ -23,7 +23,7 @@ import {
   parseStoredBoolean,
   parseStoredPositiveNumber,
   parseStoredString,
-} from "../../utils/storage";
+} from "@shared/utils/storage";
 import {
   getComparisonMetrics,
   getDeadlineMetrics,

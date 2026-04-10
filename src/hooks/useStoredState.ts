@@ -5,7 +5,7 @@ import {
   readStorageValue,
   serializeStoredValue,
   setStorageValue,
-} from "../utils/storage";
+} from "@shared/utils/storage";
 
 interface StoredStateOptions<T> {
   parse: (rawValue: string) => T | null;

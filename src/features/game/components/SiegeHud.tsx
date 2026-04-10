@@ -1,6 +1,6 @@
-import Tooltip from "../../components/Tooltip";
-import WeaponGlyph from "../../components/WeaponGlyph";
-import type { WeaponProgressSnapshot } from "./types";
+import Tooltip from "@shared/components/Tooltip";
+import WeaponGlyph from "@shared/components/icons/WeaponGlyph";
+import type { WeaponProgressSnapshot } from "@game/types";
 
 interface SiegeHudProps {
   className?: string;

@@ -12,7 +12,14 @@
     "jsx": "react-jsx",
     "strict": true,
     "noFallthroughCasesInSwitch": true,
-    "types": ["vite/client"]
+    "types": ["vite/client"],
+    "baseUrl": ".",
+    "paths": {
+      "@shared/*": ["src/shared/*"],
+      "@game/*": ["src/features/game/*"],
+      "@dashboard/*": ["src/features/dashboard/*"],
+      "@config/*": ["src/config/*"]
+    }
   },
   "include": ["src", "interactive"]
 }
