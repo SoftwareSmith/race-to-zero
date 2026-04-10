@@ -16,10 +16,7 @@ import {
 } from "@game/utils/backgroundScene";
 import { cn } from "@shared/utils/cn";
 import { drawBugSprite } from "@game/utils/bugSprite";
-import type {
-  SiegeCombatStats,
-  SiegeZoneRect,
-} from "@game/types";
+import type { SiegeCombatStats, SiegeZoneRect } from "@game/types";
 import type {
   BugCounts,
   BugParticle,

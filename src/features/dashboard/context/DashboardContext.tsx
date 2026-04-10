@@ -17,7 +17,9 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
 export function useDashboardContext(): DashboardContextValue {
   const ctx = useContext(DashboardContext);
   if (!ctx) {
-    throw new Error("useDashboardContext must be used within a DashboardProvider");
+    throw new Error(
+      "useDashboardContext must be used within a DashboardProvider",
+    );
   }
   return ctx;
 }

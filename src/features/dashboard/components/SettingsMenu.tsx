@@ -1,6 +1,13 @@
 import type { RefObject } from "react";
-import { MenuIconButton, MenuPanel, ToggleField } from "@shared/components/MenuControls";
-import type { MenuSettingsState, SettingToggleKey } from "../../../types/dashboard";
+import {
+  MenuIconButton,
+  MenuPanel,
+  ToggleField,
+} from "@shared/components/MenuControls";
+import type {
+  MenuSettingsState,
+  SettingToggleKey,
+} from "../../../types/dashboard";
 
 interface SettingsMenuProps {
   containerRef: RefObject<HTMLDivElement | null>;

@@ -1,6 +1,9 @@
 import Tooltip from "@shared/components/Tooltip";
 import { cn } from "@shared/utils/cn";
-import { CARD_TONE_STYLES, CARD_GLOW_CLASSES } from "@shared/styles/toneClasses";
+import {
+  CARD_TONE_STYLES,
+  CARD_GLOW_CLASSES,
+} from "@shared/styles/toneClasses";
 import type { Tone } from "../../../types/dashboard";
 
 interface MetricCardProps {
