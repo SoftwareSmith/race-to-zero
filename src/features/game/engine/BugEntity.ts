@@ -84,6 +84,8 @@ export class BugEntity extends Entity {
   turnRate: number;
   motionTime: number;
   typeSpec: BugType | null;
+  /** Speed-slow status effect applied by Freeze Cone. */
+  slow: { multiplier: number; expiresAt: number } | null;
 
   constructor(opts: Partial<Entity> & { id?: string } = {}) {
     super(opts as Entity);
@@ -102,6 +104,7 @@ export class BugEntity extends Entity {
     this.heading = opts.heading ?? Math.atan2(this.vy || 0, this.vx || 1);
     this.motionTime = Math.random() * 100;
     this.typeSpec = null;
+    this.slow = null;
   }
 
   private syncTypeSpec() {
@@ -312,7 +315,11 @@ export class BugEntity extends Entity {
 
     const edgeFactor = 1 - wallSteering.pressure * 0.12;
     const speedBoost = this.state === "flee" ? 1.22 : 1;
-    const desiredSpeed = config.baseSpeed * this.cruiseSpeed * edgeFactor * speedBoost;
+    // Apply slow status effect from Freeze Cone
+    const now = performance.now();
+    if (this.slow && now >= this.slow.expiresAt) this.slow = null;
+    const slowMult = this.slow ? this.slow.multiplier : 1;
+    const desiredSpeed = config.baseSpeed * this.cruiseSpeed * edgeFactor * speedBoost * slowMult;
     const currentSpeed = getLength(this.vx, this.vy);
     const nextSpeed = currentSpeed + (desiredSpeed - currentSpeed) * Math.min(1, dt * 4.2);
     this.vx = Math.cos(this.heading) * nextSpeed;
@@ -328,8 +335,12 @@ export class BugEntity extends Entity {
 
   onHit(damage = 1) {
     if (this.state === "dead" || this.state === "dying") {
-      return { defeated: false, remainingHp: 0 };
+      return { defeated: false, remainingHp: 0, pointValue: 0, frozen: false };
     }
+
+    const frozen =
+      this.slow !== null && performance.now() < this.slow.expiresAt;
+    const pointValue = this.typeSpec?.pointValue ?? 1;
 
     this.lastHitTime = performance.now();
     this.hp = Math.max(0, this.hp - damage);
@@ -338,13 +349,31 @@ export class BugEntity extends Entity {
       this.deathProgress = 0;
       this.vx = 0;
       this.vy = 0;
-      return { defeated: true, remainingHp: 0 };
+      return { defeated: true, remainingHp: 0, pointValue, frozen };
     }
 
     this.state = "flee";
     this.fleeTimer = 0.9 + Math.random() * 0.5;
     this.syncTypeSpec();
-    return { defeated: false, remainingHp: this.hp };
+    return { defeated: false, remainingHp: this.hp, pointValue: 0, frozen };
+  }
+
+  /** Apply a Freeze Cone slow. May stack to extend duration. */
+  applyFreeze(multiplier: number, durationMs: number) {
+    const expiresAt = performance.now() + durationMs;
+    if (!this.slow || expiresAt > this.slow.expiresAt) {
+      this.slow = { multiplier, expiresAt };
+    }
+  }
+
+  /** Apply an impulse and trigger flee state (Pulse Cannon knockback). */
+  knockback(dx: number, dy: number) {
+    if (this.state === "dying" || this.state === "dead") return;
+    this.vx += dx;
+    this.vy += dy;
+    this.heading = Math.atan2(this.vy, this.vx);
+    this.state = "flee";
+    this.fleeTimer = (this.fleeTimer ?? 0) + 1.0;
   }
 
   revive(width: number, height: number) {
@@ -361,6 +390,7 @@ export class BugEntity extends Entity {
     this.state = "patrol";
     this.deathProgress = 0;
     this.fleeTimer = null;
+    this.slow = null;
     this.motionTime = Math.random() * 100;
     this.opacity = 1;
     this.size = this.baseSize;

@@ -17,9 +17,12 @@ import {
 import { cn } from "@shared/utils/cn";
 import { drawBugSprite } from "@game/utils/bugSprite";
 import type {
+  AgentCaptureState,
+  PlacedStructure,
   SiegeCombatStats,
   SiegeWeaponId,
   SiegeZoneRect,
+  StructureId,
   WeaponEffectEvent,
 } from "@game/types";
 import type {
@@ -36,6 +39,7 @@ import { WEAPON_DEFS } from "@config/weaponConfig";
 import { drawHealthBar, HEALTHBAR_SHOW_DURATION } from "@game/utils/healthbar";
 import WeaponCursor from "@game/components/WeaponCursor";
 import WeaponEffectLayer from "@game/components/WeaponEffectLayer";
+import StructureLayer from "@game/components/StructureLayer";
 import { createEffectEvent, isEffectAlive } from "@game/utils/weaponEffects";
 
 const TARGET_FRAME_MS = 1000 / 24;
@@ -63,6 +67,8 @@ interface BugHitPayload {
   variant: BugVariant;
   x: number;
   y: number;
+  pointValue?: number;
+  frozen?: boolean;
 }
 
 interface RenderedBugPosition {
@@ -171,27 +177,49 @@ function stabilizeQaEngine(
 
 function getSplatClassName(variant: BugVariant) {
   if (variant === "urgent") {
-    return "fixed z-[80] h-12 w-12 -translate-x-1/2 -translate-y-1/2 rounded-[36%] bg-[radial-gradient(circle_at_35%_35%,rgba(255,200,200,0.26),transparent_18%),radial-gradient(circle_at_center,rgba(185,28,28,0.95),rgba(120,14,14,0.28)_68%,transparent_74%)] [animation:bug-splat_520ms_ease-out_forwards] pointer-events-none";
+    return "fixed z-[80] h-16 w-16 -translate-x-1/2 -translate-y-1/2 rounded-[52%_48%_55%_45%/43%_57%_46%_54%] bg-[radial-gradient(circle_at_38%_34%,rgba(255,214,214,0.18),transparent_22%),radial-gradient(circle_at_64%_62%,rgba(220,38,38,0.74),rgba(127,29,29,0.88)_64%,rgba(69,10,10,0.18)_86%,transparent_94%)] [animation:urgent-splatter_760ms_ease-out_forwards] pointer-events-none";
   }
 
   if (variant === "high") {
-    return "fixed z-[80] h-10 w-10 -translate-x-1/2 -translate-y-1/2 rounded-[40%] bg-[radial-gradient(circle_at_38%_36%,rgba(255,180,160,0.22),transparent_18%),radial-gradient(circle_at_center,rgba(244,63,94,0.9),rgba(153,27,27,0.2)_68%,transparent_74%)] [animation:bug-splat_480ms_ease-out_forwards] pointer-events-none";
+    return "fixed z-[80] h-14 w-14 -translate-x-1/2 -translate-y-1/2 rounded-[38%] bg-[radial-gradient(circle_at_38%_36%,rgba(255,180,160,0.22),transparent_18%),radial-gradient(circle_at_center,rgba(244,63,94,0.9),rgba(153,27,27,0.2)_68%,transparent_74%)] [animation:bug-splat_520ms_ease-out_forwards] pointer-events-none";
   }
 
   if (variant === "medium") {
     return "fixed z-[80] h-9 w-9 -translate-x-1/2 -translate-y-1/2 rounded-[45%] bg-[radial-gradient(circle_at_42%_38%,rgba(255,230,200,0.22),transparent_18%),radial-gradient(circle_at_center,rgba(250,130,100,0.86),rgba(160,40,30,0.16)_70%,transparent_76%)] [animation:bug-splat_440ms_ease-out_forwards] pointer-events-none";
   }
 
-  return "fixed z-[80] h-7 w-7 -translate-x-1/2 -translate-y-1/2 rounded-full bg-[radial-gradient(circle_at_40%_40%,rgba(255,255,255,0.2),transparent_20%),radial-gradient(circle_at_center,rgba(248,113,113,0.82),rgba(185,28,28,0.14)_70%,transparent_75%)] [animation:bug-splat_420ms_ease-out_forwards] pointer-events-none";
+  return "fixed z-[80] h-5 w-5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-[radial-gradient(circle_at_40%_40%,rgba(255,255,255,0.2),transparent_20%),radial-gradient(circle_at_center,rgba(248,113,113,0.82),rgba(185,28,28,0.14)_70%,transparent_75%)] [animation:bug-splat_380ms_ease-out_forwards] pointer-events-none";
 }
 
 interface BugCanvasProps {
   bugVisualSettings: BugVisualSettings;
+  bugCountsKey: string;
   chartFocus: ChartFocusState | null;
   combatStats?: SiegeCombatStats | null;
   motionProfile: MotionProfile;
   onHit: (payload: BugHitPayload) => void;
-  onWeaponFire?: (weapon: SiegeWeaponId, x: number, y: number) => void;
+  onWeaponFire?: (
+    weapon: SiegeWeaponId,
+    x: number,
+    y: number,
+    extras?: {
+      angle?: number;
+      chainNodes?: Array<{ x: number; y: number }>;
+      jagOffsets?: number[];
+      targetX?: number;
+      targetY?: number;
+      color?: string;
+    },
+  ) => void;
+  placingStructureId?: StructureId | null;
+  onStructurePlace?: (
+    structureType: StructureId,
+    viewportX: number,
+    viewportY: number,
+    canvasX: number,
+    canvasY: number,
+    structureId?: string,
+  ) => void;
   selectedWeaponId?: SiegeWeaponId;
   bugCounts: BugCounts;
   sceneProfile: SceneProfile;
@@ -199,34 +227,69 @@ interface BugCanvasProps {
   siegeZones?: SiegeZoneRect[];
   terminatorMode: boolean;
   onEntityDeath?: (x: number, y: number, variant: string) => void;
+  onStructureKill?: (x: number, y: number, variant: string) => void;
+  onAgentAbsorb?: (data: {
+    structureId: string;
+    phase: "absorbing" | "done" | "failed";
+    variant: string;
+    bugX: number;
+    bugY: number;
+    processingMs?: number;
+  }) => void;
+  onTurretFire?: (data: {
+    structureId: string;
+    srcX: number;
+    srcY: number;
+    targetX: number;
+    targetY: number;
+    angle: number;
+  }) => void;
   gameConfig?: GameConfig;
+  hammerPositionRef?: { current: { x: number; y: number } };
 }
 
 const BugCanvas = memo(function BugCanvas({
   bugVisualSettings,
+  bugCountsKey,
   chartFocus,
   combatStats,
   motionProfile,
   onHit,
   onWeaponFire,
-  selectedWeaponId = "hammer",
+  placingStructureId,
+  onStructurePlace,
+  selectedWeaponId = "wrench",
   bugCounts,
   sceneProfile,
   sessionKey,
   siegeZones = [],
   terminatorMode,
   onEntityDeath,
+  onStructureKill,
+  onAgentAbsorb,
+  onTurretFire,
   gameConfig,
+  hammerPositionRef,
 }: BugCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const swarmRef = useRef<any | null>(null);
   const motionProfileRef = useRef(motionProfile);
   const sceneProfileRef = useRef(sceneProfile);
   const chartFocusRef = useRef(chartFocus);
+  const terminatorModeRef = useRef(terminatorMode);
   const combatStatsRef = useRef<SiegeCombatStats | null>(combatStats ?? null);
   const onHitRef = useRef(onHit);
   const onEntityDeathRef = useRef(onEntityDeath);
+  const onStructureKillRef = useRef(onStructureKill);
+  const onAgentAbsorbRef = useRef(onAgentAbsorb);
+  const onTurretFireRef = useRef(onTurretFire);
   const onWeaponFireRef = useRef(onWeaponFire);
+  const placingStructureIdRef = useRef(placingStructureId);
+  const onStructurePlaceRef = useRef(onStructurePlace);
+
+  useEffect(() => {
+    terminatorModeRef.current = terminatorMode;
+  }, [terminatorMode]);
   const selectedWeaponIdRef = useRef<SiegeWeaponId>(selectedWeaponId);
   const lastFireTimeRef = useRef<Record<string, number>>({});
   const reseedInfoRef = useRef<{
@@ -237,7 +300,6 @@ const BugCanvas = memo(function BugCanvas({
   const siegeZonesRef = useRef<SiegeZoneRect[]>(siegeZones);
   const boundsRef = useRef({ height: 0, left: 0, top: 0, width: 0 });
   const latestBugPositionsRef = useRef<RenderedBugPosition[]>([]);
-  const deadBugIndexesRef = useRef<Set<number>>(new Set());
   const hitPointsRef = useRef<Map<number, number>>(new Map());
   const targetSettingsRef = useRef({
     sizeMultiplier: bugVisualSettings?.sizeMultiplier ?? 1,
@@ -252,6 +314,10 @@ const BugCanvas = memo(function BugCanvas({
     clustered: number;
     total: number;
   } | null>(null);
+  const gameConfigKey = useMemo(
+    () => JSON.stringify(gameConfig ?? {}),
+    [gameConfig],
+  );
 
   const getLocalSiegeZones = useCallback(() => {
     const canvasBounds = canvasRef.current?.getBoundingClientRect();
@@ -267,68 +333,6 @@ const BugCanvas = memo(function BugCanvas({
       }))
       .filter((zone) => zone.width > 0 && zone.height > 0);
   }, []);
-
-  const triggerAutoHits = useCallback(
-    (damage: number, volleyCount: number, preferZones: boolean) => {
-      const engine = swarmRef.current;
-      if (!engine || volleyCount <= 0) {
-        return;
-      }
-
-      const localZones = getLocalSiegeZones();
-      const candidates = latestBugPositionsRef.current
-        .filter((position) => !deadBugIndexesRef.current.has(position.index))
-        .map((position) => ({
-          ...position,
-          inZone: localZones.some(
-            (zone) =>
-              position.x >= zone.left &&
-              position.x <= zone.left + zone.width &&
-              position.y >= zone.top &&
-              position.y <= zone.top + zone.height,
-          ),
-        }))
-        .sort((leftCandidate, rightCandidate) => {
-          if (leftCandidate.inZone !== rightCandidate.inZone) {
-            return leftCandidate.inZone ? -1 : 1;
-          }
-
-          return leftCandidate.y - rightCandidate.y;
-        });
-
-      const orderedCandidates =
-        preferZones && candidates.some((candidate) => candidate.inZone)
-          ? candidates
-          : candidates;
-
-      for (const candidate of orderedCandidates.slice(0, volleyCount)) {
-        const result = engine.handleHit(candidate.index, damage);
-        if (!result) {
-          continue;
-        }
-
-        if (result.defeated) {
-          deadBugIndexesRef.current.add(candidate.index);
-        }
-
-        onHitRef.current({
-          defeated: result.defeated,
-          remainingHp: result.remainingHp,
-          variant: result.variant,
-          x: Math.round(candidate.x + boundsRef.current.left),
-          y: Math.round(candidate.y + boundsRef.current.top),
-        });
-        updateQaLastHit({
-          defeated: result.defeated,
-          remainingHp: result.remainingHp,
-          variant: result.variant,
-          x: Math.round(candidate.x + boundsRef.current.left),
-          y: Math.round(candidate.y + boundsRef.current.top),
-        });
-      }
-    },
-    [getLocalSiegeZones],
-  );
 
   useEffect(() => {
     // when incoming counts change, recreate swarm to match new counts
@@ -359,6 +363,42 @@ const BugCanvas = memo(function BugCanvas({
               Math.round(y + (boundsRef.current.top || 0)),
               variant,
             );
+          } catch {
+            void 0;
+          }
+        },
+        onStructureKill: (x, y, variant) => {
+          try {
+            onStructureKillRef.current?.(
+              Math.round(x + (boundsRef.current.left || 0)),
+              Math.round(y + (boundsRef.current.top || 0)),
+              variant,
+            );
+          } catch {
+            void 0;
+          }
+        },
+        onAgentAbsorb: (data) => {
+          try {
+            onAgentAbsorbRef.current?.(data);
+          } catch {
+            void 0;
+          }
+        },
+        onTurretFire: (data) => {
+          try {
+            const vx = Math.round(data.srcX + (boundsRef.current.left || 0));
+            const vy = Math.round(data.srcY + (boundsRef.current.top || 0));
+            const vtx = Math.round(
+              data.targetX + (boundsRef.current.left || 0),
+            );
+            const vty = Math.round(data.targetY + (boundsRef.current.top || 0));
+            onWeaponFireRef.current?.("pointer", vx, vy, {
+              targetX: vtx,
+              targetY: vty,
+              color: "#22d3ee",
+            });
+            onTurretFireRef.current?.(data);
           } catch {
             void 0;
           }
@@ -399,7 +439,6 @@ const BugCanvas = memo(function BugCanvas({
       }
       setReseedInfo({ ts: Date.now(), clustered, total: maybeBugs.length });
     }
-    deadBugIndexesRef.current = new Set();
     const bugs = swarmRef.current.getAllBugs() as Array<any>;
     hitPointsRef.current = new Map(
       bugs.map((b: any, i: number) => [i, getBugVariantMaxHp(b.variant)]),
@@ -418,10 +457,13 @@ const BugCanvas = memo(function BugCanvas({
       }
       swarmRef.current = null;
     };
-  }, [bugCounts, gameConfig, getLocalSiegeZones, terminatorMode]);
+    // Note: terminatorMode is intentionally excluded from this dep array.
+    // Removing it prevents the engine from being destroyed and recreated when
+    // siege mode activates, giving a seamless visual transition.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bugCountsKey, gameConfigKey, getLocalSiegeZones]);
 
   useEffect(() => {
-    deadBugIndexesRef.current = new Set();
     const bugs = (swarmRef.current?.getAllBugs() ?? []) as Array<any>;
     hitPointsRef.current = new Map(
       bugs.map((b: any, i: number) => [i, getBugVariantMaxHp(b.variant)]),
@@ -449,8 +491,28 @@ const BugCanvas = memo(function BugCanvas({
   }, [onEntityDeath]);
 
   useEffect(() => {
+    onStructureKillRef.current = onStructureKill;
+  }, [onStructureKill]);
+
+  useEffect(() => {
+    onAgentAbsorbRef.current = onAgentAbsorb;
+  }, [onAgentAbsorb]);
+
+  useEffect(() => {
+    onTurretFireRef.current = onTurretFire;
+  }, [onTurretFire]);
+
+  useEffect(() => {
     onWeaponFireRef.current = onWeaponFire;
   }, [onWeaponFire]);
+
+  useEffect(() => {
+    placingStructureIdRef.current = placingStructureId;
+  }, [placingStructureId]);
+
+  useEffect(() => {
+    onStructurePlaceRef.current = onStructurePlace;
+  }, [onStructurePlace]);
 
   useEffect(() => {
     selectedWeaponIdRef.current = selectedWeaponId;
@@ -474,70 +536,6 @@ const BugCanvas = memo(function BugCanvas({
       speedMultiplier: getSpeedMultiplier(bugVisualSettings?.chaosMultiplier),
     };
   }, [bugVisualSettings]);
-
-  useEffect(() => {
-    if (!terminatorMode) {
-      deadBugIndexesRef.current = new Set();
-    }
-  }, [terminatorMode]);
-
-  useEffect(() => {
-    if (!terminatorMode) {
-      return undefined;
-    }
-
-    const intervalIds: number[] = [];
-    const initialStats = combatStatsRef.current;
-
-    if (initialStats?.pulseUnlocked) {
-      intervalIds.push(
-        window.setInterval(() => {
-          const nextStats = combatStatsRef.current;
-          if (!nextStats?.pulseUnlocked) {
-            return;
-          }
-
-          triggerAutoHits(
-            nextStats.pulseDamage,
-            nextStats.pulseVolleyCount,
-            true,
-          );
-        }, initialStats.pulseInterval),
-      );
-    }
-
-    if (initialStats?.laserUnlocked) {
-      intervalIds.push(
-        window.setInterval(() => {
-          const nextStats = combatStatsRef.current;
-          if (!nextStats?.laserUnlocked) {
-            return;
-          }
-
-          triggerAutoHits(
-            nextStats.laserDamage,
-            nextStats.laserVolleyCount,
-            false,
-          );
-        }, initialStats.laserInterval),
-      );
-    }
-
-    return () => {
-      for (const intervalId of intervalIds) {
-        window.clearInterval(intervalId);
-      }
-    };
-  }, [
-    combatStats?.laserInterval,
-    combatStats?.laserUnlocked,
-    gameConfig,
-    combatStats?.pulseInterval,
-    combatStats?.pulseUnlocked,
-    sessionKey,
-    terminatorMode,
-    triggerAutoHits,
-  ]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -691,15 +689,10 @@ const BugCanvas = memo(function BugCanvas({
         : [];
       const activeMotionProfile = motionProfileRef.current;
       const activeChartFocus = chartFocusRef.current;
-      const deadBugIndexes = deadBugIndexesRef.current;
       const focusX = activeChartFocus?.relativeIndex ?? 0.5;
       latestBugPositionsRef.current = [];
 
       for (let index = 0; index < activeParticles.length; index += 1) {
-        if (deadBugIndexes.has(index)) {
-          continue;
-        }
-
         const particle = activeParticles[index];
         const normalizedX = particle.x / width;
         const focusDistance = Math.abs(normalizedX - focusX);
@@ -798,22 +791,66 @@ const BugCanvas = memo(function BugCanvas({
     resizeObserver.observe(canvas);
 
     const handlePointerDown = (event: MouseEvent) => {
-      if (!terminatorMode) {
+      if (!terminatorModeRef.current) {
         return;
+      }
+
+      // Keep bounds fresh on scroll; stale viewport offsets break click→canvas mapping.
+      const liveBounds = canvas.getBoundingClientRect();
+      if (liveBounds.width && liveBounds.height) {
+        boundsRef.current = {
+          height: liveBounds.height,
+          left: liveBounds.left,
+          top: liveBounds.top,
+          width: liveBounds.width,
+        };
       }
 
       const targetElement =
         event.target instanceof Element ? event.target : null;
-      if (
-        targetElement?.closest(
-          "[data-no-hammer], button, a, input, select, textarea, label, summary",
-        )
-      ) {
+      if (targetElement?.closest("[data-no-hammer]")) {
         return;
       }
 
       const bounds = boundsRef.current;
       if (!bounds.width || !bounds.height) {
+        return;
+      }
+
+      const clickX = event.clientX - bounds.left;
+      const clickY = event.clientY - bounds.top;
+      const hpRef = hammerPositionRef;
+      const hasLiveCursor =
+        hpRef != null &&
+        Number.isFinite(hpRef.current.x) &&
+        Number.isFinite(hpRef.current.y) &&
+        (hpRef.current.x !== 0 || hpRef.current.y !== 0);
+      const fireX = hasLiveCursor ? hpRef!.current.x : event.clientX;
+      const fireY = hasLiveCursor ? hpRef!.current.y : event.clientY;
+      const targetX = fireX - bounds.left;
+      const targetY = fireY - bounds.top;
+
+      // ── Structure placement takes priority over weapon fire ─────
+      const placingId = placingStructureIdRef.current;
+      if (placingId) {
+        const placedStructureId = `${placingId}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+        const engine = swarmRef.current;
+        if (engine) {
+          (engine as any).addStructure(
+            clickX,
+            clickY,
+            placingId,
+            placedStructureId,
+          );
+        }
+        onStructurePlaceRef.current?.(
+          placingId,
+          event.clientX,
+          event.clientY,
+          clickX,
+          clickY,
+          placedStructureId,
+        );
         return;
       }
 
@@ -831,22 +868,21 @@ const BugCanvas = memo(function BugCanvas({
         lastFireTimeRef.current[weaponId] = now;
       }
 
-      const clickX = event.clientX - bounds.left;
-      const clickY = event.clientY - bounds.top;
-
-      // Notify parent to render the on-screen fire effect
-      onWeaponFireRef.current?.(weaponId, event.clientX, event.clientY);
+      const centerX = bounds.width / 2;
+      const centerY = bounds.height / 2;
 
       const engine = swarmRef.current;
       if (!engine) return;
 
       if (weaponDef.hitPattern === "point") {
-        // ── Hammer: hit nearest bug within radius ───────────────
+        // ── Wrench: hit nearest bug within radius ────────────────
+        onWeaponFireRef.current?.(weaponId, fireX, fireY);
+
         let hitCandidate: { distance: number; index: number } | null = null;
 
         try {
           if (typeof engine.hitTest === "function") {
-            const res = engine.hitTest(clickX, clickY);
+            const res = engine.hitTest(targetX, targetY);
             if (res)
               hitCandidate = { distance: res.distance, index: res.index };
           }
@@ -857,8 +893,8 @@ const BugCanvas = memo(function BugCanvas({
         if (!hitCandidate) {
           for (const bugPosition of latestBugPositionsRef.current) {
             const distance = Math.hypot(
-              clickX - bugPosition.x,
-              clickY - bugPosition.y,
+              targetX - bugPosition.x,
+              targetY - bugPosition.y,
             );
             if (
               distance <= bugPosition.radius &&
@@ -869,23 +905,23 @@ const BugCanvas = memo(function BugCanvas({
           }
         }
 
-        if (
-          hitCandidate &&
-          !deadBugIndexesRef.current.has(hitCandidate.index)
-        ) {
+        if (hitCandidate) {
           const particle = engine.getAllBugs()[hitCandidate.index];
           if (particle) {
             if (typeof engine.handleHit === "function") {
-              const result = engine.handleHit(hitCandidate.index, 1);
+              const result = engine.handleHit(
+                hitCandidate.index,
+                weaponDef.damage ?? 1,
+              );
               if (result) {
-                if (result.defeated)
-                  deadBugIndexesRef.current.add(hitCandidate.index);
                 onHitRef.current({
                   defeated: result.defeated,
                   remainingHp: result.remainingHp,
                   variant: result.variant,
                   x: event.clientX,
                   y: event.clientY,
+                  pointValue: result.pointValue,
+                  frozen: result.frozen,
                 });
                 updateQaLastHit({
                   defeated: result.defeated,
@@ -898,14 +934,15 @@ const BugCanvas = memo(function BugCanvas({
               }
             }
 
-            // Fallback HP tracking
             const currentHp =
               hitPointsRef.current.get(hitCandidate.index) ??
               getBugVariantMaxHp(particle.variant);
-            const remainingHp = Math.max(0, currentHp - 1);
+            const remainingHp = Math.max(
+              0,
+              currentHp - (weaponDef.damage ?? 1),
+            );
             hitPointsRef.current.set(hitCandidate.index, remainingHp);
             const defeated = remainingHp === 0;
-            if (defeated) deadBugIndexesRef.current.add(hitCandidate.index);
             onHitRef.current({
               defeated,
               remainingHp,
@@ -923,21 +960,55 @@ const BugCanvas = memo(function BugCanvas({
           }
         }
       } else if (weaponDef.hitPattern === "line") {
-        // ── Laser: hit all bugs on a horizontal beam ────────────
+        // ── Laser: directional beam with optional 8-way snap ────
+        let beamAngleRad = 0;
+
+        if (weaponDef.snapAngle) {
+          // Snap angle from click to screen center to nearest 45 degrees
+          const rawAngle = Math.atan2(centerY - targetY, centerX - targetX);
+          const snapped = Math.round(rawAngle / (Math.PI / 4)) * (Math.PI / 4);
+          beamAngleRad = snapped;
+        }
+
+        onWeaponFireRef.current?.(weaponId, fireX, fireY, {
+          angle: beamAngleRad,
+        });
+
         if (typeof engine.lineHitTest === "function") {
-          const canvasWidth = bounds.width;
-          const hitIndexes = engine.lineHitTest(
-            0,
-            clickY,
-            canvasWidth,
-            clickY,
-            weaponDef.hitRadius,
-          );
+          let hitIndexes: number[];
+          if (weaponDef.snapAngle) {
+            // Snapped directional beam: line from edge to edge through click along angle
+            const length = Math.max(bounds.width, bounds.height) * 1.5;
+            const cos = Math.cos(beamAngleRad);
+            const sin = Math.sin(beamAngleRad);
+            hitIndexes = engine.lineHitTest(
+              targetX - cos * length,
+              targetY - sin * length,
+              targetX + cos * length,
+              targetY + sin * length,
+              weaponDef.hitRadius,
+            );
+          } else {
+            const isVertical = weaponDef.hitOrientation === "vertical";
+            hitIndexes = isVertical
+              ? engine.lineHitTest(
+                  targetX,
+                  0,
+                  targetX,
+                  bounds.height,
+                  weaponDef.hitRadius,
+                )
+              : engine.lineHitTest(
+                  0,
+                  targetY,
+                  bounds.width,
+                  targetY,
+                  weaponDef.hitRadius,
+                );
+          }
           for (const idx of hitIndexes) {
-            if (deadBugIndexesRef.current.has(idx)) continue;
-            const result = engine.handleHit(idx, 1);
+            const result = engine.handleHit(idx, weaponDef.damage ?? 1);
             if (!result) continue;
-            if (result.defeated) deadBugIndexesRef.current.add(idx);
             const bugPos = engine.getAllBugs()[idx];
             const vx = bugPos
               ? Math.round(bugPos.x + bounds.left)
@@ -951,6 +1022,8 @@ const BugCanvas = memo(function BugCanvas({
               variant: result.variant,
               x: vx,
               y: vy,
+              pointValue: result.pointValue,
+              frozen: result.frozen,
             });
             updateQaLastHit({
               defeated: result.defeated,
@@ -962,19 +1035,39 @@ const BugCanvas = memo(function BugCanvas({
           }
         }
       } else if (weaponDef.hitPattern === "area") {
-        // ── Pulse: hit all bugs within radius ───────────────────
+        // ── Pulse / Bomb / Shockwave / Zapper ───────────────────
+        onWeaponFireRef.current?.(weaponId, fireX, fireY);
+
         if (typeof engine.radiusHitTest === "function") {
           const hitIndexes = engine.radiusHitTest(
-            clickX,
-            clickY,
+            targetX,
+            targetY,
             weaponDef.hitRadius,
           );
           for (const idx of hitIndexes) {
-            if (deadBugIndexesRef.current.has(idx)) continue;
-            const result = engine.handleHit(idx, 1);
+            const bug = engine.getAllBugs()[idx];
+            let damage = weaponDef.damage ?? 1;
+
+            // Instakill 1-HP bugs if weapon has that flag
+            if (weaponDef.instakillLowHp && bug) {
+              const bugHp: number = (bug as any).hp ?? 1;
+              if (bugHp <= 1) damage = 999;
+            }
+
+            const result = engine.handleHit(idx, damage);
             if (!result) continue;
-            if (result.defeated) deadBugIndexesRef.current.add(idx);
-            const bugPos = engine.getAllBugs()[idx];
+
+            // Knockback surviving bugs
+            if (weaponDef.appliesKnockback && !result.defeated && bug) {
+              const dx = bug.x - targetX || 1;
+              const dy = bug.y - targetY || 1;
+              const dist = Math.hypot(dx, dy) || 1;
+              if (typeof (bug as any).knockback === "function") {
+                (bug as any).knockback((dx / dist) * 180, (dy / dist) * 180);
+              }
+            }
+
+            const bugPos = bug;
             const vx = bugPos
               ? Math.round(bugPos.x + bounds.left)
               : event.clientX;
@@ -987,6 +1080,8 @@ const BugCanvas = memo(function BugCanvas({
               variant: result.variant,
               x: vx,
               y: vy,
+              pointValue: result.pointValue,
+              frozen: result.frozen,
             });
             updateQaLastHit({
               defeated: result.defeated,
@@ -997,12 +1092,245 @@ const BugCanvas = memo(function BugCanvas({
             });
           }
         }
+      } else if (weaponDef.hitPattern === "cone") {
+        // ── Freeze: icy cone spray from click toward center ──────
+        const angleDeg =
+          (Math.atan2(centerY - targetY, centerX - targetX) * 180) / Math.PI;
+        const arcDeg = weaponDef.coneArcDeg ?? 90;
+
+        onWeaponFireRef.current?.(weaponId, fireX, fireY, {
+          angle: (angleDeg * Math.PI) / 180,
+        });
+
+        if (typeof engine.coneHitTest === "function") {
+          const hitIndexes = engine.coneHitTest(
+            targetX,
+            targetY,
+            angleDeg,
+            arcDeg,
+            weaponDef.hitRadius,
+          );
+          for (const idx of hitIndexes) {
+            const result = engine.handleHit(idx, weaponDef.damage ?? 1);
+            if (!result) continue;
+
+            // Apply slow to surviving or just-hit bugs
+            const bug = engine.getAllBugs()[idx];
+            if (weaponDef.appliesSlow && bug) {
+              if (typeof (bug as any).applyFreeze === "function") {
+                (bug as any).applyFreeze(0.35, 3500);
+              }
+            }
+
+            const bugPos = bug;
+            const vx = bugPos
+              ? Math.round(bugPos.x + bounds.left)
+              : event.clientX;
+            const vy = bugPos
+              ? Math.round(bugPos.y + bounds.top)
+              : event.clientY;
+            onHitRef.current({
+              defeated: result.defeated,
+              remainingHp: result.remainingHp,
+              variant: result.variant,
+              x: vx,
+              y: vy,
+              pointValue: result.pointValue,
+              frozen: result.frozen,
+            });
+            updateQaLastHit({
+              defeated: result.defeated,
+              remainingHp: result.remainingHp,
+              variant: result.variant,
+              x: vx,
+              y: vy,
+            });
+          }
+        }
+      } else if (weaponDef.hitPattern === "chain") {
+        // ── Chain Zap: bounce lightning between nearby bugs ──────
+        let hitCandidate: { distance: number; index: number } | null = null;
+
+        try {
+          if (typeof engine.hitTest === "function") {
+            const res = engine.hitTest(targetX, targetY);
+            if (res)
+              hitCandidate = { distance: res.distance, index: res.index };
+          }
+        } catch {
+          void 0;
+        }
+
+        if (!hitCandidate) {
+          for (const bugPosition of latestBugPositionsRef.current) {
+            const distance = Math.hypot(
+              targetX - bugPosition.x,
+              targetY - bugPosition.y,
+            );
+            if (
+              distance <= Math.max(bugPosition.radius, weaponDef.hitRadius) &&
+              (!hitCandidate || distance < hitCandidate.distance)
+            ) {
+              hitCandidate = { distance, index: bugPosition.index };
+            }
+          }
+        }
+
+        if (!hitCandidate) {
+          // No initial target, show effect at click
+          onWeaponFireRef.current?.(weaponId, fireX, fireY);
+          return;
+        }
+
+        const chainIndexes =
+          typeof engine.chainHitTest === "function"
+            ? [
+                hitCandidate.index,
+                ...engine.chainHitTest(
+                  hitCandidate.index,
+                  weaponDef.hitRadius,
+                  weaponDef.chainMaxBounces ?? 3,
+                ),
+              ]
+            : [hitCandidate.index];
+
+        // Build chain node positions for the effect (viewport-space)
+        const chainNodes = chainIndexes
+          .map((idx) => {
+            const bug = engine.getAllBugs()[idx];
+            if (!bug) return null;
+            return {
+              x: Math.round(bug.x + bounds.left),
+              y: Math.round(bug.y + bounds.top),
+            };
+          })
+          .filter(Boolean) as Array<{ x: number; y: number }>;
+
+        onWeaponFireRef.current?.(weaponId, fireX, fireY, {
+          chainNodes,
+        });
+
+        for (const idx of chainIndexes) {
+          const result = engine.handleHit(idx, weaponDef.damage ?? 1);
+          if (!result) continue;
+          const bugPos = engine.getAllBugs()[idx];
+          const vx = bugPos
+            ? Math.round(bugPos.x + bounds.left)
+            : event.clientX;
+          const vy = bugPos ? Math.round(bugPos.y + bounds.top) : event.clientY;
+          onHitRef.current({
+            defeated: result.defeated,
+            remainingHp: result.remainingHp,
+            variant: result.variant,
+            x: vx,
+            y: vy,
+            pointValue: result.pointValue,
+            frozen: result.frozen,
+          });
+          updateQaLastHit({
+            defeated: result.defeated,
+            remainingHp: result.remainingHp,
+            variant: result.variant,
+            x: vx,
+            y: vy,
+          });
+        }
+      } else if (weaponDef.hitPattern === "seeking") {
+        // ── Pointer / Null Pointer: auto-seek closest bug ────────
+        let targetIdx = -1;
+
+        try {
+          if (typeof engine.closestTargetIndex === "function") {
+            const sr =
+              weaponDef.seekRadius === undefined ||
+              weaponDef.seekRadius === Infinity
+                ? Infinity
+                : weaponDef.seekRadius;
+            targetIdx = engine.closestTargetIndex(targetX, targetY, sr);
+          }
+        } catch {
+          void 0;
+        }
+
+        const seekTargetBug =
+          targetIdx >= 0 ? engine.getAllBugs()[targetIdx] : null;
+        const seekTargetVx = seekTargetBug
+          ? Math.round(seekTargetBug.x + bounds.left)
+          : event.clientX;
+        const seekTargetVy = seekTargetBug
+          ? Math.round(seekTargetBug.y + bounds.top)
+          : event.clientY;
+        onWeaponFireRef.current?.(weaponId, fireX, fireY, {
+          targetX: seekTargetVx,
+          targetY: seekTargetVy,
+        });
+
+        if (targetIdx >= 0) {
+          const result = engine.handleHit(targetIdx, weaponDef.damage ?? 1);
+          if (result) {
+            const bugPos = engine.getAllBugs()[targetIdx];
+            const vx = bugPos
+              ? Math.round(bugPos.x + bounds.left)
+              : event.clientX;
+            const vy = bugPos
+              ? Math.round(bugPos.y + bounds.top)
+              : event.clientY;
+            onHitRef.current({
+              defeated: result.defeated,
+              remainingHp: result.remainingHp,
+              variant: result.variant,
+              x: vx,
+              y: vy,
+              pointValue: result.pointValue,
+              frozen: result.frozen,
+            });
+            updateQaLastHit({
+              defeated: result.defeated,
+              remainingHp: result.remainingHp,
+              variant: result.variant,
+              x: vx,
+              y: vy,
+            });
+
+            // Splash damage for nullpointer
+            if (
+              weaponDef.splashRadius &&
+              typeof engine.radiusHitTest === "function"
+            ) {
+              const primaryBug = engine.getAllBugs()[targetIdx];
+              if (primaryBug) {
+                const splashTargets = engine
+                  .radiusHitTest(
+                    primaryBug.x,
+                    primaryBug.y,
+                    weaponDef.splashRadius,
+                  )
+                  .filter((i: number) => i !== targetIdx);
+                for (const idx of splashTargets) {
+                  const sr = engine.handleHit(idx, 1);
+                  if (!sr) continue;
+                  const sp = engine.getAllBugs()[idx];
+                  onHitRef.current({
+                    defeated: sr.defeated,
+                    remainingHp: sr.remainingHp,
+                    variant: sr.variant,
+                    x: sp ? Math.round(sp.x + bounds.left) : vx,
+                    y: sp ? Math.round(sp.y + bounds.top) : vy,
+                    pointValue: sr.pointValue,
+                  });
+                }
+              }
+            }
+          }
+        }
       }
     };
 
     document.addEventListener("visibilitychange", updateActivity);
     window.addEventListener("focus", updateActivity);
     window.addEventListener("blur", updateActivity);
+    // Single registration - the useEffect cleanup in React Strict Mode re-runs will
+    // remove the previous listener before re-registering, so no double-fire risk.
     window.addEventListener("mousedown", handlePointerDown);
     animationFrameId = window.requestAnimationFrame(renderFrame);
 
@@ -1044,7 +1372,27 @@ interface BackgroundFieldProps {
   className?: string;
   combatStats?: SiegeCombatStats | null;
   interactiveSessionKey?: string | null;
+  onStructurePlace?: (
+    structureType: StructureId,
+    viewportX: number,
+    viewportY: number,
+    canvasX: number,
+    canvasY: number,
+    structureId?: string,
+  ) => void;
   onTerminatorHit?: (payload: BugHitPayload) => void;
+  onWeaponFired?: (id: SiegeWeaponId, firedAt: number) => void;
+  placedStructures?: PlacedStructure[];
+  agentCaptures?: Record<string, AgentCaptureState>;
+  onAgentAbsorb?: (data: {
+    structureId: string;
+    phase: "absorbing" | "done" | "failed";
+    variant: string;
+    bugX: number;
+    bugY: number;
+    processingMs?: number;
+  }) => void;
+  placingStructureId?: StructureId | null;
   remainingBugCount?: number;
   selectedWeaponId?: SiegeWeaponId;
   showParticleCount: boolean;
@@ -1062,9 +1410,15 @@ const BackgroundField = memo(function BackgroundField({
   className = "",
   combatStats = null,
   interactiveSessionKey = null,
+  onStructurePlace,
   onTerminatorHit,
+  onWeaponFired,
+  placedStructures,
+  agentCaptures,
+  onAgentAbsorb,
+  placingStructureId,
   remainingBugCount,
-  selectedWeaponId = "hammer",
+  selectedWeaponId = "wrench",
   showParticleCount,
   showTerminatorStatusBadge = true,
   siegeZones = [],
@@ -1098,18 +1452,79 @@ const BackgroundField = memo(function BackgroundField({
     : `${terminatorMode ? "terminator" : "ambient"}:${bugCountsKey}`;
   const [hammerPosition, setHammerPosition] = useState({ x: 0, y: 0 });
   const [hammerSwing, setHammerSwing] = useState(false);
+  const [cursorLastFireTimes, setCursorLastFireTimes] = useState<
+    Partial<Record<SiegeWeaponId, number>>
+  >({});
+  const [turretLastFireTimes, setTurretLastFireTimes] = useState<
+    Record<string, number>
+  >({});
   const hammerPositionRef = useRef({ x: 0, y: 0 });
   const weaponCursorRef = useRef<HTMLDivElement | null>(null);
   const hammerMoveFrameRef = useRef<number | null>(null);
   const [weaponEffects, setWeaponEffects] = useState<WeaponEffectEvent[]>([]);
+  const onWeaponFiredRef = useRef(onWeaponFired);
+
+  useEffect(() => {
+    onWeaponFiredRef.current = onWeaponFired;
+  }, [onWeaponFired]);
+
+  useEffect(() => {
+    if (!terminatorMode) {
+      setCursorLastFireTimes({});
+      setTurretLastFireTimes({});
+      return;
+    }
+
+    setCursorLastFireTimes({});
+    setTurretLastFireTimes({});
+  }, [gameSessionKey, terminatorMode]);
+
+  const handleTurretFire = useCallback(
+    (data: {
+      structureId: string;
+      srcX: number;
+      srcY: number;
+      targetX: number;
+      targetY: number;
+      angle: number;
+    }) => {
+      setTurretLastFireTimes((prev) => ({
+        ...prev,
+        [data.structureId]: performance.now(),
+      }));
+    },
+    [],
+  );
 
   const handleWeaponFire = useCallback(
-    (weapon: SiegeWeaponId, x: number, y: number) => {
-      const event = createEffectEvent(weapon, x, y);
+    (
+      weapon: SiegeWeaponId,
+      x: number,
+      y: number,
+      extras?: {
+        angle?: number;
+        chainNodes?: Array<{ x: number; y: number }>;
+        jagOffsets?: number[];
+        targetX?: number;
+        targetY?: number;
+        color?: string;
+      },
+    ) => {
+      const event = createEffectEvent(weapon, x, y, extras);
       setWeaponEffects((prev) => {
         const now = performance.now();
         return [...prev.filter((e) => isEffectAlive(e, now)), event];
       });
+      setCursorLastFireTimes((prev) => ({
+        ...prev,
+        [weapon]: event.startedAt,
+      }));
+      // Always swing wrench cursor on any wrench fire (hit or miss)
+      if (weapon === "wrench") {
+        setHammerSwing(true);
+      }
+      // Notify parent so it can update reload bar state
+      onWeaponFiredRef.current?.(weapon, event.startedAt);
     },
     [],
   );
@@ -1135,6 +1550,28 @@ const BackgroundField = memo(function BackgroundField({
       document.body.classList.remove("cursor-none");
     };
   }, [terminatorMode]);
+
+  useEffect(() => {
+    if (!terminatorMode) {
+      setWeaponEffects([]);
+      return undefined;
+    }
+
+    if (weaponEffects.length === 0) {
+      return undefined;
+    }
+
+    const intervalId = window.setInterval(() => {
+      const now = performance.now();
+      setWeaponEffects((previous) =>
+        previous.filter((effect) => isEffectAlive(effect, now)),
+      );
+    }, 80);
+
+    return () => {
+      window.clearInterval(intervalId);
+    };
+  }, [terminatorMode, weaponEffects.length]);
 
   useEffect(() => {
     if (!terminatorMode) {
@@ -1254,8 +1691,16 @@ const BackgroundField = memo(function BackgroundField({
     [gameSessionKey, onTerminatorHit, totalBugCount],
   );
 
-  const handleEntityDeath = useCallback(
+  const handleStructureKill = useCallback(
     (x: number, y: number, variant: string) => {
+      onTerminatorHit?.({
+        defeated: true,
+        remainingHp: 0,
+        variant: variant as BugVariant,
+        x,
+        y,
+        pointValue: 1,
+      });
       setGameState((currentValue) => {
         const nextState =
           currentValue.sessionKey === gameSessionKey
@@ -1263,11 +1708,11 @@ const BackgroundField = memo(function BackgroundField({
             : {
                 remainingTargets: totalBugCount,
                 sessionKey: gameSessionKey,
-                splats: [],
+                splats: [] as GameState["splats"],
               };
-
         return {
           ...nextState,
+          remainingTargets: Math.max(0, nextState.remainingTargets - 1),
           splats: [
             ...nextState.splats.slice(-5),
             {
@@ -1280,7 +1725,15 @@ const BackgroundField = memo(function BackgroundField({
         };
       });
     },
-    [gameSessionKey, totalBugCount],
+    [gameSessionKey, onTerminatorHit, totalBugCount],
+  );
+
+  const handleEntityDeath = useCallback(
+    (_x: number, _y: number, _variant: string) => {
+      // Weapon/structure handlers already update kill state and splats.
+      // Avoid duplicate delayed splats when engine transitions dying->dead.
+    },
+    [],
   );
 
   const overlayLabel = terminatorMode
@@ -1308,6 +1761,7 @@ const BackgroundField = memo(function BackgroundField({
       ) : null}
       <BugCanvas
         bugVisualSettings={bugVisualSettings}
+        bugCountsKey={bugCountsKey}
         chartFocus={chartFocus}
         combatStats={combatStats}
         motionProfile={motionProfile}
@@ -1319,15 +1773,36 @@ const BackgroundField = memo(function BackgroundField({
         terminatorMode={terminatorMode}
         gameConfig={gameConfig}
         onEntityDeath={handleEntityDeath}
+        onStructureKill={terminatorMode ? handleStructureKill : undefined}
+        onAgentAbsorb={terminatorMode ? onAgentAbsorb : undefined}
+        onTurretFire={terminatorMode ? handleTurretFire : undefined}
+        placingStructureId={terminatorMode ? placingStructureId : null}
+        onStructurePlace={terminatorMode ? onStructurePlace : undefined}
         selectedWeaponId={selectedWeaponId}
         onWeaponFire={terminatorMode ? handleWeaponFire : undefined}
+        hammerPositionRef={hammerPositionRef}
       />
       {effectiveBugCount === 0 ? (
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_35%,rgba(187,247,208,0.12),transparent_28%),radial-gradient(circle_at_60%_68%,rgba(125,211,252,0.08),transparent_34%)] [animation:all-clear-breathe_6s_ease-in-out_infinite]" />
       ) : null}
       <WeaponEffectLayer effects={terminatorMode ? weaponEffects : []} />
+      {terminatorMode && placedStructures && placedStructures.length > 0 ? (
+        <StructureLayer
+          structures={placedStructures}
+          agentCaptures={agentCaptures}
+          turretLastFireTimes={turretLastFireTimes}
+        />
+      ) : null}
       {terminatorMode ? (
-        <WeaponCursor weaponId={selectedWeaponId} swinging={hammerSwing} />
+        <WeaponCursor
+          hideSystemCursor={
+            selectedWeaponId === "wrench" || !!placingStructureId
+          }
+          lastFiredAt={cursorLastFireTimes[selectedWeaponId]}
+          structureId={placingStructureId ?? undefined}
+          weaponId={selectedWeaponId}
+          swinging={hammerSwing}
+        />
       ) : null}
       {activeGameState.splats.map((splat) => (
         <div

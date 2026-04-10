@@ -71,8 +71,29 @@ function AppContent() {
         interactiveSessionKey={
           siegeGame.interactiveMode ? siegeGame.interactiveSessionKey : null
         }
+        agentCaptures={
+          siegeGame.interactiveMode ? siegeGame.agentCaptures : undefined
+        }
+        onAgentAbsorb={
+          siegeGame.interactiveMode ? siegeGame.handleAgentAbsorb : undefined
+        }
+        onStructurePlace={
+          siegeGame.interactiveMode
+            ? (type, vx, vy, cx, cy, structureId) =>
+                siegeGame.placeStructure(type, vx, vy, cx, cy, structureId)
+            : undefined
+        }
         onTerminatorHit={
           siegeGame.interactiveMode ? siegeGame.handleInteractiveHit : undefined
+        }
+        onWeaponFired={
+          siegeGame.interactiveMode ? siegeGame.handleWeaponFired : undefined
+        }
+        placedStructures={
+          siegeGame.interactiveMode ? siegeGame.placedStructures : undefined
+        }
+        placingStructureId={
+          siegeGame.interactiveMode ? siegeGame.placingStructureId : undefined
         }
         remainingBugCount={
           siegeGame.interactiveMode
@@ -100,13 +121,19 @@ function AppContent() {
           "relative z-10 mx-auto flex min-h-screen w-full max-w-[1380px] flex-col gap-8 px-4 py-6 sm:px-6 sm:py-8 lg:px-8 lg:py-10",
           siegeGame.interactiveMode ? "pointer-events-none select-none" : "",
         )}
+        style={{
+          opacity:
+            siegeGame.siegePhase === "active"
+              ? 0.86
+              : siegeGame.siegePhase === "entering"
+                ? 0.94
+                : siegeGame.siegePhase === "exiting"
+                  ? 0.96
+                  : 1,
+          transition: "opacity 320ms ease-out",
+        }}
       >
-        <header
-          className={cn(
-            "flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between",
-            siegeGame.interactiveMode ? "opacity-80" : "",
-          )}
-        >
+        <header className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div className="max-w-3xl">
             <p className="text-[0.72rem] font-semibold uppercase tracking-[0.28em] text-stone-500">
               {headerModeEyebrow}
@@ -123,11 +150,19 @@ function AppContent() {
             {siegeGame.interactiveMode ? (
               <SiegeHud
                 className="pointer-events-auto w-[min(18rem,calc(100vw-1.5rem))]"
+                debugMode={siegeGame.debugMode}
                 interactiveKills={siegeGame.interactiveKills}
+                interactivePoints={siegeGame.interactivePoints}
                 interactiveRemainingBugs={siegeGame.interactiveRemainingBugs}
+                onArmStructure={siegeGame.armStructure}
                 onExit={handleExitInteractiveMode}
                 onSelectWeapon={siegeGame.selectWeapon}
+                onToggleDebugMode={siegeGame.toggleDebugMode}
+                placedCountByType={siegeGame.placedCountByType}
+                placingStructureId={siegeGame.placingStructureId}
                 selectedWeaponId={siegeGame.selectedWeaponId}
+                lastFireTimes={siegeGame.lastFireTimes}
+                unlockedStructures={siegeGame.combatStats.unlockedStructures}
                 weaponSnapshots={siegeGame.weaponSnapshots}
               />
             ) : (

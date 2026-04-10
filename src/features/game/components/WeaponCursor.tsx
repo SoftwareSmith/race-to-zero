@@ -1,149 +1,279 @@
 /**
- * WeaponCursor — a per-weapon SVG cursor that tracks the mouse position.
- *
- * Position is updated imperatively via direct DOM style mutation (no React
- * state on mouse-move) for zero-jank cursor tracking. The `swinging` prop
- * is used to play the hammer-swing animation on click.
+ * WeaponCursor — a per-weapon custom cursor that tracks the mouse position.
  */
 
 import { useEffect, useRef } from "react";
-import type { SiegeWeaponId } from "@game/types";
+import { WEAPON_DEFS } from "@config/weaponConfig";
+import type { SiegeWeaponId, StructureId } from "@game/types";
+import WeaponGlyph from "@shared/components/icons/WeaponGlyph";
 
 interface WeaponCursorProps {
+  hideSystemCursor?: boolean;
+  lastFiredAt?: number;
+  structureId?: StructureId;
   weaponId: SiegeWeaponId;
   swinging?: boolean;
 }
 
-// ── Hammer ──────────────────────────────────────────────────────
+const CURSOR_THEME: Record<
+  SiegeWeaponId,
+  { accent: string; aura: string; ringClassName?: string; size: number }
+> = {
+  wrench: {
+    accent: "#fbbf24",
+    aura: "0 0 22px rgba(251,191,36,0.32)",
+    size: 48,
+  },
+  zapper: {
+    accent: "#fde047",
+    aura: "0 0 22px rgba(253,224,71,0.3)",
+    size: 48,
+  },
+  pulse: {
+    accent: "#38bdf8",
+    aura: "0 0 22px rgba(56,189,248,0.3)",
+    size: 50,
+  },
+  pointer: {
+    accent: "#f87171",
+    aura: "0 0 24px rgba(248,113,113,0.28)",
+    size: 46,
+  },
+  freeze: {
+    accent: "#bfdbfe",
+    aura: "0 0 22px rgba(191,219,254,0.32)",
+    size: 50,
+  },
+  chain: {
+    accent: "#6ee7b7",
+    aura: "0 0 24px rgba(110,231,183,0.28)",
+    ringClassName: "[animation:laser-cursor-breathe_2s_ease-in-out_infinite]",
+    size: 48,
+  },
+  laser: {
+    accent: "#f87171",
+    aura: "0 0 24px rgba(248,113,113,0.28)",
+    size: 48,
+  },
+  bomb: {
+    accent: "#fb923c",
+    aura: "0 0 24px rgba(251,146,60,0.28)",
+    size: 52,
+  },
+  shockwave: {
+    accent: "#a78bfa",
+    aura: "0 0 26px rgba(167,139,250,0.3)",
+    size: 54,
+  },
+  nullpointer: {
+    accent: "#fb7185",
+    aura: "0 0 26px rgba(251,113,133,0.3)",
+    size: 54,
+  },
+  flame: {
+    accent: "#f97316",
+    aura: "0 0 24px rgba(249,115,22,0.35)",
+    size: 50,
+  },
+  stomp: {
+    accent: "#a3e635",
+    aura: "0 0 22px rgba(163,230,53,0.3)",
+    size: 52,
+  },
+  swatter: {
+    accent: "#fcd34d",
+    aura: "0 0 22px rgba(252,211,77,0.3)",
+    size: 50,
+  },
+};
 
-function HammerIcon({ swinging }: { swinging: boolean }) {
-  return (
-    <span
-      className={[
-        "inline-flex text-[1.9rem]",
-        "[filter:drop-shadow(0_8px_18px_rgba(0,0,0,0.35))]",
-        "[transform:translate3d(-6px,-6px,0)]",
-        "[transform-origin:18px_14px]",
-        swinging ? "[animation:weapon-cursor-swing_180ms_ease-out]" : "",
-      ]
-        .filter(Boolean)
-        .join(" ")}
-    >
-      🔨
-    </span>
-  );
-}
+function CursorReticle({
+  lastFiredAt,
+  structureId,
+  weaponId,
+}: {
+  lastFiredAt?: number;
+  structureId?: StructureId;
+  weaponId: SiegeWeaponId;
+}) {
+  if (structureId) {
+    const structureTheme: Record<
+      StructureId,
+      { accent: string; aura: string; icon: JSX.Element; size: number }
+    > = {
+      lantern: {
+        accent: "#fbbf24",
+        aura: "0 0 24px rgba(251,191,36,0.35)",
+        icon: <span className="text-xl leading-none">🔦</span>,
+        size: 48,
+      },
+      agent: {
+        accent: "#34d399",
+        aura: "0 0 24px rgba(52,211,153,0.35)",
+        icon: <span className="text-xl leading-none">🤖</span>,
+        size: 48,
+      },
+      turret: {
+        accent: "#22d3ee",
+        aura: "0 0 24px rgba(34,211,238,0.35)",
+        icon: <WeaponGlyph className="h-6 w-6 text-cyan-100" id="pointer" />,
+        size: 48,
+      },
+    };
+    const active = structureTheme[structureId];
 
-// ── Laser crosshair ──────────────────────────────────────────────
+    return (
+      <div
+        className="relative"
+        style={{
+          width: active.size,
+          height: active.size,
+          filter: `drop-shadow(${active.aura})`,
+          transform: "translate(-50%, -50%)",
+        }}
+      >
+        <div
+          className="absolute inset-0 rounded-full border"
+          style={{
+            borderColor: `${active.accent}66`,
+            background:
+              "radial-gradient(circle at 38% 36%, rgba(255,255,255,0.18), rgba(2,6,23,0.6))",
+          }}
+        />
+        <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
+          {active.icon}
+        </div>
+      </div>
+    );
+  }
 
-function LaserIcon() {
-  return (
-    <svg
-      aria-hidden="true"
-      viewBox="-20 -20 40 40"
-      width="40"
-      height="40"
-      className="[animation:laser-cursor-breathe_2s_ease-in-out_infinite] [transform:translate(-50%,-50%)]"
-      style={{ position: "absolute", left: 0, top: 0 }}
-    >
-      {/* Outer ring */}
-      <circle
-        cx="0"
-        cy="0"
-        r="11"
-        stroke="#f87171"
-        strokeWidth="1"
-        fill="none"
-        opacity="0.7"
-      />
-      {/* Four guide lines with gaps */}
-      <line
-        x1="-19"
-        y1="0"
-        x2="-14"
-        y2="0"
-        stroke="#f87171"
-        strokeWidth="1.2"
-        opacity="0.9"
-      />
-      <line
-        x1="14"
-        y1="0"
-        x2="19"
-        y2="0"
-        stroke="#f87171"
-        strokeWidth="1.2"
-        opacity="0.9"
-      />
-      <line
-        x1="0"
-        y1="-19"
-        x2="0"
-        y2="-14"
-        stroke="#f87171"
-        strokeWidth="1.2"
-        opacity="0.9"
-      />
-      <line
-        x1="0"
-        y1="14"
-        x2="0"
-        y2="19"
-        stroke="#f87171"
-        strokeWidth="1.2"
-        opacity="0.9"
-      />
-      {/* Center dot */}
-      <circle cx="0" cy="0" r="1.5" fill="#f87171" opacity="0.95" />
-    </svg>
-  );
-}
+  const theme = CURSOR_THEME[weaponId];
+  const cooldownMs =
+    WEAPON_DEFS.find((weapon) => weapon.id === weaponId)?.cooldownMs ?? 0;
+  const size = theme.size;
+  const guide = Math.round(size * 0.22);
+  const inner = Math.round(size * 0.42);
+  const showOuterRing = !!theme.ringClassName;
+  const showInnerRing =
+    weaponId !== "wrench" && weaponId !== "bomb" && weaponId !== "pointer";
+  const showCrosshair =
+    weaponId === "laser" ||
+    weaponId === "pointer" ||
+    weaponId === "nullpointer";
 
-// ── Pulse rings ──────────────────────────────────────────────────
-
-function PulseIcon() {
   return (
     <div
-      aria-hidden="true"
-      style={{ position: "absolute", left: 0, top: 0, width: 0, height: 0 }}
+      className="relative"
+      style={{
+        width: size,
+        height: size,
+        filter: `drop-shadow(${theme.aura})`,
+        transform: "translate(-50%, -50%)",
+      }}
     >
-      {/* Outer breathing ring */}
+      {showOuterRing ? (
+        <div
+          className={[
+            "absolute inset-0 rounded-full border bg-black/20 backdrop-blur-[1px]",
+            theme.ringClassName ?? "",
+          ]
+            .filter(Boolean)
+            .join(" ")}
+          style={{ borderColor: `${theme.accent}cc` }}
+        />
+      ) : null}
+      {showInnerRing ? (
+        <div
+          className="absolute left-1/2 top-1/2 rounded-full border bg-black/28"
+          style={{
+            width: inner,
+            height: inner,
+            borderColor: `${theme.accent}99`,
+            transform: "translate(-50%, -50%)",
+          }}
+        />
+      ) : null}
+      {showCrosshair ? (
+        <>
+          <div
+            className="absolute left-1/2 top-0"
+            style={{
+              width: 1.5,
+              height: guide,
+              background: theme.accent,
+              opacity: 0.95,
+              transform: "translateX(-50%)",
+            }}
+          />
+          <div
+            className="absolute bottom-0 left-1/2"
+            style={{
+              width: 1.5,
+              height: guide,
+              background: theme.accent,
+              opacity: 0.95,
+              transform: "translateX(-50%)",
+            }}
+          />
+          <div
+            className="absolute left-0 top-1/2"
+            style={{
+              width: guide,
+              height: 1.5,
+              background: theme.accent,
+              opacity: 0.95,
+              transform: "translateY(-50%)",
+            }}
+          />
+          <div
+            className="absolute right-0 top-1/2"
+            style={{
+              width: guide,
+              height: 1.5,
+              background: theme.accent,
+              opacity: 0.95,
+              transform: "translateY(-50%)",
+            }}
+          />
+        </>
+      ) : null}
       <div
-        className="rounded-full border border-sky-400/60 [animation:pulse-cursor-orbit_2s_ease-in-out_infinite]"
+        className="absolute left-1/2 top-1/2 rounded-full"
         style={{
-          position: "absolute",
-          width: 32,
-          height: 32,
+          width: 3,
+          height: 3,
+          background: theme.accent,
+          boxShadow: `0 0 6px ${theme.accent}`,
           transform: "translate(-50%, -50%)",
         }}
       />
-      {/* Inner static ring */}
-      <div
-        className="rounded-full border border-sky-300/80"
-        style={{
-          position: "absolute",
-          width: 14,
-          height: 14,
-          transform: "translate(-50%, -50%)",
-        }}
+      <WeaponGlyph
+        className="absolute left-1/2 top-1/2 h-6 w-6 -translate-x-1/2 -translate-y-1/2"
+        id={weaponId}
       />
-      {/* Center dot */}
-      <div
-        className="rounded-full bg-sky-300"
-        style={{
-          position: "absolute",
-          width: 4,
-          height: 4,
-          transform: "translate(-50%, -50%)",
-        }}
-      />
+      {cooldownMs > 0 && lastFiredAt != null ? (
+        <div
+          className="absolute left-1/2 top-full mt-1 h-1 w-[68%] -translate-x-1/2 overflow-hidden rounded-full border border-black/35 bg-black/45"
+          style={{ boxShadow: `0 0 8px ${theme.accent}33` }}
+        >
+          <div
+            key={lastFiredAt}
+            className="h-full rounded-full"
+            style={{
+              background: `linear-gradient(90deg, ${theme.accent}, ${theme.accent}bb)`,
+              animation: `reload-drain ${cooldownMs}ms linear forwards`,
+            }}
+          />
+        </div>
+      ) : null}
     </div>
   );
 }
 
-// ── Main component ───────────────────────────────────────────────
-
 export default function WeaponCursor({
+  hideSystemCursor = false,
+  lastFiredAt,
+  structureId,
   weaponId,
   swinging = false,
 }: WeaponCursorProps) {
@@ -174,16 +304,47 @@ export default function WeaponCursor({
     };
   }, []);
 
+  useEffect(() => {
+    document.body.classList.toggle("wrench-cursor-active", hideSystemCursor);
+
+    return () => {
+      document.body.classList.remove("wrench-cursor-active");
+    };
+  }, [hideSystemCursor]);
+
   return (
     <div
       ref={containerRef}
       aria-hidden="true"
-      className="pointer-events-none fixed left-0 top-0 z-[95]"
+      className="pointer-events-none fixed left-0 top-0 z-[110]"
       style={{ transform: "translate3d(-200px, -200px, 0)" }}
     >
-      {weaponId === "hammer" && <HammerIcon swinging={swinging} />}
-      {weaponId === "laser" && <LaserIcon />}
-      {weaponId === "pulse" && <PulseIcon />}
+      <div
+        className={
+          weaponId === "wrench" && swinging
+            ? "[animation:weapon-cursor-swing_180ms_ease-out]"
+            : undefined
+        }
+        style={{
+          transformOrigin:
+            weaponId === "wrench" && !structureId ? "18% 18%" : "50% 50%",
+        }}
+      >
+        <div
+          style={{
+            transform:
+              weaponId === "wrench" && !structureId
+                ? "translate(-30%, -28%)"
+                : undefined,
+          }}
+        >
+          <CursorReticle
+            lastFiredAt={lastFiredAt}
+            structureId={structureId}
+            weaponId={weaponId}
+          />
+        </div>
+      </div>
     </div>
   );
 }

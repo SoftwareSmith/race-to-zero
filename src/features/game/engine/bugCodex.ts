@@ -35,6 +35,8 @@ export interface BugType {
   iconUrl?: string;
   color?: string;
   size?: number;
+  /** Points awarded to the player for defeating this bug. */
+  pointValue?: number;
   weaponMatchups: BugWeaponMatchups;
 }
 
@@ -57,11 +59,10 @@ function variantDefToBugType(def: BugVariantDef): BugType {
     preferredRegion: def.preferredRegion,
     iconVariant: def.iconVariant,
     iconUrl: def.iconUrl,
-    weaponMatchups: {
-      hammer: { ...def.weaponMatchups.hammer },
-      laser: { ...def.weaponMatchups.laser },
-      pulse: { ...def.weaponMatchups.pulse },
-    },
+    pointValue: def.pointValue,
+    weaponMatchups: Object.fromEntries(
+      Object.entries(def.weaponMatchups).map(([k, v]) => [k, { ...v }])
+    ) as BugWeaponMatchups,
   };
 }
 
@@ -78,11 +79,11 @@ function cloneWeaponMatchups(
   source: Partial<BugWeaponMatchups> | undefined,
   fallback: BugWeaponMatchups,
 ) {
-  return {
-    hammer: { ...fallback.hammer, ...source?.hammer },
-    laser: { ...fallback.laser, ...source?.laser },
-    pulse: { ...fallback.pulse, ...source?.pulse },
-  } satisfies BugWeaponMatchups;
+  const result = {} as BugWeaponMatchups;
+  for (const key of Object.keys(fallback) as Array<keyof BugWeaponMatchups>) {
+    result[key] = { ...fallback[key], ...source?.[key] };
+  }
+  return result;
 }
 
 export function cloneCodex(source: Record<string, BugType>) {

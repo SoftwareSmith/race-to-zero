@@ -39,7 +39,7 @@ export interface CrawlProfile {
 
 // ── Weapon matchup types ──────────────────────────────────────────────────────
 
-export type BugWeaponId = "hammer" | "laser" | "pulse";
+export type BugWeaponId = "wrench" | "pulse" | "freeze" | "shockwave" | "nullpointer";
 export type BugWeaponMatchupState = "favored" | "steady" | "risky";
 
 export interface BugWeaponMatchup {
@@ -72,6 +72,8 @@ export interface BugVariantDef {
   darken: number;
   defaultOpacity: number;
   maxHp: number;
+  /** Points awarded to the player for defeating this bug type. */
+  pointValue: number;
   sizeBoost: number;
   swayAmplitude: number;
   swayFrequency: number;
@@ -95,20 +97,30 @@ function steadyMatchups(
   overrides: Partial<BugWeaponMatchups> = {},
 ): BugWeaponMatchups {
   return {
-    hammer: {
+    wrench: {
       note: "Serviceable cleanup, but not the primary answer.",
       state: "steady",
-      ...overrides.hammer,
-    },
-    laser: {
-      note: "Useful once the lane is stable enough to stay on target.",
-      state: "steady",
-      ...overrides.laser,
+      ...overrides.wrench,
     },
     pulse: {
       note: "Helps manage spread, but timing matters more than raw output.",
       state: "steady",
       ...overrides.pulse,
+    },
+    freeze: {
+      note: "Slows the target, but low priority unless it's fast or flanking.",
+      state: "steady",
+      ...overrides.freeze,
+    },
+    shockwave: {
+      note: "Useful for clearing surrounding pressure, not a direct counter.",
+      state: "steady",
+      ...overrides.shockwave,
+    },
+    nullpointer: {
+      note: "Reserve for high-HP targets; overkill against low-threat types.",
+      state: "steady",
+      ...overrides.nullpointer,
     },
   };
 }
@@ -138,6 +150,7 @@ export const BUG_VARIANT_DEFS: Record<BugVariant, BugVariantDef> = {
     darken: 0.6,
     defaultOpacity: 0.6,
     maxHp: 1,
+    pointValue: 1,
     sizeBoost: 0,
     swayAmplitude: 7,
     swayFrequency: 5.6,
@@ -161,16 +174,16 @@ export const BUG_VARIANT_DEFS: Record<BugVariant, BugVariantDef> = {
     socialAffinity: 0.6,
     preferredRegion: "middle",
     weaponMatchups: steadyMatchups({
-      hammer: {
+      wrench: {
         note: "Fine for single cleanup once a straggler is already isolated.",
-        state: "steady",
-      },
-      laser: {
-        note: "Keeps lanes tidy, but it is usually more precision than you need.",
         state: "steady",
       },
       pulse: {
         note: "Best answer when Glitchlings are flooding in clusters and visual noise is building.",
+        state: "favored",
+      },
+      shockwave: {
+        note: "Massive overkill on a 1-HP type, but clears the whole swarm in one blast.",
         state: "favored",
       },
     }),
@@ -200,6 +213,7 @@ export const BUG_VARIANT_DEFS: Record<BugVariant, BugVariantDef> = {
     darken: 0.8,
     defaultOpacity: 0.75,
     maxHp: 2,
+    pointValue: 2,
     sizeBoost: 1,
     swayAmplitude: 8,
     swayFrequency: 4.2,
@@ -223,17 +237,17 @@ export const BUG_VARIANT_DEFS: Record<BugVariant, BugVariantDef> = {
     socialAffinity: 0.2,
     preferredRegion: "middle",
     weaponMatchups: steadyMatchups({
-      hammer: {
+      wrench: {
         note: "Can get stuck trading one-for-one while the patrol route keeps pressure alive.",
         state: "risky",
-      },
-      laser: {
-        note: "Strongest option for shaving down steady route pressure before it loops back around.",
-        state: "favored",
       },
       pulse: {
         note: "Useful when the board is getting crowded, but not a hard counter by itself.",
         state: "steady",
+      },
+      freeze: {
+        note: "Slowing patrol routes gives you crucial breathing room to follow up.",
+        state: "favored",
       },
     }),
   },
@@ -262,6 +276,7 @@ export const BUG_VARIANT_DEFS: Record<BugVariant, BugVariantDef> = {
     darken: 0.9,
     defaultOpacity: 0.9,
     maxHp: 3,
+    pointValue: 4,
     sizeBoost: 2,
     swayAmplitude: 10,
     swayFrequency: 3.4,
@@ -285,17 +300,17 @@ export const BUG_VARIANT_DEFS: Record<BugVariant, BugVariantDef> = {
     socialAffinity: -0.3,
     preferredRegion: "interior",
     weaponMatchups: steadyMatchups({
-      hammer: {
+      wrench: {
         note: "Closing distance gives Nullify too much room to steal the center lane back.",
         state: "risky",
       },
-      laser: {
-        note: "Best tool once its line is identified, letting you pin the interior before it stacks pressure.",
+      freeze: {
+        note: "Best tool against Nullify — halving its speed turns the fast stalker into an easy target.",
         state: "favored",
       },
-      pulse: {
-        note: "Good for softening interior pressure, but it still needs follow-up focus.",
-        state: "steady",
+      nullpointer: {
+        note: "Reliable single-target solution once Nullify is in the interior and you need a guaranteed hit.",
+        state: "favored",
       },
     }),
   },
@@ -324,6 +339,7 @@ export const BUG_VARIANT_DEFS: Record<BugVariant, BugVariantDef> = {
     darken: 1,
     defaultOpacity: 1,
     maxHp: 4,
+    pointValue: 6,
     sizeBoost: 3,
     swayAmplitude: 12,
     swayFrequency: 2.8,
@@ -348,17 +364,17 @@ export const BUG_VARIANT_DEFS: Record<BugVariant, BugVariantDef> = {
     preferredRegion: "middle",
     iconVariant: "urgent",
     weaponMatchups: steadyMatchups({
-      hammer: {
+      wrench: {
         note: "Too volatile to rely on close-range cleanup alone once the outbreak is moving.",
         state: "risky",
       },
-      laser: {
-        note: "Worth using only when you already created a stable lane and can keep focus on target.",
+      shockwave: {
+        note: "Clears surrounding pressure and softens ZeroDay when surrounded by a swarm.",
         state: "steady",
       },
-      pulse: {
-        note: "Helps stabilize surrounding pressure, but it does not directly solve the outbreak.",
-        state: "steady",
+      nullpointer: {
+        note: "The most reliable answer — locks onto ZeroDay regardless of how erratically it moves.",
+        state: "favored",
       },
     }),
   },
