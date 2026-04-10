@@ -6,7 +6,6 @@ import {
   type BugWeaponMatchups,
 } from "@config/bugVariants";
 
-// Re-export types for consumers that import them from this module.
 export type {
   CrawlRegion,
   CrawlProfile,
@@ -16,7 +15,6 @@ export type {
   BugWeaponMatchups,
 } from "@config/bugVariants";
 
-// Re-export CRAWL_PROFILES for any legacy consumer.
 export { CRAWL_PROFILES } from "@config/bugVariants";
 
 export interface BugType {

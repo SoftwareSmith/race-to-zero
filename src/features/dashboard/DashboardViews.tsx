@@ -1,20 +1,19 @@
 import { Suspense, lazy, memo, useMemo } from "react";
 import MetricCard from "@dashboard/components/MetricCard";
 import { cn } from "@shared/utils/cn";
-import StatusBanner from "@shared/components/StatusBanner";
 import {
   formatNumber,
   formatPercent,
   formatSignedNumber,
   getMetricTone,
   getNetChangeTone,
-} from "../../utils/dashboard";
+} from "./utils/dashboard";
 import {
   buildComparisonSummaryChartData,
   buildComparisonTimelineChartData,
   buildDeadlineBurndownChartData,
   buildPriorityChartData,
-} from "../../utils/metrics";
+} from "@dashboard/utils/metrics";
 import type {
   ChartFocusState,
   ComparisonMetrics,
@@ -196,8 +195,6 @@ function ChartFallback({ className = "" }: { className?: string }) {
   );
 }
 
-// StatusBanner is now a shared component — re-export so existing consumers
-// that import it from here continue to work.
 export { default as StatusBanner } from "@shared/components/StatusBanner";
 
 interface OverviewViewProps {

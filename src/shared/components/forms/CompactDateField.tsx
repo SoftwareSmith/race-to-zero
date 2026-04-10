@@ -1,6 +1,6 @@
 import type { ChangeEventHandler } from "react";
 import { cn } from "@shared/utils/cn";
-import { getDateInputBounds } from "../../../utils/dashboard";
+import { getDateInputBounds } from "@dashboard/utils/dashboard";
 
 interface CompactDateFieldProps {
   disabled?: boolean;

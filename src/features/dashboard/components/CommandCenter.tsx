@@ -7,7 +7,7 @@ import {
   formatSignedNumber,
   getDeltaTone,
   getStatusTagText,
-} from "../../../utils/dashboard";
+} from "../utils/dashboard";
 import type { DeadlineMetrics, SummaryMetrics } from "../../../types/dashboard";
 
 interface CommandCenterProps {

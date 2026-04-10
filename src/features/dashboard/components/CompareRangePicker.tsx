@@ -1,7 +1,7 @@
 import type { MouseEvent } from "react";
 import { useCallback } from "react";
 import { cn } from "@shared/utils/cn";
-import { COMPARE_RANGE_OPTIONS } from "../../../utils/dashboard";
+import { COMPARE_RANGE_OPTIONS } from "../utils/dashboard";
 import type { CompareRangeKey } from "../../../types/dashboard";
 
 interface CompareRangePickerProps {

@@ -3,7 +3,7 @@ import { memo } from "react";
 import Tabs from "@shared/components/Tabs";
 import CompactDateField from "@shared/components/forms/CompactDateField";
 import CompareRangePicker from "@dashboard/components/CompareRangePicker";
-import { TAB_ITEMS } from "../../../utils/dashboard";
+import { TAB_ITEMS } from "../utils/dashboard";
 import type { ActiveTab, CompareRangeKey } from "../../../types/dashboard";
 
 interface TopNavProps {

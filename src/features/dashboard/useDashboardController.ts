@@ -7,7 +7,7 @@ import {
 } from "../../constants/bugs";
 import { STORAGE_KEYS } from "../../constants/storageKeys";
 import { DEFAULT_GAME_CONFIG } from "@game/engine/types";
-import { useMetrics } from "../../hooks/useMetrics";
+import { useMetrics } from "./hooks/useMetrics";
 import { useStoredState } from "../../hooks/useStoredState";
 import type {
   ActiveTab,
@@ -28,9 +28,7 @@ import {
   getComparisonMetrics,
   getDeadlineMetrics,
   getSummaryMetrics,
-} from "../../utils/metrics";
-
-// Milestone flashes removed — milestone logic deprecated
+} from "@dashboard/utils/metrics";
 
 export function useDashboardController() {
   const { metrics, error } = useMetrics();
@@ -100,7 +98,6 @@ export function useDashboardController() {
     format(new Date(), "yyyy-MM-dd"),
   );
   const [chartFocus, setChartFocus] = useState<ChartFocusState | null>(null);
-  // milestoneFlash state removed
   const settingsMenuRef = useRef<HTMLDivElement | null>(null);
   const bugSettingsMenuRef = useRef<HTMLDivElement | null>(null);
   const codexMenuRef = useRef<HTMLDivElement | null>(null);
@@ -338,8 +335,6 @@ export function useDashboardController() {
     };
   }, [openTopMenu]);
 
-  // milestone detection removed
-
   const headerEyebrow =
     summary.bugCount === 0 ? "All clear" : "Operations dashboard";
   const headerSubtitle =
@@ -378,7 +373,6 @@ export function useDashboardController() {
     handleTopNavInteract,
     headerEyebrow,
     headerSubtitle,
-    // milestoneFlash removed
     openTopMenu,
     settings,
     settingsMenuRef,

@@ -916,8 +916,6 @@ const BugCanvas = memo(function BugCanvas({
   );
 });
 
-// Fireflies removed — keep only bug rendering. Palette still provided via getEffectPalette.
-
 interface BackgroundFieldProps {
   bugCounts: BugCounts;
   bugVisualSettings: BugVisualSettings;

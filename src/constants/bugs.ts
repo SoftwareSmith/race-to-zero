@@ -4,9 +4,6 @@ import type {
   PriorityDistributionEntry,
 } from "../types/dashboard";
 
-// BugVariantConfig, BUG_VARIANT_CONFIG, and visual accessors now live in
-// src/config/bugVariants.ts.  Re-exported here so existing callers are
-// unaffected without importing from two places.
 export type { BugVariantConfig } from "@config/bugVariants";
 export {
   BUG_VARIANT_CONFIG,

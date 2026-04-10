@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import type { MetricsSource } from "../types/dashboard";
+import type { MetricsSource } from "../../../types/dashboard";
 
 const METRICS_PATH = `${import.meta.env.BASE_URL}data/metrics.json`;
 

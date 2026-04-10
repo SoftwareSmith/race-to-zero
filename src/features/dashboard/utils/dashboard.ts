@@ -1,7 +1,5 @@
-import type { CompareRangeOption, TabItem, Tone } from "../types/dashboard";
+import type { CompareRangeOption, TabItem, Tone } from "../../../types/dashboard";
 
-// formatNumber, formatSignedNumber, formatPercent are now in @shared/utils/formatters.
-// Re-exported here so existing callers continue to work.
 export {
   formatNumber,
   formatSignedNumber,
