@@ -96,6 +96,7 @@ function MetricInfoCard({
                 progressClassName,
               )}
               style={{
+                boxShadow: progressGlow,
                 width: `${value}%`,
                 willChange: "width, boxShadow",
                 ...(progressStyle ?? {}),

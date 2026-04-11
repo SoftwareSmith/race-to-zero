@@ -154,25 +154,30 @@ export function useSiegeGame({
   const handleAgentAbsorb = useCallback(
     (data: {
       structureId: string;
-      phase: "absorbing" | "done" | "failed";
+      phase: "absorbing" | "done" | "failed" | "pulling";
       variant: string;
       bugX: number;
       bugY: number;
+      srcX?: number;
+      srcY?: number;
       processingMs?: number;
     }) => {
-      setAgentCaptures((prev) => ({
-        ...prev,
-        [data.structureId]: {
-          structureId: data.structureId,
-          phase: data.phase,
-          startedAt: Date.now(),
-          processingMs: data.processingMs ?? 1500,
-          variant: data.variant,
-          bugX: data.bugX,
-          bugY: data.bugY,
-        },
-      }));
-      if (data.phase === "done" || data.phase === "failed") {
+      const { phase } = data;
+      if (phase !== "pulling") {
+        setAgentCaptures((prev) => ({
+          ...prev,
+          [data.structureId]: {
+            structureId: data.structureId,
+            phase,
+            startedAt: Date.now(),
+            processingMs: data.processingMs ?? 1500,
+            variant: data.variant,
+            bugX: data.bugX,
+            bugY: data.bugY,
+          },
+        }));
+      }
+      if (phase === "done" || phase === "failed") {
         window.setTimeout(() => {
           setAgentCaptures((prev) => {
             const next = { ...prev };
@@ -191,7 +196,13 @@ export function useSiegeGame({
     const stats = getSiegeCombatStats(interactiveKills, debugMode);
     const highest = stats.unlockedWeapons[stats.unlockedWeapons.length - 1];
     if (highest && highest !== "wrench") {
-      setSelectedWeaponId(highest);
+      const timeoutId = window.setTimeout(() => {
+        setSelectedWeaponId(highest);
+      }, 0);
+
+      return () => {
+        window.clearTimeout(timeoutId);
+      };
     }
   }, [debugMode, interactiveKills]);
 

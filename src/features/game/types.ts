@@ -39,6 +39,8 @@ export interface WeaponEffectEvent {
   targetX?: number;
   /** For seeking weapons: viewport y of the target bug */
   targetY?: number;
+  /** For bouncing laser disc: path segments in viewport coords */
+  segments?: Array<{ x1: number; y1: number; x2: number; y2: number }>;
   /** Optional color tint override for effect rendering (e.g. turret pointer in cyan). */
   color?: string;
 }

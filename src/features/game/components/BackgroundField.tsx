@@ -52,6 +52,7 @@ const OVERLAY_EFFECT_WEAPONS = new Set<SiegeWeaponId>([
   "chain",
   "laser",
   "nullpointer",
+  "void",
 ]);
 
 function interpolate(
@@ -218,6 +219,7 @@ interface BugCanvasProps {
       targetX?: number;
       targetY?: number;
       color?: string;
+      segments?: Array<{ x1: number; y1: number; x2: number; y2: number }>;
     },
   ) => void;
   placingStructureId?: StructureId | null;
@@ -235,14 +237,21 @@ interface BugCanvasProps {
   sessionKey: string;
   siegeZones?: SiegeZoneRect[];
   terminatorMode: boolean;
-  onEntityDeath?: (x: number, y: number, variant: string) => void;
+  onEntityDeath?: (
+    x: number,
+    y: number,
+    variant: string,
+    meta: { credited: boolean; frozen: boolean; pointValue: number },
+  ) => void;
   onStructureKill?: (x: number, y: number, variant: string) => void;
   onAgentAbsorb?: (data: {
     structureId: string;
-    phase: "absorbing" | "done" | "failed";
+    phase: "absorbing" | "pulling" | "done" | "failed";
     variant: string;
     bugX: number;
     bugY: number;
+    srcX?: number;
+    srcY?: number;
     processingMs?: number;
   }) => void;
   onTurretFire?: (data: {
@@ -252,6 +261,7 @@ interface BugCanvasProps {
     targetX: number;
     targetY: number;
     angle: number;
+    phase: "aim" | "fire";
   }) => void;
   gameConfig?: GameConfig;
   hammerPositionRef?: { current: { x: number; y: number } };
@@ -294,12 +304,13 @@ const BugCanvas = memo(function BugCanvas({
   const onTurretFireRef = useRef(onTurretFire);
   const onWeaponFireRef = useRef(onWeaponFire);
   const vfxRef = useRef<VfxEngine | null>(null);
+  const blackHoleVfxIdRef = useRef<string | null>(null);
   const placingStructureIdRef = useRef(placingStructureId);
   const onStructurePlaceRef = useRef(onStructurePlace);
 
   useEffect(() => {
     terminatorModeRef.current = terminatorMode;
-  }, [terminatorMode]);
+  }, [hammerPositionRef, terminatorMode]);
   const selectedWeaponIdRef = useRef<SiegeWeaponId>(selectedWeaponId);
   const lastFireTimeRef = useRef<Record<string, number>>({});
   const reseedInfoRef = useRef<{
@@ -366,12 +377,13 @@ const BugCanvas = memo(function BugCanvas({
         width: w,
         height: h,
         config: (gameConfig as any) ?? undefined,
-        onEntityDeath: (x, y, variant) => {
+        onEntityDeath: (x, y, variant, meta) => {
           try {
             onEntityDeathRef.current?.(
               Math.round(x + (boundsRef.current.left || 0)),
               Math.round(y + (boundsRef.current.top || 0)),
               variant,
+              meta,
             );
           } catch {
             void 0;
@@ -390,6 +402,25 @@ const BugCanvas = memo(function BugCanvas({
         },
         onAgentAbsorb: (data) => {
           try {
+            // VFX: lasso tracer during pull phase
+            if (
+              data.phase === "pulling" &&
+              vfxRef.current &&
+              data.srcX !== undefined &&
+              data.srcY !== undefined
+            ) {
+              vfxRef.current.addTracerLine(
+                data.bugX,
+                data.bugY,
+                data.srcX,
+                data.srcY,
+                120,
+              );
+            }
+            // VFX: burst on fail
+            if (data.phase === "failed" && vfxRef.current) {
+              vfxRef.current.spawnExplosion(data.bugX, data.bugY, 60, 0x34d399);
+            }
             onAgentAbsorbRef.current?.(data);
           } catch {
             void 0;
@@ -403,11 +434,34 @@ const BugCanvas = memo(function BugCanvas({
               data.targetX + (boundsRef.current.left || 0),
             );
             const vty = Math.round(data.targetY + (boundsRef.current.top || 0));
-            onWeaponFireRef.current?.("laser", vx, vy, {
-              targetX: vtx,
-              targetY: vty,
-              color: "#22d3ee",
-            });
+            if (data.phase === "aim") {
+              // Tracer line from turret to target during aim phase
+              vfxRef.current?.addTracerLine(
+                data.srcX,
+                data.srcY,
+                data.targetX,
+                data.targetY,
+                550,
+              );
+              onWeaponFireRef.current?.("nullpointer", vx, vy, {
+                targetX: vtx,
+                targetY: vty,
+                color: "#22d3ee",
+              });
+            } else {
+              // Fire phase: spark crown + small burst at target
+              vfxRef.current?.spawnSparkCrown(
+                data.targetX,
+                data.targetY,
+                0x22d3ee,
+              );
+              vfxRef.current?.spawnExplosion(
+                data.targetX,
+                data.targetY,
+                40,
+                0x22d3ee,
+              );
+            }
             onTurretFireRef.current?.(data);
           } catch {
             void 0;
@@ -782,6 +836,32 @@ const BugCanvas = memo(function BugCanvas({
 
       updateQaBugPositions(latestBugPositionsRef.current, boundsRef.current);
 
+      // Tick black hole gravity well (Void Pulse weapon)
+      if (
+        swarmRef.current &&
+        typeof swarmRef.current.tickBlackHole === "function"
+      ) {
+        swarmRef.current.tickBlackHole(
+          dtSec * 1000,
+          (bx: number, by: number, brad: number) => {
+            if (vfxRef.current) {
+              vfxRef.current.spawnVoidCollapse(bx, by, brad);
+              vfxRef.current.spawnExplosion(bx, by, brad * 0.6, 0x7c3aed);
+            }
+            // Clean up the black hole visual
+            if (blackHoleVfxIdRef.current && vfxRef.current) {
+              vfxRef.current.destroyBlackHole(blackHoleVfxIdRef.current);
+              blackHoleVfxIdRef.current = null;
+            }
+          },
+        );
+        // Animate the persistent black hole rings each frame
+        const bhId = blackHoleVfxIdRef.current;
+        if (bhId && vfxRef.current) {
+          vfxRef.current.tickBlackHoleVfx(bhId);
+        }
+      }
+
       // one-time safety reseed: if many bugs still sit at 0,0, reseed and surface badge
       if (!reseedInfoRef.current && swarmRef.current) {
         const bugs = swarmRef.current.getAllBugs() as Array<any>;
@@ -912,52 +992,78 @@ const BugCanvas = memo(function BugCanvas({
         const coneAngle =
           (Math.atan2(centerY - targetY, centerX - targetX) * 180) / Math.PI;
         switch (weaponId) {
-          case "flame":
-            vfx.spawnFire(targetX, targetY, coneAngle + 180, 68);
+          case "flame": {
+            const flameDir = coneAngle + 180;
+            vfx.spawnFire(targetX, targetY, flameDir, 68, 60);
             vfx.addCharMark(
-              targetX + Math.cos(((coneAngle + 180) * Math.PI) / 180) * 32,
-              targetY + Math.sin(((coneAngle + 180) * Math.PI) / 180) * 32,
-              50,
+              targetX + Math.cos((flameDir * Math.PI) / 180) * 32,
+              targetY + Math.sin((flameDir * Math.PI) / 180) * 32,
+              55,
             );
+            vfx.addFirePatch(targetX, targetY, 90);
             break;
-          case "zapper":
-            vfx.spawnEMP(targetX, targetY, 45);
+          }
+          case "zapper": {
+            // Bug Spray: lingering toxic cloud with aerosol particles, no SVG cone
+            const sprayAngle =
+              (Math.atan2(centerY - targetY, centerX - targetX) * 180) /
+              Math.PI;
+            vfx.spawnSprayParticles(targetX, targetY, sprayAngle + 180, 50);
+            vfx.addToxicCloud(targetX, targetY, 96, 2400);
             break;
-          case "shockwave":
-            vfx.spawnExplosion(targetX, targetY, 200, 0xa855f7);
+          }
+          case "shockwave": {
+            // Static Net: wire mesh + EMP ring
+            vfx.spawnNetCast(targetX, targetY, 200, 3000);
+            vfx.spawnEMP(targetX, targetY, 200);
             break;
-          case "plasma":
-            vfx.spawnPlasmaFountain(targetX, targetY);
+          }
+          case "plasma": {
+            // Plasma Bomb: implosion first, then explosion
+            vfx.spawnPlasmaImplosion(targetX, targetY, 170);
+            setTimeout(() => {
+              if (vfxRef.current) {
+                vfxRef.current.spawnPlasmaFountain(targetX, targetY);
+                vfxRef.current.addPlasmaCrater(targetX, targetY);
+              }
+            }, 400);
             break;
+          }
           case "void":
-            vfx.spawnVoidNova(targetX, targetY);
-            vfx.addVoidRift(targetX, targetY);
+            // Void handled in blackhole dispatch below — skip duplicate VFX here
             break;
           case "laser": {
-            const laserAngle = weaponDef.snapAngle
-              ? Math.round(
-                  Math.atan2(centerY - targetY, centerX - targetX) /
-                    (Math.PI / 4),
-                ) *
-                (Math.PI / 4)
-              : 0;
-            const beamLen = Math.max(bounds.width, bounds.height) * 1.5;
-            vfx.addBurnScar(
-              targetX - Math.cos(laserAngle) * beamLen,
-              targetY - Math.sin(laserAngle) * beamLen,
-              targetX + Math.cos(laserAngle) * beamLen,
-              targetY + Math.sin(laserAngle) * beamLen,
-            );
+            // Bouncing disc: burn scars are added per-segment in the line dispatch.
+            // Legacy snap-angle beam: add a single scar now.
+            if (!weaponDef.bouncingDisc) {
+              const laserAngle = weaponDef.snapAngle
+                ? Math.round(
+                    Math.atan2(centerY - targetY, centerX - targetX) /
+                      (Math.PI / 4),
+                  ) *
+                  (Math.PI / 4)
+                : 0;
+              const beamLen = Math.max(bounds.width, bounds.height) * 1.5;
+              vfx.addBurnScar(
+                targetX - Math.cos(laserAngle) * beamLen,
+                targetY - Math.sin(laserAngle) * beamLen,
+                targetX + Math.cos(laserAngle) * beamLen,
+                targetY + Math.sin(laserAngle) * beamLen,
+              );
+            }
             break;
           }
           case "nullpointer":
-            vfx.spawnExplosion(targetX, targetY, 120, 0xfb7185);
+            // VFX handled in seeking dispatch at bug position — skip here
             break;
           case "wrench":
             vfx.addCrack(targetX, targetY);
             break;
           case "freeze":
-            vfx.addFrostDecal(targetX, targetY);
+            vfx.spawnExplosion(targetX, targetY, 180, 0x93c5fd);
+            if (typeof (vfx as any).spawnSnowflakeDecals === "function") {
+              (vfx as any).spawnSnowflakeDecals(targetX, targetY, 24, 200);
+            }
             break;
           default:
             break;
@@ -1003,6 +1109,7 @@ const BugCanvas = memo(function BugCanvas({
               const result = engine.handleHit(
                 hitCandidate.index,
                 weaponDef.damage ?? 1,
+                true,
               );
               if (result) {
                 onHitRef.current({
@@ -1051,54 +1158,87 @@ const BugCanvas = memo(function BugCanvas({
           }
         }
       } else if (weaponDef.hitPattern === "line") {
-        // ── Laser: directional beam with optional 8-way snap ────
-        let beamAngleRad = 0;
+        // ── Laser: bouncing disc or legacy beam ────────────────
+        if (weaponDef.bouncingDisc) {
+          // Bouncing disc: fire from center toward click, reflect off canvas walls
+          const maxBounces = weaponDef.maxBounces ?? 2;
+          const discAngle = Math.atan2(targetY - centerY, targetX - centerX);
+          const discLen = Math.max(bounds.width, bounds.height) * 2;
 
-        if (weaponDef.snapAngle) {
-          // Snap angle from click to screen center to nearest 45 degrees
-          const rawAngle = Math.atan2(centerY - targetY, centerX - targetX);
-          const snapped = Math.round(rawAngle / (Math.PI / 4)) * (Math.PI / 4);
-          beamAngleRad = snapped;
-        }
+          // Build reflected path segments
+          const segments: Array<{
+            x1: number;
+            y1: number;
+            x2: number;
+            y2: number;
+          }> = [];
+          let px = centerX,
+            py = centerY;
+          let dx = Math.cos(discAngle),
+            dy = Math.sin(discAngle);
+          const W = bounds.width,
+            H = bounds.height;
 
-        onWeaponFireRef.current?.(weaponId, fireX, fireY, {
-          angle: beamAngleRad,
-        });
+          for (let bounce = 0; bounce <= maxBounces; bounce++) {
+            // Find first wall intersection
+            let tMin = discLen;
+            if (dx > 0) tMin = Math.min(tMin, (W - px) / dx);
+            else if (dx < 0) tMin = Math.min(tMin, -px / dx);
+            if (dy > 0) tMin = Math.min(tMin, (H - py) / dy);
+            else if (dy < 0) tMin = Math.min(tMin, -py / dy);
 
-        if (typeof engine.lineHitTest === "function") {
-          let hitIndexes: number[];
-          if (weaponDef.snapAngle) {
-            // Snapped directional beam: line from edge to edge through click along angle
-            const length = Math.max(bounds.width, bounds.height) * 1.5;
-            const cos = Math.cos(beamAngleRad);
-            const sin = Math.sin(beamAngleRad);
-            hitIndexes = engine.lineHitTest(
-              targetX - cos * length,
-              targetY - sin * length,
-              targetX + cos * length,
-              targetY + sin * length,
-              weaponDef.hitRadius,
-            );
-          } else {
-            const isVertical = weaponDef.hitOrientation === "vertical";
-            hitIndexes = isVertical
-              ? engine.lineHitTest(
-                  targetX,
-                  0,
-                  targetX,
-                  bounds.height,
-                  weaponDef.hitRadius,
-                )
-              : engine.lineHitTest(
-                  0,
-                  targetY,
-                  bounds.width,
-                  targetY,
-                  weaponDef.hitRadius,
-                );
+            const nx = px + dx * tMin;
+            const ny = py + dy * tMin;
+            segments.push({ x1: px, y1: py, x2: nx, y2: ny });
+
+            if (bounce < maxBounces) {
+              // Reflect: determine which wall was hit
+              const hitLeft = Math.abs(nx) < 1;
+              const hitRight = Math.abs(nx - W) < 1;
+              const hitTop = Math.abs(ny) < 1;
+              const hitBottom = Math.abs(ny - H) < 1;
+              if (hitLeft || hitRight) dx = -dx;
+              if (hitTop || hitBottom) dy = -dy;
+
+              // VFX: spark at bounce point
+              vfxRef.current?.spawnSparkCrown(nx, ny, 0xf87171);
+            }
+            px = nx;
+            py = ny;
           }
-          for (const idx of hitIndexes) {
-            const result = engine.handleHit(idx, weaponDef.damage ?? 1);
+
+          // Viewport-space segments for WeaponEffectLayer
+          const viewportSegments = segments.map((s) => ({
+            x1: Math.round(s.x1 + bounds.left),
+            y1: Math.round(s.y1 + bounds.top),
+            x2: Math.round(s.x2 + bounds.left),
+            y2: Math.round(s.y2 + bounds.top),
+          }));
+          onWeaponFireRef.current?.(weaponId, fireX, fireY, {
+            segments: viewportSegments,
+          });
+
+          // Hit detection on all segments
+          const hitSet = new Set<number>();
+          if (typeof engine.lineHitTest === "function") {
+            for (const seg of segments) {
+              for (const idx of engine.lineHitTest(
+                seg.x1,
+                seg.y1,
+                seg.x2,
+                seg.y2,
+                weaponDef.hitRadius,
+              )) {
+                hitSet.add(idx);
+              }
+            }
+          }
+          // Add burn scar along each segment
+          for (const seg of segments) {
+            vfxRef.current?.addBurnScar(seg.x1, seg.y1, seg.x2, seg.y2);
+          }
+          for (const idx of hitSet) {
+            const result = engine.handleHit(idx, weaponDef.damage ?? 1, true);
             if (!result) continue;
             const bugPos = engine.getAllBugs()[idx];
             const vx = bugPos
@@ -1124,10 +1264,134 @@ const BugCanvas = memo(function BugCanvas({
               y: vy,
             });
           }
+        } else {
+          let beamAngleRad = 0;
+
+          if (weaponDef.snapAngle) {
+            // Snap angle from click to screen center to nearest 45 degrees
+            const rawAngle = Math.atan2(centerY - targetY, centerX - targetX);
+            const snapped =
+              Math.round(rawAngle / (Math.PI / 4)) * (Math.PI / 4);
+            beamAngleRad = snapped;
+          }
+
+          onWeaponFireRef.current?.(weaponId, fireX, fireY, {
+            angle: beamAngleRad,
+          });
+
+          if (typeof engine.lineHitTest === "function") {
+            let hitIndexes: number[];
+            if (weaponDef.snapAngle) {
+              // Snapped directional beam: line from edge to edge through click along angle
+              const length = Math.max(bounds.width, bounds.height) * 1.5;
+              const cos = Math.cos(beamAngleRad);
+              const sin = Math.sin(beamAngleRad);
+              hitIndexes = engine.lineHitTest(
+                targetX - cos * length,
+                targetY - sin * length,
+                targetX + cos * length,
+                targetY + sin * length,
+                weaponDef.hitRadius,
+              );
+            } else {
+              const isVertical = weaponDef.hitOrientation === "vertical";
+              hitIndexes = isVertical
+                ? engine.lineHitTest(
+                    targetX,
+                    0,
+                    targetX,
+                    bounds.height,
+                    weaponDef.hitRadius,
+                  )
+                : engine.lineHitTest(
+                    0,
+                    targetY,
+                    bounds.width,
+                    targetY,
+                    weaponDef.hitRadius,
+                  );
+            }
+            for (const idx of hitIndexes) {
+              const result = engine.handleHit(idx, weaponDef.damage ?? 1, true);
+              if (!result) continue;
+              const bugPos = engine.getAllBugs()[idx];
+              const vx = bugPos
+                ? Math.round(bugPos.x + bounds.left)
+                : event.clientX;
+              const vy = bugPos
+                ? Math.round(bugPos.y + bounds.top)
+                : event.clientY;
+              onHitRef.current({
+                defeated: result.defeated,
+                remainingHp: result.remainingHp,
+                variant: result.variant,
+                x: vx,
+                y: vy,
+                pointValue: result.pointValue,
+                frozen: result.frozen,
+              });
+              updateQaLastHit({
+                defeated: result.defeated,
+                remainingHp: result.remainingHp,
+                variant: result.variant,
+                x: vx,
+                y: vy,
+              });
+            }
+          }
+        } // end else (legacy beam)
+      } else if (weaponDef.hitPattern === "blackhole") {
+        // ── Void Pulse: persistent gravity well ─────────────────
+        onWeaponFireRef.current?.(weaponId, fireX, fireY);
+        const started =
+          typeof engine.startBlackHole === "function"
+            ? engine.startBlackHole(
+                targetX,
+                targetY,
+                weaponDef.blackHoleRadius ?? 300,
+                weaponDef.blackHoleCoreRadius ?? 80,
+                weaponDef.blackHoleDurationMs ?? 2000,
+                weaponDef.damage ?? 3,
+              )
+            : false;
+        if (started && vfxRef.current) {
+          const bhId = vfxRef.current.createBlackHole(targetX, targetY);
+          blackHoleVfxIdRef.current = bhId;
         }
       } else if (weaponDef.hitPattern === "area") {
         // ── Pulse / Bomb / Shockwave / Zapper ───────────────────
         onWeaponFireRef.current?.(weaponId, fireX, fireY);
+
+        // Static Net: ensnare all bugs in radius
+        if (
+          weaponDef.applyEnsnare &&
+          typeof engine.applyEnsnareInRadius === "function"
+        ) {
+          engine.applyEnsnareInRadius(
+            targetX,
+            targetY,
+            weaponDef.hitRadius,
+            weaponDef.ensnareDurationMs ?? 3000,
+          );
+        }
+
+        // Freeze Blast: slow/freeze all bugs in radius
+        if (
+          weaponDef.appliesSlow &&
+          typeof engine.radiusHitTest === "function"
+        ) {
+          const freezeIdxs = engine.radiusHitTest(
+            targetX,
+            targetY,
+            weaponDef.hitRadius,
+          );
+          for (const idx of freezeIdxs) {
+            const bug = engine.getAllBugs()[idx];
+            if (bug && typeof (bug as any).applyFreeze === "function") {
+              (bug as any).applyFreeze(0.35, 3500);
+            }
+          }
+        }
 
         if (typeof engine.radiusHitTest === "function") {
           const hitIndexes = engine.radiusHitTest(
@@ -1145,7 +1409,7 @@ const BugCanvas = memo(function BugCanvas({
               if (bugHp <= 1) damage = 999;
             }
 
-            const result = engine.handleHit(idx, damage);
+            const result = engine.handleHit(idx, damage, true);
             if (!result) continue;
 
             // Knockback surviving bugs
@@ -1184,32 +1448,46 @@ const BugCanvas = memo(function BugCanvas({
           }
         }
       } else if (weaponDef.hitPattern === "cone") {
-        // ── Freeze: icy cone spray from click toward center ──────
+        // ── Flame / Bug Spray: cone spray from click toward center ──────
         const angleDeg =
           (Math.atan2(centerY - targetY, centerX - targetX) * 180) / Math.PI;
         const arcDeg = weaponDef.coneArcDeg ?? 90;
+        // Flamethrower fires AWAY from center (coneAngle+180); freeze aims TOWARD center
+        const hitAngleDeg =
+          weaponId === "flame" || weaponId === "zapper"
+            ? angleDeg + 180
+            : angleDeg;
 
         onWeaponFireRef.current?.(weaponId, fireX, fireY, {
-          angle: (angleDeg * Math.PI) / 180,
+          angle: (hitAngleDeg * Math.PI) / 180,
         });
 
         if (typeof engine.coneHitTest === "function") {
           const hitIndexes = engine.coneHitTest(
             targetX,
             targetY,
-            angleDeg,
+            hitAngleDeg,
             arcDeg,
             weaponDef.hitRadius,
           );
           for (const idx of hitIndexes) {
-            const result = engine.handleHit(idx, weaponDef.damage ?? 1);
+            const result = engine.handleHit(idx, weaponDef.damage ?? 1, true);
             if (!result) continue;
 
-            // Apply slow to surviving or just-hit bugs
             const bug = engine.getAllBugs()[idx];
+            // Apply slow/freeze
             if (weaponDef.appliesSlow && bug) {
               if (typeof (bug as any).applyFreeze === "function") {
                 (bug as any).applyFreeze(0.35, 3500);
+              }
+            }
+            // Apply poison (Bug Spray)
+            if (weaponDef.applyPoison && bug) {
+              if (typeof (bug as any).applyPoison === "function") {
+                (bug as any).applyPoison(
+                  weaponDef.poisonDps ?? 0.5,
+                  weaponDef.poisonDurationMs ?? 4000,
+                );
               }
             }
 
@@ -1273,17 +1551,23 @@ const BugCanvas = memo(function BugCanvas({
           return;
         }
 
-        const chainIndexes =
-          typeof engine.chainHitTest === "function"
-            ? [
+        // Prefer unfrozen targets for chain bounces
+        const chainFn =
+          typeof engine.chainHitTestPreferUnfrozen === "function"
+            ? engine.chainHitTestPreferUnfrozen.bind(engine)
+            : typeof engine.chainHitTest === "function"
+              ? engine.chainHitTest.bind(engine)
+              : null;
+        const chainIndexes = chainFn
+          ? [
+              hitCandidate.index,
+              ...chainFn(
                 hitCandidate.index,
-                ...engine.chainHitTest(
-                  hitCandidate.index,
-                  weaponDef.hitRadius,
-                  weaponDef.chainMaxBounces ?? 3,
-                ),
-              ]
-            : [hitCandidate.index];
+                weaponDef.hitRadius,
+                weaponDef.chainMaxBounces ?? 3,
+              ),
+            ]
+          : [hitCandidate.index];
 
         // Build chain node positions for the effect (viewport-space)
         const chainNodes = chainIndexes
@@ -1300,7 +1584,7 @@ const BugCanvas = memo(function BugCanvas({
         onWeaponFireRef.current?.(weaponId, fireX, fireY, {
           chainNodes,
         });
-        // Spawn Pixi lightning using canvas-local node coords
+        // Spawn Pixi lightning + spark crown at each bounce node
         if (vfxRef.current && chainIndexes.length > 0) {
           const canvasNodes = chainIndexes
             .map((idx) => {
@@ -1314,11 +1598,15 @@ const BugCanvas = memo(function BugCanvas({
               1200,
               0x6ee7b7,
             );
+            // Spark crown at every bounce node
+            for (const node of canvasNodes) {
+              vfxRef.current.spawnSparkCrown(node.x, node.y, 0x6ee7b7);
+            }
           }
         }
 
         for (const idx of chainIndexes) {
-          const result = engine.handleHit(idx, weaponDef.damage ?? 1);
+          const result = engine.handleHit(idx, weaponDef.damage ?? 1, true);
           if (!result) continue;
           const bugPos = engine.getAllBugs()[idx];
           const vx = bugPos
@@ -1373,7 +1661,21 @@ const BugCanvas = memo(function BugCanvas({
         });
 
         if (targetIdx >= 0) {
-          const result = engine.handleHit(targetIdx, weaponDef.damage ?? 1);
+          // Null pointer VFX fires at the actual bug position (not cursor)
+          if (weaponId === "nullpointer" && vfxRef.current && seekTargetBug) {
+            vfxRef.current.spawnExplosion(
+              seekTargetBug.x,
+              seekTargetBug.y,
+              120,
+              0xfb7185,
+            );
+            vfxRef.current.spawnBinaryBurst(seekTargetBug.x, seekTargetBug.y);
+          }
+          const result = engine.handleHit(
+            targetIdx,
+            weaponDef.damage ?? 1,
+            true,
+          );
           if (result) {
             const bugPos = engine.getAllBugs()[targetIdx];
             const vx = bugPos
@@ -1414,7 +1716,7 @@ const BugCanvas = memo(function BugCanvas({
                   )
                   .filter((i: number) => i !== targetIdx);
                 for (const idx of splashTargets) {
-                  const sr = engine.handleHit(idx, 1);
+                  const sr = engine.handleHit(idx, 1, true);
                   if (!sr) continue;
                   const sp = engine.getAllBugs()[idx];
                   onHitRef.current({
@@ -1451,7 +1753,7 @@ const BugCanvas = memo(function BugCanvas({
         window.cancelAnimationFrame(animationFrameId);
       }
     };
-  }, [terminatorMode]);
+  }, [hammerPositionRef, terminatorMode]);
 
   return (
     <>
@@ -1494,10 +1796,12 @@ interface BackgroundFieldProps {
   agentCaptures?: Record<string, AgentCaptureState>;
   onAgentAbsorb?: (data: {
     structureId: string;
-    phase: "absorbing" | "done" | "failed";
+    phase: "absorbing" | "pulling" | "done" | "failed";
     variant: string;
     bugX: number;
     bugY: number;
+    srcX?: number;
+    srcY?: number;
     processingMs?: number;
   }) => void;
   placingStructureId?: StructureId | null;
@@ -1558,7 +1862,6 @@ const BackgroundField = memo(function BackgroundField({
   const gameSessionKey = interactiveSessionKey
     ? `interactive:${interactiveSessionKey}`
     : `${terminatorMode ? "terminator" : "ambient"}:${bugCountsKey}`;
-  const [hammerPosition, setHammerPosition] = useState({ x: 0, y: 0 });
   const [hammerSwing, setHammerSwing] = useState(false);
   const [cursorLastFireTimes, setCursorLastFireTimes] = useState<
     Partial<Record<SiegeWeaponId, number>>
@@ -1577,14 +1880,14 @@ const BackgroundField = memo(function BackgroundField({
   }, [onWeaponFired]);
 
   useEffect(() => {
-    if (!terminatorMode) {
+    const timeoutId = window.setTimeout(() => {
       setCursorLastFireTimes({});
       setTurretLastFireTimes({});
-      return;
-    }
+    }, 0);
 
-    setCursorLastFireTimes({});
-    setTurretLastFireTimes({});
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
   }, [gameSessionKey, terminatorMode]);
 
   const handleTurretFire = useCallback(
@@ -1669,8 +1972,13 @@ const BackgroundField = memo(function BackgroundField({
 
   useEffect(() => {
     if (!terminatorMode) {
-      setWeaponEffects([]);
-      return undefined;
+      const timeoutId = window.setTimeout(() => {
+        setWeaponEffects([]);
+      }, 0);
+
+      return () => {
+        window.clearTimeout(timeoutId);
+      };
     }
 
     if (weaponEffects.length === 0) {
@@ -1687,7 +1995,7 @@ const BackgroundField = memo(function BackgroundField({
     return () => {
       window.clearInterval(intervalId);
     };
-  }, [terminatorMode, weaponEffects.length]);
+  }, [terminatorMode, weaponEffects.length, hammerPositionRef]);
 
   useEffect(() => {
     if (!terminatorMode) {
@@ -1772,7 +2080,6 @@ const BackgroundField = memo(function BackgroundField({
 
   const handleBugHit = useCallback(
     (payload: BugHitPayload) => {
-      setHammerPosition(hammerPositionRef.current);
       setHammerSwing(true);
       onTerminatorHit?.(payload);
       setGameState((currentValue) => {
@@ -1845,11 +2152,52 @@ const BackgroundField = memo(function BackgroundField({
   );
 
   const handleEntityDeath = useCallback(
-    (_x: number, _y: number, _variant: string) => {
-      // Weapon/structure handlers already update kill state and splats.
-      // Avoid duplicate delayed splats when engine transitions dying->dead.
+    (
+      x: number,
+      y: number,
+      variant: string,
+      meta: { credited: boolean; frozen: boolean; pointValue: number },
+    ) => {
+      if (meta.credited) {
+        return;
+      }
+
+      onTerminatorHit?.({
+        defeated: true,
+        remainingHp: 0,
+        variant: variant as BugVariant,
+        x,
+        y,
+        pointValue: meta.pointValue,
+        frozen: meta.frozen,
+      });
+
+      setGameState((currentValue) => {
+        const nextState =
+          currentValue.sessionKey === gameSessionKey
+            ? currentValue
+            : {
+                remainingTargets: totalBugCount,
+                sessionKey: gameSessionKey,
+                splats: [] as GameState["splats"],
+              };
+
+        return {
+          ...nextState,
+          remainingTargets: Math.max(0, nextState.remainingTargets - 1),
+          splats: [
+            ...nextState.splats.slice(-5),
+            {
+              id: `${x}-${y}-${Date.now()}`,
+              variant: variant as BugVariant,
+              x,
+              y,
+            },
+          ],
+        };
+      });
     },
-    [],
+    [gameSessionKey, onTerminatorHit, totalBugCount],
   );
 
   const overlayLabel = terminatorMode

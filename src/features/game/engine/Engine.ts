@@ -17,12 +17,24 @@ interface StructureEntry {
     variant: string;
     bugX: number;
     bugY: number;
+    /** original capture position for pull animation */
+    pullFromX: number;
+    pullFromY: number;
+    /** elapsedMs when pull started */
+    pullStartedAt: number;
     size: number;
     completesAt: number;
     failChance: number;
   } | null;
   /** Last fire angle in radians for turret visual rotation */
   lastFireAngle?: number;
+  /** Turret aim phase: locks target while waiting to fire */
+  aimPhase?: {
+    targetX: number;
+    targetY: number;
+    angle: number;
+    firesAt: number;
+  } | null;
   /** Elapsed-ms timestamp when this structure was placed (for firewall expiry) */
   placedAt?: number;
   /** Elapsed-ms timestamp of next firewall damage tick */
@@ -33,16 +45,24 @@ export interface EngineOptions {
   width: number;
   height: number;
   config?: Partial<GameConfig>;
-  onEntityDeath?: (x: number, y: number, variant: string) => void;
+  onEntityDeath?: (
+    x: number,
+    y: number,
+    variant: string,
+    meta: { credited: boolean; frozen: boolean; pointValue: number },
+  ) => void;
   /** Called when a structure (lantern/agent/turret) kills a bug — counts toward the player kill tally */
   onStructureKill?: (x: number, y: number, variant: string) => void;
   /** Called when the agent starts/finishes/fails absorbing a bug */
   onAgentAbsorb?: (data: {
     structureId: string;
-    phase: "absorbing" | "done" | "failed";
+    phase: "absorbing" | "pulling" | "done" | "failed";
     variant: string;
     bugX: number;
     bugY: number;
+    /** Agent canvas position (for lasso VFX during pull phase) */
+    srcX?: number;
+    srcY?: number;
     processingMs?: number;
   }) => void;
   /** Called when the turret fires at a bug (canvas-local coords) */
@@ -53,6 +73,8 @@ export interface EngineOptions {
     targetX: number;
     targetY: number;
     angle: number;
+    /** "aim" = locking on (tracer shown), "fire" = damage dealt */
+    phase: "aim" | "fire";
   }) => void;
   /** Called when the tesla coil chain-zaps bugs (canvas-local coords) */
   onTeslaFire?: (data: {
@@ -69,14 +91,21 @@ export class Engine {
   entities: Entity[] = [];
   config: GameConfig;
   pool: BugEntity[] = [];
-  onEntityDeath?: (x: number, y: number, variant: string) => void;
+  onEntityDeath?: (
+    x: number,
+    y: number,
+    variant: string,
+    meta: { credited: boolean; frozen: boolean; pointValue: number },
+  ) => void;
   onStructureKill?: (x: number, y: number, variant: string) => void;
   onAgentAbsorb?: (data: {
     structureId: string;
-    phase: "absorbing" | "done" | "failed";
+    phase: "absorbing" | "pulling" | "done" | "failed";
     variant: string;
     bugX: number;
     bugY: number;
+    srcX?: number;
+    srcY?: number;
     processingMs?: number;
   }) => void;
   onTurretFire?: (data: {
@@ -86,6 +115,7 @@ export class Engine {
     targetX: number;
     targetY: number;
     angle: number;
+    phase: "aim" | "fire";
   }) => void;
   onTeslaFire?: (data: {
     structureId: string;
@@ -93,6 +123,21 @@ export class Engine {
   }) => void;
   private structures: StructureEntry[] = [];
   private elapsedMs = 0;
+
+  /**
+   * Black hole state for Void Pulse.
+   * Only one black hole can exist at a time.
+   */
+  private blackHole: {
+    x: number;
+    y: number;
+    radius: number;
+    coreRadius: number;
+    collapseDamage: number;
+    startedAt: number;
+    durationMs: number;
+    active: boolean;
+  } | null = null;
 
   constructor(canvas: HTMLCanvasElement, opts: EngineOptions) {
     this.canvas = canvas;
@@ -364,7 +409,12 @@ export class Engine {
       if ((ent as any).state === "dead") {
         const be = ent as any as BugEntity;
         try {
-          this.onEntityDeath?.(be.x, be.y, be.variant);
+          this.onEntityDeath?.(be.x, be.y, be.variant, {
+            credited: be.deathCredited,
+            frozen:
+              be.slow !== null && performance.now() < be.slow.expiresAt,
+            pointValue: be.typeSpec?.pointValue ?? 1,
+          });
         } catch {
           void 0;
         }
@@ -378,11 +428,14 @@ export class Engine {
     this.tickStructures(dt * 1000);
   }
 
-  handleHit(index: number, damage = 1) {
+  handleHit(index: number, damage = 1, creditOnDeath = false) {
     const e = this.entities[index];
     if (!e) return null;
     if (typeof (e as any).onHit === "function") {
       const res = (e as any).onHit(damage);
+      if (res.defeated && "deathCredited" in (e as any)) {
+        (e as any).deathCredited = creditOnDeath;
+      }
       return {
         defeated: res.defeated,
         remainingHp: res.remainingHp,
@@ -573,8 +626,8 @@ export class Engine {
 
   private tickLantern(s: StructureEntry): void {
     const ATTRACT_RADIUS = 280;
-    const ORBIT_SPEED = 1.2;  // tangential pixels per tick
-    const PULL_PX = 0.6;      // inward pull strength
+    const ORBIT_SPEED = 0.65;  // tangential pixels per tick
+    const PULL_PX = 0.18;      // inward pull strength
 
     for (let i = 0; i < this.entities.length; i++) {
       const e = this.entities[i] as any;
@@ -599,21 +652,44 @@ export class Engine {
 
   private tickAgent(s: StructureEntry): void {
     const CAPTURE_RADIUS = 80;
+    const PULL_DURATION_MS = 500;
 
     // Phase 2: processing an already-captured bug
     if (s.absorbing) {
+      // Animate bug position toward agent during pull window
+      const pullElapsed = this.elapsedMs - s.absorbing.pullStartedAt;
+      if (pullElapsed < PULL_DURATION_MS) {
+        const t = pullElapsed / PULL_DURATION_MS;
+        s.absorbing.bugX = s.absorbing.pullFromX + (s.x - s.absorbing.pullFromX) * t;
+        s.absorbing.bugY = s.absorbing.pullFromY + (s.y - s.absorbing.pullFromY) * t;
+        try {
+          this.onAgentAbsorb?.({
+            structureId: s.id,
+            phase: "pulling",
+            variant: s.absorbing.variant,
+            bugX: s.absorbing.bugX,
+            bugY: s.absorbing.bugY,
+            srcX: s.x,
+            srcY: s.y,
+          });
+        } catch { void 0; }
+        return;
+      }
+
       if (this.elapsedMs >= s.absorbing.completesAt) {
         const fail = Math.random() < s.absorbing.failChance;
         if (!fail) {
-          try { this.onStructureKill?.(s.absorbing.bugX, s.absorbing.bugY, s.absorbing.variant); } catch { void 0; }
+          try { this.onStructureKill?.(s.x, s.y, s.absorbing.variant); } catch { void 0; }
         }
         try {
           this.onAgentAbsorb?.({
             structureId: s.id,
             phase: fail ? "failed" : "done",
             variant: s.absorbing.variant,
-            bugX: s.absorbing.bugX,
-            bugY: s.absorbing.bugY,
+            bugX: s.x,
+            bugY: s.y,
+            srcX: s.x,
+            srcY: s.y,
           });
         } catch { void 0; }
         s.absorbing = null;
@@ -645,11 +721,14 @@ export class Engine {
         variant: e.variant,
         bugX: e.x,
         bugY: e.y,
+        pullFromX: e.x,
+        pullFromY: e.y,
+        pullStartedAt: this.elapsedMs,
         size,
-        completesAt: this.elapsedMs + processingMs,
+        completesAt: this.elapsedMs + PULL_DURATION_MS + processingMs,
         failChance: 0.2,
       };
-      // Remove bug from simulation immediately
+      // Remove bug from simulation immediately — pull is purely visual
       const be = e as BugEntity;
       this.pool.push(be);
       this.entities.splice(bestIdx, 1);
@@ -660,6 +739,8 @@ export class Engine {
           variant: e.variant,
           bugX: e.x,
           bugY: e.y,
+          srcX: s.x,
+          srcY: s.y,
           processingMs,
         });
       } catch { void 0; }
@@ -667,7 +748,45 @@ export class Engine {
   }
   private tickTurret(s: StructureEntry): void {
     const SHOOT_RADIUS = 150;
-    const SHOOT_INTERVAL_MS = 2000;
+    const SHOOT_INTERVAL_MS = 2500;
+    const AIM_DURATION_MS = 500;
+
+    // Resolve active aim phase
+    if (s.aimPhase) {
+      if (this.elapsedMs >= s.aimPhase.firesAt) {
+        // Fire phase: deal damage
+        const ap = s.aimPhase;
+        s.aimPhase = null;
+        s.nextCaptureAt = this.elapsedMs + SHOOT_INTERVAL_MS;
+        // Find the bug closest to the locked target position (it may have moved)
+        let bestDist2 = Infinity;
+        let bestIdx2 = -1;
+        for (let j = 0; j < this.entities.length; j++) {
+          const e2 = this.entities[j] as any;
+          if (e2.state === "dead" || e2.state === "dying") continue;
+          const d = Math.hypot(e2.x - ap.targetX, e2.y - ap.targetY);
+          if (d < bestDist2) { bestDist2 = d; bestIdx2 = j; }
+        }
+        const fireTarget = bestIdx2 >= 0 ? this.entities[bestIdx2] as any : null;
+        if (fireTarget) {
+          const angle2 = Math.atan2(fireTarget.y - s.y, fireTarget.x - s.x);
+          s.lastFireAngle = angle2;
+          const result = this.handleHit(bestIdx2, 1, true);
+          if (result?.defeated) {
+            try { this.onStructureKill?.(fireTarget.x, fireTarget.y, fireTarget.variant); } catch { void 0; }
+          }
+          try {
+            this.onTurretFire?.({
+              structureId: s.id,
+              srcX: s.x, srcY: s.y,
+              targetX: fireTarget.x, targetY: fireTarget.y,
+              angle: angle2, phase: "fire",
+            });
+          } catch { void 0; }
+        }
+      }
+      return;
+    }
 
     if (this.elapsedMs < s.nextCaptureAt) return;
 
@@ -688,24 +807,17 @@ export class Engine {
 
     const target = this.entities[bestIdx] as any;
     const angle = Math.atan2(target.y - s.y, target.x - s.x);
-    s.lastFireAngle = angle;
-    s.nextCaptureAt = this.elapsedMs + SHOOT_INTERVAL_MS;
 
-    // Deal damage
-    const result = this.handleHit(bestIdx, 1);
-    if (result?.defeated) {
-      try { this.onStructureKill?.(target.x, target.y, target.variant); } catch { void 0; }
-    }
+    // Start aim phase
+    s.aimPhase = { targetX: target.x, targetY: target.y, angle, firesAt: this.elapsedMs + AIM_DURATION_MS };
 
-    // Notify for visual effect
+    // Notify for aim VFX
     try {
       this.onTurretFire?.({
         structureId: s.id,
-        srcX: s.x,
-        srcY: s.y,
-        targetX: target.x,
-        targetY: target.y,
-        angle,
+        srcX: s.x, srcY: s.y,
+        targetX: target.x, targetY: target.y,
+        angle, phase: "aim",
       });
     } catch { void 0; }
   }
@@ -737,7 +849,7 @@ export class Engine {
     for (const { idx } of targets) {
       const e = this.entities[idx] as any;
       nodes.push({ x: e.x, y: e.y });
-      const result = this.handleHit(idx, 1);
+      const result = this.handleHit(idx, 1, true);
       if (result?.defeated) {
         try { this.onStructureKill?.(e.x, e.y, e.variant); } catch { void 0; }
       }
@@ -759,13 +871,130 @@ export class Engine {
       const e = this.entities[i] as any;
       if (e.state === "dead" || e.state === "dying") continue;
       if (Math.abs(e.x - s.x) <= WALL_HALF_WIDTH) {
-        const result = this.handleHit(i, 1);
+        const result = this.handleHit(i, 1, true);
         if (result?.defeated) {
           dead.push(i);
           try { this.onStructureKill?.(e.x, e.y, e.variant); } catch { void 0; }
         }
       }
     }
+  }
+
+  // ── Status-effect area applicators ─────────────────────────────────
+
+  applyPoisonInRadius(cx: number, cy: number, radius: number, dps: number, durationMs: number): void {
+    for (const e of this.entities) {
+      const bug = e as any;
+      if (bug.state === "dead" || bug.state === "dying") continue;
+      if (Math.hypot(e.x - cx, e.y - cy) <= radius) {
+        if (typeof bug.applyPoison === "function") bug.applyPoison(dps, durationMs);
+      }
+    }
+  }
+
+  applyEnsnareInRadius(cx: number, cy: number, radius: number, durationMs: number): void {
+    for (const e of this.entities) {
+      const bug = e as any;
+      if (bug.state === "dead" || bug.state === "dying") continue;
+      if (Math.hypot(e.x - cx, e.y - cy) <= radius) {
+        if (typeof bug.applyEnsnare === "function") bug.applyEnsnare(durationMs);
+      }
+    }
+  }
+
+  // ── Black-hole lifecycle ─────────────────────────────────────────────
+
+  /** Returns false when a black hole is already active (throttle duplicate fires). */
+  startBlackHole(
+    x: number, y: number,
+    radius: number, coreRadius: number,
+    durationMs: number, collapseDamage: number,
+  ): boolean {
+    if (this.blackHole?.active) return false;
+    this.blackHole = {
+      x, y, radius, coreRadius,
+      collapseDamage,
+      startedAt: this.elapsedMs,
+      durationMs,
+      active: true,
+    };
+    return true;
+  }
+
+  getBlackHole() {
+    return this.blackHole;
+  }
+
+  /** Call each tick; fires onCollapse callback once when duration expires. */
+  tickBlackHole(dtMs: number, onCollapse: (x: number, y: number, radius: number) => void): void {
+    if (!this.blackHole?.active) return;
+    const age = this.elapsedMs - this.blackHole.startedAt;
+    const { x, y, radius, coreRadius, collapseDamage, durationMs } = this.blackHole;
+
+    // Gravity pull towards core
+    for (let index = 0; index < this.entities.length; index++) {
+      const bug = this.entities[index] as any;
+      if (bug.state === "dead" || bug.state === "dying") continue;
+      const dx = x - bug.x;
+      const dy = y - bug.y;
+      const dist = Math.hypot(dx, dy);
+      if (dist > radius || dist < 1) continue;
+      const pull = (1 - dist / radius) * 2.5 * (dtMs / 16);
+      bug.x += (dx / dist) * pull;
+      bug.y += (dy / dist) * pull;
+      // Core contact: instant kill tick
+      if (dist <= coreRadius) {
+        this.handleHit(index, bug.maxHp ?? 99);
+      }
+    }
+
+    // Collapse when time expires
+    if (age >= durationMs) {
+      const hits = this.radiusHitTest(x, y, radius);
+      for (const idx of hits) this.handleHit(idx, collapseDamage);
+      onCollapse(x, y, radius);
+      this.blackHole = null;
+    }
+  }
+
+  // ── Chain-zap synergy: prefer unfrozen targets ──────────────────────
+
+  chainHitTestPreferUnfrozen(startIndex: number, chainRadius: number, maxBounces: number): number[] {
+    const result: number[] = [];
+    if (startIndex < 0 || startIndex >= this.entities.length) return result;
+    const visited = new Set<number>([startIndex]);
+    let currentIndex = startIndex;
+    for (let bounce = 0; bounce < maxBounces; bounce++) {
+      const current = this.entities[currentIndex] as any;
+      if (!current) break;
+      let bestDist = Infinity;
+      let bestIndex = -1;
+      let bestFrozen = true;
+      for (let i = 0; i < this.entities.length; i++) {
+        if (visited.has(i)) continue;
+        const e = this.entities[i] as any;
+        if (e.state === "dead" || e.state === "dying") continue;
+        const dist = Math.hypot(current.x - e.x, current.y - e.y);
+        if (dist > chainRadius) continue;
+        const now = performance.now();
+        const frozen = e.slow != null && now < (e.slow?.expiresAt ?? 0);
+        // Prefer unfrozen; within the same freeze category prefer closest
+        if (
+          bestIndex === -1 ||
+          (!frozen && bestFrozen) ||
+          (frozen === bestFrozen && dist < bestDist)
+        ) {
+          bestDist = dist;
+          bestIndex = i;
+          bestFrozen = frozen;
+        }
+      }
+      if (bestIndex === -1) break;
+      result.push(bestIndex);
+      visited.add(bestIndex);
+      currentIndex = bestIndex;
+    }
+    return result;
   }
 
   render(alpha = 1) {

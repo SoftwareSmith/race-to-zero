@@ -101,7 +101,6 @@ export function useDashboardController() {
   const settingsMenuRef = useRef<HTMLDivElement | null>(null);
   const bugSettingsMenuRef = useRef<HTMLDivElement | null>(null);
   const codexMenuRef = useRef<HTMLDivElement | null>(null);
-  const previousBugCountRef = useRef<number | null>(null);
   const [gameConfig] = useStoredState(
     STORAGE_KEYS.gameConfig,
     DEFAULT_GAME_CONFIG,

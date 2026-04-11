@@ -3,6 +3,7 @@
  * absolute-positioned layer inside BackgroundField, aligned with canvas-local coords.
  */
 
+import { useEffect, useState } from "react";
 import type { AgentCaptureState, PlacedStructure } from "@game/types";
 import WeaponGlyph from "@shared/components/icons/WeaponGlyph";
 import { STRUCTURE_DEFS } from "@config/structureConfig";
@@ -32,6 +33,18 @@ export default function StructureLayer({
   agentCaptures,
   turretLastFireTimes,
 }: StructureLayerProps) {
+  const [now, setNow] = useState(() => Date.now());
+
+  useEffect(() => {
+    const intervalId = window.setInterval(() => {
+      setNow(Date.now());
+    }, 100);
+
+    return () => {
+      window.clearInterval(intervalId);
+    };
+  }, []);
+
   if (structures.length === 0) return null;
 
   return (
@@ -50,10 +63,7 @@ export default function StructureLayer({
         const isFailed = capture?.phase === "failed";
         const progress =
           isAbsorbing && capture
-            ? Math.min(
-                1,
-                (Date.now() - capture.startedAt) / capture.processingMs,
-              )
+            ? Math.min(1, (now - capture.startedAt) / capture.processingMs)
             : isDone
               ? 1
               : 0;
@@ -238,18 +248,46 @@ export default function StructureLayer({
             ) : isFirewall ? (
               /* ── Firewall: flame column + countdown bar ── */
               <>
-                {/* Vertical fire column glow */}
+                {/* Flame tongue 1 — central, tallest */}
                 <div
-                  className="pointer-events-none absolute [animation:fire-flicker_400ms_ease-out_infinite]"
+                  className="pointer-events-none absolute [animation:fire-flicker_380ms_ease-in-out_infinite]"
                   style={{
-                    width: 40,
+                    width: 28,
                     height: 180,
-                    left: -20,
+                    left: -26,
                     top: -90,
-                    background: `linear-gradient(to top, ${color}00 0%, ${color}55 30%, ${color}88 60%, ${color}55 80%, ${color}00 100%)`,
-                    boxShadow: `0 0 28px 8px ${color}30`,
+                    background: `linear-gradient(to top, ${color}00 0%, ${color}66 30%, ${color}99 60%, ${color}55 80%, ${color}00 100%)`,
+                    boxShadow: `0 0 22px 6px ${color}30`,
+                    borderRadius: "50%",
+                    filter: "blur(3px)",
+                  }}
+                />
+                {/* Flame tongue 2 — left, shorter */}
+                <div
+                  className="pointer-events-none absolute [animation:fire-flicker-2_420ms_ease-in-out_infinite]"
+                  style={{
+                    width: 20,
+                    height: 140,
+                    left: -14,
+                    top: -85,
+                    background: `linear-gradient(to top, ${color}00 0%, ${color}44 35%, ${color}77 65%, ${color}33 85%, ${color}00 100%)`,
+                    borderRadius: "50%",
+                    filter: "blur(3.5px)",
+                    opacity: 0.85,
+                  }}
+                />
+                {/* Flame tongue 3 — right, narrowest */}
+                <div
+                  className="pointer-events-none absolute [animation:fire-flicker-3_350ms_ease-in-out_infinite]"
+                  style={{
+                    width: 16,
+                    height: 120,
+                    left: -8,
+                    top: -88,
+                    background: `linear-gradient(to top, ${color}00 0%, ${color}33 40%, ${color}66 70%, ${color}22 90%, ${color}00 100%)`,
                     borderRadius: "50%",
                     filter: "blur(4px)",
+                    opacity: 0.7,
                   }}
                 />
                 {/* Core icon */}

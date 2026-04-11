@@ -353,32 +353,6 @@ export class VfxEngine {
   }
 
   /**
-   * Void nova — black/violet/white radial burst.
-   */
-  spawnVoidNova(x: number, y: number, count = 100): void {
-    for (let i = 0; i < count; i++) {
-      const a = Math.random() * Math.PI * 2;
-      const speed = 50 + Math.random() * 360;
-      const phase = Math.random();
-      const [r, g, b] =
-        phase < 0.33
-          ? [180, 40, 255] as [number, number, number]   // violet
-          : phase < 0.66
-          ? [255, 255, 255] as [number, number, number]  // white
-          : [20, 0, 60] as [number, number, number];     // deep purple
-      this.spawnParticle({
-        x, y,
-        vx: Math.cos(a) * speed, vy: Math.sin(a) * speed,
-        ay: 20,
-        life: 600 + Math.random() * 900,
-        size: phase < 0.33 ? 4 + Math.random() * 10 : 2 + Math.random() * 6,
-        type: PType.PLASMA, r, g, b,
-        additive: phase < 0.66,
-      });
-    }
-  }
-
-  /**
    * Lightning arc — 3 noise-displaced strands per segment, redrawn each tick.
    */
   spawnLightning(
@@ -520,41 +494,6 @@ export class VfxEngine {
   }
 
   /**
-   * Cyan frost crystal shape at bug hit position — persists 3 seconds.
-   */
-  addFrostDecal(x: number, y: number): void {
-    if (!this.initialized) return;
-    const gfx = this.acquireGfx();
-    gfx.x = x;
-    gfx.y = y;
-    const spikes = 6;
-    for (let i = 0; i < spikes; i++) {
-      const a = (i / spikes) * Math.PI * 2;
-      const len = 8 + Math.random() * 8;
-      gfx.moveTo(0, 0);
-      gfx.lineTo(Math.cos(a) * len, Math.sin(a) * len);
-      gfx.stroke({ color: 0xbfdbfe, width: 1.5, alpha: 0.8 });
-      // Small cross at tip
-      const tx = Math.cos(a) * len;
-      const ty = Math.sin(a) * len;
-      const ca = a + Math.PI / 2;
-      gfx.moveTo(tx + Math.cos(ca) * 3, ty + Math.sin(ca) * 3);
-      gfx.lineTo(tx - Math.cos(ca) * 3, ty - Math.sin(ca) * 3);
-      gfx.stroke({ color: 0xe0f2fe, width: 1, alpha: 0.6 });
-    }
-    gfx.circle(0, 0, 4);
-    gfx.fill({ color: 0xbfdbfe, alpha: 0.7 });
-    this.decalContainer.addChild(gfx);
-    this.decals.push({
-      gfx,
-      createdAt: performance.now(),
-      lifetime: 3500,
-      initialAlpha: 0.9,
-      container: this.decalContainer,
-    });
-  }
-
-  /**
    * Orange-red glowing burn scar along a laser beam — fades over 2 seconds.
    */
   addBurnScar(x1: number, y1: number, x2: number, y2: number): void {
@@ -576,31 +515,392 @@ export class VfxEngine {
     });
   }
 
-  /**
-   * Purple void rift swirl — fades after 3 seconds.
-   */
-  addVoidRift(x: number, y: number): void {
+  // ── Bug Spray: lime-green aerosol cone ──────────────────────────────────────
+
+  spawnSprayParticles(x: number, y: number, angleDeg: number, coneDeg = 50): void {
+    if (!this.initialized) return;
+    const half = (coneDeg / 2) * (Math.PI / 180);
+    const baseAngle = angleDeg * (Math.PI / 180);
+    for (let i = 0; i < 28; i++) {
+      const a = baseAngle + (Math.random() - 0.5) * 2 * half;
+      const speed = 120 + Math.random() * 160;
+      const life = 350 + Math.random() * 300;
+      this.spawnParticle({
+        x: x + (Math.random() - 0.5) * 8,
+        y: y + (Math.random() - 0.5) * 8,
+        vx: Math.cos(a) * speed,
+        vy: Math.sin(a) * speed,
+        ax: 0, ay: 20,
+        life,
+        size: 4 + Math.random() * 5,
+        type: PType.SMOKE,
+        r: 100 + Math.floor(Math.random() * 60),
+        g: 200 + Math.floor(Math.random() * 55),
+        b: 50 + Math.floor(Math.random() * 60),
+        additive: false,
+      });
+    }
+    // Extra bright sparks at nozzle
+    for (let i = 0; i < 8; i++) {
+      const a = baseAngle + (Math.random() - 0.5) * half;
+      this.spawnParticle({
+        x, y,
+        vx: Math.cos(a) * (200 + Math.random() * 80),
+        vy: Math.sin(a) * (200 + Math.random() * 80),
+        ax: 0, ay: 30,
+        life: 200 + Math.random() * 150,
+        size: 2.5 + Math.random() * 2,
+        type: PType.SPARK,
+        r: 160, g: 255, b: 80,
+        additive: true,
+      });
+    }
+  }
+
+  addToxicCloud(x: number, y: number, radiusPx: number, durationMs: number): void {
     if (!this.initialized) return;
     const gfx = this.acquireGfx();
     gfx.x = x;
     gfx.y = y;
-    // Radiating cracks in void palette
-    const crackCount = 8;
-    for (let i = 0; i < crackCount; i++) {
-      const a = (i / crackCount) * Math.PI * 2 + Math.random() * 0.3;
-      const len = 20 + Math.random() * 30;
-      gfx.moveTo(0, 0);
-      gfx.lineTo(Math.cos(a) * len, Math.sin(a) * len);
-      gfx.stroke({ color: i % 2 === 0 ? 0xc084fc : 0x7c3aed, width: 1.5, alpha: 0.8 });
-    }
-    gfx.circle(0, 0, 8);
-    gfx.fill({ color: 0x4c1d95, alpha: 0.6 });
+    const rx = radiusPx * 1.1;
+    const ry = radiusPx * 0.65;
+    // Outer haze
+    gfx.ellipse(0, 0, rx, ry);
+    gfx.fill({ color: 0x4ade80, alpha: 0.22 });
+    gfx.ellipse(0, 0, rx * 0.65, ry * 0.65);
+    gfx.fill({ color: 0x86efac, alpha: 0.18 });
+    // Pulsing edge ring
+    gfx.ellipse(0, 0, rx, ry);
+    gfx.stroke({ color: 0x16a34a, width: 2, alpha: 0.55 });
     this.decalContainer.addChild(gfx);
     this.decals.push({
       gfx,
       createdAt: performance.now(),
-      lifetime: 3000,
+      lifetime: durationMs,
+      initialAlpha: 0.9,
+      container: this.decalContainer,
+    });
+  }
+
+  // ── Freeze Blast: scattered snowflake decals ──────────────────────────────
+
+  spawnSnowflakeDecals(x: number, y: number, count = 10, radius = 160): void {
+    if (!this.initialized) return;
+    for (let i = 0; i < count; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const dist = (0.3 + Math.random() * 0.7) * radius;
+      const sx = x + Math.cos(angle) * dist;
+      const sy = y + Math.sin(angle) * dist;
+      const gfx = this.acquireGfx();
+      gfx.x = sx;
+      gfx.y = sy;
+      const spikes = 6;
+    const outerLen = 4 + Math.random() * 14;
+      const innerLen = outerLen * 0.38;
+      for (let s = 0; s < spikes; s++) {
+        const a = (s / spikes) * Math.PI * 2;
+        // Main arm
+        gfx.moveTo(0, 0);
+        gfx.lineTo(Math.cos(a) * outerLen, Math.sin(a) * outerLen);
+        gfx.stroke({ color: 0xbae6fd, width: 1.5, alpha: 0.9 });
+        // Cross-bars on each arm
+        const mx = Math.cos(a) * outerLen * 0.55;
+        const my = Math.sin(a) * outerLen * 0.55;
+        const ca = a + Math.PI / 2;
+        gfx.moveTo(mx + Math.cos(ca) * innerLen, my + Math.sin(ca) * innerLen);
+        gfx.lineTo(mx - Math.cos(ca) * innerLen, my - Math.sin(ca) * innerLen);
+        gfx.stroke({ color: 0xe0f2fe, width: 1, alpha: 0.7 });
+      }
+      gfx.circle(0, 0, 2.5);
+      gfx.fill({ color: 0xffffff, alpha: 0.9 });
+      this.decalContainer.addChild(gfx);
+      this.decals.push({
+        gfx,
+        createdAt: performance.now(),
+        lifetime: 2200 + Math.random() * 800,
+        initialAlpha: 0.88,
+        container: this.decalContainer,
+      });
+    }
+  }
+
+  // ── Flamethrower: ground fire patch ──────────────────────────────────────
+
+  addFirePatch(x: number, y: number, radiusPx: number): void {
+    if (!this.initialized) return;
+    const gfx = this.acquireGfx();
+    gfx.x = x;
+    gfx.y = y;
+    gfx.ellipse(0, 0, radiusPx, radiusPx * 0.5);
+    gfx.fill({ color: 0xff6a00, alpha: 0.38 });
+    gfx.ellipse(0, 0, radiusPx * 0.55, radiusPx * 0.25);
+    gfx.fill({ color: 0xffd200, alpha: 0.28 });
+    this.decalContainer.addChild(gfx);
+      this.decals.push({
+        gfx,
+        createdAt: performance.now(),
+        lifetime: 4000,
+        initialAlpha: 0.85,
+        container: this.decalContainer,
+      });
+  }
+
+  // ── Static Net: expanding wire-mesh ring ──────────────────────────────────
+
+  spawnNetCast(x: number, y: number, radiusPx: number, durationMs: number): void {
+    if (!this.initialized) return;
+    const gfx = this.acquireGfx();
+    gfx.x = x;
+    gfx.y = y;
+    // Radial spokes
+    const spokes = 10;
+    for (let i = 0; i < spokes; i++) {
+      const a = (i / spokes) * Math.PI * 2;
+      gfx.moveTo(0, 0);
+      gfx.lineTo(Math.cos(a) * radiusPx, Math.sin(a) * radiusPx);
+      gfx.stroke({ color: 0xe2e8f0, width: 1.2, alpha: 0.7 });
+    }
+    // Concentric rings
+    const rings = 3;
+    for (let r = 1; r <= rings; r++) {
+      gfx.circle(0, 0, radiusPx * (r / rings));
+      gfx.stroke({ color: 0xffffff, width: 1, alpha: 0.55 });
+    }
+    this.decalContainer.addChild(gfx);
+    this.decals.push({
+      gfx,
+      createdAt: performance.now(),
+      lifetime: durationMs,
       initialAlpha: 0.85,
+      container: this.decalContainer,
+    });
+  }
+
+  // ── Chain Zap: spark crown at bounce point ────────────────────────────────
+
+  spawnSparkCrown(x: number, y: number, colorHex = 0xfbbf24): void {
+    if (!this.initialized) return;
+    const spokes = 8;
+    for (let i = 0; i < spokes; i++) {
+      const a = (i / spokes) * Math.PI * 2;
+      const speed = 90 + Math.random() * 70;
+      this.spawnParticle({
+        x, y,
+        vx: Math.cos(a) * speed,
+        vy: Math.sin(a) * speed,
+        ax: 0, ay: 0,
+        life: 200 + Math.random() * 150,
+        size: 3 + Math.random() * 3,
+        type: PType.SPARK,
+        r: (colorHex >> 16) & 0xff,
+        g: (colorHex >> 8) & 0xff,
+        b: colorHex & 0xff,
+        additive: true,
+      });
+    }
+  }
+
+  // ── Plasma Bomb: inward clockwise implosion spiral ────────────────────────
+
+  spawnPlasmaImplosion(x: number, y: number, radiusPx: number): void {
+    if (!this.initialized) return;
+    for (let i = 0; i < 40; i++) {
+      const startAngle = Math.random() * Math.PI * 2;
+      const r = radiusPx * (0.5 + Math.random() * 0.5);
+      const sx = x + Math.cos(startAngle) * r;
+      const sy = y + Math.sin(startAngle) * r;
+      // Velocity points inward + clockwise tangent
+      const inwardX = x - sx;
+      const inwardY = y - sy;
+      const tangX = -inwardY;
+      const tangY = inwardX;
+      const len = Math.hypot(inwardX, inwardY) || 1;
+      const speed = 80 + Math.random() * 120;
+      const mix = 0.7;
+      this.spawnParticle({
+        x: sx, y: sy,
+        vx: (inwardX / len * mix + tangX / len * (1 - mix)) * speed,
+        vy: (inwardY / len * mix + tangY / len * (1 - mix)) * speed,
+        ax: 0, ay: 0,
+        life: 300 + Math.random() * 250,
+        size: 3.5 + Math.random() * 4,
+        type: PType.PLASMA,
+        r: 96, g: 165, b: 250,
+        additive: true,
+      });
+    }
+  }
+
+  addPlasmaCrater(x: number, y: number): void {
+    if (!this.initialized) return;
+    const gfx = this.acquireGfx();
+    gfx.x = x;
+    gfx.y = y;
+    // Radial gradient-like rings
+    gfx.circle(0, 0, 60);
+    gfx.fill({ color: 0x1e3a5f, alpha: 0.55 });
+    gfx.circle(0, 0, 35);
+    gfx.fill({ color: 0x3b82f6, alpha: 0.35 });
+    gfx.circle(0, 0, 14);
+    gfx.fill({ color: 0x93c5fd, alpha: 0.45 });
+    this.decalContainer.addChild(gfx);
+    this.decals.push({
+      gfx,
+      createdAt: performance.now(),
+      lifetime: 4000,
+      initialAlpha: 0.9,
+      container: this.decalContainer,
+    });
+  }
+
+  // ── Void Pulse: persistent black-hole visual ─────────────────────────────
+
+  private blackHoleGfxMap = new Map<string, Graphics>();
+  private bhIdCounter = 0;
+
+  createBlackHole(x: number, y: number): string {
+    if (!this.initialized) return "";
+    const id = `bh_${++this.bhIdCounter}`;
+    const gfx = this.acquireGfx();
+    gfx.x = x;
+    gfx.y = y;
+    this._drawBlackHole(gfx);
+    // Insert between decal and normal layers so it renders under sparks
+    this.decalContainer.addChild(gfx);
+    this.blackHoleGfxMap.set(id, gfx);
+    return id;
+  }
+
+  destroyBlackHole(id: string): void {
+    const gfx = this.blackHoleGfxMap.get(id);
+    if (!gfx) return;
+    gfx.clear();
+    gfx.removeFromParent();
+    this.gfxPool.push(gfx);
+    this.blackHoleGfxMap.delete(id);
+  }
+
+  /** Call each tick to animate the black hole rings. */
+  tickBlackHoleVfx(id: string): void {
+    const gfx = this.blackHoleGfxMap.get(id);
+    if (!gfx) return;
+    gfx.clear();
+    this._drawBlackHole(gfx);
+  }
+
+  private _drawBlackHole(gfx: Graphics): void {
+    const t = performance.now() * 0.001;
+    // Accretion rings: pulsing alpha
+    const rings = [{ r: 80, color: 0x4c1d95, a: 0.25 }, { r: 55, color: 0x7c3aed, a: 0.35 }, { r: 35, color: 0xa855f7, a: 0.45 }];
+    for (const ring of rings) {
+      const pulse = 0.15 * Math.sin(t * 3 + ring.r * 0.05);
+      gfx.circle(0, 0, ring.r);
+      gfx.fill({ color: ring.color, alpha: ring.a + pulse });
+    }
+    // Hard black core
+    gfx.circle(0, 0, 22);
+    gfx.fill({ color: 0x000000, alpha: 0.95 });
+    // Photon ring
+    gfx.circle(0, 0, 28);
+    gfx.stroke({ color: 0xc084fc, width: 2.5, alpha: 0.85 });
+  }
+
+  spawnVoidCollapse(x: number, y: number, radiusPx: number): void {
+    if (!this.initialized) return;
+    // Thick violet shock-ring via decal
+    const gfx = this.acquireGfx();
+    gfx.x = x;
+    gfx.y = y;
+    gfx.circle(0, 0, radiusPx);
+    gfx.stroke({ color: 0xc084fc, width: 8, alpha: 0.9 });
+    gfx.circle(0, 0, radiusPx * 0.85);
+    gfx.fill({ color: 0x4c1d95, alpha: 0.22 });
+    this.decalContainer.addChild(gfx);
+    this.decals.push({
+      gfx,
+      createdAt: performance.now(),
+      lifetime: 600,
+      initialAlpha: 1.0,
+      container: this.decalContainer,
+    });
+    // Plasma burst particles
+    for (let i = 0; i < 30; i++) {
+      const a = Math.random() * Math.PI * 2;
+      const speed = 160 + Math.random() * 220;
+      this.spawnParticle({
+        x, y,
+        vx: Math.cos(a) * speed,
+        vy: Math.sin(a) * speed,
+        ax: 0, ay: 0,
+        life: 400 + Math.random() * 400,
+        size: 4 + Math.random() * 6,
+        type: PType.PLASMA,
+        r: 192, g: 132, b: 252,
+        additive: true,
+      });
+    }
+  }
+
+  // ── Null Pointer: binary burst ────────────────────────────────────────────
+
+  spawnBinaryBurst(x: number, y: number): void {
+    if (!this.initialized) return;
+    const count = 14;
+    for (let i = 0; i < count; i++) {
+      const a = (i / count) * Math.PI * 2 + Math.random() * 0.4;
+      const speed = 60 + Math.random() * 100;
+      // Create a tiny Pixi text node using a Graphics approach (draw "0"/"1" as simple rects)
+      const gfx = this.acquireGfx();
+      gfx.x = x;
+      gfx.y = y;
+      // Draw a small pixel "1" or "0" shape
+      const isBit1 = Math.random() < 0.5;
+      if (isBit1) {
+        gfx.rect(-1.5, -5, 3, 10);
+      } else {
+        gfx.rect(-3.5, -5, 7, 10);
+        gfx.stroke({ color: 0x00ff88, width: 1.5, alpha: 0.9 });
+        gfx.rect(-2.5, -3.5, 5, 7);
+        gfx.fill({ color: 0x000000, alpha: 1 });
+      }
+      gfx.fill({ color: 0x00ff88, alpha: 0.9 });
+      const vx = Math.cos(a) * speed;
+      const vy = Math.sin(a) * speed;
+      const life = 600 + Math.random() * 400;
+      // Simulate via the particle hack: store in normalContainer, tick manually via decal
+      this.additiveContainer.addChild(gfx);
+      // Animate position via decal lifetime trick (position updated outside normal particle loop)
+      this.decals.push({
+        gfx,
+        createdAt: performance.now(),
+        lifetime: life,
+        initialAlpha: 0.9,
+        container: this.additiveContainer,
+      });
+      // Store vx/vy on gfx via custom property for the update loop
+      (gfx as any).__bvx = vx;
+      (gfx as any).__bvy = vy;
+    }
+  }
+
+  // ── Laser: tracer line ────────────────────────────────────────────────────
+
+  addTracerLine(x1: number, y1: number, x2: number, y2: number, durationMs: number): void {
+    if (!this.initialized) return;
+    const gfx = this.acquireGfx();
+    gfx.moveTo(x1, y1);
+    gfx.lineTo(x2, y2);
+    gfx.stroke({ color: 0xff3333, width: 2.5, alpha: 0.85 });
+    // Core bright line
+    gfx.moveTo(x1, y1);
+    gfx.lineTo(x2, y2);
+    gfx.stroke({ color: 0xffe4e4, width: 0.8, alpha: 0.7 });
+    this.decalContainer.addChild(gfx);
+    this.decals.push({
+      gfx,
+      createdAt: performance.now(),
+      lifetime: durationMs,
+      initialAlpha: 0.9,
       container: this.decalContainer,
     });
   }
@@ -720,6 +1020,13 @@ export class VfxEngine {
       }
       const progress = age / d.lifetime;
       d.gfx.alpha = d.initialAlpha * (1 - progress);
+      // Animate binary-burst bits position
+      const bvx = (d.gfx as any).__bvx;
+      if (bvx !== undefined) {
+        const bvy = (d.gfx as any).__bvy;
+        d.gfx.x += bvx * (dtMs / 1000);
+        d.gfx.y += bvy * (dtMs / 1000);
+      }
     }
     for (const d of deadDecals) {
       this.releaseDecal(d);

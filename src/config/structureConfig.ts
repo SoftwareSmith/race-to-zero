@@ -39,7 +39,7 @@ export const STRUCTURE_DEFS: StructureDef[] = [
     title: "Bug Lantern",
     unlockKills: 45,
     detail:
-      "Emits an irresistible glow that pulls bugs into a mesmerising orbit. Bugs spiral in and circle the flame — pick them off while they\'re circling.",
+      "Emits an irresistible glow that pulls bugs into a mesmerising orbit. Bugs spiral in and circle the flame — pick them off while they're circling.",
     hint: "Click to arm, then click the field to place (max 3)",
     maxPlaced: 3,
     effectRadius: 280,

@@ -6,117 +6,88 @@
  * an expanding circle.
  */
 
+import type { CSSProperties } from "react";
 import type { WeaponEffectEvent } from "@game/types";
 
-// ── Freeze Cone: SVG cone + ice shard triangles ──────────────────────────────
+// ── Freeze Blast: expanding ice ring + fade ──────────────────────────────────
 
-function FreezeEffect({
-  x,
-  y,
-  angle,
-}: {
-  x: number;
-  y: number;
-  angle?: number;
-}) {
-  const rad = angle ?? 0;
-  const DEPTH = 180;
-  const HALF_ARC = Math.PI / 4;
-  const leftAngle = rad - HALF_ARC;
-  const rightAngle = rad + HALF_ARC;
-
-  const margin = 20;
-  const svgLeft = x - DEPTH - margin;
-  const svgTop = y - DEPTH - margin;
-  const svgSize = (DEPTH + margin) * 2;
-  const ox = DEPTH + margin;
-  const oy = DEPTH + margin;
-  const lx = ox + Math.cos(leftAngle) * DEPTH;
-  const ly = oy + Math.sin(leftAngle) * DEPTH;
-  const rx = ox + Math.cos(rightAngle) * DEPTH;
-  const ry = oy + Math.sin(rightAngle) * DEPTH;
-  const conePath = `M ${ox} ${oy} L ${lx.toFixed(1)} ${ly.toFixed(1)} A ${DEPTH} ${DEPTH} 0 0 1 ${rx.toFixed(1)} ${ry.toFixed(1)} Z`;
-
-  const shards = Array.from({ length: 7 }, (_, i) => {
-    const shardAngle = leftAngle + ((i + 0.5) * (HALF_ARC * 2)) / 7;
-    const dist = 30 + i * 20;
-    const size = 7 + (i % 3) * 4;
-    const sx = ox + Math.cos(shardAngle) * dist;
-    const sy = oy + Math.sin(shardAngle) * dist;
-    const rot = (shardAngle * 180) / Math.PI + 90;
-    return { sx, sy, size, rot };
-  });
-
-  const sparkles = Array.from({ length: 5 }, (_, i) => {
-    const a = leftAngle + ((i + 1) * (HALF_ARC * 2)) / 6;
-    const d = 50 + (i % 3) * 30;
-    return {
-      cx: ox + Math.cos(a) * d,
-      cy: oy + Math.sin(a) * d,
-      r: 3 + (i % 2) * 2,
-    };
-  });
+function FreezeEffect({ x, y }: { x: number; y: number; angle?: number }) {
+  const R = 180;
+  const margin = 12;
+  const svgSize = (R + margin) * 2;
+  const cx = R + margin;
+  const cy = R + margin;
 
   return (
     <svg
       aria-hidden="true"
-      className="pointer-events-none fixed [animation:freeze-cone-fade_700ms_ease-out_forwards]"
+      className="pointer-events-none fixed [animation:freeze-radial-fade_700ms_ease-out_forwards]"
       style={{
-        left: svgLeft,
-        top: svgTop,
+        left: x - (R + margin),
+        top: y - (R + margin),
         width: svgSize,
         height: svgSize,
         overflow: "visible",
       }}
       viewBox={`0 0 ${svgSize} ${svgSize}`}
     >
-      <path
-        d={conePath}
-        fill="rgba(186,230,253,0.22)"
-        stroke="rgba(147,210,255,0.55)"
-        strokeWidth="1.5"
-        strokeLinejoin="round"
-        filter="drop-shadow(0 0 8px rgba(186,230,253,0.4))"
+      {/* Outer expanding ring */}
+      <circle
+        cx={cx}
+        cy={cy}
+        r={R}
+        fill="rgba(147,197,253,0.08)"
+        stroke="rgba(147,197,253,0.65)"
+        strokeWidth="2"
+        filter="drop-shadow(0 0 8px rgba(147,197,253,0.5))"
       />
-      {shards.map((s, i) => (
-        <g
-          key={i}
-          transform={`translate(${s.sx.toFixed(1)},${s.sy.toFixed(1)}) rotate(${s.rot.toFixed(1)})`}
-          style={
-            {
-              animation: "sparkle-appear 500ms ease-out forwards",
-              animationDelay: `${i * 65}ms`,
-              opacity: 0,
-            } as React.CSSProperties
-          }
-        >
-          <polygon
-            points={`0,${-s.size} ${s.size * 0.4},${s.size * 0.5} ${-s.size * 0.4},${s.size * 0.5}`}
-            fill={
-              i % 2 === 0 ? "rgba(224,242,254,0.7)" : "rgba(147,210,255,0.55)"
+      {/* Mid ring */}
+      <circle
+        cx={cx}
+        cy={cy}
+        r={R * 0.55}
+        fill="rgba(186,230,253,0.10)"
+        stroke="rgba(186,230,253,0.4)"
+        strokeWidth="1.5"
+      />
+      {/* Core burst */}
+      <circle
+        cx={cx}
+        cy={cy}
+        r={18}
+        fill="rgba(224,242,254,0.35)"
+        stroke="rgba(255,255,255,0.6)"
+        strokeWidth="1"
+        filter="drop-shadow(0 0 5px rgba(186,230,253,0.8))"
+      />
+      {/* 8 ice shard radials */}
+      {Array.from({ length: 8 }, (_, i) => {
+        const a = (i / 8) * Math.PI * 2;
+        const len = 24 + (i % 3) * 8;
+        const x1 = cx + Math.cos(a) * 20;
+        const y1 = cy + Math.sin(a) * 20;
+        const x2 = cx + Math.cos(a) * (20 + len);
+        const y2 = cy + Math.sin(a) * (20 + len);
+        return (
+          <line
+            key={i}
+            x1={x1.toFixed(1)}
+            y1={y1.toFixed(1)}
+            x2={x2.toFixed(1)}
+            y2={y2.toFixed(1)}
+            stroke="rgba(186,230,253,0.55)"
+            strokeWidth="1.5"
+            strokeLinecap="round"
+            style={
+              {
+                animation: `sparkle-appear 400ms ease-out forwards`,
+                animationDelay: `${i * 30}ms`,
+                opacity: 0,
+              } as CSSProperties
             }
-            stroke="rgba(255,255,255,0.4)"
-            strokeWidth="0.8"
           />
-        </g>
-      ))}
-      {sparkles.map((sp, i) => (
-        <circle
-          key={`sp-${i}`}
-          cx={sp.cx}
-          cy={sp.cy}
-          r={sp.r}
-          fill="#e0f2fe"
-          opacity="0"
-          style={
-            {
-              animation: "sparkle-appear 420ms ease-out forwards",
-              animationDelay: `${i * 50 + 80}ms`,
-            } as React.CSSProperties
-          }
-        />
-      ))}
-      <circle cx={ox} cy={oy} r="4" fill="#bfdbfe" opacity="0.85" />
+        );
+      })}
     </svg>
   );
 }
@@ -294,15 +265,99 @@ function ChainEffect({
 
 // ── Directional Laser: beam with glow halo ───────────────────────────────────
 
+// ── Laser Disc: bouncing path as SVG line segments with glow ─────────────────
+
 function LaserBeamEffect({
   x,
   y,
   angle,
+  segments,
 }: {
   x: number;
   y: number;
   angle?: number;
+  segments?: Array<{ x1: number; y1: number; x2: number; y2: number }>;
 }) {
+  if (segments && segments.length > 0) {
+    const allX = segments.flatMap((s) => [s.x1, s.x2]);
+    const allY = segments.flatMap((s) => [s.y1, s.y2]);
+    const svgLeft = Math.min(...allX) - 16;
+    const svgTop = Math.min(...allY) - 16;
+    const svgW = Math.max(...allX) - svgLeft + 32;
+    const svgH = Math.max(...allY) - svgTop + 32;
+
+    return (
+      <svg
+        aria-hidden="true"
+        className="pointer-events-none fixed [animation:laser-beam-fade_400ms_ease-out_forwards]"
+        style={{
+          left: svgLeft,
+          top: svgTop,
+          width: svgW,
+          height: svgH,
+          overflow: "visible",
+        }}
+        viewBox={`${svgLeft} ${svgTop} ${svgW} ${svgH}`}
+      >
+        <defs>
+          <filter id="laser-glow">
+            <feGaussianBlur stdDeviation="3" result="blur" />
+            <feMerge>
+              <feMergeNode in="blur" />
+              <feMergeNode in="SourceGraphic" />
+            </feMerge>
+          </filter>
+        </defs>
+        {segments.map((seg, i) => (
+          <g key={i}>
+            {/* Glow halo */}
+            <line
+              x1={seg.x1}
+              y1={seg.y1}
+              x2={seg.x2}
+              y2={seg.y2}
+              stroke="rgba(248,113,113,0.25)"
+              strokeWidth="10"
+              strokeLinecap="round"
+            />
+            {/* Core beam */}
+            <line
+              x1={seg.x1}
+              y1={seg.y1}
+              x2={seg.x2}
+              y2={seg.y2}
+              stroke="#f87171"
+              strokeWidth="2.5"
+              strokeLinecap="round"
+              filter="url(#laser-glow)"
+            />
+          </g>
+        ))}
+        {/* Bounce markers */}
+        {segments.slice(1).map((seg, i) => (
+          <circle
+            key={`b-${i}`}
+            cx={seg.x1}
+            cy={seg.y1}
+            r="5"
+            fill="#fff"
+            opacity="0.85"
+            filter="url(#laser-glow)"
+          />
+        ))}
+        {/* Origin dot */}
+        <circle
+          cx={segments[0].x1}
+          cy={segments[0].y1}
+          r="4"
+          fill="#fff"
+          opacity="0.7"
+        />
+      </svg>
+    );
+  }
+
+  // Fallback: single line from origin along angle
   const rad = angle ?? 0;
   const length = Math.max(window.innerWidth, window.innerHeight) * 1.5;
   const cos = Math.cos(rad);
@@ -491,6 +546,198 @@ function NullPointerEffect({
   );
 }
 
+// ── Void Pulse: animated spinning black hole ──────────────────────────────────
+
+function VoidPulseEffect({ x, y }: { x: number; y: number }) {
+  return (
+    <div
+      aria-hidden="true"
+      className="pointer-events-none fixed [animation:void-field-pulse_2200ms_ease-out_forwards]"
+      style={{ left: x, top: y, width: 0, height: 0, overflow: "visible" }}
+    >
+      {/* Outer gravitational field */}
+      <div
+        style={{
+          position: "absolute",
+          width: 600,
+          height: 600,
+          left: -300,
+          top: -300,
+          borderRadius: "50%",
+          pointerEvents: "none",
+          background:
+            "radial-gradient(circle, rgba(124,58,237,0.18) 0%, rgba(76,29,149,0.08) 45%, transparent 70%)",
+        }}
+      />
+      {/* Outer accretion ring – slow spin */}
+      <div
+        style={{
+          position: "absolute",
+          width: 180,
+          height: 180,
+          left: -90,
+          top: -90,
+          borderRadius: "50%",
+          border: "1.5px dashed rgba(167,139,250,0.5)",
+          boxShadow: "0 0 24px rgba(139,92,246,0.3)",
+          pointerEvents: "none",
+          animation: "agent-ring-spin 2.5s linear infinite",
+        }}
+      />
+      {/* Inner accretion ring – fast reverse spin */}
+      <div
+        style={{
+          position: "absolute",
+          width: 110,
+          height: 110,
+          left: -55,
+          top: -55,
+          borderRadius: "50%",
+          border: "2px dashed rgba(192,132,252,0.65)",
+          boxShadow: "0 0 14px rgba(147,51,234,0.4)",
+          pointerEvents: "none",
+          animation: "agent-ring-spin 1.4s linear infinite reverse",
+        }}
+      />
+      {/* Photon ring glow */}
+      <div
+        style={{
+          position: "absolute",
+          width: 66,
+          height: 66,
+          left: -33,
+          top: -33,
+          borderRadius: "50%",
+          pointerEvents: "none",
+          boxShadow:
+            "0 0 0 2.5px rgba(192,132,252,0.9), 0 0 18px rgba(147,51,234,0.7), 0 0 40px rgba(124,58,237,0.3)",
+          animation: "structure-pulse 0.8s ease-in-out infinite",
+        }}
+      />
+      {/* Hard black core */}
+      <div
+        style={{
+          position: "absolute",
+          width: 44,
+          height: 44,
+          left: -22,
+          top: -22,
+          borderRadius: "50%",
+          pointerEvents: "none",
+          background:
+            "radial-gradient(circle, #000 55%, rgba(76,29,149,0.8) 100%)",
+          boxShadow: "0 0 22px rgba(124,58,237,0.7)",
+        }}
+      />
+    </div>
+  );
+}
+
+// ── Static Net: expanding wire mesh ring ──────────────────────────────────────
+
+function StaticNetEffect({ x, y }: { x: number; y: number }) {
+  const R = 200;
+  const margin = 20;
+  const svgSize = (R + margin) * 2;
+  const cx = R + margin;
+  const cy = R + margin;
+  const spokes = 10;
+
+  return (
+    <svg
+      aria-hidden="true"
+      className="pointer-events-none fixed [animation:shockwave-expand_800ms_ease-out_forwards]"
+      style={{
+        left: x - cx,
+        top: y - cy,
+        width: svgSize,
+        height: svgSize,
+        overflow: "visible",
+        opacity: 0.9,
+      }}
+      viewBox={`0 0 ${svgSize} ${svgSize}`}
+    >
+      {/* Spokes */}
+      {Array.from({ length: spokes }, (_, i) => {
+        const a = (i / spokes) * Math.PI * 2;
+        return (
+          <line
+            key={`spoke-${i}`}
+            x1={cx}
+            y1={cy}
+            x2={(cx + Math.cos(a) * R).toFixed(1)}
+            y2={(cy + Math.sin(a) * R).toFixed(1)}
+            stroke="rgba(226,232,240,0.65)"
+            strokeWidth="1.2"
+            strokeLinecap="round"
+          />
+        );
+      })}
+      {/* Concentric rings */}
+      {[1 / 3, 2 / 3, 1].map((frac, i) => (
+        <circle
+          key={`ring-${i}`}
+          cx={cx}
+          cy={cy}
+          r={R * frac}
+          fill="none"
+          stroke="rgba(255,255,255,0.5)"
+          strokeWidth="1"
+        />
+      ))}
+      {/* Outer glow ring */}
+      <circle
+        cx={cx}
+        cy={cy}
+        r={R}
+        fill="none"
+        stroke="rgba(148,163,184,0.7)"
+        strokeWidth="2.5"
+        filter="drop-shadow(0 0 6px rgba(148,163,184,0.6))"
+      />
+    </svg>
+  );
+}
+
+// ── Plasma Bomb: implosion ring ───────────────────────────────────────────────
+
+function PlasmaBombEffect({ x, y }: { x: number; y: number }) {
+  return (
+    <>
+      {/* Implosion inward ring */}
+      <div
+        aria-hidden="true"
+        className="pointer-events-none fixed rounded-full [animation:plasma-implosion_400ms_ease-in_forwards]"
+        style={{
+          left: x,
+          top: y,
+          width: 340,
+          height: 340,
+          background:
+            "radial-gradient(circle, transparent 40%, rgba(96,165,250,0.35) 70%, transparent 100%)",
+          transform: "translate(-50%, -50%)",
+        }}
+      />
+      {/* Explosion ring (delayed) */}
+      <div
+        aria-hidden="true"
+        className="pointer-events-none fixed rounded-full [animation:shockwave-expand_900ms_ease-out_400ms_forwards]"
+        style={{
+          left: x,
+          top: y,
+          width: 380,
+          height: 380,
+          background:
+            "radial-gradient(circle, rgba(59,130,246,0.4) 0%, rgba(29,78,216,0.15) 55%, transparent 75%)",
+          boxShadow: "0 0 60px 16px rgba(59,130,246,0.18)",
+          transform: "translate(-50%, -50%)",
+          opacity: 0,
+        }}
+      />
+    </>
+  );
+}
+
 // ── Layer component ──────────────────────────────────────────────
 
 interface WeaponEffectLayerProps {
@@ -504,6 +751,18 @@ export default function WeaponEffectLayer({ effects }: WeaponEffectLayerProps) {
     <>
       {effects.map((effect) => {
         switch (effect.weapon) {
+          case "void":
+            return (
+              <VoidPulseEffect key={effect.id} x={effect.x} y={effect.y} />
+            );
+          case "shockwave":
+            return (
+              <StaticNetEffect key={effect.id} x={effect.x} y={effect.y} />
+            );
+          case "plasma":
+            return (
+              <PlasmaBombEffect key={effect.id} x={effect.x} y={effect.y} />
+            );
           case "freeze":
             return (
               <FreezeEffect
@@ -530,6 +789,7 @@ export default function WeaponEffectLayer({ effects }: WeaponEffectLayerProps) {
                 x={effect.x}
                 y={effect.y}
                 angle={effect.angle}
+                segments={effect.segments}
               />
             );
           case "nullpointer":

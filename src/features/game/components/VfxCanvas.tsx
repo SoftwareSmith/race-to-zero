@@ -23,7 +23,7 @@ const VfxCanvas = forwardRef<VfxEngine | null, Props>(function VfxCanvas(
   const wrapperRef = useRef<HTMLDivElement>(null);
   const engineRef = useRef<VfxEngine | null>(null);
   const rafRef = useRef<number>(0);
-  const prevTimeRef = useRef<number>(performance.now());
+  const prevTimeRef = useRef<number>(0);
 
   // Expose engine instance via ref
 

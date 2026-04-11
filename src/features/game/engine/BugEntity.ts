@@ -86,6 +86,12 @@ export class BugEntity extends Entity {
   typeSpec: BugType | null;
   /** Speed-slow status effect applied by Freeze Cone. */
   slow: { multiplier: number; expiresAt: number } | null;
+  /** Poison DOT applied by Bug Spray. */
+  poison: { dps: number; expiresAt: number; accumulatedDmg: number } | null;
+  /** Ensnare applied by Static Net — stops all movement; next click = instakill. */
+  ensnare: { expiresAt: number; canInstakill: boolean } | null;
+  /** Whether this bug's eventual death has already been credited to the player. */
+  deathCredited: boolean;
 
   constructor(opts: Partial<Entity> & { id?: string } = {}) {
     super(opts as Entity);
@@ -105,6 +111,9 @@ export class BugEntity extends Entity {
     this.motionTime = Math.random() * 100;
     this.typeSpec = null;
     this.slow = null;
+    this.poison = null;
+    this.ensnare = null;
+    this.deathCredited = false;
   }
 
   private syncTypeSpec() {
@@ -315,9 +324,39 @@ export class BugEntity extends Entity {
 
     const edgeFactor = 1 - wallSteering.pressure * 0.12;
     const speedBoost = this.state === "flee" ? 1.22 : 1;
-    // Apply slow status effect from Freeze Cone
+    // Apply status effects
     const now = performance.now();
     if (this.slow && now >= this.slow.expiresAt) this.slow = null;
+    if (this.ensnare && now >= this.ensnare.expiresAt) this.ensnare = null;
+    if (this.poison && now >= this.poison.expiresAt) this.poison = null;
+
+    // Tick poison DOT damage
+    if (this.poison && (this.state as BugState) !== "dying" && (this.state as BugState) !== "dead") {
+      this.poison.accumulatedDmg += this.poison.dps * dt;
+      if (this.poison.accumulatedDmg >= 1) {
+        const dmgToApply = Math.floor(this.poison.accumulatedDmg);
+        this.poison.accumulatedDmg -= dmgToApply;
+        this.lastHitTime = performance.now();
+        this.hp = Math.max(0, this.hp - dmgToApply);
+        if (this.hp === 0) {
+          this.state = "dying";
+          this.deathProgress = 0;
+          this.vx = 0;
+          this.vy = 0;
+          this.deathCredited = false;
+        }
+      }
+    }
+
+    // Ensnared bugs cannot move at all
+    if (this.ensnare && now < this.ensnare.expiresAt) {
+      this.vx = 0;
+      this.vy = 0;
+      this.opacity = 1;
+      this.size = this.baseSize;
+      return;
+    }
+
     const slowMult = this.slow ? this.slow.multiplier : 1;
     const desiredSpeed = config.baseSpeed * this.cruiseSpeed * edgeFactor * speedBoost * slowMult;
     const currentSpeed = getLength(this.vx, this.vy);
@@ -335,35 +374,63 @@ export class BugEntity extends Entity {
 
   onHit(damage = 1) {
     if (this.state === "dead" || this.state === "dying") {
-      return { defeated: false, remainingHp: 0, pointValue: 0, frozen: false };
+      return { defeated: false, remainingHp: 0, pointValue: 0, frozen: false, poisoned: false, ensnared: false };
     }
 
-    const frozen =
-      this.slow !== null && performance.now() < this.slow.expiresAt;
+    const now = performance.now();
+    const frozen = this.slow !== null && now < this.slow.expiresAt;
+    const poisoned = this.poison !== null && now < this.poison.expiresAt;
+    const ensnared = this.ensnare !== null && now < this.ensnare.expiresAt;
     const pointValue = this.typeSpec?.pointValue ?? 1;
 
     this.lastHitTime = performance.now();
-    this.hp = Math.max(0, this.hp - damage);
+    // Ensnared bugs can be instakilled by a click
+    const effectiveDamage = ensnared ? this.maxHp : damage;
+    this.hp = Math.max(0, this.hp - effectiveDamage);
     if (this.hp === 0) {
       this.state = "dying";
       this.deathProgress = 0;
       this.vx = 0;
       this.vy = 0;
-      return { defeated: true, remainingHp: 0, pointValue, frozen };
+      this.ensnare = null;
+      return { defeated: true, remainingHp: 0, pointValue, frozen, poisoned, ensnared };
     }
 
     this.state = "flee";
     this.fleeTimer = 0.9 + Math.random() * 0.5;
     this.syncTypeSpec();
-    return { defeated: false, remainingHp: this.hp, pointValue: 0, frozen };
+    return { defeated: false, remainingHp: this.hp, pointValue: 0, frozen, poisoned, ensnared };
   }
 
-  /** Apply a Freeze Cone slow. May stack to extend duration. */
+  /** Apply a Freeze Cone slow. Stacks to extend duration. */
   applyFreeze(multiplier: number, durationMs: number) {
-    const expiresAt = performance.now() + durationMs;
-    if (!this.slow || expiresAt > this.slow.expiresAt) {
-      this.slow = { multiplier, expiresAt };
+    const now = performance.now();
+    if (this.slow && now < this.slow.expiresAt) {
+      // Extend: add remaining time + new duration
+      this.slow.expiresAt = this.slow.expiresAt + durationMs;
+    } else {
+      this.slow = { multiplier, expiresAt: now + durationMs };
     }
+  }
+
+  /** Apply Bug Spray poison DOT. Stacks to extend duration. */
+  applyPoison(dps: number, durationMs: number) {
+    const now = performance.now();
+    if (this.poison && now < this.poison.expiresAt) {
+      this.poison.expiresAt = this.poison.expiresAt + durationMs;
+    } else {
+      this.poison = { dps, expiresAt: now + durationMs, accumulatedDmg: 0 };
+    }
+  }
+
+  /** Apply Static Net ensnare — completely immobilises; next hit = instakill. */
+  applyEnsnare(durationMs: number) {
+    this.ensnare = { expiresAt: performance.now() + durationMs, canInstakill: true };
+    // Stop movement immediately
+    this.vx = 0;
+    this.vy = 0;
+    this.state = "patrol";
+    this.fleeTimer = null;
   }
 
   /** Apply an impulse and trigger flee state (Pulse Cannon knockback). */
@@ -391,6 +458,9 @@ export class BugEntity extends Entity {
     this.deathProgress = 0;
     this.fleeTimer = null;
     this.slow = null;
+    this.poison = null;
+    this.ensnare = null;
+    this.deathCredited = false;
     this.motionTime = Math.random() * 100;
     this.opacity = 1;
     this.size = this.baseSize;

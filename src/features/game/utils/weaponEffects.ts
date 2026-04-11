@@ -9,7 +9,7 @@ import type { SiegeWeaponId, WeaponEffectEvent } from "@game/types";
 /** Duration in ms each weapon's fire animation plays before cleanup. */
 export const EFFECT_DURATION: Record<SiegeWeaponId, number> = {
   wrench: 520,
-  zapper: 700,
+  zapper: 1400,
   freeze: 700,
   chain: 1200,
   flame: 3000,
@@ -17,7 +17,7 @@ export const EFFECT_DURATION: Record<SiegeWeaponId, number> = {
   shockwave: 1200,
   nullpointer: 1500,
   plasma: 1100,
-  void: 1500,
+  void: 2500,
 };
 
 /** Returns true if the effect animation is still playing. */
@@ -36,6 +36,7 @@ export function createEffectEvent(
     targetX?: number;
     targetY?: number;
     color?: string;
+    segments?: Array<{ x1: number; y1: number; x2: number; y2: number }>;
   },
 ): WeaponEffectEvent {
   // Pre-seed stable jag offsets for chain zap so arcs don't flicker on re-renders
