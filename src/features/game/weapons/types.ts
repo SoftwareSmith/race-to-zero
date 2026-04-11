@@ -35,6 +35,10 @@ export interface WeaponDef {
   appliesSlow?: boolean;
   appliesKnockback?: boolean;
   applyPoison?: boolean;
+  applyBurn?: boolean;
+  burnDps?: number;
+  burnDurationMs?: number;
+  burnDecayPerSecond?: number;
   poisonDps?: number;
   poisonDurationMs?: number;
   applyEnsnare?: boolean;

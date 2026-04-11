@@ -88,6 +88,13 @@ export class BugEntity extends Entity {
   slow: { multiplier: number; expiresAt: number } | null;
   /** Poison DOT applied by Bug Spray. */
   poison: { dps: number; expiresAt: number; accumulatedDmg: number } | null;
+  /** Burn DOT applied by Flamethrower. Decays exponentially after contact. */
+  burn: {
+    dps: number;
+    expiresAt: number;
+    accumulatedDmg: number;
+    decayPerSecond: number;
+  } | null;
   /** Ensnare applied by Static Net — stops all movement; next click = instakill. */
   ensnare: { expiresAt: number; canInstakill: boolean } | null;
   /** Whether this bug's eventual death has already been credited to the player. */
@@ -112,6 +119,7 @@ export class BugEntity extends Entity {
     this.typeSpec = null;
     this.slow = null;
     this.poison = null;
+    this.burn = null;
     this.ensnare = null;
     this.deathCredited = false;
   }
@@ -329,6 +337,7 @@ export class BugEntity extends Entity {
     if (this.slow && now >= this.slow.expiresAt) this.slow = null;
     if (this.ensnare && now >= this.ensnare.expiresAt) this.ensnare = null;
     if (this.poison && now >= this.poison.expiresAt) this.poison = null;
+    if (this.burn && now >= this.burn.expiresAt) this.burn = null;
 
     // Tick poison DOT damage
     if (this.poison && (this.state as BugState) !== "dying" && (this.state as BugState) !== "dead") {
@@ -345,6 +354,28 @@ export class BugEntity extends Entity {
           this.vy = 0;
           this.deathCredited = false;
         }
+      }
+    }
+
+    // Tick burn DOT damage with exponential decay so bugs still burn after leaving flame
+    if (this.burn && (this.state as BugState) !== "dying" && (this.state as BugState) !== "dead") {
+      this.burn.dps *= Math.exp(-this.burn.decayPerSecond * dt);
+      this.burn.accumulatedDmg += this.burn.dps * dt;
+      if (this.burn.accumulatedDmg >= 1) {
+        const dmgToApply = Math.floor(this.burn.accumulatedDmg);
+        this.burn.accumulatedDmg -= dmgToApply;
+        this.lastHitTime = performance.now();
+        this.hp = Math.max(0, this.hp - dmgToApply);
+        if (this.hp === 0) {
+          this.state = "dying";
+          this.deathProgress = 0;
+          this.vx = 0;
+          this.vy = 0;
+          this.deathCredited = false;
+        }
+      }
+      if (this.burn && this.burn.dps < 0.05) {
+        this.burn = null;
       }
     }
 
@@ -374,12 +405,13 @@ export class BugEntity extends Entity {
 
   onHit(damage = 1) {
     if (this.state === "dead" || this.state === "dying") {
-      return { defeated: false, remainingHp: 0, pointValue: 0, frozen: false, poisoned: false, ensnared: false };
+      return { defeated: false, remainingHp: 0, pointValue: 0, frozen: false, poisoned: false, burning: false, ensnared: false };
     }
 
     const now = performance.now();
     const frozen = this.slow !== null && now < this.slow.expiresAt;
     const poisoned = this.poison !== null && now < this.poison.expiresAt;
+    const burning = this.burn !== null && now < this.burn.expiresAt;
     const ensnared = this.ensnare !== null && now < this.ensnare.expiresAt;
     const pointValue = this.typeSpec?.pointValue ?? 1;
 
@@ -393,13 +425,13 @@ export class BugEntity extends Entity {
       this.vx = 0;
       this.vy = 0;
       this.ensnare = null;
-      return { defeated: true, remainingHp: 0, pointValue, frozen, poisoned, ensnared };
+      return { defeated: true, remainingHp: 0, pointValue, frozen, poisoned, burning, ensnared };
     }
 
     this.state = "flee";
     this.fleeTimer = 0.9 + Math.random() * 0.5;
     this.syncTypeSpec();
-    return { defeated: false, remainingHp: this.hp, pointValue: 0, frozen, poisoned, ensnared };
+    return { defeated: false, remainingHp: this.hp, pointValue: 0, frozen, poisoned, burning, ensnared };
   }
 
   /** Apply a Freeze Cone slow. Stacks to extend duration. */
@@ -420,6 +452,23 @@ export class BugEntity extends Entity {
       this.poison.expiresAt = this.poison.expiresAt + durationMs;
     } else {
       this.poison = { dps, expiresAt: now + durationMs, accumulatedDmg: 0 };
+    }
+  }
+
+  /** Apply flamethrower burn. Reapplication refreshes duration and keeps the stronger flame. */
+  applyBurn(dps: number, durationMs: number, decayPerSecond = 3.2) {
+    const now = performance.now();
+    if (this.burn && now < this.burn.expiresAt) {
+      this.burn.dps = Math.max(this.burn.dps, dps);
+      this.burn.decayPerSecond = Math.max(this.burn.decayPerSecond, decayPerSecond);
+      this.burn.expiresAt = Math.max(this.burn.expiresAt, now + durationMs);
+    } else {
+      this.burn = {
+        dps,
+        expiresAt: now + durationMs,
+        accumulatedDmg: 0,
+        decayPerSecond,
+      };
     }
   }
 
@@ -459,6 +508,7 @@ export class BugEntity extends Entity {
     this.fleeTimer = null;
     this.slow = null;
     this.poison = null;
+    this.burn = null;
     this.ensnare = null;
     this.deathCredited = false;
     this.motionTime = Math.random() * 100;

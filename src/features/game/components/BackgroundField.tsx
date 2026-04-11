@@ -313,6 +313,10 @@ const BugCanvas = memo(function BugCanvas({
   }, [hammerPositionRef, terminatorMode]);
   const selectedWeaponIdRef = useRef<SiegeWeaponId>(selectedWeaponId);
   const lastFireTimeRef = useRef<Record<string, number>>({});
+  const isFiringRef = useRef(false);
+  const currentMouseRef = useRef<{ x: number; y: number } | null>(null);
+  const fireIntervalRef = useRef<number | null>(null);
+  const lastPaintPosRef = useRef<{ x: number; y: number } | null>(null);
   const reseedInfoRef = useRef<{
     ts: number;
     clustered: number;
@@ -902,6 +906,256 @@ const BugCanvas = memo(function BugCanvas({
     });
     resizeObserver.observe(canvas);
 
+    // Fire action extracted so it can be invoked once (click) or repeatedly (hold)
+    const fireAt = (clientX: number, clientY: number) => {
+      const bounds = boundsRef.current;
+      if (!bounds.width || !bounds.height) return;
+      // client -> canvas coords
+      const clickX = clientX - bounds.left;
+      const clickY = clientY - bounds.top;
+      const hpRef = hammerPositionRef;
+      const hasLiveCursor =
+        hpRef != null &&
+        Number.isFinite(hpRef.current.x) &&
+        Number.isFinite(hpRef.current.y) &&
+        (hpRef.current.x !== 0 || hpRef.current.y !== 0);
+      const fireX = hasLiveCursor ? hpRef!.current.x : clientX;
+      const fireY = hasLiveCursor ? hpRef!.current.y : clientY;
+      const targetX = fireX - bounds.left;
+      const targetY = fireY - bounds.top;
+
+      // Structure placement takes priority
+      const placingId = placingStructureIdRef.current;
+      if (placingId) {
+        const placedStructureId = `${placingId}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+        const engine = swarmRef.current;
+        if (engine) {
+          (engine as any).addStructure(
+            clickX,
+            clickY,
+            placingId,
+            placedStructureId,
+          );
+        }
+        onStructurePlaceRef.current?.(
+          placingId,
+          clientX,
+          clientY,
+          clickX,
+          clickY,
+          placedStructureId,
+        );
+        return;
+      }
+
+      const weaponId = selectedWeaponIdRef.current;
+      const weaponDef =
+        WEAPON_DEFS.find((w) => w.id === weaponId) ?? WEAPON_DEFS[0];
+
+      // cooldown
+      if (weaponDef.cooldownMs > 0) {
+        const now = performance.now();
+        const lastFire = lastFireTimeRef.current[weaponId] ?? 0;
+        if (now - lastFire < weaponDef.cooldownMs) {
+          return;
+        }
+        lastFireTimeRef.current[weaponId] = now;
+      }
+
+      const centerX = bounds.width / 2;
+      const centerY = bounds.height / 2;
+
+      const engine = swarmRef.current;
+      if (!engine) return;
+
+      // VFX and engine interactions (mirrors original logic)
+      if (vfxRef.current) {
+        const vfx = vfxRef.current;
+        const coneAngle =
+          (Math.atan2(centerY - targetY, centerX - targetX) * 180) / Math.PI;
+        switch (weaponId) {
+          case "flame": {
+            const flameDir = coneAngle + 180;
+            vfx.spawnSprayParticles(targetX, targetY, flameDir, 40, 18);
+            vfx.addFirePatch(targetX, targetY, 90, 1000);
+            break;
+          }
+          case "zapper": {
+            const sprayAngle =
+              (Math.atan2(centerY - targetY, centerX - targetX) * 180) /
+              Math.PI;
+            vfx.spawnSprayParticles(targetX, targetY, sprayAngle + 180, 50);
+            vfx.addToxicCloud(targetX, targetY, 96, 2400);
+            try {
+              const poisonDps = weaponDef.poisonDps ?? 0.5;
+              const poisonDurationMs = weaponDef.poisonDurationMs ?? 3000;
+              const cloudRadius = 96;
+              const cloudMs = 2400;
+              engine.applyPoisonInRadius(
+                targetX,
+                targetY,
+                cloudRadius,
+                poisonDps,
+                poisonDurationMs,
+              );
+              const intervalMs = 400;
+              const intId = window.setInterval(() => {
+                const eng = swarmRef.current;
+                if (!eng) {
+                  window.clearInterval(intId);
+                  return;
+                }
+                eng.applyPoisonInRadius(
+                  targetX,
+                  targetY,
+                  cloudRadius,
+                  poisonDps,
+                  poisonDurationMs,
+                );
+              }, intervalMs);
+              window.setTimeout(
+                () => window.clearInterval(intId),
+                cloudMs + 50,
+              );
+            } catch {
+              void 0;
+            }
+            break;
+          }
+          default:
+            break;
+        }
+      }
+      if (canvasRef.current) triggerWeaponShake(canvasRef.current, weaponId);
+
+      // now apply hits (point/line/cone logic)
+      // copy the remaining portion from original handler: hitPattern handling
+      if (weaponDef.hitPattern === "point") {
+        onWeaponFireRef.current?.(weaponId, clientX, clientY);
+        let hitCandidate: { distance: number; index: number } | null = null;
+        try {
+          if (typeof engine.hitTest === "function") {
+            const res = engine.hitTest(targetX, targetY);
+            if (res)
+              hitCandidate = { distance: res.distance, index: res.index };
+          }
+        } catch {
+          void 0;
+        }
+        if (!hitCandidate) {
+          for (const bugPosition of latestBugPositionsRef.current) {
+            const distance = Math.hypot(
+              targetX - bugPosition.x,
+              targetY - bugPosition.y,
+            );
+            if (
+              distance <= bugPosition.radius &&
+              (!hitCandidate || distance < hitCandidate.distance)
+            ) {
+              hitCandidate = { distance, index: bugPosition.index };
+            }
+          }
+        }
+        if (hitCandidate) {
+          const particle = engine.getAllBugs()[hitCandidate.index];
+          if (particle) {
+            if (typeof engine.handleHit === "function") {
+              const result = engine.handleHit(
+                hitCandidate.index,
+                weaponDef.damage ?? 1,
+                true,
+              );
+              if (result) {
+                onHitRef.current({
+                  defeated: result.defeated,
+                  remainingHp: result.remainingHp,
+                  variant: result.variant,
+                  x: clientX,
+                  y: clientY,
+                  pointValue: result.pointValue,
+                  frozen: result.frozen,
+                });
+                updateQaLastHit({
+                  defeated: result.defeated,
+                  remainingHp: result.remainingHp,
+                  variant: result.variant,
+                  x: clientX,
+                  y: clientY,
+                });
+                return;
+              }
+            }
+
+            const currentHp =
+              hitPointsRef.current.get(hitCandidate.index) ??
+              getBugVariantMaxHp(particle.variant);
+            const remainingHp = Math.max(
+              0,
+              currentHp - (weaponDef.damage ?? 1),
+            );
+            hitPointsRef.current.set(hitCandidate.index, remainingHp);
+            const defeated = remainingHp === 0;
+            onHitRef.current({
+              defeated,
+              remainingHp,
+              variant: particle.variant,
+              x: clientX,
+              y: clientY,
+            });
+            updateQaLastHit({
+              defeated,
+              remainingHp,
+              variant: particle.variant,
+              x: clientX,
+              y: clientY,
+            });
+          }
+        }
+      } else if (weaponDef.hitPattern === "line") {
+        // For brevity, keep existing line behavior unchanged: call existing code path by
+        // synthesizing a quick line dispatch similar to original handler.
+        // (Original complex line logic remains in the main handler; for hold weapons
+        // that are cone-based we rely on VFX/area effects instead.)
+      }
+    };
+
+    // Visual-only flame trail painter used while dragging quickly so the
+    // cursor path stays continuous between cooldown-based weapon fires.
+    const paintFlameAt = (clientX: number, clientY: number) => {
+      const bounds = boundsRef.current;
+      if (!bounds.width || !bounds.height) return;
+      const hpRef = hammerPositionRef;
+      const hasLiveCursor =
+        hpRef != null &&
+        Number.isFinite(hpRef.current.x) &&
+        Number.isFinite(hpRef.current.y) &&
+        (hpRef.current.x !== 0 || hpRef.current.y !== 0);
+      const fireX = hasLiveCursor ? hpRef!.current.x : clientX;
+      const fireY = hasLiveCursor ? hpRef!.current.y : clientY;
+      const targetX = fireX - bounds.left;
+      const targetY = fireY - bounds.top;
+
+      const centerX = bounds.width / 2;
+      const centerY = bounds.height / 2;
+      const engine = swarmRef.current;
+      const vfx = vfxRef.current;
+      if (!vfx) return;
+      const flameDir =
+        (Math.atan2(centerY - targetY, centerX - targetX) * 180) / Math.PI +
+        180;
+      if (typeof (vfx as any).spawnFlameTrailBurst === "function") {
+        (vfx as any).spawnFlameTrailBurst(targetX, targetY, flameDir, 4);
+      }
+      if (typeof (vfx as any).addFireTrailStamp === "function") {
+        (vfx as any).addFireTrailStamp(targetX, targetY, 52, 180);
+      }
+      try {
+        engine?.applyBurnInRadius(targetX, targetY, 52, 4.5, 850, 3.2);
+      } catch {
+        void 0;
+      }
+    };
+
     const handlePointerDown = (event: MouseEvent) => {
       if (!terminatorModeRef.current) {
         return;
@@ -926,6 +1180,73 @@ const BugCanvas = memo(function BugCanvas({
 
       const bounds = boundsRef.current;
       if (!bounds.width || !bounds.height) {
+        return;
+      }
+
+      // update current mouse position
+      currentMouseRef.current = { x: event.clientX, y: event.clientY };
+
+      const holdWeaponId = selectedWeaponIdRef.current;
+      const holdWeaponDef =
+        WEAPON_DEFS.find((w) => w.id === holdWeaponId) ?? WEAPON_DEFS[0];
+
+      if (holdWeaponDef.inputMode === "hold") {
+        // start continuous firing while mouse is held
+        if (isFiringRef.current) return;
+        isFiringRef.current = true;
+        // update mouse on move
+        const moveHandler = (ev: MouseEvent) => {
+          currentMouseRef.current = { x: ev.clientX, y: ev.clientY };
+          if (holdWeaponId !== "flame") {
+            return;
+          }
+          const prev = lastPaintPosRef.current ?? {
+            x: ev.clientX,
+            y: ev.clientY,
+          };
+          const dx = ev.clientX - prev.x;
+          const dy = ev.clientY - prev.y;
+          const dist = Math.hypot(dx, dy);
+          const spacing = 8;
+          const steps = Math.max(1, Math.ceil(dist / spacing));
+          for (let s = 1; s <= steps; s++) {
+            const t = s / steps;
+            const ix = Math.round(prev.x + dx * t);
+            const iy = Math.round(prev.y + dy * t);
+            paintFlameAt(ix, iy);
+          }
+          lastPaintPosRef.current = { x: ev.clientX, y: ev.clientY };
+        };
+        window.addEventListener("mousemove", moveHandler);
+        // fire immediately, then drive continuous firing via RAF to keep up with fast mouse movement
+        fireAt(event.clientX, event.clientY);
+        lastPaintPosRef.current = { x: event.clientX, y: event.clientY };
+        const cooldown = Math.max(60, holdWeaponDef.cooldownMs ?? 120);
+        let rafId = 0;
+        const rafTick = () => {
+          if (!isFiringRef.current) return;
+          const m = currentMouseRef.current;
+          const now = performance.now();
+          const last = lastFireTimeRef.current[holdWeaponId] ?? 0;
+          if (m && now - last >= cooldown) {
+            fireAt(m.x, m.y);
+          }
+          rafId = window.requestAnimationFrame(rafTick);
+        };
+        rafId = window.requestAnimationFrame(rafTick);
+        fireIntervalRef.current = rafId as unknown as number;
+
+        const upHandler = () => {
+          isFiringRef.current = false;
+          if (fireIntervalRef.current) {
+            window.cancelAnimationFrame(fireIntervalRef.current);
+            fireIntervalRef.current = null;
+          }
+          lastPaintPosRef.current = null;
+          window.removeEventListener("mousemove", moveHandler);
+          window.removeEventListener("mouseup", upHandler);
+        };
+        window.addEventListener("mouseup", upHandler);
         return;
       }
 
@@ -994,13 +1315,25 @@ const BugCanvas = memo(function BugCanvas({
         switch (weaponId) {
           case "flame": {
             const flameDir = coneAngle + 180;
-            vfx.spawnFire(targetX, targetY, flameDir, 68, 60);
-            vfx.addCharMark(
-              targetX + Math.cos((flameDir * Math.PI) / 180) * 32,
-              targetY + Math.sin((flameDir * Math.PI) / 180) * 32,
-              55,
-            );
-            vfx.addFirePatch(targetX, targetY, 90);
+            // Remove long-distance flame projectiles and char-ring; rely on emitter-based patch
+            // small local ember burst to emphasize impact
+            if (typeof (vfx as any).spawnFlameTrailBurst === "function") {
+              (vfx as any).spawnFlameTrailBurst(targetX, targetY, flameDir, 10);
+            }
+            // persistent flame patch (short-lived — 1s)
+            vfx.addFirePatch(targetX, targetY, 90, 700);
+            try {
+              engine.applyBurnInRadius(
+                targetX,
+                targetY,
+                90,
+                weaponDef.burnDps ?? 6,
+                weaponDef.burnDurationMs ?? 1200,
+                weaponDef.burnDecayPerSecond ?? 3.2,
+              );
+            } catch {
+              void 0;
+            }
             break;
           }
           case "zapper": {
@@ -1010,6 +1343,42 @@ const BugCanvas = memo(function BugCanvas({
               Math.PI;
             vfx.spawnSprayParticles(targetX, targetY, sprayAngle + 180, 50);
             vfx.addToxicCloud(targetX, targetY, 96, 2400);
+            // Apply poison to bugs passing through the cloud periodically
+            try {
+              const poisonDps = weaponDef.poisonDps ?? 0.5;
+              const poisonDurationMs = weaponDef.poisonDurationMs ?? 3000;
+              const cloudRadius = 96;
+              const cloudMs = 2400;
+              // immediate apply once, then periodic ticks while cloud exists
+              engine.applyPoisonInRadius(
+                targetX,
+                targetY,
+                cloudRadius,
+                poisonDps,
+                poisonDurationMs,
+              );
+              const intervalMs = 400;
+              const intId = window.setInterval(() => {
+                const eng = swarmRef.current;
+                if (!eng) {
+                  window.clearInterval(intId);
+                  return;
+                }
+                eng.applyPoisonInRadius(
+                  targetX,
+                  targetY,
+                  cloudRadius,
+                  poisonDps,
+                  poisonDurationMs,
+                );
+              }, intervalMs);
+              window.setTimeout(
+                () => window.clearInterval(intId),
+                cloudMs + 50,
+              );
+            } catch {
+              // safe no-op if engine API unavailable
+            }
             break;
           }
           case "shockwave": {
@@ -1471,7 +1840,7 @@ const BugCanvas = memo(function BugCanvas({
             weaponDef.hitRadius,
           );
           for (const idx of hitIndexes) {
-            const result = engine.handleHit(idx, weaponDef.damage ?? 1, true);
+            const result = engine.handleHit(idx, weaponDef.damage ?? 0, true);
             if (!result) continue;
 
             const bug = engine.getAllBugs()[idx];
@@ -1487,6 +1856,19 @@ const BugCanvas = memo(function BugCanvas({
                 (bug as any).applyPoison(
                   weaponDef.poisonDps ?? 0.5,
                   weaponDef.poisonDurationMs ?? 4000,
+                );
+              }
+            }
+            if (weaponDef.applyBurn && bug) {
+              const distance = Math.hypot(bug.x - targetX, bug.y - targetY);
+              const normalized = distance / Math.max(1, weaponDef.hitRadius);
+              const intensity =
+                0.2 + 0.8 * Math.exp(-3.2 * normalized * normalized);
+              if (typeof (bug as any).applyBurn === "function") {
+                (bug as any).applyBurn(
+                  (weaponDef.burnDps ?? 6) * intensity,
+                  weaponDef.burnDurationMs ?? 1200,
+                  weaponDef.burnDecayPerSecond ?? 3.2,
                 );
               }
             }

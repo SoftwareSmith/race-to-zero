@@ -14,7 +14,6 @@ import {
   Graphics,
   type ColorSource,
 } from "pixi.js";
-
 // ── Particle types ────────────────────────────────────────────────────────────
 
 const enum PType {
@@ -24,12 +23,16 @@ const enum PType {
   SMOKE = 3,
   DEBRIS = 4,
   PLASMA = 5,
+  MIST = 6,
 }
+
+const MAX_PARTICLES = 1400;
+const MAX_DECALS = 180;
+const MAX_FIRE_TRAIL_DECALS = 36;
 
 interface Particle {
   gfx: Graphics;
   x: number;
-  y: number;
   vx: number;
   vy: number;
   ax: number;
@@ -179,6 +182,10 @@ export class VfxEngine {
     additive?: boolean;
   }): void {
     if (!this.initialized) return;
+    if (this.particles.length >= MAX_PARTICLES) {
+      const oldest = this.particles.shift();
+      if (oldest) this.releaseParticle(oldest);
+    }
     const gfx = this.acquireGfx();
     const p: Particle = {
       gfx,
@@ -234,7 +241,7 @@ export class VfxEngine {
       });
     }
     // Embers
-    for (let i = 0; i < Math.ceil(count * 0.4); i++) {
+    for (let i = 0; i < Math.ceil(count * 0.6); i++) {
       const a = baseRad + (Math.random() - 0.5) * 2 * half * 1.2;
       const speed = 60 + Math.random() * 120;
       this.spawnParticle({
@@ -517,11 +524,11 @@ export class VfxEngine {
 
   // ── Bug Spray: lime-green aerosol cone ──────────────────────────────────────
 
-  spawnSprayParticles(x: number, y: number, angleDeg: number, coneDeg = 50): void {
+  spawnSprayParticles(x: number, y: number, angleDeg: number, coneDeg = 50, count = 28): void {
     if (!this.initialized) return;
     const half = (coneDeg / 2) * (Math.PI / 180);
     const baseAngle = angleDeg * (Math.PI / 180);
-    for (let i = 0; i < 28; i++) {
+    for (let i = 0; i < count; i++) {
       const a = baseAngle + (Math.random() - 0.5) * 2 * half;
       const speed = 120 + Math.random() * 160;
       const life = 350 + Math.random() * 300;
@@ -557,29 +564,57 @@ export class VfxEngine {
     }
   }
 
-  addToxicCloud(x: number, y: number, radiusPx: number, durationMs: number): void {
+  addToxicCloud(
+    x: number,
+    y: number,
+    radiusPx: number,
+    durationMs: number,
+  ): void {
     if (!this.initialized) return;
-    const gfx = this.acquireGfx();
-    gfx.x = x;
-    gfx.y = y;
-    const rx = radiusPx * 1.1;
-    const ry = radiusPx * 0.65;
-    // Outer haze
-    gfx.ellipse(0, 0, rx, ry);
-    gfx.fill({ color: 0x4ade80, alpha: 0.22 });
-    gfx.ellipse(0, 0, rx * 0.65, ry * 0.65);
-    gfx.fill({ color: 0x86efac, alpha: 0.18 });
-    // Pulsing edge ring
-    gfx.ellipse(0, 0, rx, ry);
-    gfx.stroke({ color: 0x16a34a, width: 2, alpha: 0.55 });
-    this.decalContainer.addChild(gfx);
-    this.decals.push({
-      gfx,
-      createdAt: performance.now(),
-      lifetime: durationMs,
-      initialAlpha: 0.9,
-      container: this.decalContainer,
-    });
+    // Emitter: spawn a fine mist (no decal circle)
+    const start = performance.now();
+    const end = start + durationMs;
+
+    const spawnMist = (count = 8) => {
+      for (let i = 0; i < count; i++) {
+        const dist = Math.random() * radiusPx * 0.7;
+        const ang = Math.random() * Math.PI * 2;
+        const sx = x + Math.cos(ang) * dist + (Math.random() - 0.5) * 6;
+        const sy = y + Math.sin(ang) * dist + (Math.random() - 0.5) * 6;
+        const vx = (Math.random() - 0.5) * 24; // gentle horizontal drift
+        const vy = -8 + (Math.random() - 0.5) * 8; // slow upward drift
+        const life = 2000 + Math.random() * 2200;
+        const size = 6 + Math.random() * 10;
+        const r = 120 + Math.floor(Math.random() * 40);
+        const g = 210 + Math.floor(Math.random() * 45);
+        const b = 70 + Math.floor(Math.random() * 40);
+        this.spawnParticle({
+          x: sx, y: sy,
+          vx, vy,
+          ax: 0, ay: -6,
+          life,
+          size,
+          type: PType.MIST,
+          r, g, b,
+          additive: false,
+        });
+      }
+    };
+
+    // Initial seeding: fill cloud with a fine mist
+    spawnMist(40);
+
+    const tickerFn = () => {
+      const now = performance.now();
+      if (now >= end) {
+        this.app.ticker.remove(tickerFn);
+        return;
+      }
+      // occasional gentle mist puffs to keep the cloud alive
+      if (Math.random() < 0.45) spawnMist(4 + Math.floor(Math.random() * 6));
+    };
+
+    this.app.ticker.add(tickerFn);
   }
 
   // ── Freeze Blast: scattered snowflake decals ──────────────────────────────
@@ -626,23 +661,178 @@ export class VfxEngine {
 
   // ── Flamethrower: ground fire patch ──────────────────────────────────────
 
-  addFirePatch(x: number, y: number, radiusPx: number): void {
+  /**
+   * Fire patch with persistent ember/micro-flame emitter.
+   * Emits small fire/ember particles within the patch for the given duration.
+   */
+  addFirePatch(x: number, y: number, radiusPx: number, durationMs = 700): void {
     if (!this.initialized) return;
     const gfx = this.acquireGfx();
     gfx.x = x;
     gfx.y = y;
-    gfx.ellipse(0, 0, radiusPx, radiusPx * 0.5);
-    gfx.fill({ color: 0xff6a00, alpha: 0.38 });
-    gfx.ellipse(0, 0, radiusPx * 0.55, radiusPx * 0.25);
-    gfx.fill({ color: 0xffd200, alpha: 0.28 });
+    // Keep a subtle scorch decal as base (more translucent)
+    gfx.ellipse(0, 0, radiusPx, radiusPx * 0.45);
+    gfx.fill({ color: 0xff6a00, alpha: 0.24 });
+    gfx.ellipse(0, 0, radiusPx * 0.5, radiusPx * 0.22);
+    gfx.fill({ color: 0xffd200, alpha: 0.18 });
     this.decalContainer.addChild(gfx);
-      this.decals.push({
-        gfx,
-        createdAt: performance.now(),
-        lifetime: 4000,
-        initialAlpha: 0.85,
-        container: this.decalContainer,
+    this.decals.push({
+      gfx,
+      createdAt: performance.now(),
+      lifetime: durationMs,
+      initialAlpha: 0.75,
+      container: this.decalContainer,
+    });
+
+    // Emitter: spawn gentle embers/small flames inside the patch
+    const end = performance.now() + durationMs;
+
+    const spawnEmbers = (count = 8) => {
+      for (let i = 0; i < count; i++) {
+        const dist = Math.random() * radiusPx * 0.75;
+        const ang = Math.random() * Math.PI * 2;
+        const sx = x + Math.cos(ang) * dist + (Math.random() - 0.5) * 8;
+        const sy = y + Math.sin(ang) * dist + (Math.random() - 0.5) * 8;
+        // gentle outward drift + upward lift
+        const vx = (Math.random() - 0.5) * 36 + Math.cos(ang) * 6;
+        const vy = -12 + (Math.random() - 0.5) * 18;
+        const life = 400 + Math.random() * 1800;
+        const size = 2 + Math.random() * 14;
+        // Ember color leans bright yellow/orange
+        const heat = 0.7 + Math.random() * 0.3;
+        const [r, g, b] = lerpColor(250, 250, 7, 200, 70, 12, heat);
+        // bright additive ember
+        this.spawnParticle({
+          x: sx, y: sy,
+          vx, vy,
+          ay: -10,
+          life,
+          size,
+          type: PType.FIRE,
+          r, g, b,
+          additive: true,
+        });
+
+        // occasional larger glow blob to simulate bloom
+        if (Math.random() < 0.25) {
+          this.spawnParticle({
+            x: sx + (Math.random() - 0.5) * 10, y: sy + (Math.random() - 0.5) * 6,
+            vx: (Math.random() - 0.5) * 10, vy: -6 + (Math.random() - 0.5) * 8,
+            ay: -6,
+            life: 500 + Math.random() * 900,
+            size: 10 + Math.random() * 18,
+            type: PType.PLASMA,
+            r: 255, g: 200 + Math.floor(Math.random() * 55), b: 90,
+            additive: true,
+          });
+        }
+
+        // small smoke puffs for volume
+        if (Math.random() < 0.6) {
+          this.spawnParticle({
+            x: sx + (Math.random() - 0.5) * 8, y: sy + (Math.random() - 0.5) * 8,
+            vx: (Math.random() - 0.5) * 14, vy: -8 + (Math.random() - 0.5) * 8,
+            ay: -6,
+            life: 1200 + Math.random() * 2000,
+            size: 8 + Math.random() * 14,
+            type: PType.SMOKE,
+            r: 110 + Math.floor(Math.random() * 40), g: 100 + Math.floor(Math.random() * 50), b: 90,
+            additive: false,
+          });
+        }
+      }
+    };
+
+    // Seed initial embers and keep occasional bursts while lifetime remains
+    spawnEmbers(40);
+    const tickerFn = () => {
+      const now = performance.now();
+      if (now >= end) {
+        this.app.ticker.remove(tickerFn);
+        return;
+      }
+      // more frequent gentle bursts for a sustained flamethrower look
+      if (Math.random() < 0.75) spawnEmbers(4 + Math.floor(Math.random() * 8));
+    };
+    this.app.ticker.add(tickerFn);
+  }
+
+  addFireTrailStamp(x: number, y: number, radiusPx = 56, durationMs = 180): void {
+    if (!this.initialized) return;
+
+    while (this.decals.filter((d) => d.gfx.label === "fireTrail").length >= MAX_FIRE_TRAIL_DECALS) {
+      const oldest = this.decals.find((d) => d.gfx.label === "fireTrail");
+      if (!oldest) break;
+      this.releaseDecal(oldest);
+      this.decals = this.decals.filter((d) => d !== oldest);
+    }
+
+    if (this.decals.length >= MAX_DECALS) {
+      const oldest = this.decals.shift();
+      if (oldest) this.releaseDecal(oldest);
+    }
+
+    const gfx = this.acquireGfx();
+    gfx.label = "fireTrail";
+    gfx.x = x;
+    gfx.y = y;
+    gfx.ellipse(0, 0, radiusPx, radiusPx * 0.38);
+    gfx.fill({ color: 0xff7a18, alpha: 0.16 });
+    gfx.ellipse(0, 0, radiusPx * 0.45, radiusPx * 0.18);
+    gfx.fill({ color: 0xffd86b, alpha: 0.1 });
+    this.decalContainer.addChild(gfx);
+    this.decals.push({
+      gfx,
+      createdAt: performance.now(),
+      lifetime: durationMs,
+      initialAlpha: 0.55,
+      container: this.decalContainer,
+    });
+
+    for (let i = 0; i < 3; i++) {
+      const ang = Math.random() * Math.PI * 2;
+      const dist = Math.random() * radiusPx * 0.45;
+      const sx = x + Math.cos(ang) * dist;
+      const sy = y + Math.sin(ang) * dist;
+      this.spawnParticle({
+        x: sx,
+        y: sy,
+        vx: (Math.random() - 0.5) * 22,
+        vy: -18 + (Math.random() - 0.5) * 10,
+        ay: -8,
+        life: 180 + Math.random() * 180,
+        size: 4 + Math.random() * 5,
+        type: PType.FIRE,
+        r: 255,
+        g: 190 + Math.floor(Math.random() * 40),
+        b: 80,
+        additive: true,
       });
+    }
+  }
+
+  spawnFlameTrailBurst(x: number, y: number, angleDeg: number, count = 4): void {
+    if (!this.initialized) return;
+    const half = 18 * (Math.PI / 180);
+    const baseRad = (angleDeg * Math.PI) / 180;
+    for (let i = 0; i < count; i++) {
+      const a = baseRad + (Math.random() - 0.5) * 2 * half;
+      const speed = 70 + Math.random() * 110;
+      this.spawnParticle({
+        x: x + (Math.random() - 0.5) * 6,
+        y: y + (Math.random() - 0.5) * 6,
+        vx: Math.cos(a) * speed,
+        vy: Math.sin(a) * speed - 10,
+        ay: -18,
+        life: 90 + Math.random() * 120,
+        size: 5 + Math.random() * 4,
+        type: PType.FIRE,
+        r: 255,
+        g: 200 + Math.floor(Math.random() * 30),
+        b: 90 + Math.floor(Math.random() * 20),
+        additive: true,
+      });
+    }
   }
 
   // ── Static Net: expanding wire-mesh ring ──────────────────────────────────
@@ -943,22 +1133,39 @@ export class VfxEngine {
       // Colour fade
       let alpha: number;
       if (p.type === PType.FIRE) {
-        alpha = t < 0.1 ? t / 0.1 : t;
+        // Fire: very quick bright core then fast fade. Use an age-based ease-out fade
+        const ageMs = p.maxLife - p.life;
+        const fadeMs = Math.min(180, p.maxLife);
+        const frac = Math.max(0, Math.min(1, ageMs / fadeMs));
+        // stronger ease-out for faster disappearance
+        alpha = Math.max(0, Math.pow(1 - frac, 2.4));
       } else if (p.type === PType.SMOKE) {
-        alpha = t * 0.45;
+        // smoke should be relatively soft
+        alpha = t * 0.36;
+      } else if (p.type === PType.MIST) {
+        // mist should be very translucent and lingering
+        alpha = t * 0.22;
       } else if (p.type === PType.EMBER) {
         alpha = t * 0.9;
       } else {
         alpha = t;
       }
 
-      // Color shift: fire fades toward red-black
+      // Colour and temperature shifts
       let [r, g, b] = [p.r, p.g, p.b];
       if (p.type === PType.FIRE) {
-        const fade = Math.max(0, 1 - t);
-        r = Math.max(0, p.r - fade * 100);
-        g = Math.max(0, p.g - fade * p.g * 0.9);
-        b = Math.max(0, p.b - fade * p.b);
+        // lifeProgress: 0 at birth -> 1 at death
+        const lifeProgress = 1 - p.life / p.maxLife;
+        // hotter at birth (bright yellow/white), cooler toward end (deep orange/red)
+        const [sr, sg, sb] = [255, 240, 160];
+        const [er, eg, eb] = [90, 30, 10];
+        const mix = Math.min(1, Math.max(0, lifeProgress));
+        [r, g, b] = lerpColor(sr, sg, sb, er, eg, eb, mix);
+        // Slight darkening as it cools
+        const darken = 0.25 * mix;
+        r = Math.max(0, Math.floor(r * (1 - darken)));
+        g = Math.max(0, Math.floor(g * (1 - darken * 0.9)));
+        b = Math.max(0, Math.floor(b * (1 - darken * 0.6)));
       }
 
       const gfx = p.gfx;
@@ -998,7 +1205,11 @@ export class VfxEngine {
         gfx.fill({ color: 0xfff7d6, alpha: 0.7 });
       } else if (p.type === PType.SMOKE) {
         gfx.ellipse(0, 0, sz * 1.1, sz * 0.86);
-        gfx.fill({ color: toHex(r, g, b), alpha: 0.78 });
+        gfx.fill({ color: toHex(r, g, b), alpha: 0.5 });
+      } else if (p.type === PType.MIST) {
+        // Fine, translucent mist for toxic clouds
+        gfx.ellipse(0, 0, sz * 1.2, sz * 0.9);
+        gfx.fill({ color: toHex(r, g, b), alpha: 0.36 });
       } else if (p.type === PType.DEBRIS) {
         gfx.rotation = p.rotation;
         gfx.roundRect(-sz * 0.55, -sz * 0.4, sz * 1.1, sz * 0.8, sz * 0.14);

@@ -892,6 +892,27 @@ export class Engine {
     }
   }
 
+  applyBurnInRadius(
+    cx: number,
+    cy: number,
+    radius: number,
+    peakDps: number,
+    durationMs: number,
+    decayPerSecond = 3.2,
+  ): void {
+    for (const e of this.entities) {
+      const bug = e as any;
+      if (bug.state === "dead" || bug.state === "dying") continue;
+      const dist = Math.hypot(e.x - cx, e.y - cy);
+      if (dist > radius) continue;
+      const normalized = dist / Math.max(1, radius);
+      const intensity = 0.2 + 0.8 * Math.exp(-3.2 * normalized * normalized);
+      if (typeof bug.applyBurn === "function") {
+        bug.applyBurn(peakDps * intensity, durationMs, decayPerSecond);
+      }
+    }
+  }
+
   applyEnsnareInRadius(cx: number, cy: number, radius: number, durationMs: number): void {
     for (const e of this.entities) {
       const bug = e as any;
