@@ -47,6 +47,12 @@ import { triggerWeaponShake } from "@game/utils/screenShake";
 
 const TARGET_FRAME_MS = 1000 / 24;
 const TRANSITION_EASING = 0.08;
+const OVERLAY_EFFECT_WEAPONS = new Set<SiegeWeaponId>([
+  "freeze",
+  "chain",
+  "laser",
+  "nullpointer",
+]);
 
 function interpolate(
   currentValue: number,
@@ -1612,21 +1618,29 @@ const BackgroundField = memo(function BackgroundField({
         color?: string;
       },
     ) => {
-      const event = createEffectEvent(weapon, x, y, extras);
-      setWeaponEffects((prev) => {
-        const now = performance.now();
-        return [...prev.filter((e) => isEffectAlive(e, now)), event];
-      });
+      let startedAt = performance.now();
+
+      // Weapons that already have upgraded Pixi VFX should not also render the
+      // legacy overlay effect, otherwise both old and new visuals stack.
+      if (OVERLAY_EFFECT_WEAPONS.has(weapon)) {
+        const event = createEffectEvent(weapon, x, y, extras);
+        startedAt = event.startedAt;
+        setWeaponEffects((prev) => {
+          const now = performance.now();
+          return [...prev.filter((e) => isEffectAlive(e, now)), event];
+        });
+      }
+
       setCursorLastFireTimes((prev) => ({
         ...prev,
-        [weapon]: event.startedAt,
+        [weapon]: startedAt,
       }));
       // Always swing wrench cursor on any wrench fire (hit or miss)
       if (weapon === "wrench") {
         setHammerSwing(true);
       }
       // Notify parent so it can update reload bar state
-      onWeaponFiredRef.current?.(weapon, event.startedAt);
+      onWeaponFiredRef.current?.(weapon, startedAt);
     },
     [],
   );

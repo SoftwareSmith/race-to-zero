@@ -666,19 +666,42 @@ export class VfxEngine {
       gfx.x = p.x;
       gfx.y = p.y;
       gfx.alpha = Math.max(0, Math.min(1, alpha));
+      gfx.rotation = 0;
 
-      if (p.type === PType.FIRE || p.type === PType.PLASMA || p.type === PType.SPARK) {
-        gfx.circle(0, 0, sz);
+      if (p.type === PType.FIRE) {
+        const speed = Math.hypot(p.vx, p.vy);
+        const stretch = Math.min(2.8, 1.2 + speed / 180);
+        gfx.rotation = Math.atan2(p.vy, p.vx);
+        gfx.ellipse(0, 0, sz * stretch, sz * 0.72);
+        gfx.fill({ color: toHex(r, g, b), alpha: 0.92 });
+        gfx.circle(sz * 0.45, 0, sz * 0.42);
+        gfx.fill({ color: toHex(Math.min(255, r + 30), Math.min(255, g + 24), Math.min(255, b + 18)), alpha: 0.75 });
+      } else if (p.type === PType.PLASMA) {
+        gfx.circle(0, 0, sz * 1.15);
+        gfx.fill({ color: toHex(r, g, b), alpha: 0.42 });
+        gfx.circle(0, 0, sz * 0.7);
+        gfx.fill({ color: toHex(Math.min(255, r + 20), Math.min(255, g + 30), Math.min(255, b + 45)), alpha: 0.95 });
+        gfx.circle(0, 0, Math.max(1.2, sz * 0.24));
+        gfx.fill({ color: 0xffffff, alpha: 0.82 });
+      } else if (p.type === PType.SPARK) {
+        const speed = Math.hypot(p.vx, p.vy);
+        const stretch = Math.min(4.5, 1.6 + speed / 110);
+        gfx.rotation = Math.atan2(p.vy, p.vx);
+        gfx.roundRect(-sz * 0.35, -sz * 0.22, sz * stretch, sz * 0.44, sz * 0.16);
         gfx.fill({ color: toHex(r, g, b), alpha: 1 });
+        gfx.circle(sz * (stretch - 0.25), 0, Math.max(0.8, sz * 0.26));
+        gfx.fill({ color: 0xffffff, alpha: 0.8 });
       } else if (p.type === PType.EMBER) {
         gfx.circle(0, 0, sz);
-        gfx.fill({ color: toHex(r, g, b), alpha: 1 });
+        gfx.fill({ color: toHex(r, g, b), alpha: 0.95 });
+        gfx.circle(0, 0, Math.max(0.5, sz * 0.35));
+        gfx.fill({ color: 0xfff7d6, alpha: 0.7 });
       } else if (p.type === PType.SMOKE) {
-        gfx.circle(0, 0, sz);
-        gfx.fill({ color: toHex(r, g, b), alpha: 1 });
+        gfx.ellipse(0, 0, sz * 1.1, sz * 0.86);
+        gfx.fill({ color: toHex(r, g, b), alpha: 0.78 });
       } else if (p.type === PType.DEBRIS) {
         gfx.rotation = p.rotation;
-        gfx.rect(-sz * 0.5, -sz * 0.5, sz, sz);
+        gfx.roundRect(-sz * 0.55, -sz * 0.4, sz * 1.1, sz * 0.8, sz * 0.14);
         gfx.fill({ color: toHex(r, g, b), alpha: 1 });
       }
     }
