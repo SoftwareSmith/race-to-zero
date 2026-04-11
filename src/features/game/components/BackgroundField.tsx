@@ -44,6 +44,9 @@ import { createEffectEvent, isEffectAlive } from "@game/utils/weaponEffects";
 import VfxCanvas from "@game/components/VfxCanvas";
 import type { VfxEngine } from "@game/engine/VfxEngine";
 import { triggerWeaponShake } from "@game/utils/screenShake";
+import type { WeaponContext, ExecutionContext, PersistentFireSession } from "@game/weapons/runtime/types";
+import { getEntry, hasEntry } from "@game/weapons/runtime/registry";
+import { executeCommands } from "@game/weapons/runtime/executor";
 
 const TARGET_FRAME_MS = 1000 / 24;
 const TRANSITION_EASING = 0.08;
@@ -1194,6 +1197,110 @@ const BugCanvas = memo(function BugCanvas({
         // start continuous firing while mouse is held
         if (isFiringRef.current) return;
         isFiringRef.current = true;
+        // ── New-path seam: registered hold-weapon plugin ──────────────────
+        if (hasEntry(holdWeaponId)) {
+          const _hp = hammerPositionRef;
+          const _resolveHoldCtx = (
+            clientX: number,
+            clientY: number,
+          ): { wCtx: WeaponContext; eCtx: ExecutionContext } => {
+            const _pos = _hp?.current ?? { x: 0, y: 0 };
+            const _hasLive =
+              _hp != null &&
+              Number.isFinite(_pos.x) &&
+              Number.isFinite(_pos.y) &&
+              (_pos.x !== 0 || _pos.y !== 0);
+            const _vx = _hasLive ? _pos.x : clientX;
+            const _vy = _hasLive ? _pos.y : clientY;
+            const _b = boundsRef.current;
+            const wCtx: WeaponContext = {
+              targetX: _vx - _b.left,
+              targetY: _vy - _b.top,
+              centerX: _b.width / 2,
+              centerY: _b.height / 2,
+              canvasWidth: _b.width,
+              canvasHeight: _b.height,
+              viewportX: _vx,
+              viewportY: _vy,
+              bounds: _b,
+              now: performance.now(),
+              engine: swarmRef.current as unknown as WeaponContext["engine"],
+            };
+            const eCtx: ExecutionContext = {
+              engine: swarmRef.current as unknown as ExecutionContext["engine"],
+              vfx: vfxRef.current,
+              canvas: canvasRef.current,
+              bounds: _b,
+              viewportX: _vx,
+              viewportY: _vy,
+              weaponId: holdWeaponId,
+              onHit: (p) => onHitRef.current(p as any),
+              updateQaLastHit: (p) => updateQaLastHit(p as any),
+              enqueueOverlay: (wid, evx, evy, extras) =>
+                onWeaponFireRef.current?.(wid, evx, evy, extras as any),
+              blackHoleVfxIdRef,
+            };
+            return { wCtx, eCtx };
+          };
+          const { wCtx: _initWCtx, eCtx: _initECtx } = _resolveHoldCtx(
+            event.clientX,
+            event.clientY,
+          );
+          const _holdSession = getEntry(holdWeaponId)!.createSession(_initWCtx);
+          if (_holdSession.mode === "hold") {
+            lastFireTimeRef.current[holdWeaponId] = performance.now();
+            executeCommands(_holdSession.begin(_initWCtx), _initECtx);
+            lastPaintPosRef.current = {
+              x: event.clientX,
+              y: event.clientY,
+            };
+            const _hMoveHandler = (ev: MouseEvent) => {
+              currentMouseRef.current = { x: ev.clientX, y: ev.clientY };
+              if (_holdSession.paint) {
+                const { wCtx: _pw, eCtx: _pe } = _resolveHoldCtx(
+                  ev.clientX,
+                  ev.clientY,
+                );
+                executeCommands(_holdSession.paint(_pw), _pe);
+              }
+            };
+            window.addEventListener("mousemove", _hMoveHandler);
+            const _tickCooldown = Math.max(
+              60,
+              getEntry(holdWeaponId)!.config.cooldownMs ?? 120,
+            );
+            let _rafId = 0;
+            const _rafTick = () => {
+              if (!isFiringRef.current) return;
+              const _m = currentMouseRef.current;
+              const _now = performance.now();
+              const _last = lastFireTimeRef.current[holdWeaponId] ?? 0;
+              if (_m && _now - _last >= _tickCooldown) {
+                lastFireTimeRef.current[holdWeaponId] = _now;
+                const { wCtx: _tw, eCtx: _te } = _resolveHoldCtx(_m.x, _m.y);
+                executeCommands(_holdSession.tick(_tw), _te);
+              }
+              _rafId = window.requestAnimationFrame(_rafTick);
+            };
+            _rafId = window.requestAnimationFrame(_rafTick);
+            fireIntervalRef.current = _rafId as unknown as number;
+            const _hUpHandler = () => {
+              isFiringRef.current = false;
+              _holdSession.end();
+              if (fireIntervalRef.current) {
+                window.cancelAnimationFrame(fireIntervalRef.current);
+                fireIntervalRef.current = null;
+              }
+              lastPaintPosRef.current = null;
+              window.removeEventListener("mousemove", _hMoveHandler);
+              window.removeEventListener("mouseup", _hUpHandler);
+            };
+            window.addEventListener("mouseup", _hUpHandler);
+            return;
+          }
+          isFiringRef.current = false; // plugin did not return a hold session
+        }
+        // ── End new-path seam ──────────────────────────────────────────────
         // update mouse on move
         const moveHandler = (ev: MouseEvent) => {
           currentMouseRef.current = { x: ev.clientX, y: ev.clientY };
@@ -1306,6 +1413,48 @@ const BugCanvas = memo(function BugCanvas({
 
       const engine = swarmRef.current;
       if (!engine) return;
+
+      // ── New-path seam: delegated to registered weapon plugin ──────────
+      if (hasEntry(weaponId)) {
+        const _np_wCtx: WeaponContext = {
+          targetX,
+          targetY,
+          centerX: bounds.width / 2,
+          centerY: bounds.height / 2,
+          canvasWidth: bounds.width,
+          canvasHeight: bounds.height,
+          viewportX: fireX,
+          viewportY: fireY,
+          bounds,
+          now: performance.now(),
+          engine: engine as unknown as WeaponContext["engine"],
+        };
+        const _np_eCtx: ExecutionContext = {
+          engine: engine as unknown as ExecutionContext["engine"],
+          vfx: vfxRef.current,
+          canvas: canvasRef.current,
+          bounds,
+          viewportX: fireX,
+          viewportY: fireY,
+          weaponId,
+          onHit: (p) => onHitRef.current(p as any),
+          updateQaLastHit: (p) => updateQaLastHit(p as any),
+          enqueueOverlay: (wid, evx, evy, extras) =>
+            onWeaponFireRef.current?.(wid, evx, evy, extras as any),
+          blackHoleVfxIdRef,
+        };
+        const _np_session = getEntry(weaponId)!.createSession(_np_wCtx);
+        if (_np_session.mode === "once") {
+          executeCommands(_np_session.commands, _np_eCtx);
+        } else if (_np_session.mode === "persistent") {
+          executeCommands(
+            (_np_session as PersistentFireSession).begin(_np_wCtx),
+            _np_eCtx,
+          );
+        }
+        return;
+      }
+      // ── End new-path seam ─────────────────────────────────────────────
 
       // ── Pixi VFX dispatch ─────────────────────────────────────────────
       if (vfxRef.current) {

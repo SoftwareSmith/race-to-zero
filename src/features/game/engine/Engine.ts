@@ -4,6 +4,10 @@ import { BugEntity } from "./BugEntity";
 import { Entity } from "./Entity";
 import { getBugVariantMaxHp } from "../../../constants/bugs";
 import type { StructureId } from "../types";
+import { hasEntry, getEntry } from "@game/structures/runtime/registry";
+import type { StructureTickContext, StructureGameEngine } from "@game/structures/runtime/types";
+// Trigger all structure plugin self-registrations at Engine load time.
+import "@game/structures/index";
 
 interface StructureEntry {
   id: string;
@@ -603,279 +607,47 @@ export class Engine {
     return this.structures.map(({ id, type, x, y }) => ({ id, type, x, y }));
   }
 
+  /** Build the StructureTickContext passed to each plugin's tick() method. */
+  private _buildStructureCtx(dtMs: number): StructureTickContext {
+    const self = this;
+    const engineFacade: StructureGameEngine = {
+      get elapsedMs() { return self.elapsedMs; },
+      getEntities() { return self.entities as any[]; },
+      spliceEntity(index: number) {
+        const [removed] = self.entities.splice(index, 1);
+        return removed as any;
+      },
+      returnToPool(entity: any) {
+        self.pool.push(entity as BugEntity);
+      },
+      handleHit(index, damage, creditOnDeath) {
+        return self.handleHit(index, damage, creditOnDeath);
+      },
+    };
+    return {
+      now: this.elapsedMs,
+      dtMs,
+      engine: engineFacade,
+      callbacks: {
+        onStructureKill: this.onStructureKill?.bind(this),
+        onAgentAbsorb: this.onAgentAbsorb?.bind(this),
+        onTurretFire: this.onTurretFire?.bind(this),
+        onTeslaFire: this.onTeslaFire?.bind(this),
+      },
+    };
+  }
+
   private tickStructures(dtMs: number): void {
     this.elapsedMs += dtMs;
     // Expire firewall structures after 8 seconds
     this.structures = this.structures.filter(
       (s) => s.type !== "firewall" || (s.placedAt != null && this.elapsedMs - s.placedAt < 8000),
     );
+    const ctx = this._buildStructureCtx(dtMs);
     for (const s of this.structures) {
-      if (s.type === "lantern") {
-        this.tickLantern(s);
-      } else if (s.type === "agent") {
-        this.tickAgent(s);
-      } else if (s.type === "turret") {
-        this.tickTurret(s);
-      } else if (s.type === "tesla") {
-        this.tickTesla(s);
-      } else if (s.type === "firewall") {
-        this.tickFirewall(s);
-      }
-    }
-  }
-
-  private tickLantern(s: StructureEntry): void {
-    const ATTRACT_RADIUS = 280;
-    const ORBIT_SPEED = 0.65;  // tangential pixels per tick
-    const PULL_PX = 0.18;      // inward pull strength
-
-    for (let i = 0; i < this.entities.length; i++) {
-      const e = this.entities[i] as any;
-      if (e.state === "dead" || e.state === "dying") continue;
-      const dx = s.x - e.x;
-      const dy = s.y - e.y;
-      const dist = Math.hypot(dx, dy);
-      if (dist > ATTRACT_RADIUS || dist < 1) continue;
-
-      // Tangential component (left-turn orbit)
-      const tx = (-dy / dist) * ORBIT_SPEED;
-      const ty = (dx / dist) * ORBIT_SPEED;
-      // Inward radial component (diminishing toward edge)
-      const inwardFactor = (1 - dist / ATTRACT_RADIUS) * PULL_PX;
-      const rx = (dx / dist) * inwardFactor;
-      const ry = (dy / dist) * inwardFactor;
-
-      e.x += tx + rx;
-      e.y += ty + ry;
-    }
-  }
-
-  private tickAgent(s: StructureEntry): void {
-    const CAPTURE_RADIUS = 80;
-    const PULL_DURATION_MS = 500;
-
-    // Phase 2: processing an already-captured bug
-    if (s.absorbing) {
-      // Animate bug position toward agent during pull window
-      const pullElapsed = this.elapsedMs - s.absorbing.pullStartedAt;
-      if (pullElapsed < PULL_DURATION_MS) {
-        const t = pullElapsed / PULL_DURATION_MS;
-        s.absorbing.bugX = s.absorbing.pullFromX + (s.x - s.absorbing.pullFromX) * t;
-        s.absorbing.bugY = s.absorbing.pullFromY + (s.y - s.absorbing.pullFromY) * t;
-        try {
-          this.onAgentAbsorb?.({
-            structureId: s.id,
-            phase: "pulling",
-            variant: s.absorbing.variant,
-            bugX: s.absorbing.bugX,
-            bugY: s.absorbing.bugY,
-            srcX: s.x,
-            srcY: s.y,
-          });
-        } catch { void 0; }
-        return;
-      }
-
-      if (this.elapsedMs >= s.absorbing.completesAt) {
-        const fail = Math.random() < s.absorbing.failChance;
-        if (!fail) {
-          try { this.onStructureKill?.(s.x, s.y, s.absorbing.variant); } catch { void 0; }
-        }
-        try {
-          this.onAgentAbsorb?.({
-            structureId: s.id,
-            phase: fail ? "failed" : "done",
-            variant: s.absorbing.variant,
-            bugX: s.x,
-            bugY: s.y,
-            srcX: s.x,
-            srcY: s.y,
-          });
-        } catch { void 0; }
-        s.absorbing = null;
-        s.nextCaptureAt = this.elapsedMs + 2000;
-      }
-      return;
-    }
-
-    if (this.elapsedMs < s.nextCaptureAt) return;
-
-    // Phase 1: find and immediately capture nearest bug in range
-    let bestDist = Infinity;
-    let bestIdx = -1;
-    for (let i = 0; i < this.entities.length; i++) {
-      const e = this.entities[i] as any;
-      if (e.state === "dead" || e.state === "dying") continue;
-      const dist = Math.hypot(e.x - s.x, e.y - s.y);
-      if (dist <= CAPTURE_RADIUS && dist < bestDist) {
-        bestDist = dist;
-        bestIdx = i;
-      }
-    }
-
-    if (bestIdx >= 0) {
-      const e = this.entities[bestIdx] as any;
-      const size = e.size ?? 12;
-      const processingMs = Math.round(800 + size * 80);
-      s.absorbing = {
-        variant: e.variant,
-        bugX: e.x,
-        bugY: e.y,
-        pullFromX: e.x,
-        pullFromY: e.y,
-        pullStartedAt: this.elapsedMs,
-        size,
-        completesAt: this.elapsedMs + PULL_DURATION_MS + processingMs,
-        failChance: 0.2,
-      };
-      // Remove bug from simulation immediately — pull is purely visual
-      const be = e as BugEntity;
-      this.pool.push(be);
-      this.entities.splice(bestIdx, 1);
-      try {
-        this.onAgentAbsorb?.({
-          structureId: s.id,
-          phase: "absorbing",
-          variant: e.variant,
-          bugX: e.x,
-          bugY: e.y,
-          srcX: s.x,
-          srcY: s.y,
-          processingMs,
-        });
-      } catch { void 0; }
-    }
-  }
-  private tickTurret(s: StructureEntry): void {
-    const SHOOT_RADIUS = 150;
-    const SHOOT_INTERVAL_MS = 2500;
-    const AIM_DURATION_MS = 500;
-
-    // Resolve active aim phase
-    if (s.aimPhase) {
-      if (this.elapsedMs >= s.aimPhase.firesAt) {
-        // Fire phase: deal damage
-        const ap = s.aimPhase;
-        s.aimPhase = null;
-        s.nextCaptureAt = this.elapsedMs + SHOOT_INTERVAL_MS;
-        // Find the bug closest to the locked target position (it may have moved)
-        let bestDist2 = Infinity;
-        let bestIdx2 = -1;
-        for (let j = 0; j < this.entities.length; j++) {
-          const e2 = this.entities[j] as any;
-          if (e2.state === "dead" || e2.state === "dying") continue;
-          const d = Math.hypot(e2.x - ap.targetX, e2.y - ap.targetY);
-          if (d < bestDist2) { bestDist2 = d; bestIdx2 = j; }
-        }
-        const fireTarget = bestIdx2 >= 0 ? this.entities[bestIdx2] as any : null;
-        if (fireTarget) {
-          const angle2 = Math.atan2(fireTarget.y - s.y, fireTarget.x - s.x);
-          s.lastFireAngle = angle2;
-          const result = this.handleHit(bestIdx2, 1, true);
-          if (result?.defeated) {
-            try { this.onStructureKill?.(fireTarget.x, fireTarget.y, fireTarget.variant); } catch { void 0; }
-          }
-          try {
-            this.onTurretFire?.({
-              structureId: s.id,
-              srcX: s.x, srcY: s.y,
-              targetX: fireTarget.x, targetY: fireTarget.y,
-              angle: angle2, phase: "fire",
-            });
-          } catch { void 0; }
-        }
-      }
-      return;
-    }
-
-    if (this.elapsedMs < s.nextCaptureAt) return;
-
-    // Find nearest alive bug in range
-    let bestDist = Infinity;
-    let bestIdx = -1;
-    for (let i = 0; i < this.entities.length; i++) {
-      const e = this.entities[i] as any;
-      if (e.state === "dead" || e.state === "dying") continue;
-      const dist = Math.hypot(e.x - s.x, e.y - s.y);
-      if (dist <= SHOOT_RADIUS && dist < bestDist) {
-        bestDist = dist;
-        bestIdx = i;
-      }
-    }
-
-    if (bestIdx < 0) return;
-
-    const target = this.entities[bestIdx] as any;
-    const angle = Math.atan2(target.y - s.y, target.x - s.x);
-
-    // Start aim phase
-    s.aimPhase = { targetX: target.x, targetY: target.y, angle, firesAt: this.elapsedMs + AIM_DURATION_MS };
-
-    // Notify for aim VFX
-    try {
-      this.onTurretFire?.({
-        structureId: s.id,
-        srcX: s.x, srcY: s.y,
-        targetX: target.x, targetY: target.y,
-        angle, phase: "aim",
-      });
-    } catch { void 0; }
-  }
-  private tickTesla(s: StructureEntry): void {
-    const SHOOT_RADIUS = 120;
-    const SHOOT_INTERVAL_MS = 2500;
-    const MAX_HOPS = 3;
-
-    if (this.elapsedMs < s.nextCaptureAt) return;
-
-    // Gather alive bugs within radius
-    const candidates: Array<{ idx: number; dist: number }> = [];
-    for (let i = 0; i < this.entities.length; i++) {
-      const e = this.entities[i] as any;
-      if (e.state === "dead" || e.state === "dying") continue;
-      const dist = Math.hypot(e.x - s.x, e.y - s.y);
-      if (dist <= SHOOT_RADIUS) candidates.push({ idx: i, dist });
-    }
-    if (candidates.length === 0) return;
-
-    // Sort by distance, take up to MAX_HOPS
-    candidates.sort((a, b) => a.dist - b.dist);
-    const targets = candidates.slice(0, MAX_HOPS);
-
-    s.nextCaptureAt = this.elapsedMs + SHOOT_INTERVAL_MS;
-
-    // Build chain nodes: structure origin → each bug
-    const nodes: Array<{ x: number; y: number }> = [{ x: s.x, y: s.y }];
-    for (const { idx } of targets) {
-      const e = this.entities[idx] as any;
-      nodes.push({ x: e.x, y: e.y });
-      const result = this.handleHit(idx, 1, true);
-      if (result?.defeated) {
-        try { this.onStructureKill?.(e.x, e.y, e.variant); } catch { void 0; }
-      }
-    }
-
-    try { this.onTeslaFire?.({ structureId: s.id, nodes }); } catch { void 0; }
-  }
-
-  private tickFirewall(s: StructureEntry): void {
-    const WALL_HALF_WIDTH = 20;
-    const DAMAGE_INTERVAL_MS = 800;
-
-    if (this.elapsedMs < (s.firewallNextDamageAt ?? 0)) return;
-    s.firewallNextDamageAt = this.elapsedMs + DAMAGE_INTERVAL_MS;
-
-    // Damage all bugs whose x coordinate falls within the firewall strip
-    const dead: number[] = [];
-    for (let i = 0; i < this.entities.length; i++) {
-      const e = this.entities[i] as any;
-      if (e.state === "dead" || e.state === "dying") continue;
-      if (Math.abs(e.x - s.x) <= WALL_HALF_WIDTH) {
-        const result = this.handleHit(i, 1, true);
-        if (result?.defeated) {
-          dead.push(i);
-          try { this.onStructureKill?.(e.x, e.y, e.variant); } catch { void 0; }
-        }
+      const behavior = hasEntry(s.type) ? getEntry(s.type) : undefined;
+      if (behavior) {
+        behavior.tick(s as any, ctx);
       }
     }
   }

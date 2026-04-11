@@ -27,3 +27,17 @@ export const WEAPON_REGISTRY = [
   plasmaBomb,
   voidPulse,
 ] as const;
+
+// ─── Self-registering weapon plugins ────────────────────────────────────────
+// Side-effect imports: each module calls register() at load time.
+// Import order matches WEAPON_REGISTRY for consistency.
+import "./wrench/index";
+import "./bug-spray/index";
+import "./freeze-cone/index";
+import "./chain-zap/index";
+import "./flame/index";
+import "./laser-cutter/index";
+import "./static-net/index";
+import "./null-pointer/index";
+import "./plasma-bomb/index";
+import "./void-pulse/index";
