@@ -3,6 +3,7 @@
  */
 
 import { useEffect, useRef } from "react";
+import type React from "react";
 import { WEAPON_DEFS } from "@config/weaponConfig";
 import type { SiegeWeaponId, StructureId } from "@game/types";
 import WeaponGlyph from "@shared/components/icons/WeaponGlyph";
@@ -29,16 +30,6 @@ const CURSOR_THEME: Record<
     aura: "0 0 22px rgba(253,224,71,0.3)",
     size: 48,
   },
-  pulse: {
-    accent: "#38bdf8",
-    aura: "0 0 22px rgba(56,189,248,0.3)",
-    size: 50,
-  },
-  pointer: {
-    accent: "#f87171",
-    aura: "0 0 24px rgba(248,113,113,0.28)",
-    size: 46,
-  },
   freeze: {
     accent: "#bfdbfe",
     aura: "0 0 22px rgba(191,219,254,0.32)",
@@ -50,15 +41,15 @@ const CURSOR_THEME: Record<
     ringClassName: "[animation:laser-cursor-breathe_2s_ease-in-out_infinite]",
     size: 48,
   },
+  flame: {
+    accent: "#f97316",
+    aura: "0 0 24px rgba(249,115,22,0.35)",
+    size: 50,
+  },
   laser: {
     accent: "#f87171",
     aura: "0 0 24px rgba(248,113,113,0.28)",
     size: 48,
-  },
-  bomb: {
-    accent: "#fb923c",
-    aura: "0 0 24px rgba(251,146,60,0.28)",
-    size: 52,
   },
   shockwave: {
     accent: "#a78bfa",
@@ -70,20 +61,15 @@ const CURSOR_THEME: Record<
     aura: "0 0 26px rgba(251,113,133,0.3)",
     size: 54,
   },
-  flame: {
-    accent: "#f97316",
-    aura: "0 0 24px rgba(249,115,22,0.35)",
-    size: 50,
-  },
-  stomp: {
-    accent: "#a3e635",
-    aura: "0 0 22px rgba(163,230,53,0.3)",
+  plasma: {
+    accent: "#38bdf8",
+    aura: "0 0 26px rgba(56,189,248,0.35)",
     size: 52,
   },
-  swatter: {
-    accent: "#fcd34d",
-    aura: "0 0 22px rgba(252,211,77,0.3)",
-    size: 50,
+  void: {
+    accent: "#c084fc",
+    aura: "0 0 30px rgba(192,132,252,0.4)",
+    size: 56,
   },
 };
 
@@ -99,7 +85,7 @@ function CursorReticle({
   if (structureId) {
     const structureTheme: Record<
       StructureId,
-      { accent: string; aura: string; icon: JSX.Element; size: number }
+      { accent: string; aura: string; icon: React.ReactElement; size: number }
     > = {
       lantern: {
         accent: "#fbbf24",
@@ -116,8 +102,20 @@ function CursorReticle({
       turret: {
         accent: "#22d3ee",
         aura: "0 0 24px rgba(34,211,238,0.35)",
-        icon: <WeaponGlyph className="h-6 w-6 text-cyan-100" id="pointer" />,
+        icon: <WeaponGlyph className="h-6 w-6 text-cyan-100" id="laser" />,
         size: 48,
+      },
+      tesla: {
+        accent: "#c084fc",
+        aura: "0 0 24px rgba(192,132,252,0.35)",
+        icon: <span className="text-xl leading-none">⚡</span>,
+        size: 50,
+      },
+      firewall: {
+        accent: "#f97316",
+        aura: "0 0 24px rgba(249,115,22,0.35)",
+        icon: <span className="text-xl leading-none">🔥</span>,
+        size: 50,
       },
     };
     const active = structureTheme[structureId];
@@ -154,12 +152,8 @@ function CursorReticle({
   const guide = Math.round(size * 0.22);
   const inner = Math.round(size * 0.42);
   const showOuterRing = !!theme.ringClassName;
-  const showInnerRing =
-    weaponId !== "wrench" && weaponId !== "bomb" && weaponId !== "pointer";
-  const showCrosshair =
-    weaponId === "laser" ||
-    weaponId === "pointer" ||
-    weaponId === "nullpointer";
+  const showInnerRing = weaponId !== "wrench";
+  const showCrosshair = weaponId === "laser" || weaponId === "nullpointer";
 
   return (
     <div

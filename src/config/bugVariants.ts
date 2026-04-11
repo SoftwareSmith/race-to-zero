@@ -39,7 +39,7 @@ export interface CrawlProfile {
 
 // ── Weapon matchup types ──────────────────────────────────────────────────────
 
-export type BugWeaponId = "wrench" | "pulse" | "freeze" | "shockwave" | "nullpointer";
+export type BugWeaponId = "wrench" | "zapper" | "freeze" | "shockwave" | "nullpointer";
 export type BugWeaponMatchupState = "favored" | "steady" | "risky";
 
 export interface BugWeaponMatchup {
@@ -102,10 +102,10 @@ function steadyMatchups(
       state: "steady",
       ...overrides.wrench,
     },
-    pulse: {
-      note: "Helps manage spread, but timing matters more than raw output.",
+    zapper: {
+      note: "Manages spread with EMP bursts, but timing matters more than raw output.",
       state: "steady",
-      ...overrides.pulse,
+      ...overrides.zapper,
     },
     freeze: {
       note: "Slows the target, but low priority unless it's fast or flanking.",
@@ -178,7 +178,7 @@ export const BUG_VARIANT_DEFS: Record<BugVariant, BugVariantDef> = {
         note: "Fine for single cleanup once a straggler is already isolated.",
         state: "steady",
       },
-      pulse: {
+      zapper: {
         note: "Best answer when Glitchlings are flooding in clusters and visual noise is building.",
         state: "favored",
       },
@@ -241,7 +241,7 @@ export const BUG_VARIANT_DEFS: Record<BugVariant, BugVariantDef> = {
         note: "Can get stuck trading one-for-one while the patrol route keeps pressure alive.",
         state: "risky",
       },
-      pulse: {
+      zapper: {
         note: "Useful when the board is getting crowded, but not a hard counter by itself.",
         state: "steady",
       },

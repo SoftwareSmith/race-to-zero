@@ -41,6 +41,8 @@ export default function StructureLayer({
         const color = def?.accentColor ?? "#fbbf24";
         const isLantern = s.structureType === "lantern";
         const isTurret = s.structureType === "turret";
+        const isTesla = s.structureType === "tesla";
+        const isFirewall = s.structureType === "firewall";
         const effectR = def?.effectRadius ?? 80;
         const capture = agentCaptures?.[s.id];
         const isAbsorbing = capture?.phase === "absorbing";
@@ -66,11 +68,12 @@ export default function StructureLayer({
           <div
             key={s.id}
             aria-hidden="true"
-            className="pointer-events-none absolute"
+            className="pointer-events-none absolute overflow-visible [animation:structure-spawn-in_420ms_cubic-bezier(.34,1.56,.64,1)_forwards]"
             style={{
               left: s.canvasX,
               top: s.canvasY,
-              transform: "translate(-50%, -50%)",
+              width: 0,
+              height: 0,
             }}
           >
             {/* ── Lantern: large radial warm glow field ── */}
@@ -101,11 +104,13 @@ export default function StructureLayer({
                 />
                 {/* Central flame icon */}
                 <div
-                  className="relative flex h-10 w-10 items-center justify-center rounded-full border [animation:structure-glow_2s_ease-in-out_infinite]"
+                  className="absolute flex h-10 w-10 items-center justify-center rounded-full border [animation:structure-glow_2s_ease-in-out_infinite]"
                   style={{
+                    left: -20,
+                    top: -20,
                     borderColor: `${color}70`,
-                    background: `${color}22`,
-                    boxShadow: `0 0 20px ${color}55`,
+                    background: `${color}30`,
+                    boxShadow: `0 0 28px ${color}70`,
                   }}
                 >
                   <span className="text-xl leading-none">🔦</span>
@@ -135,16 +140,18 @@ export default function StructureLayer({
                   }}
                 />
                 <div
-                  className="relative flex h-11 w-11 items-center justify-center rounded-full border"
+                  className="absolute flex h-11 w-11 items-center justify-center rounded-full border"
                   style={{
+                    left: -22,
+                    top: -22,
                     borderColor: `${color}70`,
                     background: `radial-gradient(circle at 40% 38%, ${color}30 0%, ${color}18 45%, rgba(3,7,18,0.88) 100%)`,
-                    boxShadow: `0 0 14px ${color}45`,
+                    boxShadow: `0 0 18px ${color}55`,
                   }}
                 >
                   <div className="absolute inset-[5px] rounded-full border border-cyan-200/18 [animation:laser-cursor-breathe_1.8s_ease-in-out_infinite]" />
                   <div className="text-cyan-100 [animation:laser-cursor-breathe_1.2s_ease-in-out_infinite]">
-                    <WeaponGlyph className="h-5 w-5" id="pointer" />
+                    <WeaponGlyph className="h-5 w-5" id="laser" />
                   </div>
                   <div
                     className="absolute left-1/2 top-1/2 h-1.5 w-1.5 rounded-full bg-cyan-100"
@@ -155,8 +162,12 @@ export default function StructureLayer({
                   />
                 </div>
                 <div
-                  className="absolute left-1/2 top-full mt-1 h-1.5 w-12 -translate-x-1/2 overflow-hidden rounded-full border border-cyan-200/20 bg-slate-950/80"
-                  style={{ boxShadow: `0 0 10px ${color}18` }}
+                  className="absolute h-1.5 w-12 overflow-hidden rounded-full border border-cyan-200/20 bg-slate-950/80"
+                  style={{
+                    top: 26,
+                    left: -24,
+                    boxShadow: `0 0 10px ${color}18`,
+                  }}
                 >
                   <div
                     key={turretLastFiredAt}
@@ -168,6 +179,103 @@ export default function StructureLayer({
                           }
                         : { width: "100%" }
                     }
+                  />
+                </div>
+              </>
+            ) : isTesla ? (
+              /* ── Tesla Coil: rotating plasma ring + coil core ── */
+              <>
+                {/* Field radius indicator */}
+                <div
+                  className="pointer-events-none absolute rounded-full border border-dashed [animation:turret-scan_1.4s_ease-in-out_infinite]"
+                  style={{
+                    width: effectR * 2,
+                    height: effectR * 2,
+                    left: -effectR,
+                    top: -effectR,
+                    borderColor: `${color}40`,
+                  }}
+                />
+                {/* Outer ambient ring */}
+                <div
+                  className="pointer-events-none absolute rounded-full border [animation:structure-pulse_2s_ease-in-out_infinite]"
+                  style={{
+                    width: 64,
+                    height: 64,
+                    left: -32,
+                    top: -32,
+                    borderColor: `${color}60`,
+                    boxShadow: `0 0 22px ${color}30`,
+                  }}
+                />
+                {/* Inner plasma rotating ring */}
+                <div
+                  className="pointer-events-none absolute rounded-full border-2 border-dashed"
+                  style={{
+                    width: 46,
+                    height: 46,
+                    left: -23,
+                    top: -23,
+                    borderColor: `${color}90`,
+                    animation: "agent-ring-spin 1.8s linear infinite",
+                    boxShadow: `0 0 14px ${color}50, inset 0 0 10px ${color}20`,
+                  }}
+                />
+                {/* Core */}
+                <div
+                  className="absolute flex h-10 w-10 items-center justify-center rounded-full border-2"
+                  style={{
+                    left: -20,
+                    top: -20,
+                    borderColor: `${color}80`,
+                    background: `radial-gradient(circle at 38% 36%, ${color}40 0%, ${color}18 50%, rgba(3,7,18,0.9) 100%)`,
+                    boxShadow: `0 0 22px ${color}70`,
+                  }}
+                >
+                  <span className="text-lg leading-none">⚡</span>
+                </div>
+              </>
+            ) : isFirewall ? (
+              /* ── Firewall: flame column + countdown bar ── */
+              <>
+                {/* Vertical fire column glow */}
+                <div
+                  className="pointer-events-none absolute [animation:fire-flicker_400ms_ease-out_infinite]"
+                  style={{
+                    width: 40,
+                    height: 180,
+                    left: -20,
+                    top: -90,
+                    background: `linear-gradient(to top, ${color}00 0%, ${color}55 30%, ${color}88 60%, ${color}55 80%, ${color}00 100%)`,
+                    boxShadow: `0 0 28px 8px ${color}30`,
+                    borderRadius: "50%",
+                    filter: "blur(4px)",
+                  }}
+                />
+                {/* Core icon */}
+                <div
+                  className="absolute flex h-10 w-10 items-center justify-center rounded-full border-2"
+                  style={{
+                    left: -20,
+                    top: -20,
+                    borderColor: `${color}80`,
+                    background: `radial-gradient(circle, ${color}30 0%, rgba(3,7,18,0.9) 100%)`,
+                    boxShadow: `0 0 24px ${color}70`,
+                  }}
+                >
+                  <span className="text-xl leading-none">🔥</span>
+                </div>
+                {/* Lifetime indicator bar */}
+                <div
+                  className="absolute h-1.5 w-12 overflow-hidden rounded-full border border-orange-400/25 bg-slate-950/80"
+                  style={{ top: 26, left: -24 }}
+                >
+                  <div
+                    className="h-full rounded-full"
+                    style={{
+                      background: `linear-gradient(90deg, ${color}, ${color}bb)`,
+                      animation: `reload-drain 8000ms linear forwards`,
+                    }}
                   />
                 </div>
               </>
@@ -259,8 +367,10 @@ export default function StructureLayer({
                 ) : null}
                 {/* Icon */}
                 <div
-                  className="relative flex h-9 w-9 items-center justify-center rounded-full border text-sm"
+                  className="absolute flex h-9 w-9 items-center justify-center rounded-full border text-sm"
                   style={{
+                    left: -18,
+                    top: -18,
                     borderColor: `${color}60`,
                     background: `${color}18`,
                     boxShadow: `0 0 12px ${color}40`,
@@ -291,8 +401,10 @@ export default function StructureLayer({
                 {/* Commentary text */}
                 {agentLabel ? (
                   <div
-                    className="absolute left-1/2 bottom-full mb-2 whitespace-nowrap rounded-full border border-white/10 bg-black/78 px-2 py-1 font-mono text-[0.68rem] font-semibold shadow-[0_6px_16px_rgba(0,0,0,0.3)]"
+                    className="absolute whitespace-nowrap rounded-full border border-white/10 bg-black/78 px-2 py-1 font-mono text-[0.68rem] font-semibold shadow-[0_6px_16px_rgba(0,0,0,0.3)]"
                     style={{
+                      bottom: 26,
+                      left: 0,
                       transform: "translateX(-50%)",
                       color: agentLabel.color,
                     }}

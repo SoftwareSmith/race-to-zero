@@ -9,17 +9,14 @@ export interface SiegeZoneRect {
 export type SiegeWeaponId =
   | "wrench"
   | "zapper"
-  | "pulse"
-  | "pointer"
   | "freeze"
   | "chain"
+  | "flame"
   | "laser"
-  | "bomb"
   | "shockwave"
   | "nullpointer"
-  | "flame"
-  | "stomp"
-  | "swatter";
+  | "plasma"
+  | "void";
 
 export type SiegePhase = "idle" | "entering" | "active" | "exiting";
 
@@ -68,7 +65,7 @@ export interface SiegeCombatStats {
 
 // ── Structure types ──────────────────────────────────────────────
 
-export type StructureId = "lantern" | "agent" | "turret";
+export type StructureId = "lantern" | "agent" | "turret" | "tesla" | "firewall";
 
 export interface PlacedStructure {
   id: string;

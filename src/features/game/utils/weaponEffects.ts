@@ -10,14 +10,14 @@ import type { SiegeWeaponId, WeaponEffectEvent } from "@game/types";
 export const EFFECT_DURATION: Record<SiegeWeaponId, number> = {
   wrench: 520,
   zapper: 700,
-  pulse: 600,
-  pointer: 320,
   freeze: 700,
-  chain: 800,
-  laser: 320,
-  bomb: 1000,
-  shockwave: 900,
-  nullpointer: 1200,
+  chain: 1200,
+  flame: 3000,
+  laser: 400,
+  shockwave: 1200,
+  nullpointer: 1500,
+  plasma: 1100,
+  void: 1500,
 };
 
 /** Returns true if the effect animation is still playing. */

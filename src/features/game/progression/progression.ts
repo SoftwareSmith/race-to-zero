@@ -10,17 +10,14 @@ import type { StructureId } from "@game/types";
 const WEAPON_LABELS: Record<SiegeWeaponId, string> = {
   wrench: "Wrench",
   zapper: "Bug Zapper",
-  pulse: "Pulse Cannon",
-  pointer: "Debug Pointer",
   freeze: "Freeze Cone",
   chain: "Chain Zap",
+  flame: "Flamethrower",
   laser: "Directional Laser",
-  bomb: "Pixel Bomb",
   shockwave: "Shockwave",
   nullpointer: "Null Pointer",
-  flame: "Flamethrower",
-  stomp: "Boot Stomp",
-  swatter: "Fly Swatter",
+  plasma: "Plasma Arc",
+  void: "Void Pulse",
 };
 
 export function getSiegeCombatStats(

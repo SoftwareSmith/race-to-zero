@@ -23,6 +23,10 @@ interface StructureEntry {
   } | null;
   /** Last fire angle in radians for turret visual rotation */
   lastFireAngle?: number;
+  /** Elapsed-ms timestamp when this structure was placed (for firewall expiry) */
+  placedAt?: number;
+  /** Elapsed-ms timestamp of next firewall damage tick */
+  firewallNextDamageAt?: number;
 }
 
 export interface EngineOptions {
@@ -49,6 +53,11 @@ export interface EngineOptions {
     targetX: number;
     targetY: number;
     angle: number;
+  }) => void;
+  /** Called when the tesla coil chain-zaps bugs (canvas-local coords) */
+  onTeslaFire?: (data: {
+    structureId: string;
+    nodes: Array<{ x: number; y: number }>;
   }) => void;
 }
 
@@ -78,6 +87,10 @@ export class Engine {
     targetY: number;
     angle: number;
   }) => void;
+  onTeslaFire?: (data: {
+    structureId: string;
+    nodes: Array<{ x: number; y: number }>;
+  }) => void;
   private structures: StructureEntry[] = [];
   private elapsedMs = 0;
 
@@ -93,6 +106,7 @@ export class Engine {
     this.onStructureKill = opts.onStructureKill;
     this.onAgentAbsorb = opts.onAgentAbsorb;
     this.onTurretFire = opts.onTurretFire;
+    this.onTeslaFire = opts.onTeslaFire;
   }
 
   setSize(w: number, h: number) {
@@ -516,8 +530,15 @@ export class Engine {
     const id =
       forcedId ??
       `${type}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
-    const initialDelay = type === "turret" ? 1000 : 2000;
-    this.structures.push({ id, type, x, y, nextCaptureAt: this.elapsedMs + initialDelay, absorbing: null });
+    const initialDelay = type === "turret" || type === "tesla" ? 1000 : 2000;
+    const placedAt = this.elapsedMs;
+    this.structures.push({
+      id, type, x, y,
+      nextCaptureAt: this.elapsedMs + initialDelay,
+      absorbing: null,
+      placedAt,
+      firewallNextDamageAt: this.elapsedMs + 1000,
+    });
     return id;
   }
 
@@ -531,6 +552,10 @@ export class Engine {
 
   private tickStructures(dtMs: number): void {
     this.elapsedMs += dtMs;
+    // Expire firewall structures after 8 seconds
+    this.structures = this.structures.filter(
+      (s) => s.type !== "firewall" || (s.placedAt != null && this.elapsedMs - s.placedAt < 8000),
+    );
     for (const s of this.structures) {
       if (s.type === "lantern") {
         this.tickLantern(s);
@@ -538,6 +563,10 @@ export class Engine {
         this.tickAgent(s);
       } else if (s.type === "turret") {
         this.tickTurret(s);
+      } else if (s.type === "tesla") {
+        this.tickTesla(s);
+      } else if (s.type === "firewall") {
+        this.tickFirewall(s);
       }
     }
   }
@@ -680,6 +709,65 @@ export class Engine {
       });
     } catch { void 0; }
   }
+  private tickTesla(s: StructureEntry): void {
+    const SHOOT_RADIUS = 120;
+    const SHOOT_INTERVAL_MS = 2500;
+    const MAX_HOPS = 3;
+
+    if (this.elapsedMs < s.nextCaptureAt) return;
+
+    // Gather alive bugs within radius
+    const candidates: Array<{ idx: number; dist: number }> = [];
+    for (let i = 0; i < this.entities.length; i++) {
+      const e = this.entities[i] as any;
+      if (e.state === "dead" || e.state === "dying") continue;
+      const dist = Math.hypot(e.x - s.x, e.y - s.y);
+      if (dist <= SHOOT_RADIUS) candidates.push({ idx: i, dist });
+    }
+    if (candidates.length === 0) return;
+
+    // Sort by distance, take up to MAX_HOPS
+    candidates.sort((a, b) => a.dist - b.dist);
+    const targets = candidates.slice(0, MAX_HOPS);
+
+    s.nextCaptureAt = this.elapsedMs + SHOOT_INTERVAL_MS;
+
+    // Build chain nodes: structure origin → each bug
+    const nodes: Array<{ x: number; y: number }> = [{ x: s.x, y: s.y }];
+    for (const { idx } of targets) {
+      const e = this.entities[idx] as any;
+      nodes.push({ x: e.x, y: e.y });
+      const result = this.handleHit(idx, 1);
+      if (result?.defeated) {
+        try { this.onStructureKill?.(e.x, e.y, e.variant); } catch { void 0; }
+      }
+    }
+
+    try { this.onTeslaFire?.({ structureId: s.id, nodes }); } catch { void 0; }
+  }
+
+  private tickFirewall(s: StructureEntry): void {
+    const WALL_HALF_WIDTH = 20;
+    const DAMAGE_INTERVAL_MS = 800;
+
+    if (this.elapsedMs < (s.firewallNextDamageAt ?? 0)) return;
+    s.firewallNextDamageAt = this.elapsedMs + DAMAGE_INTERVAL_MS;
+
+    // Damage all bugs whose x coordinate falls within the firewall strip
+    const dead: number[] = [];
+    for (let i = 0; i < this.entities.length; i++) {
+      const e = this.entities[i] as any;
+      if (e.state === "dead" || e.state === "dying") continue;
+      if (Math.abs(e.x - s.x) <= WALL_HALF_WIDTH) {
+        const result = this.handleHit(i, 1);
+        if (result?.defeated) {
+          dead.push(i);
+          try { this.onStructureKill?.(e.x, e.y, e.variant); } catch { void 0; }
+        }
+      }
+    }
+  }
+
   render(alpha = 1) {
     const ctx = this.ctx;
     ctx.clearRect(0, 0, this.width, this.height);

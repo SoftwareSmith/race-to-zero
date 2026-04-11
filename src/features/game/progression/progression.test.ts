@@ -12,36 +12,39 @@ describe("siege progression", () => {
     expect(stats.currentToolLabel).toBe("Wrench");
   });
 
-  it("unlocks zapper at 10 kills", () => {
-    const stats = getSiegeCombatStats(10);
+  it("unlocks zapper at 12 kills", () => {
+    const stats = getSiegeCombatStats(12);
 
     expect(stats.unlockedWeapons).toContain("wrench");
     expect(stats.unlockedWeapons).toContain("zapper");
-    expect(stats.unlockedWeapons).not.toContain("pulse");
-  });
-
-  it("unlocks pulse at 15 kills but not freeze", () => {
-    const stats = getSiegeCombatStats(15);
-    const snapshots = getSiegeWeaponSnapshots(15, "pulse");
-
-    expect(stats.unlockedWeapons).toContain("pulse");
     expect(stats.unlockedWeapons).not.toContain("freeze");
-    expect(snapshots.find((s) => s.id === "pulse")?.locked).toBe(false);
-    expect(snapshots.find((s) => s.id === "freeze")?.locked).toBe(true);
   });
 
-  it("unlocks all 10 weapons at 100 kills", () => {
-    const stats = getSiegeCombatStats(100);
+  it("unlocks freeze at 25 kills but not chain", () => {
+    const stats = getSiegeCombatStats(25);
+    const snapshots = getSiegeWeaponSnapshots(25, "freeze");
 
-    expect(stats.unlockedWeapons.length).toBe(10);
-    expect(stats.unlockedWeapons).toContain("nullpointer");
-    expect(stats.unlockedWeapons).toContain("shockwave");
+    expect(stats.unlockedWeapons).toContain("freeze");
+    expect(stats.unlockedWeapons).not.toContain("chain");
+    expect(snapshots.find((s) => s.id === "freeze")?.locked).toBe(false);
+    expect(snapshots.find((s) => s.id === "chain")?.locked).toBe(true);
+  });
+
+  it("unlocks 8 weapons at 100 kills, all 10 at 130", () => {
+    const stats100 = getSiegeCombatStats(100);
+    const stats130 = getSiegeCombatStats(130);
+
+    expect(stats100.unlockedWeapons.length).toBe(8);
+    expect(stats100.unlockedWeapons).toContain("nullpointer");
+    expect(stats100.unlockedWeapons).not.toContain("plasma");
+    expect(stats130.unlockedWeapons.length).toBe(10);
+    expect(stats130.unlockedWeapons).toContain("void");
   });
 
   it("label reflects highest unlocked weapon", () => {
     expect(getSiegeCombatStats(0).currentToolLabel).toBe("Wrench");
-    expect(getSiegeCombatStats(9).currentToolLabel).toBe("Wrench");
-    expect(getSiegeCombatStats(10).currentToolLabel).toBe("Bug Zapper");
+    expect(getSiegeCombatStats(11).currentToolLabel).toBe("Wrench");
+    expect(getSiegeCombatStats(12).currentToolLabel).toBe("Bug Zapper");
     expect(getSiegeCombatStats(100).currentToolLabel).toBe("Null Pointer");
   });
 });

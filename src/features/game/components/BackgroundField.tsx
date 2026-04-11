@@ -41,6 +41,9 @@ import WeaponCursor from "@game/components/WeaponCursor";
 import WeaponEffectLayer from "@game/components/WeaponEffectLayer";
 import StructureLayer from "@game/components/StructureLayer";
 import { createEffectEvent, isEffectAlive } from "@game/utils/weaponEffects";
+import VfxCanvas from "@game/components/VfxCanvas";
+import type { VfxEngine } from "@game/engine/VfxEngine";
+import { triggerWeaponShake } from "@game/utils/screenShake";
 
 const TARGET_FRAME_MS = 1000 / 24;
 const TRANSITION_EASING = 0.08;
@@ -284,6 +287,7 @@ const BugCanvas = memo(function BugCanvas({
   const onAgentAbsorbRef = useRef(onAgentAbsorb);
   const onTurretFireRef = useRef(onTurretFire);
   const onWeaponFireRef = useRef(onWeaponFire);
+  const vfxRef = useRef<VfxEngine | null>(null);
   const placingStructureIdRef = useRef(placingStructureId);
   const onStructurePlaceRef = useRef(onStructurePlace);
 
@@ -393,12 +397,34 @@ const BugCanvas = memo(function BugCanvas({
               data.targetX + (boundsRef.current.left || 0),
             );
             const vty = Math.round(data.targetY + (boundsRef.current.top || 0));
-            onWeaponFireRef.current?.("pointer", vx, vy, {
+            onWeaponFireRef.current?.("laser", vx, vy, {
               targetX: vtx,
               targetY: vty,
               color: "#22d3ee",
             });
             onTurretFireRef.current?.(data);
+          } catch {
+            void 0;
+          }
+        },
+        onTeslaFire: (data) => {
+          try {
+            vfxRef.current?.spawnLightning(data.nodes, 900, 0xc084fc);
+            const chainNodes = data.nodes.map((n) => ({
+              x: Math.round(n.x + (boundsRef.current.left || 0)),
+              y: Math.round(n.y + (boundsRef.current.top || 0)),
+            }));
+            if (chainNodes.length >= 2) {
+              onWeaponFireRef.current?.(
+                "chain",
+                chainNodes[0].x,
+                chainNodes[0].y,
+                {
+                  chainNodes,
+                  color: "#c084fc",
+                },
+              );
+            }
           } catch {
             void 0;
           }
@@ -874,6 +900,65 @@ const BugCanvas = memo(function BugCanvas({
       const engine = swarmRef.current;
       if (!engine) return;
 
+      // ── Pixi VFX dispatch ─────────────────────────────────────────────
+      if (vfxRef.current) {
+        const vfx = vfxRef.current;
+        const coneAngle =
+          (Math.atan2(centerY - targetY, centerX - targetX) * 180) / Math.PI;
+        switch (weaponId) {
+          case "flame":
+            vfx.spawnFire(targetX, targetY, coneAngle + 180, 68);
+            vfx.addCharMark(
+              targetX + Math.cos(((coneAngle + 180) * Math.PI) / 180) * 32,
+              targetY + Math.sin(((coneAngle + 180) * Math.PI) / 180) * 32,
+              50,
+            );
+            break;
+          case "zapper":
+            vfx.spawnEMP(targetX, targetY, 45);
+            break;
+          case "shockwave":
+            vfx.spawnExplosion(targetX, targetY, 200, 0xa855f7);
+            break;
+          case "plasma":
+            vfx.spawnPlasmaFountain(targetX, targetY);
+            break;
+          case "void":
+            vfx.spawnVoidNova(targetX, targetY);
+            vfx.addVoidRift(targetX, targetY);
+            break;
+          case "laser": {
+            const laserAngle = weaponDef.snapAngle
+              ? Math.round(
+                  Math.atan2(centerY - targetY, centerX - targetX) /
+                    (Math.PI / 4),
+                ) *
+                (Math.PI / 4)
+              : 0;
+            const beamLen = Math.max(bounds.width, bounds.height) * 1.5;
+            vfx.addBurnScar(
+              targetX - Math.cos(laserAngle) * beamLen,
+              targetY - Math.sin(laserAngle) * beamLen,
+              targetX + Math.cos(laserAngle) * beamLen,
+              targetY + Math.sin(laserAngle) * beamLen,
+            );
+            break;
+          }
+          case "nullpointer":
+            vfx.spawnExplosion(targetX, targetY, 120, 0xfb7185);
+            break;
+          case "wrench":
+            vfx.addCrack(targetX, targetY);
+            break;
+          case "freeze":
+            vfx.addFrostDecal(targetX, targetY);
+            break;
+          default:
+            break;
+        }
+      }
+      if (canvasRef.current) triggerWeaponShake(canvasRef.current, weaponId);
+
       if (weaponDef.hitPattern === "point") {
         // ── Wrench: hit nearest bug within radius ────────────────
         onWeaponFireRef.current?.(weaponId, fireX, fireY);
@@ -1209,6 +1294,22 @@ const BugCanvas = memo(function BugCanvas({
         onWeaponFireRef.current?.(weaponId, fireX, fireY, {
           chainNodes,
         });
+        // Spawn Pixi lightning using canvas-local node coords
+        if (vfxRef.current && chainIndexes.length > 0) {
+          const canvasNodes = chainIndexes
+            .map((idx) => {
+              const b = engine.getAllBugs()[idx];
+              return b ? { x: b.x, y: b.y } : null;
+            })
+            .filter(Boolean) as Array<{ x: number; y: number }>;
+          if (canvasNodes.length > 0) {
+            vfxRef.current.spawnLightning(
+              [{ x: targetX, y: targetY }, ...canvasNodes],
+              1200,
+              0x6ee7b7,
+            );
+          }
+        }
 
         for (const idx of chainIndexes) {
           const result = engine.handleHit(idx, weaponDef.damage ?? 1);
@@ -1353,6 +1454,7 @@ const BugCanvas = memo(function BugCanvas({
         className="absolute inset-0 h-full w-full opacity-96"
         aria-hidden="true"
       />
+      <VfxCanvas ref={vfxRef} />
       {reseedInfo ? (
         <div className="pointer-events-none fixed left-3 bottom-3 z-[120] rounded-md bg-black/60 px-2 py-1 text-xs text-white backdrop-blur-sm">
           <div>Reseeded: {new Date(reseedInfo.ts).toLocaleTimeString()}</div>

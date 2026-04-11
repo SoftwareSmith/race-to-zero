@@ -70,6 +70,30 @@ export const STRUCTURE_DEFS: StructureDef[] = [
     effectType: "shoot",
     accentColor: "#22d3ee",
   },
+  {
+    id: "tesla",
+    title: "Tesla Coil",
+    unlockKills: 95,
+    detail:
+      "Auto-firing chain lightning coil. Every 3 seconds it unleashes a plasma arc that bounces between 2 nearby bugs within 120px. Deals 1 damage per hop.",
+    hint: "Click to arm, then click the field to place (max 2)",
+    maxPlaced: 2,
+    effectRadius: 120,
+    effectType: "shoot",
+    accentColor: "#c084fc",
+  },
+  {
+    id: "firewall",
+    title: "Firewall",
+    unlockKills: 120,
+    detail:
+      "Places a 200px horizontal burn zone. Any bug that crosses it takes 1 damage per tick for 10 seconds. Fire renders continuously with VFX.",
+    hint: "Click to arm, then click the field to place (max 2)",
+    maxPlaced: 2,
+    effectRadius: 20,
+    effectType: "capture",
+    accentColor: "#f97316",
+  },
 ];
 
 export const STRUCTURE_UNLOCK_THRESHOLDS: Record<StructureId, number> =

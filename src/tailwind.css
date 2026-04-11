@@ -111,20 +111,10 @@
 /* ── Weapon fire effects ─────────────────────────────── */
 
 @keyframes hammer-crack {
-  0% {
-    opacity: 0.9;
-    transform: scale(0.6);
-  }
-
-  25% {
-    opacity: 0.95;
-    transform: scale(1.05);
-  }
-
-  100% {
-    opacity: 0;
-    transform: scale(1.2);
-  }
+  0%   { transform: translate(-50%, -50%) scale(0.1); }
+  14%  { transform: translate(-50%, -50%) scale(1.08); }
+  36%  { transform: translate(-50%, -50%) scale(0.95); }
+  100% { transform: translate(-50%, -50%) scale(1); }
 }
 
 @keyframes laser-beam-fade {
@@ -475,4 +465,46 @@ body.wrench-cursor-active * {
 /* Agent spin for dashed ring */
 @keyframes agent-ring-spin {
   to { transform: rotate(360deg); }
+}
+
+/* Structure spring pop-in on placement */
+@keyframes structure-spawn-in {
+  0%   { transform: scale(0); opacity: 0; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+/* Fire jet circles travel outward from click origin */
+@keyframes flame-jet-travel {
+  0%   { transform: translate(0px, 0px) scale(0.2); opacity: 0.9; }
+  22%  { opacity: 1; }
+  100% { transform: translate(var(--jx), var(--jy)) scale(1.85); opacity: 0; }
+}
+
+/* Streak lines from origin toward jet tips */
+@keyframes flame-streak {
+  0%   { opacity: 0; stroke-dashoffset: var(--len, 160); }
+  18%  { opacity: 0.85; }
+  55%  { opacity: 0.45; }
+  100% { opacity: 0; stroke-dashoffset: 0; }
+}
+
+/* Ambient heat cone glow div */
+@keyframes flame-cone-glow {
+  0%   { opacity: 1; }
+  55%  { opacity: 0.55; }
+  100% { opacity: 0; }
+}
+
+/* Hot core flash at flame origin */
+@keyframes flame-core-flash {
+  0%   { transform: scale(0.2); opacity: 1; }
+  28%  { transform: scale(1.15); opacity: 0.85; }
+  100% { transform: scale(1.6); opacity: 0; }
+}
+
+/* Plasma charge-up orb before detonation */
+@keyframes plasma-charge {
+  0%   { transform: translate(-50%, -50%) scale(0); opacity: 0.7; }
+  65%  { transform: translate(-50%, -50%) scale(0.35); opacity: 1; }
+  100% { transform: translate(-50%, -50%) scale(0.08); opacity: 0; }
 }

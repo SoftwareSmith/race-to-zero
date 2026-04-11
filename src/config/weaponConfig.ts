@@ -1,7 +1,6 @@
 /**
  * Static definitions for all player weapons.
- * Unlock thresholds, display text, and descriptive copy live here
- * so that progression.ts and UI components share a single source of truth.
+ * 10 weapons with world-class VFX and distinct mechanics.
  */
 
 import type { SiegeWeaponId } from "../features/game/types";
@@ -61,184 +60,171 @@ export interface WeaponDef {
 }
 
 export const WEAPON_DEFS: WeaponDef[] = [
+  // ── 1. Wrench ─────────────────────────────────────────────
   {
     id: "wrench",
     title: "Wrench",
     unlockKills: 0,
-    detail: "Precision strike. Deals 2 damage — one-shots Glitchlings and Throttlers on contact.",
+    detail:
+      "Precision strike. Deals 2 damage — one-shots Glitchlings on contact. Leaves fractal cracks that glow and persist on the field.",
     hitPattern: "point",
     hitRadius: 48,
     damage: 2,
     effectColor: "#fbbf24",
-    cooldownMs: 400,
+    cooldownMs: 300,
     inputMode: "click",
     hint: "Click directly on a bug",
   },
+  // ── 2. Bug Zapper ──────────────────────────────────────────
   {
     id: "zapper",
     title: "Bug Zapper",
-    unlockKills: 10,
-    detail: "Electrostatic burst centred on click. Fries every bug in the blast zone.",
+    unlockKills: 12,
+    detail:
+      "Plasma EMP burst centred on click. 60 electric arcs radiate outward and fry every bug in an 80px blast zone.",
     hitPattern: "area",
     hitRadius: 80,
-    effectColor: "#38bdf8",
-    cooldownMs: 450,
+    effectColor: "#fde047",
+    cooldownMs: 700,
     inputMode: "click",
-    hint: "Click anywhere to zap nearby bugs",
+    hint: "Click anywhere to EMP nearby bugs",
   },
-  {
-    id: "pulse",
-    title: "Pulse Cannon",
-    unlockKills: 15,
-    detail: "Shockwave that damages all bugs in range and knocks survivors back from the blast centre.",
-    hitPattern: "area",
-    hitRadius: 130,
-    damage: 2,
-    appliesKnockback: true,
-    effectColor: "#22d3ee",
-    cooldownMs: 900,
-    inputMode: "click",
-    hint: "Click to blast — survivors get knocked back",
-  },
-  {
-    id: "pointer",
-    title: "Debug Pointer",
-    unlockKills: 20,
-    detail: "Auto-targets the highest-HP bug within reach of your click. Deals 2 damage. Misses if nothing is nearby.",
-    hitPattern: "seeking",
-    hitRadius: 450,
-    damage: 2,
-    seekRadius: 450,
-    effectColor: "#f87171",
-    cooldownMs: 800,
-    inputMode: "seeking",
-    hint: "Click anywhere — auto-targets highest-HP bug nearby",
-  },
+
+  // ── 3. Freeze Cone ─────────────────────────────────────────
   {
     id: "freeze",
     title: "Freeze Cone",
-    unlockKills: 30,
-    detail: "Icy cone spray aimed toward the cursor. Deals 1 damage and slows all hit bugs by 50% for 3 seconds.",
+    unlockKills: 25,
+    detail:
+      "Icy cone spray aimed toward the cursor. Deals 1 damage and slows all hit bugs by 65% for 3.5 seconds. Leaves frost crystals at impact sites.",
     hitPattern: "cone",
     hitRadius: 180,
     coneArcDeg: 90,
     appliesSlow: true,
     effectColor: "#bfdbfe",
-    cooldownMs: 1000,
+    cooldownMs: 820,
     inputMode: "directional",
-    hint: "Click to fire a cone toward your cursor — slows 50% for 3s",
+    hint: "Click to fire a cone toward your cursor — slows 65% for 3.5s",
   },
+
+  // ── 4. Chain Zap ───────────────────────────────────────────
   {
     id: "chain",
     title: "Chain Zap",
-    unlockKills: 40,
-    detail: "Click near a bug to start a bouncing arc. Lightning hops up to 3 times to nearby bugs within 90px.",
+    unlockKills: 38,
+    detail:
+      "Click near a bug to start a 3-strand plasma arc. Lightning hops up to 3 times to nearby bugs within 90px — each node pulses and emits sparks.",
     hitPattern: "chain",
     hitRadius: 90,
     damage: 2,
     chainMaxBounces: 3,
-    effectColor: "#fde68a",
-    cooldownMs: 1400,
+    effectColor: "#6ee7b7",
+    cooldownMs: 950,
     inputMode: "click",
     hint: "Click near a bug — lightning bounces up to 3 times",
   },
-  {
-    id: "laser",
-    title: "Directional Laser",
-    unlockKills: 55,
-    detail: "Full-screen beam that auto-snaps to the nearest 45° axis toward your cursor. Cuts every bug on the line.",
-    hitPattern: "line",
-    hitRadius: 28,
-    snapAngle: true,
-    effectColor: "#f87171",
-    cooldownMs: 1200,
-    inputMode: "directional",
-    hint: "Click to fire a full-screen beam — 8-way snap direction",
-  },
-  {
-    id: "bomb",
-    title: "Pixel Bomb",
-    unlockKills: 65,
-    detail: "Massive area detonation. Deals 2 damage to everything in a 200px radius. Long cooldown demands precision.",
-    hitPattern: "area",
-    hitRadius: 170,
-    damage: 2,
-    effectColor: "#fb923c",
-    cooldownMs: 2200,
-    inputMode: "click",
-    hint: "Click to detonate — 2 damage in a massive 200px radius",
-  },
-  {
-    id: "shockwave",
-    title: "Shockwave",
-    unlockKills: 80,
-    detail: "Enormous blast. Deals 1 damage in a 260px radius — all 1-HP bugs are instantly vaporised.",
-    hitPattern: "area",
-    hitRadius: 210,
-    instakillLowHp: true,
-    effectColor: "#a78bfa",
-    cooldownMs: 4000,
-    inputMode: "click",
-    hint: "Click to shockwave — all 1-HP bugs instantly vaporised",
-  },
-  {
-    id: "nullpointer",
-    title: "Null Pointer",
-    unlockKills: 100,
-    detail: "Homing missile that locks onto the highest-HP bug on screen. Deals 3 damage plus a 60px splash. Never misses.",
-    hitPattern: "seeking",
-    hitRadius: 500,
-    damage: 2,
-    seekRadius: 500,
-    splashRadius: 40,
-    effectColor: "#fb923c",
-    cooldownMs: 4500,
-    inputMode: "seeking",
-    hint: "Click anywhere — locks onto highest-HP bug on screen, never misses",
-  },
+
+  // ── 5. Flamethrower ────────────────────────────────────────
   {
     id: "flame",
     title: "Flamethrower",
-    unlockKills: 110,
-    detail: "Spray napalm in a 70° cone. Burns every bug in range for 1 damage per blast. Rapid fire.",
+    unlockKills: 52,
+    detail:
+      "Spray napalm in a 70° cone. Real fire stacks on screen — rapid-fire builds a hellfire inferno. Char marks persist on the field for 6 seconds.",
     hitPattern: "cone",
     hitRadius: 90,
     damage: 1,
     coneArcDeg: 70,
     effectColor: "#f97316",
-    cooldownMs: 300,
+    cooldownMs: 200,
     inputMode: "click",
-    hint: "Click to spray flames — 70° cone, rapid fire",
+    hint: "Click to spray flames — rapid-fire stacks fire on screen",
   },
+
+  // ── 6. Laser Cutter ────────────────────────────────────────
   {
-    id: "stomp",
-    title: "Boot Stomp",
-    unlockKills: 130,
-    detail: "A divine boot descends from above. 3 damage to everything in a colossal 180px radius. Long reload.",
+    id: "laser",
+    title: "Laser Cutter",
+    unlockKills: 68,
+    detail:
+      "Full-screen beam that auto-snaps to the nearest 45° axis. Wind-up charge, blinding white core, and a 2-second glowing burn scar along the beam path.",
+    hitPattern: "line",
+    hitRadius: 28,
+    snapAngle: true,
+    effectColor: "#f87171",
+    cooldownMs: 1100,
+    inputMode: "directional",
+    hint: "Click to fire a full-screen beam — 8-way snap direction",
+  },
+
+  // ── 7. Shockwave ───────────────────────────────────────────
+  {
+    id: "shockwave",
+    title: "Shockwave",
+    unlockKills: 82,
+    detail:
+      "Enormous blast. Deals 1 damage in a 210px radius — all 1-HP bugs instantly vaporised. Ground rupture cracks radiate outward. Screen shakes.",
     hitPattern: "area",
-    hitRadius: 180,
-    damage: 3,
-    effectColor: "#a3e635",
-    cooldownMs: 5000,
+    hitRadius: 210,
+    instakillLowHp: true,
+    effectColor: "#a78bfa",
+    cooldownMs: 2600,
     inputMode: "click",
-    hint: "Click to stomp — 3 damage in a massive 180px radius",
+    hint: "Click to shockwave — all 1-HP bugs vaporised, screen shakes",
   },
+
+  // ── 8. Null Pointer ────────────────────────────────────────
   {
-    id: "swatter",
-    title: "Fly Swatter",
-    unlockKills: 150,
-    detail: "Satisfying wide-arc slap. 2 damage to everything in a 120° sweep. Fast cooldown.",
-    hitPattern: "cone",
-    hitRadius: 70,
+    id: "nullpointer",
+    title: "Null Pointer",
+    unlockKills: 95,
+    detail:
+      "Homing missile that locks onto the highest-HP bug on screen. Deals 3 damage + 60px splash. Target-lock animation, missile trail, and massive crater impact.",
+    hitPattern: "seeking",
+    hitRadius: 500,
+    damage: 3,
+    seekRadius: 500,
+    splashRadius: 60,
+    effectColor: "#fb7185",
+    cooldownMs: 3000,
+    inputMode: "seeking",
+    hint: "Click anywhere — locks onto highest-HP bug, never misses",
+  },
+
+  // ── 9. Plasma Bomb ─────────────────────────────────────────
+  {
+    id: "plasma",
+    title: "Plasma Bomb",
+    unlockKills: 110,
+    detail:
+      "A charged plasma orb detonates on click. 2 damage in a 170px radius. Orb builds charge, travels to target, erupts with a plasma fountain.",
+    hitPattern: "area",
+    hitRadius: 170,
     damage: 2,
-    coneArcDeg: 120,
-    effectColor: "#fcd34d",
-    cooldownMs: 350,
+    effectColor: "#38bdf8",
+    cooldownMs: 1500,
     inputMode: "click",
-    hint: "Click to swat — wide 120° arc, 2 damage",
+    hint: "Click to detonate — orb charges then plasma detonation",
+  },
+
+  // ── 10. Void Pulse ─────────────────────────────────────────
+  {
+    id: "void",
+    title: "Void Pulse",
+    unlockKills: 130,
+    detail:
+      "Reality distortion ultimate. Pulls all bugs inward before the nova erupts. 2 damage + instakill 1-HP in 220px. Chromatic aberration. Max screen shake.",
+    hitPattern: "area",
+    hitRadius: 220,
+    damage: 2,
+    instakillLowHp: true,
+    appliesKnockback: true,
+    effectColor: "#c084fc",
+    cooldownMs: 4200,
+    inputMode: "click",
+    hint: "Click for reality nova — gravity pull then 220px obliteration",
   },
 ];
-
 /** Convenience lookup: weapon id → kill threshold. */
 export const WEAPON_UNLOCK_THRESHOLDS: Record<SiegeWeaponId, number> =
   Object.fromEntries(WEAPON_DEFS.map((w) => [w.id, w.unlockKills])) as Record<

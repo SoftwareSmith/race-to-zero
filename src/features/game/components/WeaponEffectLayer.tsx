@@ -40,40 +40,52 @@ function WrenchCrackEffect({
   x: number;
   y: number;
 }) {
+  // Wrap in a 0×0 div so React-controlled `opacity` is never overridden by the
+  // CSS animation (which must only animate `transform`).
   return (
-    <svg
+    <div
       aria-hidden="true"
-      className="pointer-events-none fixed [animation:hammer-crack_320ms_ease-out_forwards]"
+      className="pointer-events-none fixed"
       style={{
         left: x,
         top: y,
-        width: 54,
-        height: 54,
-        overflow: "visible",
-        transform: "translate(-50%, -50%)",
+        width: 0,
+        height: 0,
         opacity,
-        filter: "drop-shadow(0 0 5px rgba(251,191,36,0.24))",
+        filter: "drop-shadow(0 0 8px rgba(253,224,71,0.55))",
       }}
-      viewBox="-27 -27 54 54"
     >
-      <polygon
-        points="-2,-1 1,-4 4,-1 2,3 -2,4 -5,1"
-        fill="rgba(251,191,36,0.18)"
-        stroke="rgba(253,230,138,0.45)"
-        strokeWidth="0.9"
-      />
-      {CRACK_PATHS.map((segment, i) => (
-        <path
-          key={i}
-          d={segment.d}
-          stroke={i < 3 ? "#fbbf24" : "#fde68a"}
-          strokeWidth={segment.width}
-          strokeLinecap="round"
-          fill="none"
-          opacity={segment.opacity}
+      <svg
+        className="[animation:hammer-crack_280ms_ease-out_forwards]"
+        style={{
+          position: "absolute",
+          left: -27,
+          top: -27,
+          width: 54,
+          height: 54,
+          overflow: "visible",
+        }}
+        viewBox="-27 -27 54 54"
+      >
+        <polygon
+          points="-2,-1 1,-4 4,-1 2,3 -2,4 -5,1"
+          fill="rgba(251,191,36,0.22)"
+          stroke="rgba(253,230,138,0.55)"
+          strokeWidth="0.9"
         />
-      ))}
-    </svg>
+        {CRACK_PATHS.map((segment, i) => (
+          <path
+            key={i}
+            d={segment.d}
+            stroke={i < 3 ? "#fbbf24" : "#fde68a"}
+            strokeWidth={segment.width}
+            strokeLinecap="round"
+            fill="none"
+            opacity={segment.opacity}
+          />
+        ))}
+      </svg>
+    </div>
   );
 }
 
@@ -138,200 +150,6 @@ function ZapperEffect({ x, y }: { x: number; y: number }) {
       />
       <circle cx="0" cy="0" r="2.5" fill="#ffffff" opacity="0.95" />
     </svg>
-  );
-}
-
-// ── Pulse Cannon: 3 staggered rings + screen flash ───────────────────────────
-
-function PulseRingEffect({ x, y }: { x: number; y: number }) {
-  return (
-    <>
-      <div
-        aria-hidden="true"
-        className="pointer-events-none fixed inset-0 [animation:screen-flash_280ms_ease-out_forwards]"
-        style={{
-          background:
-            "radial-gradient(circle at 50% 50%, rgba(56,189,248,0.07) 0%, transparent 60%)",
-        }}
-      />
-      <div
-        aria-hidden="true"
-        className="pointer-events-none fixed rounded-full border-2 border-sky-400/70 [animation:pulse-expand_600ms_ease-out_forwards]"
-        style={{
-          left: x,
-          top: y,
-          width: 360,
-          height: 360,
-          boxShadow: "0 0 28px 4px rgba(56,189,248,0.28)",
-          transform: "translate(-50%, -50%)",
-        }}
-      />
-      <div
-        aria-hidden="true"
-        className="pointer-events-none fixed rounded-full border border-cyan-300/50 [animation:pulse-expand_520ms_ease-out_forwards]"
-        style={{
-          left: x,
-          top: y,
-          width: 220,
-          height: 220,
-          transform: "translate(-50%, -50%)",
-          animationDelay: "80ms",
-          opacity: 0,
-        }}
-      />
-      <div
-        aria-hidden="true"
-        className="pointer-events-none fixed rounded-full border border-sky-200/40 [animation:pulse-expand_420ms_ease-out_forwards]"
-        style={{
-          left: x,
-          top: y,
-          width: 120,
-          height: 120,
-          transform: "translate(-50%, -50%)",
-          animationDelay: "160ms",
-          opacity: 0,
-        }}
-      />
-      {/* Particle spray */}
-      <svg
-        aria-hidden="true"
-        className="pointer-events-none fixed"
-        style={{ left: x, top: y, width: 1, height: 1, overflow: "visible" }}
-        viewBox="0 0 1 1"
-      >
-        {Array.from({ length: 6 }, (_, i) => {
-          const angle = (i * Math.PI * 2) / 6;
-          const dist = 90 + (i % 3) * 30;
-          const px = (Math.cos(angle) * dist).toFixed(1);
-          const py = (Math.sin(angle) * dist).toFixed(1);
-          return (
-            <rect
-              key={i}
-              x="-3"
-              y="-5"
-              width="6"
-              height="10"
-              rx="2"
-              fill={i % 2 === 0 ? "#38bdf8" : "#7dd3fc"}
-              opacity="0"
-              transform={`rotate(${(angle * 180) / Math.PI})`}
-              style={
-                {
-                  animation: "particle-spray 500ms ease-out forwards",
-                  animationDelay: `${i * 35}ms`,
-                  // @ts-ignore
-                  "--px": `${px}px`,
-                  "--py": `${py}px`,
-                } as React.CSSProperties
-              }
-            />
-          );
-        })}
-      </svg>
-    </>
-  );
-}
-
-// ── Debug Pointer: targeting line from click to target ───────────────────────
-
-function PointerEffect({
-  color,
-  x,
-  y,
-  targetX,
-  targetY,
-}: {
-  color?: string;
-  x: number;
-  y: number;
-  targetX?: number;
-  targetY?: number;
-}) {
-  const accent = color ?? "#f87171";
-  const accentRgb = color === "#22d3ee" ? "34,211,238" : "248,113,113";
-  const tx = targetX ?? x;
-  const ty = targetY ?? y;
-  const hasTarget = tx !== x || ty !== y;
-
-  const svgLeft = Math.min(x, tx) - 10;
-  const svgTop = Math.min(y, ty) - 10;
-  const svgW = Math.abs(tx - x) + 20;
-  const svgH = Math.abs(ty - y) + 20;
-  const lx1 = x - svgLeft;
-  const ly1 = y - svgTop;
-  const lx2 = tx - svgLeft;
-  const ly2 = ty - svgTop;
-
-  return (
-    <>
-      {hasTarget ? (
-        <svg
-          aria-hidden="true"
-          className="pointer-events-none fixed [animation:pointer-line-fade_380ms_ease-out_forwards]"
-          style={{
-            left: svgLeft,
-            top: svgTop,
-            width: svgW,
-            height: svgH,
-            overflow: "visible",
-          }}
-          viewBox={`0 0 ${svgW} ${svgH}`}
-        >
-          <line
-            x1={lx1}
-            y1={ly1}
-            x2={lx2}
-            y2={ly2}
-            stroke={accent}
-            strokeWidth="1.5"
-            strokeDasharray="6 4"
-            strokeLinecap="round"
-            opacity="0.8"
-            filter={`drop-shadow(0 0 3px rgba(${accentRgb},0.6))`}
-          />
-          {/* Dart that travels from click to target */}
-          <circle
-            cx={lx2}
-            cy={ly2}
-            r="5"
-            fill={accent}
-            style={
-              {
-                animation: "dart-travel 260ms ease-in forwards",
-                // @ts-ignore css custom properties
-                "--dx": `${(lx1 - lx2).toFixed(1)}px`,
-                "--dy": `${(ly1 - ly2).toFixed(1)}px`,
-              } as React.CSSProperties
-            }
-          />
-          <circle
-            cx={lx2}
-            cy={ly2}
-            r="10"
-            fill={`rgba(${accentRgb},0.25)`}
-            stroke={accent}
-            strokeWidth="1.5"
-            className="[animation:pulse-expand_320ms_ease-out_forwards]"
-            style={{ transformOrigin: `${lx2}px ${ly2}px` }}
-          />
-          <circle cx={lx2} cy={ly2} r="3" fill={accent} opacity="0.9" />
-        </svg>
-      ) : (
-        <div
-          aria-hidden="true"
-          className="pointer-events-none fixed rounded-full border [animation:pulse-expand_320ms_ease-out_forwards]"
-          style={{
-            left: x,
-            top: y,
-            width: 80,
-            height: 80,
-            borderColor: `${accent}b3`,
-            background: `radial-gradient(circle, rgba(${accentRgb},0.35) 0%, transparent 70%)`,
-            transform: "translate(-50%, -50%)",
-          }}
-        />
-      )}
-    </>
   );
 }
 
@@ -682,79 +500,6 @@ function LaserBeamEffect({
   );
 }
 
-// ── Pixel Bomb: radial glow + debris shards ──────────────────────────────────
-
-function BombEffect({ x, y }: { x: number; y: number }) {
-  const shards = Array.from({ length: 12 }, (_, i) => {
-    const angle = (i * Math.PI * 2) / 12 + (i % 3) * 0.18;
-    const dist = 60 + (i % 4) * 30;
-    const size = 6 + (i % 3) * 4;
-    const bx = Math.cos(angle) * dist;
-    const by = Math.sin(angle) * dist;
-    return { angle, size, bx, by };
-  });
-
-  return (
-    <>
-      <div
-        aria-hidden="true"
-        className="pointer-events-none fixed rounded-full [animation:shockwave-expand_1000ms_ease-out_forwards]"
-        style={{
-          left: x,
-          top: y,
-          width: 440,
-          height: 440,
-          background:
-            "radial-gradient(circle, rgba(251,146,60,0.42) 0%, rgba(239,68,68,0.18) 45%, transparent 70%)",
-          boxShadow: "0 0 70px 16px rgba(251,146,60,0.28)",
-          transform: "translate(-50%, -50%)",
-        }}
-      />
-      <svg
-        aria-hidden="true"
-        className="pointer-events-none fixed [animation:bomb-debris_900ms_ease-out_forwards]"
-        style={{
-          left: x,
-          top: y,
-          width: 300,
-          height: 300,
-          overflow: "visible",
-          transform: "translate(-50%, -50%)",
-        }}
-        viewBox="-150 -150 300 300"
-      >
-        {shards.map((s, i) => (
-          <g
-            key={i}
-            transform={`translate(${s.bx.toFixed(1)},${s.by.toFixed(1)}) rotate(${((s.angle * 180) / Math.PI + 90).toFixed(1)})`}
-          >
-            <polygon
-              points={`0,${-s.size} ${s.size * 0.45},${s.size * 0.6} ${-s.size * 0.45},${s.size * 0.6}`}
-              fill={
-                i % 3 === 0 ? "#fb923c" : i % 3 === 1 ? "#fbbf24" : "#ef4444"
-              }
-              opacity={0.6 + (i % 3) * 0.13}
-              stroke="rgba(255,255,255,0.2)"
-              strokeWidth="0.5"
-            />
-          </g>
-        ))}
-      </svg>
-      <div
-        aria-hidden="true"
-        className="pointer-events-none fixed rounded-full border-2 border-orange-400/45 [animation:pulse-expand_800ms_ease-out_forwards]"
-        style={{
-          left: x,
-          top: y,
-          width: 200,
-          height: 200,
-          transform: "translate(-50%, -50%)",
-        }}
-      />
-    </>
-  );
-}
-
 // ── Shockwave: crack lines radiating outward + double rings ──────────────────
 
 function ShockwaveRingEffect({ x, y }: { x: number; y: number }) {
@@ -982,139 +727,148 @@ function FlameEffect({
   y: number;
   angle?: number;
 }) {
-  const rad = angle ?? 0;
-  const DEPTH = 148;
-  const HALF_ARC = (Math.PI * 34) / 180;
-  const NUM_TONGUES = 9;
-  const svgSize = 320;
-  const ox = svgSize / 2;
-  const oy = 160;
-  const forwardGlowX = x + Math.cos(rad) * 54;
-  const forwardGlowY = y + Math.sin(rad) * 54;
+  // The coneAngle from BackgroundField points TOWARD center; flip so fire sprays outward.
+  const rad = angle !== undefined ? angle + Math.PI : 0;
+  const CONE_DEG = 76;
+  const HALF = (CONE_DEG / 2) * (Math.PI / 180);
+  const MAX_LEN = 175;
+  const N_JETS = 13;
+  const SVG = 400;
+  const ox = SVG / 2;
+  const oy = SVG / 2;
+
+  const jetColors = [
+    "rgba(255,255,210,0.94)",
+    "rgba(255,200,60,0.90)",
+    "rgba(255,130,25,0.85)",
+    "rgba(240,75,15,0.78)",
+    "rgba(190,45,10,0.70)",
+  ];
+
+  const jets = Array.from({ length: N_JETS }, (_, i) => {
+    const mix = i / (N_JETS - 1);
+    const a = rad - HALF + mix * HALF * 2;
+    const centredness = 1 - Math.abs(mix - 0.5) * 2;
+    const len = MAX_LEN * (0.48 + centredness * 0.52 + (i % 3) * 0.07);
+    const cos = Math.cos(a);
+    const sin = Math.sin(a);
+    const size = 13 + centredness * 11 + (i % 3) * 4;
+    const colorIdx = Math.min(
+      Math.floor(centredness * 2 + (i % 2)),
+      jetColors.length - 1,
+    );
+    return {
+      cos,
+      sin,
+      dx: cos * len,
+      dy: sin * len,
+      size,
+      color: jetColors[colorIdx],
+      a,
+      len,
+    };
+  });
 
   return (
     <>
+      {/* Ambient heat cone behind jets */}
       <div
         aria-hidden="true"
-        className="pointer-events-none fixed rounded-full [animation:fire-flicker_320ms_ease-out_forwards]"
+        className="pointer-events-none fixed [animation:flame-cone-glow_2600ms_ease-out_forwards]"
         style={{
-          left: forwardGlowX,
-          top: forwardGlowY,
-          width: 210,
-          height: 118,
+          left: x,
+          top: y,
+          width: MAX_LEN * 1.9,
+          height: MAX_LEN * 0.82,
           background:
-            "radial-gradient(ellipse at 28% 50%, rgba(254,240,138,0.55) 0%, rgba(251,191,36,0.34) 18%, rgba(249,115,22,0.18) 42%, transparent 72%)",
-          boxShadow: "0 0 36px 10px rgba(249,115,22,0.22)",
-          filter: "blur(7px)",
-          transform: `translate(-50%, -50%) rotate(${rad}rad)`,
-          transformOrigin: "center",
+            "radial-gradient(ellipse at 14% 50%, rgba(255,170,0,0.65) 0%, rgba(255,70,0,0.38) 38%, transparent 70%)",
+          transform: `translate(-18%, -50%) rotate(${rad}rad)`,
+          filter: "blur(18px)",
+          borderRadius: "40%",
+          pointerEvents: "none",
         }}
       />
       <svg
         aria-hidden="true"
         className="pointer-events-none fixed"
         style={{
-          left: x - svgSize / 2,
-          top: y - svgSize / 2,
-          width: svgSize,
-          height: svgSize,
+          left: x - SVG / 2,
+          top: y - SVG / 2,
+          width: SVG,
+          height: SVG,
           overflow: "visible",
-          filter: "drop-shadow(0 0 10px rgba(249,115,22,0.56))",
+          filter: "drop-shadow(0 0 16px rgba(249,115,22,0.9))",
         }}
-        viewBox={`0 0 ${svgSize} ${svgSize}`}
+        viewBox={`0 0 ${SVG} ${SVG}`}
       >
-        {Array.from({ length: NUM_TONGUES }, (_, i) => {
-          const spread = HALF_ARC * 2;
-          const mix = i / (NUM_TONGUES - 1);
-          const a = rad - HALF_ARC + mix * spread;
-          const tipLen = DEPTH * (0.76 + (i % 4) * 0.08);
-          const halfWidth =
-            10 +
-            (NUM_TONGUES - Math.abs(i - (NUM_TONGUES - 1) / 2) * 1.7) * 2.4;
-          const tx = ox + Math.cos(a) * tipLen;
-          const ty = oy + Math.sin(a) * tipLen;
-          const leftBaseX = ox + Math.cos(a - 1.48) * halfWidth;
-          const leftBaseY = oy + Math.sin(a - 1.48) * halfWidth;
-          const rightBaseX = ox + Math.cos(a + 1.48) * halfWidth;
-          const rightBaseY = oy + Math.sin(a + 1.48) * halfWidth;
-          const leftCtrl1X = ox + Math.cos(a - 0.42) * (tipLen * 0.28);
-          const leftCtrl1Y = oy + Math.sin(a - 0.42) * (tipLen * 0.28);
-          const leftCtrl2X = ox + Math.cos(a - 0.14) * (tipLen * 0.8);
-          const leftCtrl2Y = oy + Math.sin(a - 0.14) * (tipLen * 0.8);
-          const rightCtrl2X = ox + Math.cos(a + 0.14) * (tipLen * 0.78);
-          const rightCtrl2Y = oy + Math.sin(a + 0.14) * (tipLen * 0.78);
-          const rightCtrl1X = ox + Math.cos(a + 0.42) * (tipLen * 0.28);
-          const rightCtrl1Y = oy + Math.sin(a + 0.42) * (tipLen * 0.28);
-          const fill =
-            i % 3 === 0
-              ? "rgba(254,240,138,0.88)"
-              : i % 2 === 0
-                ? "rgba(251,191,36,0.8)"
-                : "rgba(249,115,22,0.74)";
-
-          return (
-            <path
-              key={i}
-              d={
-                `M ${leftBaseX.toFixed(1)} ${leftBaseY.toFixed(1)} ` +
-                `C ${leftCtrl1X.toFixed(1)} ${leftCtrl1Y.toFixed(1)} ${leftCtrl2X.toFixed(1)} ${leftCtrl2Y.toFixed(1)} ${tx.toFixed(1)} ${ty.toFixed(1)} ` +
-                `C ${rightCtrl2X.toFixed(1)} ${rightCtrl2Y.toFixed(1)} ${rightCtrl1X.toFixed(1)} ${rightCtrl1Y.toFixed(1)} ${rightBaseX.toFixed(1)} ${rightBaseY.toFixed(1)} Z`
-              }
-              fill={fill}
-              opacity={0.46 + (i % 4) * 0.12}
-              style={{
-                animation: `flame-tongue ${280 + i * 28}ms ease-out forwards`,
-                animationDelay: `${i * 16}ms`,
-                transformOrigin: `${ox}px ${oy}px`,
-              }}
-            />
-          );
-        })}
+        {/* Streak lines from origin to each jet tip */}
+        {jets.map(({ cos, sin, len, color }, i) => (
+          <line
+            key={`sk-${i}`}
+            x1={ox}
+            y1={oy}
+            x2={(ox + cos * len * 0.82).toFixed(1)}
+            y2={(oy + sin * len * 0.82).toFixed(1)}
+            stroke={color}
+            strokeWidth={2 + (i % 3)}
+            strokeLinecap="round"
+            opacity="0"
+            style={{
+              animation: `flame-streak ${195 + i * 24}ms ease-out forwards`,
+              animationDelay: `${i * 12}ms`,
+            }}
+          />
+        ))}
+        {/* Fire jet circles: start at origin, travel to destination */}
+        {jets.map(({ dx, dy, size, color }, i) => (
+          <circle
+            key={i}
+            cx={ox}
+            cy={oy}
+            r={size}
+            fill={color}
+            opacity="0"
+            style={
+              {
+                animation: `flame-jet-travel ${235 + i * 26}ms ease-out forwards`,
+                animationDelay: `${i * 12}ms`,
+                "--jx": `${dx.toFixed(1)}px`,
+                "--jy": `${dy.toFixed(1)}px`,
+              } as React.CSSProperties
+            }
+          />
+        ))}
+        {/* Embers */}
         {Array.from({ length: 10 }, (_, i) => {
-          const a = rad + (i - 4.5) * 0.08;
-          const dist = 50 + (i % 5) * 18;
-          const cx = ox + Math.cos(a) * dist;
-          const cy = oy + Math.sin(a) * dist - (i % 3) * 8;
+          const a = rad + ((i - 4.5) * (HALF * 1.5)) / 5;
+          const dist = 50 + (i % 4) * 22;
           return (
             <circle
-              key={`ember-${i}`}
-              cx={cx}
-              cy={cy}
-              r={i % 3 === 0 ? 4 : 2.5}
-              fill={
-                i % 2 === 0 ? "rgba(254,240,138,0.9)" : "rgba(251,146,60,0.82)"
-              }
+              key={`e-${i}`}
+              cx={ox}
+              cy={oy}
+              r={i % 3 === 0 ? 5 : 3}
+              fill={i % 2 === 0 ? "#fef3c7" : "#fb923c"}
               opacity="0"
               style={
                 {
-                  animation: `ember-rise ${420 + i * 40}ms ease-out forwards`,
-                  animationDelay: `${i * 22}ms`,
-                  "--dx": `${(Math.cos(a) * (20 + i * 2)).toFixed(1)}px`,
-                  "--dy": `${(-18 - (i % 4) * 10).toFixed(1)}px`,
+                  animation: `ember-rise ${390 + i * 36}ms ease-out forwards`,
+                  animationDelay: `${i * 20}ms`,
+                  "--dx": `${(Math.cos(a) * dist).toFixed(1)}px`,
+                  "--dy": `${(Math.sin(a) * dist - 16).toFixed(1)}px`,
                 } as React.CSSProperties
               }
             />
           );
         })}
-        <ellipse
+        {/* Hot core at origin */}
+        <circle
           cx={ox}
           cy={oy}
-          rx="20"
-          ry="12"
-          fill="rgba(254,240,138,0.7)"
+          r="22"
+          fill="rgba(255,255,230,0.95)"
           style={{
-            animation: "flame-tongue 260ms ease-out forwards",
-            transformOrigin: `${ox}px ${oy}px`,
-          }}
-        />
-        <ellipse
-          cx={ox + Math.cos(rad) * 16}
-          cy={oy + Math.sin(rad) * 16}
-          rx="11"
-          ry="8"
-          fill="rgba(255,255,255,0.45)"
-          style={{
-            animation: "flame-tongue 220ms ease-out forwards",
+            animation: "flame-core-flash 340ms ease-out forwards",
             transformOrigin: `${ox}px ${oy}px`,
           }}
         />
@@ -1123,133 +877,262 @@ function FlameEffect({
   );
 }
 
-// ── Stomp: massive boot-print impact + shockwave ring ────────────────────────
+// ── Plasma Orb: detonation rings + shimmer corona ────────────────────────────
 
-function StompEffect({ x, y }: { x: number; y: number }) {
+function PlasmaEffect({ x, y }: { x: number; y: number }) {
   return (
     <>
-      {/* Ground shockwave */}
+      {/* Charge-up orb — briefly pulses then collapses as the detonation begins */}
       <div
         aria-hidden="true"
-        className="pointer-events-none fixed rounded-full [animation:stomp-land_800ms_ease-out_forwards]"
+        className="pointer-events-none fixed rounded-full [animation:plasma-charge_260ms_ease-in_forwards]"
+        style={{
+          left: x,
+          top: y,
+          width: 52,
+          height: 52,
+          background:
+            "radial-gradient(circle, rgba(255,255,255,0.95) 0%, rgba(56,189,248,0.85) 48%, rgba(14,165,233,0.45) 100%)",
+          boxShadow: "0 0 24px 8px rgba(56,189,248,0.75)",
+          transform: "translate(-50%, -50%)",
+        }}
+      />
+      {/* Central orb flash */}
+      <div
+        aria-hidden="true"
+        className="pointer-events-none fixed rounded-full [animation:pulse-expand_900ms_ease-out_forwards]"
+        style={{
+          left: x,
+          top: y,
+          width: 360,
+          height: 360,
+          background:
+            "radial-gradient(circle, rgba(56,189,248,0.55) 0%, rgba(14,165,233,0.28) 35%, transparent 68%)",
+          boxShadow: "0 0 60px 16px rgba(56,189,248,0.32)",
+          transform: "translate(-50%, -50%)",
+          animationDelay: "180ms",
+          opacity: 0,
+        }}
+      />
+      {/* Inner bright core */}
+      <div
+        aria-hidden="true"
+        className="pointer-events-none fixed rounded-full [animation:shockwave-expand_500ms_ease-out_forwards]"
+        style={{
+          left: x,
+          top: y,
+          width: 80,
+          height: 80,
+          background:
+            "radial-gradient(circle, rgba(255,255,255,0.9) 0%, rgba(186,230,253,0.8) 40%, transparent 70%)",
+          transform: "translate(-50%, -50%)",
+          animationDelay: "180ms",
+          opacity: 0,
+        }}
+      />
+      {/* 3 expanding rings */}
+      <div
+        aria-hidden="true"
+        className="pointer-events-none fixed rounded-full border-2 border-sky-300/70 [animation:pulse-expand_800ms_ease-out_forwards]"
+        style={{
+          left: x,
+          top: y,
+          width: 260,
+          height: 260,
+          boxShadow:
+            "0 0 18px 4px rgba(56,189,248,0.35), inset 0 0 14px rgba(56,189,248,0.18)",
+          transform: "translate(-50%, -50%)",
+          animationDelay: "180ms",
+          opacity: 0,
+        }}
+      />
+      <div
+        aria-hidden="true"
+        className="pointer-events-none fixed rounded-full border border-cyan-400/55 [animation:pulse-expand_700ms_ease-out_forwards]"
+        style={{
+          left: x,
+          top: y,
+          width: 160,
+          height: 160,
+          transform: "translate(-50%, -50%)",
+          animationDelay: "240ms",
+          opacity: 0,
+        }}
+      />
+      <div
+        aria-hidden="true"
+        className="pointer-events-none fixed rounded-full border border-blue-200/45 [animation:pulse-expand_550ms_ease-out_forwards]"
+        style={{
+          left: x,
+          top: y,
+          width: 80,
+          height: 80,
+          transform: "translate(-50%, -50%)",
+          animationDelay: "300ms",
+          opacity: 0,
+        }}
+      />
+      {/* Spark spray */}
+      <svg
+        aria-hidden="true"
+        className="pointer-events-none fixed [animation:spark-burst_900ms_ease-out_forwards]"
+        style={{
+          left: x,
+          top: y,
+          width: 1,
+          height: 1,
+          overflow: "visible",
+          filter: "drop-shadow(0 0 5px rgba(56,189,248,0.8))",
+        }}
+        viewBox="0 0 1 1"
+      >
+        {Array.from({ length: 10 }, (_, i) => {
+          const a = (i * Math.PI * 2) / 10;
+          const len = 55 + (i % 3) * 22;
+          const jag = len * 0.45;
+          const jd = i % 2 === 0 ? 6 : -6;
+          const cos = Math.cos(a);
+          const sin = Math.sin(a);
+          const perp = a + Math.PI / 2;
+          const mx = cos * jag + Math.cos(perp) * jd;
+          const my = sin * jag + Math.sin(perp) * jd;
+          return (
+            <path
+              key={i}
+              d={`M 0 0 L ${mx.toFixed(1)} ${my.toFixed(1)} L ${(cos * len).toFixed(1)} ${(sin * len).toFixed(1)}`}
+              stroke={i % 2 === 0 ? "#38bdf8" : "#e0f2fe"}
+              strokeWidth={i % 3 === 0 ? 2 : 1.4}
+              strokeLinecap="round"
+              fill="none"
+              opacity={0.75 + (i % 3) * 0.08}
+            />
+          );
+        })}
+        <circle cx="0" cy="0" r="6" fill="rgba(255,255,255,0.9)" />
+      </svg>
+    </>
+  );
+}
+
+// ── Void Nova: chromatic aberration + dark implosion rings ────────────────────
+
+function VoidEffect({ x, y }: { x: number; y: number }) {
+  return (
+    <>
+      {/* Full-screen chromatic flash overlay */}
+      <div
+        aria-hidden="true"
+        className="pointer-events-none fixed inset-0 [animation:screen-flash_180ms_ease-out_forwards]"
+        style={{
+          background:
+            "radial-gradient(circle at 50% 50%, rgba(124,58,237,0.12) 0%, transparent 55%)",
+          mixBlendMode: "screen",
+        }}
+      />
+      {/* Dark core implosion */}
+      <div
+        aria-hidden="true"
+        className="pointer-events-none fixed rounded-full [animation:shockwave-expand_1200ms_ease-out_forwards]"
+        style={{
+          left: x,
+          top: y,
+          width: 480,
+          height: 480,
+          background:
+            "radial-gradient(circle, rgba(15,0,40,0.9) 0%, rgba(88,28,135,0.45) 30%, rgba(124,58,237,0.18) 55%, transparent 70%)",
+          boxShadow: "0 0 80px 20px rgba(124,58,237,0.28)",
+          transform: "translate(-50%, -50%)",
+        }}
+      />
+      {/* 3 void rings */}
+      <div
+        aria-hidden="true"
+        className="pointer-events-none fixed rounded-full border-2 [animation:pulse-expand_1100ms_ease-out_forwards]"
         style={{
           left: x,
           top: y,
           width: 380,
           height: 380,
-          background:
-            "radial-gradient(circle, rgba(163,230,53,0.38) 0%, rgba(132,204,22,0.15) 40%, transparent 70%)",
-          boxShadow: "0 0 60px 16px rgba(163,230,53,0.25)",
+          borderColor: "rgba(192,132,252,0.65)",
+          boxShadow:
+            "0 0 28px 6px rgba(192,132,252,0.22), inset 0 0 20px rgba(124,58,237,0.18)",
           transform: "translate(-50%, -50%)",
         }}
       />
-      {/* Outer ring */}
       <div
         aria-hidden="true"
-        className="pointer-events-none fixed rounded-full border-2 border-lime-400/55 [animation:pulse-expand_700ms_ease-out_forwards]"
+        className="pointer-events-none fixed rounded-full border [animation:pulse-expand_850ms_ease-out_forwards]"
         style={{
           left: x,
           top: y,
-          width: 420,
-          height: 420,
+          width: 220,
+          height: 220,
+          borderColor: "rgba(167,139,250,0.5)",
           transform: "translate(-50%, -50%)",
+          animationDelay: "80ms",
+          opacity: 0,
         }}
       />
-      {/* Debris shards radial */}
+      <div
+        aria-hidden="true"
+        className="pointer-events-none fixed rounded-full border [animation:pulse-expand_620ms_ease-out_forwards]"
+        style={{
+          left: x,
+          top: y,
+          width: 110,
+          height: 110,
+          borderColor: "rgba(245,208,254,0.45)",
+          transform: "translate(-50%, -50%)",
+          animationDelay: "160ms",
+          opacity: 0,
+        }}
+      />
+      {/* Void rift cracks */}
       <svg
         aria-hidden="true"
-        className="pointer-events-none fixed [animation:bomb-debris_800ms_ease-out_forwards]"
-        style={{ left: x, top: y, width: 1, height: 1, overflow: "visible" }}
+        className="pointer-events-none fixed [animation:shockwave-cracks_1000ms_ease-out_forwards]"
+        style={{
+          left: x,
+          top: y,
+          width: 1,
+          height: 1,
+          overflow: "visible",
+          filter: "drop-shadow(0 0 6px rgba(192,132,252,0.7))",
+        }}
         viewBox="0 0 1 1"
       >
-        {Array.from({ length: 10 }, (_, i) => {
-          const a = (i * Math.PI * 2) / 10 + i * 0.12;
-          const dist = 80 + (i % 4) * 25;
-          const size = 5 + (i % 3) * 3;
-          const px = (Math.cos(a) * dist).toFixed(1);
-          const py = (Math.sin(a) * dist).toFixed(1);
+        {Array.from({ length: 8 }, (_, i) => {
+          const a = (i * Math.PI * 2) / 8 + 0.2;
+          const len = 70 + (i % 3) * 28;
+          const kink = len * 0.42;
+          const jog = (i % 2 === 0 ? 1 : -1) * 14;
+          const cos = Math.cos(a);
+          const sin = Math.sin(a);
+          const perp = a + Math.PI / 2;
+          const mx = cos * kink + Math.cos(perp) * jog;
+          const my = sin * kink + Math.sin(perp) * jog;
+          const arcLen = len + 20;
           return (
-            <rect
+            <path
               key={i}
-              x={-size / 2}
-              y={-size / 2}
-              width={size}
-              height={size}
-              rx="1"
-              fill={i % 2 === 0 ? "#a3e635" : "#84cc16"}
-              opacity={0.65 + (i % 3) * 0.1}
-              transform={`translate(${px},${py}) rotate(${i * 36})`}
+              d={`M 0 0 L ${mx.toFixed(1)} ${my.toFixed(1)} L ${(cos * len).toFixed(1)} ${(sin * len).toFixed(1)}`}
+              stroke={i % 2 === 0 ? "#c084fc" : "#7c3aed"}
+              strokeWidth={i % 2 === 0 ? "2.2" : "1.6"}
+              strokeLinecap="round"
+              fill="none"
+              strokeDasharray={arcLen}
+              strokeDashoffset={arcLen}
+              style={{
+                animation: "draw-crack 360ms ease-out forwards",
+                animationDelay: `${i * 45}ms`,
+              }}
             />
           );
         })}
+        <circle cx="0" cy="0" r="8" fill="rgba(76,29,149,0.85)" />
+        <circle cx="0" cy="0" r="3" fill="rgba(245,208,254,0.9)" />
       </svg>
     </>
-  );
-}
-
-// ── Swatter: wide arc sweep stroke ───────────────────────────────────────────
-
-function SwatterEffect({
-  x,
-  y,
-  angle,
-}: {
-  x: number;
-  y: number;
-  angle?: number;
-}) {
-  const rad = angle ?? 0;
-  const HALF_ARC = (Math.PI * 60) / 180; // 120° / 2
-  const RADIUS = 70;
-
-  const startAngle = rad - HALF_ARC;
-  const endAngle = rad + HALF_ARC;
-  const sx = Math.cos(startAngle) * RADIUS;
-  const sy = Math.sin(startAngle) * RADIUS;
-  const ex = Math.cos(endAngle) * RADIUS;
-  const ey = Math.sin(endAngle) * RADIUS;
-  const arcPath = `M ${sx.toFixed(1)} ${sy.toFixed(1)} A ${RADIUS} ${RADIUS} 0 0 1 ${ex.toFixed(1)} ${ey.toFixed(1)}`;
-  const arcLen = RADIUS * HALF_ARC * 2 * 1.05;
-
-  return (
-    <svg
-      aria-hidden="true"
-      className="pointer-events-none fixed"
-      style={{
-        left: x,
-        top: y,
-        width: 1,
-        height: 1,
-        overflow: "visible",
-        filter: "drop-shadow(0 0 6px rgba(252,211,77,0.7))",
-      }}
-      viewBox="0 0 1 1"
-    >
-      {/* Thick glow arc */}
-      <path
-        d={arcPath}
-        stroke="rgba(252,211,77,0.3)"
-        strokeWidth="18"
-        strokeLinecap="round"
-        fill="none"
-        strokeDasharray={arcLen}
-        strokeDashoffset={arcLen}
-        style={{ animation: `swatter-sweep 280ms ease-out forwards` }}
-      />
-      {/* Core arc */}
-      <path
-        d={arcPath}
-        stroke="#fcd34d"
-        strokeWidth="4"
-        strokeLinecap="round"
-        fill="none"
-        strokeDasharray={arcLen}
-        strokeDashoffset={arcLen}
-        style={{ animation: `swatter-sweep 240ms ease-out forwards` }}
-      />
-      {/* Impact flash at click point */}
-      <circle cx="0" cy="0" r="6" fill="rgba(252,211,77,0.5)" />
-    </svg>
   );
 }
 
@@ -1354,23 +1237,15 @@ export default function WeaponEffectLayer({ effects }: WeaponEffectLayerProps) {
             return null; // handled by persistentCracks above
           case "zapper":
             return <ZapperEffect key={effect.id} x={effect.x} y={effect.y} />;
-          case "pulse":
+          case "freeze":
             return (
-              <PulseRingEffect key={effect.id} x={effect.x} y={effect.y} />
-            );
-          case "pointer":
-            return (
-              <PointerEffect
+              <FreezeEffect
                 key={effect.id}
-                color={effect.color}
                 x={effect.x}
                 y={effect.y}
-                targetX={effect.targetX}
-                targetY={effect.targetY}
+                angle={effect.angle}
               />
             );
-          case "freeze":
-            return <FreezeEffect key={effect.id} x={effect.x} y={effect.y} />;
           case "chain":
             return (
               <ChainEffect
@@ -1379,6 +1254,15 @@ export default function WeaponEffectLayer({ effects }: WeaponEffectLayerProps) {
                 y={effect.y}
                 chainNodes={effect.chainNodes}
                 jagOffsets={effect.jagOffsets}
+              />
+            );
+          case "flame":
+            return (
+              <FlameEffect
+                key={effect.id}
+                x={effect.x}
+                y={effect.y}
+                angle={effect.angle}
               />
             );
           case "laser":
@@ -1390,8 +1274,6 @@ export default function WeaponEffectLayer({ effects }: WeaponEffectLayerProps) {
                 angle={effect.angle}
               />
             );
-          case "bomb":
-            return <BombEffect key={effect.id} x={effect.x} y={effect.y} />;
           case "shockwave":
             return (
               <ShockwaveRingEffect key={effect.id} x={effect.x} y={effect.y} />
@@ -1406,26 +1288,10 @@ export default function WeaponEffectLayer({ effects }: WeaponEffectLayerProps) {
                 targetY={effect.targetY}
               />
             );
-          case "flame":
-            return (
-              <FlameEffect
-                key={effect.id}
-                x={effect.x}
-                y={effect.y}
-                angle={effect.angle}
-              />
-            );
-          case "stomp":
-            return <StompEffect key={effect.id} x={effect.x} y={effect.y} />;
-          case "swatter":
-            return (
-              <SwatterEffect
-                key={effect.id}
-                x={effect.x}
-                y={effect.y}
-                angle={effect.angle}
-              />
-            );
+          case "plasma":
+            return <PlasmaEffect key={effect.id} x={effect.x} y={effect.y} />;
+          case "void":
+            return <VoidEffect key={effect.id} x={effect.x} y={effect.y} />;
           default:
             return null;
         }

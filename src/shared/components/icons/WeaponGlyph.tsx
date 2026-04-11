@@ -54,40 +54,6 @@ export default function WeaponGlyph({ className, id }: WeaponGlyphProps) {
     );
   }
 
-  // ── Pulse Cannon (directional sonic emitter) ───────────────────────
-  if (id === "pulse") {
-    return (
-      <svg
-        className={className}
-        viewBox="0 0 24 24"
-        {...SVG_BASE}
-        strokeWidth="1.7"
-      >
-        {/* Emitter core */}
-        <circle cx="5" cy="12" r="2.5" />
-        {/* Concentric pulse arcs opening right */}
-        <path d="M9.5 8 Q15.5 12 9.5 16" strokeWidth="1.8" />
-        <path d="M14 5 Q23 12 14 19" strokeWidth="1.5" />
-      </svg>
-    );
-  }
-
-  // ── Debug Pointer ──────────────────────────────────────────────────
-  if (id === "pointer") {
-    return (
-      <svg
-        className={className}
-        viewBox="0 0 24 24"
-        {...SVG_BASE}
-        strokeWidth="1.6"
-      >
-        <circle cx="11" cy="11" r="5.5" />
-        <path d="M20 20l-4.35-4.35" strokeWidth="2" />
-        <path d="M11 8v6M8 11h6" strokeWidth="1.4" />
-      </svg>
-    );
-  }
-
   // ── Freeze Cone (six-arm ice crystal snowflake) ────────────────────
   // Arms: 0°/180° (vertical), 60°/240°, 120°/300° (all through center (12,12))
   // Branch V-forks at 55% along each arm tip direction
@@ -162,23 +128,6 @@ export default function WeaponGlyph({ className, id }: WeaponGlyphProps) {
     );
   }
 
-  // ── Pixel Bomb ─────────────────────────────────────────────────────
-  if (id === "bomb") {
-    return (
-      <svg
-        className={className}
-        viewBox="0 0 24 24"
-        {...SVG_BASE}
-        strokeWidth="1.6"
-      >
-        <circle cx="11" cy="13" r="7" />
-        <path d="M14.35 9.65L16 8" />
-        <path d="M18 5l-2 2" />
-        <path d="M16 5l1-1 1 1-1 1z" fill="currentColor" strokeWidth="0" />
-      </svg>
-    );
-  }
-
   // ── Shockwave (concentric rings + radial spike pairs) ──────────────
   if (id === "shockwave") {
     return (
@@ -244,8 +193,8 @@ export default function WeaponGlyph({ className, id }: WeaponGlyphProps) {
     );
   }
 
-  // ── Boot Stomp (side-view work boot + motion lines) ────────────────
-  if (id === "stomp") {
+  // ── Plasma Arc (energised orb with radiating arcs) ─────────────────
+  if (id === "plasma") {
     return (
       <svg
         className={className}
@@ -253,20 +202,24 @@ export default function WeaponGlyph({ className, id }: WeaponGlyphProps) {
         {...SVG_BASE}
         strokeWidth="1.6"
       >
-        {/* Boot shaft (upper rectangle) */}
-        <rect x="7.5" y="4" width="5" height="11" rx="1.5" />
-        {/* Foot / sole section extending right */}
-        <path d="M7.5 15 L7.5 17.5 Q7.5 19.5 9.5 19.5 L19 19.5 Q21 19.5 21 17.5 L21 16.5 Q21 15 19 15 L12.5 15" />
-        {/* Motion lines descending above the boot */}
-        <line x1="9.5" y1="1" x2="9.5" y2="3.5" strokeWidth="1.3" />
-        <line x1="12.5" y1="1.5" x2="12.5" y2="3.5" strokeWidth="1.3" />
-        <line x1="15.5" y1="1" x2="15" y2="3.5" strokeWidth="1.3" />
+        {/* Central energised orb */}
+        <circle cx="12" cy="12" r="3.5" strokeWidth="1.4" />
+        {/* Radiating plasma arcs */}
+        <path d="M12 8.5 C10 6 7.5 7 8 9.5" strokeWidth="1.3" />
+        <path d="M15.5 12 C18 10 18 13.5 15.5 14.5" strokeWidth="1.3" />
+        <path d="M12 15.5 C14 18 16.5 17 16 14.5" strokeWidth="1.3" />
+        <path d="M8.5 12 C6 14 6 10.5 8.5 9.5" strokeWidth="1.3" />
+        {/* Cardinal sparks */}
+        <line x1="12" y1="3.5" x2="12" y2="2" strokeWidth="1.5" />
+        <line x1="20.5" y1="12" x2="22" y2="12" strokeWidth="1.5" />
+        <line x1="12" y1="20.5" x2="12" y2="22" strokeWidth="1.5" />
+        <line x1="3.5" y1="12" x2="2" y2="12" strokeWidth="1.5" />
       </svg>
     );
   }
 
-  // ── Fly Swatter (grid paddle + diagonal handle) ────────────────────
-  if (id === "swatter") {
+  // ── Void Pulse (shattered ring + collapsing vortex) ────────────────
+  if (id === "void") {
     return (
       <svg
         className={className}
@@ -274,15 +227,15 @@ export default function WeaponGlyph({ className, id }: WeaponGlyphProps) {
         {...SVG_BASE}
         strokeWidth="1.6"
       >
-        {/* Diagonal handle */}
-        <line x1="2" y1="22" x2="12.5" y2="12.5" strokeWidth="2.2" />
-        {/* Paddle rectangle */}
-        <rect x="11" y="2" width="11.5" height="12" rx="2" />
-        {/* Mesh grid lines */}
-        <line x1="11" y1="6" x2="22.5" y2="6" strokeWidth="1" />
-        <line x1="11" y1="10" x2="22.5" y2="10" strokeWidth="1" />
-        <line x1="15" y1="2" x2="15" y2="14" strokeWidth="1" />
-        <line x1="19" y1="2" x2="19" y2="14" strokeWidth="1" />
+        {/* Outer shattering arcs */}
+        <path d="M12 2 A10 10 0 0 1 20 7.5" strokeWidth="2" />
+        <path d="M21.5 12 A10 10 0 0 1 12 22" strokeWidth="2" />
+        <path d="M7.5 21.5 A10 10 0 0 1 2 12" strokeWidth="2" />
+        <path d="M3.5 7 A10 10 0 0 1 8.5 2.5" strokeWidth="2" />
+        {/* Inner collapsing ring */}
+        <circle cx="12" cy="12" r="5.5" strokeDasharray="3 2" />
+        {/* Central void core */}
+        <circle cx="12" cy="12" r="2.5" fill="currentColor" strokeWidth="0" />
       </svg>
     );
   }
