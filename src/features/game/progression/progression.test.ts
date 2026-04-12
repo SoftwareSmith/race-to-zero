@@ -3,6 +3,7 @@ import {
   getSiegeCombatStats,
   getSiegeWeaponSnapshots,
 } from "./progression";
+import type { SiegeWeaponId, WeaponEvolutionState } from "@game/types";
 
 describe("siege progression", () => {
   it("starts with only hammer unlocked", () => {
@@ -46,5 +47,36 @@ describe("siege progression", () => {
     expect(getSiegeCombatStats(11).currentToolLabel).toBe("Hammer");
     expect(getSiegeCombatStats(12).currentToolLabel).toBe("Bug Zapper");
     expect(getSiegeCombatStats(100).currentToolLabel).toBe("Null Pointer");
+  });
+
+  it("surfaces evolved tier data in weapon snapshots", () => {
+    const evolutionStates: Partial<Record<SiegeWeaponId, WeaponEvolutionState>> = {
+      hammer: { tier: 2, kills: 34 },
+      void: { tier: 3, kills: 52 },
+    };
+
+    const snapshots = getSiegeWeaponSnapshots(
+      130,
+      "hammer",
+      false,
+      evolutionStates,
+    );
+
+    const hammer = snapshots.find((snapshot) => snapshot.id === "hammer");
+    const voidPulse = snapshots.find((snapshot) => snapshot.id === "void");
+
+    expect(hammer).toMatchObject({
+      current: true,
+      killsToNextTier: 26,
+      tier: 2,
+      title: "Refactor Tool",
+      weaponKills: 34,
+    });
+    expect(voidPulse).toMatchObject({
+      killsToNextTier: null,
+      tier: 3,
+      title: "Event Horizon",
+      weaponKills: 52,
+    });
   });
 });

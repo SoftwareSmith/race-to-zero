@@ -6,16 +6,25 @@ import {
 } from "@game/progression/progression";
 import { WEAPON_DEFS } from "@config/weaponConfig";
 import { STRUCTURE_DEFS } from "@config/structureConfig";
-import type { AgentCaptureState, PlacedStructure, SiegePhase, SiegeWeaponId, StructureId } from "@game/types";
+import type {
+  AgentCaptureState,
+  PlacedStructure,
+  SiegePhase,
+  SiegeWeaponId,
+  StructureId,
+  WeaponEvolutionState,
+} from "@game/types";
 
 interface UseSiegeGameOptions {
   currentBugCount: number;
   currentBugCounts: BugCounts;
+  evolutionStates?: Partial<Record<SiegeWeaponId, WeaponEvolutionState>>;
 }
 
 export function useSiegeGame({
   currentBugCount,
   currentBugCounts,
+  evolutionStates,
 }: UseSiegeGameOptions) {
   const [debugMode, setDebugMode] = useState(() => {
     if (typeof window === "undefined") {
@@ -44,7 +53,6 @@ export function useSiegeGame({
   const [placedStructures, setPlacedStructures] = useState<PlacedStructure[]>([]);
   const [agentCaptures, setAgentCaptures] = useState<Record<string, AgentCaptureState>>({});
   const [lastFireTimes, setLastFireTimes] = useState<Record<SiegeWeaponId, number>>({} as Record<SiegeWeaponId, number>);
-  const manuallySelectedRef = useRef(false);
   const phaseTimerRef = useRef<number | null>(null);
 
   const interactiveMode = siegePhase !== "idle";
@@ -63,7 +71,6 @@ export function useSiegeGame({
     setPlacingStructureId(null);
     setAgentCaptures({});
     setLastFireTimes({} as Record<SiegeWeaponId, number>);
-    manuallySelectedRef.current = false;
     setSiegePhase("entering");
     phaseTimerRef.current = window.setTimeout(() => {
       phaseTimerRef.current = null;
@@ -87,7 +94,6 @@ export function useSiegeGame({
       if (siegePhase === "idle") return;
       const stats = getSiegeCombatStats(interactiveKills, debugMode);
       if (!stats.unlockedWeapons.includes(id)) return;
-      manuallySelectedRef.current = true;
       setPlacingStructureId(null);
       setSelectedWeaponId(id);
     },
@@ -191,22 +197,6 @@ export function useSiegeGame({
   );
 
   useEffect(() => {
-    if (manuallySelectedRef.current) return;
-    if (debugMode) return;
-    const stats = getSiegeCombatStats(interactiveKills, debugMode);
-    const highest = stats.unlockedWeapons[stats.unlockedWeapons.length - 1];
-    if (highest && highest !== "hammer") {
-      const timeoutId = window.setTimeout(() => {
-        setSelectedWeaponId(highest);
-      }, 0);
-
-      return () => {
-        window.clearTimeout(timeoutId);
-      };
-    }
-  }, [debugMode, interactiveKills]);
-
-  useEffect(() => {
     if (typeof window === "undefined") {
       return;
     }
@@ -244,7 +234,6 @@ export function useSiegeGame({
       const stats = getSiegeCombatStats(interactiveKills, debugMode);
       const weaponAtSlot = WEAPON_DEFS[slotIndex];
       if (weaponAtSlot && stats.unlockedWeapons.includes(weaponAtSlot.id)) {
-        manuallySelectedRef.current = true;
         setSelectedWeaponId(weaponAtSlot.id);
       }
     };
@@ -271,8 +260,14 @@ export function useSiegeGame({
     [debugMode, interactiveKills],
   );
   const weaponSnapshots = useMemo(
-    () => getSiegeWeaponSnapshots(interactiveKills, selectedWeaponId, debugMode),
-    [debugMode, interactiveKills, selectedWeaponId],
+    () =>
+      getSiegeWeaponSnapshots(
+        interactiveKills,
+        selectedWeaponId,
+        debugMode,
+        evolutionStates,
+      ),
+    [debugMode, evolutionStates, interactiveKills, selectedWeaponId],
   );
 
   const toggleDebugMode = useCallback(() => {

@@ -28,6 +28,7 @@ export function executeCommands(
           cmd.targetIndex,
           cmd.amount,
           cmd.creditOnDeath ?? true,
+          ctx.weaponId,
         );
         if (result) {
           const bug = ctx.engine.getAllBugs()[cmd.targetIndex];

@@ -60,18 +60,25 @@ function getTierSlotClassName(snapshot: WeaponProgressSnapshot) {
       // Gold  — T3
       return cn(
         base,
-        "border-amber-400/38 bg-[linear-gradient(135deg,rgba(120,53,15,0.22),rgba(0,0,0,0.24))] shadow-[0_0_14px_rgba(251,191,36,0.18)]",
+        "border-amber-400/48 bg-[linear-gradient(135deg,rgba(180,83,9,0.24),rgba(24,24,27,0.92))] shadow-[0_0_18px_rgba(251,191,36,0.18)]",
       );
     }
     if (snapshot.tier >= 2) {
       // Silver — T2
       return cn(
         base,
-        "border-slate-400/32 bg-[linear-gradient(135deg,rgba(100,116,139,0.14),rgba(0,0,0,0.22))] shadow-[0_0_10px_rgba(148,163,184,0.12)]",
+        "border-slate-300/48 bg-[linear-gradient(135deg,rgba(148,163,184,0.2),rgba(24,24,27,0.92))] shadow-[0_0_14px_rgba(148,163,184,0.14)]",
       );
     }
+
+    // Bronze — T1
+    return cn(
+      base,
+      "border-orange-400/38 bg-[linear-gradient(135deg,rgba(154,52,18,0.2),rgba(24,24,27,0.92))] shadow-[0_0_12px_rgba(249,115,22,0.12)]",
+    );
   }
-  // Bronze / locked — T1 default
+
+  // Locked weapons stay neutral.
   return cn(base, "border-white/8 bg-black/18");
 }
 
@@ -80,12 +87,6 @@ function getWeaponButtonClassName(
   isSelected: boolean,
 ) {
   if (isSelected) {
-    if (snapshot.tier >= 3) {
-      return "inline-flex h-9 w-9 items-center justify-center rounded-xl border border-amber-300/55 bg-amber-500/22 text-amber-50 shadow-[0_0_22px_rgba(251,191,36,0.32)]";
-    }
-    if (snapshot.tier >= 2) {
-      return "inline-flex h-9 w-9 items-center justify-center rounded-xl border border-slate-300/50 bg-slate-400/20 text-slate-50 shadow-[0_0_20px_rgba(148,163,184,0.26)]";
-    }
     return "inline-flex h-9 w-9 items-center justify-center rounded-xl border border-sky-300/40 bg-sky-400/16 text-sky-50 shadow-[0_0_20px_rgba(56,189,248,0.18)]";
   }
 
@@ -93,13 +94,7 @@ function getWeaponButtonClassName(
     return "inline-flex h-9 w-9 items-center justify-center rounded-xl border border-white/6 bg-white/4 text-stone-500 opacity-65";
   }
 
-  if (snapshot.tier >= 3) {
-    return "inline-flex h-9 w-9 items-center justify-center rounded-xl border border-amber-400/32 bg-amber-500/14 text-amber-100 transition-colors duration-150 hover:border-amber-300/52 hover:bg-amber-400/22 hover:text-amber-50";
-  }
-  if (snapshot.tier >= 2) {
-    return "inline-flex h-9 w-9 items-center justify-center rounded-xl border border-slate-400/30 bg-slate-500/12 text-slate-100 transition-colors duration-150 hover:border-slate-300/48 hover:bg-slate-400/18 hover:text-slate-50";
-  }
-  return "inline-flex h-9 w-9 items-center justify-center rounded-xl border border-emerald-400/20 bg-emerald-500/8 text-emerald-100 transition-colors duration-150 hover:border-sky-400/30 hover:bg-sky-500/10 hover:text-sky-100";
+  return "inline-flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-stone-100 transition-colors duration-150 hover:border-sky-400/30 hover:bg-sky-500/10 hover:text-sky-100";
 }
 
 export default function SiegeHud({
@@ -295,7 +290,7 @@ export default function SiegeHud({
                               ? "bg-amber-400/80"
                               : snapshot.tier >= 2
                                 ? "bg-slate-300/80"
-                                : "bg-sky-400/80",
+                                : "bg-orange-300/80",
                           )}
                           style={{
                             animation: `reload-drain ${snapshot.cooldownMs}ms linear forwards`,

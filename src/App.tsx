@@ -25,11 +25,13 @@ import { cn } from "@shared/utils/cn";
 
 function AppContent() {
   const dashboard = useDashboardContext();
+  const { evolutionStates, onEvolution, syncFromEngine, getWeaponTier } =
+    useWeaponEvolution();
   const siegeGame = useSiegeGame({
     currentBugCount: dashboard.currentBugCount,
     currentBugCounts: dashboard.currentBugCounts,
+    evolutionStates,
   });
-  const { evolutionStates, onEvolution, getWeaponTier } = useWeaponEvolution();
   const [evolutionToast, setEvolutionToast] = useState<string | null>(null);
   const [justEvolvedWeaponId, setJustEvolvedWeaponId] =
     useState<SiegeWeaponId | null>(null);
@@ -132,6 +134,7 @@ function AppContent() {
         terminatorMode={siegeGame.interactiveMode || dashboard.terminatorMode}
         tone={dashboard.deadlineMetrics.statusTone}
         getWeaponTier={getWeaponTier}
+        onWeaponEvolutionStatesChange={syncFromEngine}
         onWeaponEvolution={handleEvolution}
         initialEvolutionStates={evolutionStates}
       />

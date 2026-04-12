@@ -274,6 +274,9 @@ interface BugCanvasProps {
   gameConfig?: GameConfig;
   hammerPositionRef?: { current: { x: number; y: number } };
   getWeaponTier?: (id: SiegeWeaponId) => import("@game/types").WeaponTier;
+  onWeaponEvolutionStatesChange?: (
+    states: Map<SiegeWeaponId, import("@game/types").WeaponEvolutionState>,
+  ) => void;
   onWeaponEvolution?: (
     weaponId: SiegeWeaponId,
     newTier: import("@game/types").WeaponTier,
@@ -307,6 +310,7 @@ const BugCanvas = memo(function BugCanvas({
   gameConfig,
   hammerPositionRef,
   getWeaponTier = () => 1 as import("@game/types").WeaponTier,
+  onWeaponEvolutionStatesChange,
   onWeaponEvolution,
   initialEvolutionStates,
 }: BugCanvasProps) {
@@ -324,6 +328,9 @@ const BugCanvas = memo(function BugCanvas({
   const onTurretFireRef = useRef(onTurretFire);
   const onTeslaFireRef = useRef(onTeslaFire);
   const onWeaponFireRef = useRef(onWeaponFire);
+  const onWeaponEvolutionStatesChangeRef = useRef(
+    onWeaponEvolutionStatesChange,
+  );
   const vfxRef = useRef<VfxEngine | null>(null);
   const blackHoleVfxIdRef = useRef<string | null>(null);
   const placingStructureIdRef = useRef(placingStructureId);
@@ -332,12 +339,21 @@ const BugCanvas = memo(function BugCanvas({
   useEffect(() => {
     terminatorModeRef.current = terminatorMode;
   }, [hammerPositionRef, terminatorMode]);
+  useEffect(() => {
+    onWeaponEvolutionStatesChangeRef.current = onWeaponEvolutionStatesChange;
+  }, [onWeaponEvolutionStatesChange]);
   const selectedWeaponIdRef = useRef<SiegeWeaponId>(selectedWeaponId);
   const lastFireTimeRef = useRef<Record<string, number>>({});
   const isFiringRef = useRef(false);
   const currentMouseRef = useRef<{ x: number; y: number } | null>(null);
   const fireIntervalRef = useRef<number | null>(null);
   const lastPaintPosRef = useRef<{ x: number; y: number } | null>(null);
+  const syncWeaponEvolutionStates = useCallback(() => {
+    const states = swarmRef.current?.getWeaponEvolutionStates?.();
+    if (states) {
+      onWeaponEvolutionStatesChangeRef.current?.(states);
+    }
+  }, []);
   const reseedInfoRef = useRef<{
     ts: number;
     clustered: number;
@@ -410,6 +426,7 @@ const BugCanvas = memo(function BugCanvas({
               variant,
               meta,
             );
+            syncWeaponEvolutionStates();
           } catch {
             void 0;
           }
@@ -1261,7 +1278,12 @@ const BugCanvas = memo(function BugCanvas({
               viewportX: _vx,
               viewportY: _vy,
               weaponId: holdWeaponId,
-              onHit: (p) => onHitRef.current(p as any),
+              onHit: (p) => {
+                onHitRef.current(p as any);
+                if (p.defeated) {
+                  syncWeaponEvolutionStates();
+                }
+              },
               updateQaLastHit: (p) => updateQaLastHit(p as any),
               enqueueOverlay: (wid, evx, evy, extras) =>
                 onWeaponFireRef.current?.(wid, evx, evy, extras as any),
@@ -1466,7 +1488,12 @@ const BugCanvas = memo(function BugCanvas({
           viewportX: fireX,
           viewportY: fireY,
           weaponId,
-          onHit: (p) => onHitRef.current(p as any),
+          onHit: (p) => {
+            onHitRef.current(p as any);
+            if (p.defeated) {
+              syncWeaponEvolutionStates();
+            }
+          },
           updateQaLastHit: (p) => updateQaLastHit(p as any),
           enqueueOverlay: (wid, evx, evy, extras) =>
             onWeaponFireRef.current?.(wid, evx, evy, extras as any),
@@ -2375,6 +2402,9 @@ interface BackgroundFieldProps {
   gameConfig?: GameConfig;
   /** Returns the current evolution tier for a given weapon. Defaults to T1 when not provided. */
   getWeaponTier?: (id: SiegeWeaponId) => import("@game/types").WeaponTier;
+  onWeaponEvolutionStatesChange?: (
+    states: Map<SiegeWeaponId, import("@game/types").WeaponEvolutionState>,
+  ) => void;
   /** Called when a weapon evolves to a new tier. */
   onWeaponEvolution?: (
     weaponId: SiegeWeaponId,
@@ -2409,6 +2439,7 @@ const BackgroundField = memo(function BackgroundField({
   gameConfig,
   tone,
   getWeaponTier = () => 1 as import("@game/types").WeaponTier,
+  onWeaponEvolutionStatesChange,
   onWeaponEvolution,
   initialEvolutionStates,
 }: BackgroundFieldProps) {
@@ -2832,6 +2863,7 @@ const BackgroundField = memo(function BackgroundField({
         onWeaponFire={terminatorMode ? handleWeaponFire : undefined}
         hammerPositionRef={hammerPositionRef}
         getWeaponTier={getWeaponTier}
+        onWeaponEvolutionStatesChange={onWeaponEvolutionStatesChange}
         onWeaponEvolution={onWeaponEvolution}
         initialEvolutionStates={initialEvolutionStates}
       />
