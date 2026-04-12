@@ -15,9 +15,12 @@ import { findNearestBugInRadius } from "@game/weapons/runtime/targetingHelpers";
 const DAMAGE = 2;
 /** Hit search radius when engine.hitTest misses. */
 const SEARCH_RADIUS = 48;
+/** T3: ally conversion duration. */
+const T3_ALLY_DURATION_MS = 8000;
 
 export function createSession(ctx: WeaponContext): ClickFireResult {
   const { engine, targetX, targetY } = ctx;
+  const tier = ctx.tier ?? 1;
   const commands: WeaponCommand[] = [];
 
   // Always emit the crack decal at the aim point
@@ -31,7 +34,7 @@ export function createSession(ctx: WeaponContext): ClickFireResult {
     kind: "spawnEffect",
     descriptor: {
       type: "overlayEffect",
-      weaponId: "wrench",
+      weaponId: "hammer",
       viewportX: ctx.viewportX,
       viewportY: ctx.viewportY,
     },
@@ -39,12 +42,36 @@ export function createSession(ctx: WeaponContext): ClickFireResult {
 
   const hit = findNearestBugInRadius(engine, targetX, targetY, SEARCH_RADIUS);
   if (hit) {
-    commands.push({
-      kind: "damage",
-      targetIndex: hit.index,
-      amount: DAMAGE,
-      creditOnDeath: true,
-    });
+    if (tier >= 3) {
+      // T3: Rewrite Engine — convert bug to ally for 8 s
+      commands.push({
+        kind: "allyBug",
+        targetIndex: hit.index,
+        durationMs: T3_ALLY_DURATION_MS,
+      });
+    } else if (tier >= 2) {
+      // T2: Refactor Tool — split healthy bugs; damage near-dead ones
+      const bugs = engine.getAllBugs();
+      const bug = bugs[hit.index];
+      const hp = bug?.hp ?? 0;
+      if (hp > 2) {
+        commands.push({ kind: "splitBug", targetIndex: hit.index });
+      } else {
+        commands.push({
+          kind: "damage",
+          targetIndex: hit.index,
+          amount: DAMAGE,
+          creditOnDeath: true,
+        });
+      }
+    } else {
+      commands.push({
+        kind: "damage",
+        targetIndex: hit.index,
+        amount: DAMAGE,
+        creditOnDeath: true,
+      });
+    }
   }
 
   return { mode: "once", commands };

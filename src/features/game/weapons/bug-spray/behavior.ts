@@ -13,56 +13,63 @@ import type {
 } from "@game/weapons/runtime/types";
 import { coneAngleAway } from "@game/weapons/runtime/targetingHelpers";
 
-// Spray params (match bugSpray.ts + BackgroundField handler)
-const CONE_ARC = 80;
-const HIT_RADIUS = 120;
-const DAMAGE = 0;
+// Spray params
+// Cloud poison duration is kept just over the re-apply interval so the
+// effect expires within one cycle once the player stops spraying or the
+// bug leaves the cloud.  Without this, bugs carry 4 s of poison even after
+// moving far away from the cloud.
 const POISON_DPS = 0.5;
-const POISON_DURATION_MS = 4000;
+const POISON_DURATION_MS = 450;  // ~1 interval; expires very quickly outside cloud
 const CLOUD_RADIUS = 96;
 const CLOUD_MS = 2400;
 const CLOUD_INTERVAL_MS = 400;
+const T2_SECONDARY_RADIUS = 56;
+const T2_SECONDARY_DURATION_MS = 800;
+const T3_CLOUD_RADIUS = 144;
+const T3_CLOUD_MS = 3200;
 
 function buildTickCommands(ctx: WeaponContext): WeaponCommand[] {
-  const { engine, targetX, targetY, centerX, centerY } = ctx;
+  const { targetX, targetY, centerX, centerY } = ctx;
+  const tier = ctx.tier ?? 1;
   const sprayAngle = coneAngleAway(targetX, targetY, centerX, centerY);
-
-  const hitIndexes = engine.coneHitTest(
-    targetX,
-    targetY,
-    sprayAngle,
-    CONE_ARC,
-    HIT_RADIUS,
-  );
-
   const commands: WeaponCommand[] = [];
 
-  for (const idx of hitIndexes) {
-    commands.push({
-      kind: "damage",
-      targetIndex: idx,
-      amount: DAMAGE,
-      creditOnDeath: true,
-    });
-    commands.push({
-      kind: "applyPoison",
-      targetIndex: idx,
-      dps: POISON_DPS,
-      durationMs: POISON_DURATION_MS,
-    });
-  }
+  const cloudRadius = tier >= 3 ? T3_CLOUD_RADIUS : CLOUD_RADIUS;
+  const cloudMs = tier >= 3 ? T3_CLOUD_MS : CLOUD_MS;
+
+  // Note: we do NOT apply individual applyPoison per bug here.
+  // The repeatPoisonRadius cloud below re-poisons every 400 ms for 2.4-3.2 s,
+  // with a 450 ms duration so the effect expires almost immediately once a
+  // bug leaves the cloud — preventing phantom kills after the spray ends.
 
   // Toxic cloud area effect (repeating poison for bugs walking through)
   commands.push({
     kind: "repeatPoisonRadius",
     cx: targetX,
     cy: targetY,
-    radius: CLOUD_RADIUS,
+    radius: cloudRadius,
     dps: POISON_DPS,
     durationMs: POISON_DURATION_MS,
     intervalMs: CLOUD_INTERVAL_MS,
-    totalMs: CLOUD_MS,
+    totalMs: cloudMs,
   });
+
+  // T2+: secondary poison cloud around each bug caught in the main spray
+  if (tier >= 2) {
+    const bugs = ctx.engine.getAllBugs();
+    for (const idx of ctx.engine.radiusHitTest(targetX, targetY, cloudRadius)) {
+      const bug = bugs[idx];
+      if (!bug) continue;
+      commands.push({
+        kind: "poisonRadius",
+        cx: bug.x,
+        cy: bug.y,
+        radius: T2_SECONDARY_RADIUS,
+        dps: POISON_DPS,
+        durationMs: T2_SECONDARY_DURATION_MS,
+      });
+    }
+  }
 
   // VFX: aerosol particles + toxic cloud emitter
   commands.push({
@@ -81,8 +88,8 @@ function buildTickCommands(ctx: WeaponContext): WeaponCommand[] {
       type: "toxicCloud",
       x: targetX,
       y: targetY,
-      radius: CLOUD_RADIUS,
-      durationMs: CLOUD_MS,
+      radius: cloudRadius,
+      durationMs: cloudMs,
     },
   });
 

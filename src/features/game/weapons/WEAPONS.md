@@ -65,7 +65,7 @@ bounds, `onHit` callback, `updateQaLastHit`, `enqueueOverlay`, and the
 { mode: "once"; commands: WeaponCommand[] }
 ```
 Return from `createSession()` when the entire effect is resolved synchronously
-(wrench, freeze-cone, chain-zap, laser-cutter, static-net, null-pointer).
+(hammer, freeze-cone, chain-zap, tracer-bloom, static-net, null-pointer).
 
 ### `HoldFireSession` — continuous (mouse held)
 ```ts
@@ -89,7 +89,7 @@ cleans up listeners automatically.
   abort(): void;
 }
 ```
-Used by plasma-bomb (two-phase explosion, ~600 ms) and void-pulse (black hole,
+Used by fork-bomb legacy staged explosions and void-pulse (black hole,
 ~2100 ms). Only one void-pulse can be active at a time; fire is blocked while
 `engine.getBlackHole()?.active` is true.
 

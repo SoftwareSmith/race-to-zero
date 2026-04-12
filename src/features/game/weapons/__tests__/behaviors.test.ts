@@ -56,6 +56,17 @@ function makeMockEngine(bugs: BugSnapshot[] = [makeBug()]): GameEngine {
     applyEnsnareInRadius: vi.fn(),
     startBlackHole: vi.fn(() => true),
     getBlackHole: vi.fn(() => null),
+    applyChargedInRadius: vi.fn(),
+    applyMarkedInRadius: vi.fn(),
+    applyUnstableInRadius: vi.fn(),
+    propagateChargedNetwork: vi.fn(),
+    applyGlobalSlow: vi.fn(),
+    startDeadlockCluster: vi.fn(),
+    splitBug: vi.fn(),
+    allyBug: vi.fn(),
+    startEventHorizon: vi.fn(),
+    triggerKernelPanicExplosion: vi.fn(),
+    triggerAutoScalerPulse: vi.fn(),
   };
 }
 
@@ -72,6 +83,8 @@ function makeCtx(engine: GameEngine, overrides = {}) {
     bounds: { left: 200, top: 100, width: 400, height: 400 },
     now: 0,
     engine,
+    tier: 1 as const,
+    weaponId: "hammer" as import("@game/types").SiegeWeaponId,
     ...overrides,
   };
 }
@@ -81,19 +94,19 @@ beforeEach(() => {
 });
 
 // ---------------------------------------------------------------------------
-// Wrench
+// Hammer
 // ---------------------------------------------------------------------------
 
-describe("wrench behavior", () => {
+describe("hammer behavior", () => {
   it("returns a once session", async () => {
-    const { createSession } = await import("../wrench/behavior");
+    const { createSession } = await import("../hammer/behavior");
     const engine = makeMockEngine();
     const session = createSession(makeCtx(engine) as any);
     expect(session.mode).toBe("once");
   });
 
   it("emits a crack effect when a bug is nearby", async () => {
-    const { createSession } = await import("../wrench/behavior");
+    const { createSession } = await import("../hammer/behavior");
     const engine = makeMockEngine([makeBug({ x: 100, y: 100 })]);
     const session = createSession(makeCtx(engine) as any);
     if (session.mode !== "once") throw new Error("expected once");
@@ -219,27 +232,27 @@ describe("flame behavior", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Laser Cutter
+// Tracer Bloom (laser)
 // ---------------------------------------------------------------------------
 
-describe("laser-cutter behavior", () => {
+describe("tracer-bloom behavior", () => {
   it("returns a once session", async () => {
-    const { createSession } = await import("../laser-cutter/behavior");
+    const { createSession } = await import("../tracer-bloom/behavior");
     const engine = makeMockEngine();
     const session = createSession(makeCtx(engine) as any);
     expect(session.mode).toBe("once");
   });
 
-  it("emits a burnScar effect", async () => {
-    const { createSession } = await import("../laser-cutter/behavior");
+  it("emits 4 explosion blooms", async () => {
+    const { createSession } = await import("../tracer-bloom/behavior");
     const engine = makeMockEngine([makeBug()]);
     const session = createSession(makeCtx(engine) as any);
     if (session.mode !== "once") throw new Error("expected once");
-    const scar = session.commands.find(
+    const blooms = session.commands.filter(
       (c) =>
-        c.kind === "spawnEffect" && (c as any).descriptor.type === "burnScar",
+        c.kind === "spawnEffect" && (c as any).descriptor.type === "explosion",
     );
-    expect(scar).toBeDefined();
+    expect(blooms).toHaveLength(4);
   });
 });
 
@@ -285,36 +298,26 @@ describe("null-pointer behavior", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Plasma Bomb
+// Fork Bomb (plasma)
 // ---------------------------------------------------------------------------
 
-describe("plasma-bomb behavior", () => {
-  it("returns a persistent session", async () => {
-    const { createSession } = await import("../plasma-bomb/behavior");
+describe("fork-bomb behavior", () => {
+  it("returns a once session", async () => {
+    const { createSession } = await import("../fork-bomb/behavior");
     const engine = makeMockEngine();
     const session = createSession(makeCtx(engine) as any);
-    expect(session.mode).toBe("persistent");
+    expect(session.mode).toBe("once");
   });
 
-  it("begin() is callable and returns commands", async () => {
-    const { createSession } = await import("../plasma-bomb/behavior");
+  it("returns 5 clustered explosions", async () => {
+    const { createSession } = await import("../fork-bomb/behavior");
     const engine = makeMockEngine([makeBug()]);
     const session = createSession(makeCtx(engine) as any);
-    if (session.mode !== "persistent") throw new Error("expected persistent");
-    const cmds = session.begin(makeCtx(engine) as any);
-    expect(Array.isArray(cmds)).toBe(true);
-  });
-
-  it("goes inactive after begin()", async () => {
-    vi.useFakeTimers();
-    const { createSession } = await import("../plasma-bomb/behavior");
-    const engine = makeMockEngine();
-    const session = createSession(makeCtx(engine) as any);
-    if (session.mode !== "persistent") throw new Error("expected persistent");
-    session.begin(makeCtx(engine) as any);
-    vi.advanceTimersByTime(700);
-    expect(session.active).toBe(false);
-    vi.useRealTimers();
+    if (session.mode !== "once") throw new Error("expected once");
+    const bursts = session.commands.filter(
+      (c) => c.kind === "spawnEffect" && (c as any).descriptor.type === "explosion",
+    );
+    expect(bursts).toHaveLength(5);
   });
 });
 

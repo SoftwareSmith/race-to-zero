@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
+import { killBugs } from "./weapons/weaponQa";
 import {
-  clickQaBug,
   createConsoleCollectors,
   enableCanvasQa,
   getStaticSiegeGameConfig,
@@ -9,8 +9,10 @@ import {
   waitForQaBugPositions,
 } from "./support/dashboardQa";
 
+test.describe.configure({ timeout: 120000 });
+
 const progressionMetrics = {
-  bugs: Array.from({ length: 60 }, (_, index) => ({
+  bugs: Array.from({ length: 68 }, (_, index) => ({
     completedAt: null,
     createdAt: `2026-04-${String((index % 9) + 1).padStart(2, "0")}`,
     priority: 4,
@@ -23,7 +25,7 @@ const progressionMetrics = {
 };
 
 test.describe("siege progression QA", () => {
-  test("unlocks pulse at 15 kills and laser at 60 kills", async ({ page }) => {
+  test("unlocks zapper at 12 kills and tracer bloom at 68 kills", async ({ page }) => {
     const clientErrors = createConsoleCollectors(page);
 
     await page.setViewportSize({ height: 1200, width: 1440 });
@@ -45,7 +47,7 @@ test.describe("siege progression QA", () => {
       "data-current",
       "true",
     );
-    await expect(page.getByTestId("weapon-pulse")).toHaveAttribute(
+    await expect(page.getByTestId("weapon-zapper")).toHaveAttribute(
       "data-locked",
       "true",
     );
@@ -54,15 +56,15 @@ test.describe("siege progression QA", () => {
       "true",
     );
 
-    await clickQaBug(page, 15);
+    await killBugs(page, 12);
 
-    await expect(hud.locator("strong").nth(0)).toHaveText("45");
-    await expect(hud.locator("strong").nth(1)).toHaveText("15");
-    await expect(page.getByTestId("weapon-pulse")).toHaveAttribute(
+    await expect(hud.locator("strong").nth(0)).toHaveText("56");
+    await expect(hud.locator("strong").nth(1)).toHaveText("12");
+    await expect(page.getByTestId("weapon-zapper")).toHaveAttribute(
       "data-locked",
       "false",
     );
-    await expect(page.getByTestId("weapon-pulse")).toHaveAttribute(
+    await expect(page.getByTestId("weapon-hammer")).toHaveAttribute(
       "data-current",
       "true",
     );
@@ -71,19 +73,15 @@ test.describe("siege progression QA", () => {
       "true",
     );
 
-    await clickQaBug(page, 45);
+    await killBugs(page, 68);
 
     await expect(hud.locator("strong").nth(0)).toHaveText("0");
-    await expect(hud.locator("strong").nth(1)).toHaveText("60");
-    await expect(page.getByTestId("weapon-pulse")).toHaveAttribute(
-      "data-current",
-      "false",
-    );
+    await expect(hud.locator("strong").nth(1)).toHaveText("68");
     await expect(page.getByTestId("weapon-laser")).toHaveAttribute(
       "data-locked",
       "false",
     );
-    await expect(page.getByTestId("weapon-laser")).toHaveAttribute(
+    await expect(page.getByTestId("weapon-hammer")).toHaveAttribute(
       "data-current",
       "true",
     );

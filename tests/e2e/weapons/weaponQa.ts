@@ -14,6 +14,11 @@ import {
 
 export { getQaLastHit, waitForQaBugPositions };
 
+async function getHudKillCount(page: Page) {
+  const text = await page.getByTestId("siege-hud").locator("strong").nth(1).textContent();
+  return Number.parseInt(text ?? "0", 10);
+}
+
 // ── Metrics helpers ──────────────────────────────────────────────────────────
 
 /** Build a metrics fixture with `count` bugs in Backlog. */
@@ -57,18 +62,43 @@ export async function killBugs(page: Page, killsNeeded: number) {
   const canvasBox = await canvas.boundingBox();
   expect(canvasBox).toBeTruthy();
 
-  for (let k = 0; k < killsNeeded; k++) {
-    await waitForQaBugPositions(page);
-    const positions = await getQaBugPositions(page);
-    if (positions.length === 0) break;
-    const bug = positions[0];
-    await canvas.click({
-      force: true,
-      position: {
-        x: bug.x - (canvasBox?.x ?? 0),
-        y: bug.y - (canvasBox?.y ?? 0),
-      },
-    });
+  const hammer = page.getByTestId("weapon-hammer");
+  await expect(hammer).toHaveAttribute("data-locked", "false");
+  await hammer.getByRole("radio").click();
+  await expect(hammer).toHaveAttribute("data-current", "true");
+
+  while ((await getHudKillCount(page)) < killsNeeded) {
+    const startingKills = await getHudKillCount(page);
+
+    let defeated = false;
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      await waitForQaBugPositions(page);
+      const positions = await getQaBugPositions(page);
+      if (positions.length === 0) {
+        break;
+      }
+
+      const bug = positions[0];
+      await canvas.click({
+        force: true,
+        position: {
+          x: bug.x - (canvasBox?.x ?? 0),
+          y: bug.y - (canvasBox?.y ?? 0),
+        },
+      });
+
+      try {
+        await expect
+          .poll(() => getHudKillCount(page), { interval: 100, timeout: 1200 })
+          .toBeGreaterThan(startingKills);
+        defeated = true;
+        break;
+      } catch {
+        await page.waitForTimeout(150);
+      }
+    }
+
+    expect(defeated, "expected hammer farming to register a kill").toBe(true);
   }
 }
 

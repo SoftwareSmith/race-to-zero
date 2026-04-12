@@ -74,7 +74,7 @@ export interface DiscSegment {
 }
 
 /**
- * Build the reflected path segments for a bouncing laser disc.
+ * Build reflected path segments for legacy path-based projectiles.
  * Starts at (startX, startY), fires toward (targetX, targetY), reflects
  * off canvas walls up to maxBounces times.
  *

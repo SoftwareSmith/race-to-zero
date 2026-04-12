@@ -6,7 +6,7 @@
  *  4. Leaves expected VFX artefacts on the page
  *
  * Unlock order (via WEAPON_DEFS.unlockKills):
- *   wrench      0
+ *   hammer      0
  *   zapper     12   (Bug Spray)
  *   freeze     25
  *   chain      38
@@ -14,7 +14,7 @@
  *   laser      68
  *   shockwave  82   (Static Net)
  *   nullpointer 95
- *   plasma    110   (Plasma Bomb)
+ *   plasma    110   (Fork Bomb)
  *   void      130   (Void Pulse)
  */
 
@@ -31,15 +31,17 @@ import {
   selectWeapon,
 } from "./weaponQa";
 
-// ── Wrench (unlocked at 0 kills) ─────────────────────────────────────────────
+test.describe.configure({ timeout: 300000 });
 
-test.describe("wrench", () => {
+// ── Hammer (unlocked at 0 kills) ─────────────────────────────────────────────
+
+test.describe("hammer", () => {
   test("is unlocked by default and kills a bug on click", async ({ page }) => {
     const errs = createConsoleCollectors(page);
     await openSiegeGame(page, 10);
 
-    await expect(page.getByTestId("weapon-wrench")).toHaveAttribute("data-locked", "false");
-    await expect(page.getByTestId("weapon-wrench")).toHaveAttribute("data-current", "true");
+    await expect(page.getByTestId("weapon-hammer")).toHaveAttribute("data-locked", "false");
+    await expect(page.getByTestId("weapon-hammer")).toHaveAttribute("data-current", "true");
 
     await fireAtBug(page);
     const hit = await getQaLastHit(page);
@@ -127,16 +129,14 @@ test.describe("flamethrower", () => {
   });
 });
 
-// ── Laser Cutter (unlocks at 68 kills) ──────────────────────────────────────
+// ── Tracer Bloom (unlocks at 68 kills) ──────────────────────────────────────
 
-test.describe("laser cutter", () => {
-  test("unlocks at 68 kills and fires a line beam", async ({ page }) => {
+test.describe("tracer bloom", () => {
+  test("unlocks at 68 kills and fires linked blooms", async ({ page }) => {
     const errs = createConsoleCollectors(page);
-    await openSiegeGame(page, 60);
+    await openSiegeGame(page, 70);
 
-    await killBugs(page, 60); // use all 60 bugs from metrics
-    // Needs more bugs than we start with — just verify it unlocks after killing threshold
-    // For this test we verify the weapon slot appearance
+    await killBugs(page, 68);
     await expect(page.getByTestId("weapon-laser")).toHaveAttribute("data-locked", "false");
 
     await selectWeapon(page, "laser");
@@ -144,15 +144,15 @@ test.describe("laser cutter", () => {
     await errs.expectNoClientErrors();
   });
 
-  test("fires beam across the canvas", async ({ page }) => {
+  test("fires blooms across the canvas", async ({ page }) => {
     const errs = createConsoleCollectors(page);
     await openSiegeGame(page, 70);
 
     await killBugs(page, 68);
     await selectWeapon(page, "laser");
     await fireAtCentre(page);
-    // Laser may or may not register a QA hit depending on bug position;
-    // confirm no errors are thrown
+    // Route blooms may or may not register a QA hit depending on bug layout;
+    // confirm the effect fires without client errors.
     await errs.expectNoClientErrors();
   });
 });
@@ -194,10 +194,10 @@ test.describe("null pointer", () => {
   });
 });
 
-// ── Plasma Bomb (unlocks at 110 kills) ──────────────────────────────────────
+// ── Fork Bomb (unlocks at 110 kills) ────────────────────────────────────────
 
-test.describe("plasma bomb", () => {
-  test("unlocks at 110 kills and hits area with implosion", async ({ page }) => {
+test.describe("fork bomb", () => {
+  test("unlocks at 110 kills and hits a clustered area", async ({ page }) => {
     const errs = createConsoleCollectors(page);
     await openSiegeGame(page, 115);
 

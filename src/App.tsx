@@ -1,4 +1,4 @@
-import { useCallback, useRef } from "react";
+import { useCallback, useRef, useState } from "react";
 import BackgroundField from "@game/components/BackgroundField";
 import BugSettingsMenu from "@dashboard/components/BugSettingsMenu";
 import CodexPanel from "@game/components/CodexPanel";
@@ -18,6 +18,9 @@ import {
 import SiegeHud from "@game/components/SiegeHud";
 import { useSiegeGame } from "@game/hooks/useSiegeGame";
 import { useSiegeZones } from "@game/hooks/useSiegeZones";
+import { useWeaponEvolution } from "@game/hooks/useWeaponEvolution";
+import { WEAPON_DEFS } from "@config/weaponConfig";
+import type { SiegeWeaponId, WeaponTier } from "@game/types";
 import { cn } from "@shared/utils/cn";
 
 function AppContent() {
@@ -26,6 +29,24 @@ function AppContent() {
     currentBugCount: dashboard.currentBugCount,
     currentBugCounts: dashboard.currentBugCounts,
   });
+  const { evolutionStates, onEvolution, getWeaponTier } = useWeaponEvolution();
+  const [evolutionToast, setEvolutionToast] = useState<string | null>(null);
+  const [justEvolvedWeaponId, setJustEvolvedWeaponId] =
+    useState<SiegeWeaponId | null>(null);
+
+  const handleEvolution = useCallback(
+    (weaponId: SiegeWeaponId, newTier: WeaponTier) => {
+      onEvolution(weaponId, newTier);
+      const def = WEAPON_DEFS.find((d) => d.id === weaponId);
+      const prevTitle = def?.tierTitles?.[newTier - 2] ?? weaponId;
+      const newTitle = def?.tierTitles?.[newTier - 1] ?? weaponId;
+      setEvolutionToast(`${prevTitle} → ${newTitle}`);
+      setTimeout(() => setEvolutionToast(null), 3500);
+      setJustEvolvedWeaponId(weaponId);
+      setTimeout(() => setJustEvolvedWeaponId(null), 800);
+    },
+    [onEvolution],
+  );
   const dashboardRef = useRef<HTMLDivElement | null>(null);
 
   const siegeZones = useSiegeZones({
@@ -110,9 +131,24 @@ function AppContent() {
         siegeZones={siegeZones}
         terminatorMode={siegeGame.interactiveMode || dashboard.terminatorMode}
         tone={dashboard.deadlineMetrics.statusTone}
+        getWeaponTier={getWeaponTier}
+        onWeaponEvolution={handleEvolution}
+        initialEvolutionStates={evolutionStates}
       />
       {siegeGame.siegePhase === "entering" ? (
         <div className="pointer-events-none fixed inset-0 z-[100] [animation:siege-flash_700ms_ease-out_forwards]" />
+      ) : null}
+
+      {/* Evolution toast: fires briefly when a weapon upgrades tier */}
+      {evolutionToast && siegeGame.interactiveMode ? (
+        <div
+          aria-live="polite"
+          className="pointer-events-none fixed bottom-10 left-1/2 z-[150] -translate-x-1/2 [animation:evolve-toast_3.5s_ease-out_forwards]"
+        >
+          <div className="rounded-2xl border border-amber-300/30 bg-zinc-950/90 px-5 py-2.5 text-sm font-semibold text-amber-200 shadow-[0_0_24px_rgba(251,191,36,0.2)] backdrop-blur-md">
+            ⚡ {evolutionToast}
+          </div>
+        </div>
       ) : null}
 
       <div
@@ -162,6 +198,7 @@ function AppContent() {
                 placingStructureId={siegeGame.placingStructureId}
                 selectedWeaponId={siegeGame.selectedWeaponId}
                 lastFireTimes={siegeGame.lastFireTimes}
+                justEvolvedWeaponId={justEvolvedWeaponId}
                 unlockedStructures={siegeGame.combatStats.unlockedStructures}
                 weaponSnapshots={siegeGame.weaponSnapshots}
               />

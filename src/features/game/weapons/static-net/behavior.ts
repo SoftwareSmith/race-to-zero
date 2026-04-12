@@ -13,19 +13,51 @@ import type {
 
 const HIT_RADIUS = 200;
 const ENSNARE_DURATION_MS = 3000;
+const T2_KNOCKBACK_FORCE = 60;
+const T3_DEADLOCK_DURATION_MS = 4000;
 
 export function createSession(ctx: WeaponContext): ClickFireResult {
-  const { targetX, targetY, viewportX, viewportY } = ctx;
+  const { targetX, targetY, viewportX, viewportY, engine } = ctx;
+  const tier = ctx.tier ?? 1;
   const commands: WeaponCommand[] = [];
 
-  // Ensnare area — applies to all bugs in radius
-  commands.push({
-    kind: "ensnareRadius",
-    cx: targetX,
-    cy: targetY,
-    radius: HIT_RADIUS,
-    durationMs: ENSNARE_DURATION_MS,
-  });
+  if (tier >= 3) {
+    // T3: Deadlock Cluster — pulls all bugs toward centroid
+    commands.push({
+      kind: "startDeadlockCluster",
+      cx: targetX,
+      cy: targetY,
+      radius: HIT_RADIUS,
+      pullDurationMs: T3_DEADLOCK_DURATION_MS,
+    });
+  } else {
+    // T1/T2: ensnare area effect
+    commands.push({
+      kind: "ensnareRadius",
+      cx: targetX,
+      cy: targetY,
+      radius: HIT_RADIUS,
+      durationMs: ENSNARE_DURATION_MS,
+    });
+
+    if (tier >= 2) {
+      // T2: knockback — push all bugs outward from the net center
+      const bugs = engine.getAllBugs();
+      for (const idx of engine.radiusHitTest(targetX, targetY, HIT_RADIUS)) {
+        const bug = bugs[idx];
+        if (!bug) continue;
+        const dist = Math.hypot(bug.x - targetX, bug.y - targetY);
+        if (dist < 1) continue;
+        const scale = T2_KNOCKBACK_FORCE / dist;
+        commands.push({
+          kind: "knockback",
+          targetIndex: idx,
+          dx: (bug.x - targetX) * scale,
+          dy: (bug.y - targetY) * scale,
+        });
+      }
+    }
+  }
 
   // Pixi: net cast + EMP ring
   commands.push({

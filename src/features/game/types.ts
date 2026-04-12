@@ -7,7 +7,7 @@ export interface SiegeZoneRect {
 }
 
 export type SiegeWeaponId =
-  | "wrench"
+  | "hammer"
   | "zapper"
   | "freeze"
   | "chain"
@@ -17,6 +17,16 @@ export type SiegeWeaponId =
   | "nullpointer"
   | "plasma"
   | "void";
+
+/** Current evolution tier of a weapon (1 = base, 2 = enhanced, 3 = catastrophic). */
+export type WeaponTier = 1 | 2 | 3;
+
+/** Per-weapon kill count and tier, persisted across sessions. */
+export interface WeaponEvolutionState {
+  tier: WeaponTier;
+  /** Total kills credited to this weapon (direct + DoT). */
+  kills: number;
+}
 
 export type SiegePhase = "idle" | "entering" | "active" | "exiting";
 
@@ -39,7 +49,7 @@ export interface WeaponEffectEvent {
   targetX?: number;
   /** For seeking weapons: viewport y of the target bug */
   targetY?: number;
-  /** For bouncing laser disc: path segments in viewport coords */
+  /** Optional viewport-space segments for path-based overlay effects. */
   segments?: Array<{ x1: number; y1: number; x2: number; y2: number }>;
   /** Optional color tint override for effect rendering (e.g. turret pointer in cyan). */
   color?: string;
@@ -55,6 +65,12 @@ export interface WeaponProgressSnapshot {
   locked: boolean;
   progressText: string;
   title: string;
+  /** Current evolution tier (1–3). */
+  tier: WeaponTier;
+  /** Kills earned with this weapon so far. */
+  weaponKills: number;
+  /** Kills needed to reach next tier. null when already at T3. */
+  killsToNextTier: number | null;
 }
 
 export interface SiegeCombatStats {

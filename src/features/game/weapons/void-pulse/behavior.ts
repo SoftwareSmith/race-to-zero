@@ -23,9 +23,14 @@ const DAMAGE = 2; // collapse shockring damage
 const BLACK_HOLE_RADIUS = 300;
 const CORE_RADIUS = 80;
 const DURATION_MS = 2000;
+const T2_BURN_PEAK_DPS = 1.5;
+const T2_BURN_DURATION_MS = 3000;
+const T3_EVENT_HORIZON_RADIUS = 200;
+const T3_EVENT_HORIZON_DURATION_MS = 5000;
 
 export function createSession(ctx: WeaponContext): PersistentFireSession {
   const { targetX, targetY, viewportX, viewportY, engine } = ctx;
+  const tier = ctx.tier ?? 1;
 
   // Singleton guard — refuse if a black hole is already active
   if (engine.getBlackHole()?.active) {
@@ -66,6 +71,15 @@ export function createSession(ctx: WeaponContext): PersistentFireSession {
       _collapseTimer = setTimeout(() => {
         _active = false;
         _collapseTimer = null;
+        // T3: spawn persistent event horizon trap after collapse
+        if (tier >= 3) {
+          engine.startEventHorizon(
+            targetX,
+            targetY,
+            T3_EVENT_HORIZON_RADIUS,
+            T3_EVENT_HORIZON_DURATION_MS,
+          );
+        }
       }, DURATION_MS + 100);
 
       const commands: WeaponCommand[] = [];
@@ -86,6 +100,19 @@ export function createSession(ctx: WeaponContext): PersistentFireSession {
           viewportY,
         },
       });
+
+      // T2+: burn DoT ring during the gravity well phase
+      if (tier >= 2) {
+        commands.push({
+          kind: "burnRadius",
+          cx: targetX,
+          cy: targetY,
+          radius: CORE_RADIUS * 2,
+          peakDps: T2_BURN_PEAK_DPS,
+          durationMs: T2_BURN_DURATION_MS,
+          decayPerSecond: 0.5,
+        });
+      }
 
       return commands;
     },

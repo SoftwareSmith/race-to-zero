@@ -16,6 +16,17 @@ const staticNet: WeaponDef = {
   cooldownMs: 4000,
   inputMode: "click",
   hint: "Click to cast a net — ensnared bugs are frozen; click them to instakill",
+  tierTitles: ["Thread Lock", "Mutex", "Deadlock Cluster"],
+  tierDetails: [
+    "Expands a wire-mesh net to 200px. All bugs inside are Ensnared for 3 s. Click any ensnared bug to instakill.",
+    "Mutex contention — ensnared bugs are also pushed apart by knockback, breaking their cluster formation.",
+    "Deadlock — bugs are pulled together toward a single centroid point, crushing the cluster.",
+  ],
+  tierHints: [
+    "Click to cast a net — ensnared bugs are frozen; click them to instakill",
+    "T2: Ensnared bugs get knockback — scattered apart",
+    "T3: Deadlock pulls all bugs to one point instead",
+  ],
 };
 
 export default staticNet;

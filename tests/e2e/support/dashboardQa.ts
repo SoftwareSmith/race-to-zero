@@ -2,17 +2,20 @@ import { expect, type Page } from "@playwright/test";
 import { readFileSync } from "node:fs";
 import { format } from "date-fns";
 import { STORAGE_KEYS } from "../../../src/constants/storageKeys";
-import { DEFAULT_GAME_CONFIG, type GameConfig } from "../../../src/engine/types";
+import {
+  DEFAULT_GAME_CONFIG,
+  type GameConfig,
+} from "../../../src/features/game/engine/types";
 import {
   formatNumber,
   formatPercent,
   formatSignedNumber,
-} from "../../../src/utils/dashboard";
+} from "../../../src/features/dashboard/utils/dashboard";
 import {
   getComparisonMetrics,
   getDeadlineMetrics,
   getSummaryMetrics,
-} from "../../../src/utils/metrics";
+} from "../../../src/features/dashboard/utils/metrics";
 import type { MetricsSource, WorkdaySettings } from "../../../src/types/dashboard";
 
 export const QA_TODAY_ISO = "2026-04-09T12:00:00.000Z";
@@ -307,20 +310,44 @@ export function getStaticSiegeGameConfig(): GameConfig {
 }
 
 export async function clickQaBug(page: Page, repeatCount = 1) {
-  const [bug] = await getQaBugPositions(page);
-  expect(bug, "expected at least one QA bug position").toBeTruthy();
-
   const canvas = page.locator("canvas").first();
   const canvasBox = await canvas.boundingBox();
   expect(canvasBox, "expected bug canvas bounding box").toBeTruthy();
 
-  const position = {
-    x: bug.x - (canvasBox?.x ?? 0),
-    y: bug.y - (canvasBox?.y ?? 0),
+  const getKillCount = async () => {
+    const text = await page.getByTestId("siege-hud").locator("strong").nth(1).textContent();
+    return Number.parseInt(text ?? "0", 10);
   };
 
   for (let index = 0; index < repeatCount; index += 1) {
-    await canvas.click({ force: true, position });
+    const startingKills = await getKillCount();
+    let defeated = false;
+
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      await waitForQaBugPositions(page);
+      const [bug] = await getQaBugPositions(page);
+      expect(bug, "expected at least one QA bug position").toBeTruthy();
+
+      await canvas.click({
+        force: true,
+        position: {
+          x: bug.x - (canvasBox?.x ?? 0),
+          y: bug.y - (canvasBox?.y ?? 0),
+        },
+      });
+
+      try {
+        await expect
+          .poll(getKillCount, { interval: 100, timeout: 1200 })
+          .toBeGreaterThan(startingKills);
+        defeated = true;
+        break;
+      } catch {
+        await page.waitForTimeout(150);
+      }
+    }
+
+    expect(defeated, "expected QA click to register a kill").toBe(true);
   }
 }
 

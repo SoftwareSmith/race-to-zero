@@ -23,7 +23,16 @@ const voidPulse: WeaponDef = {
   effectColor: "#c084fc",
   cooldownMs: 6000,
   inputMode: "click",
-  hint: "Click to spawn a black hole — gravity pull 2 s then 300px collapse ring",
-};
+  hint: "Click to spawn a black hole — gravity pull 2 s then 300px collapse ring",  tierTitles: ["Void Pulse", "Singularity", "Event Horizon"],
+  tierDetails: [
+    "Creates a miniature black hole for 2 s, pulling bugs inward. Core contact: 1 dmg/tick. Collapse: 300px ring for 2 dmg.",
+    "Singularity \u2014 increased pull strength; active burn DOT applied during the gravity well phase.",
+    "Event Horizon \u2014 after collapse, leaves a persistent trap zone that instantly destroys any Unstable bugs entering it.",
+  ],
+  tierHints: [
+    "Click to spawn a black hole \u2014 gravity pull 2 s then 300px collapse ring",
+    "T2: Stronger pull + burn DOT during the well phase",
+    "T3: Leaves an Event Horizon trap that destroys Unstable bugs on contact",
+  ],};
 
 export default voidPulse;

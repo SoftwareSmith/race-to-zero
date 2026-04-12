@@ -18,17 +18,19 @@ import { coneAngleAway } from "@game/weapons/runtime/targetingHelpers";
 const CONE_ARC = 70;
 const HIT_RADIUS = 150;
 const BURN_DPS = 6;
-const BURN_DURATION_MS = 1200;
+// Burn duration is kept short so bugs stop burning quickly once they leave
+// the cone — prevents phantom kills after the player stops firing.
+const BURN_DURATION_MS = 400;
 const BURN_DECAY = 3.2;
 const PATCH_RADIUS = 90;
-const PATCH_MS = 700;
+const PATCH_MS = 400;
 // Trail paint (visual fill between cooldown ticks)
 const TRAIL_PATCH_RADIUS = 52;
 const TRAIL_PATCH_MS = 180;
 const TRAIL_BURN_DPS = 4.5;
-const TRAIL_BURN_MS = 850;
+const TRAIL_BURN_MS = 400;
 
-function buildTickCommands(ctx: WeaponContext): WeaponCommand[] {
+function buildTickCommands(ctx: WeaponContext, tier = 1): WeaponCommand[] {
   const { engine, targetX, targetY, centerX, centerY } = ctx;
   const flameDir = coneAngleAway(targetX, targetY, centerX, centerY);
   const commands: WeaponCommand[] = [];
@@ -62,6 +64,27 @@ function buildTickCommands(ctx: WeaponContext): WeaponCommand[] {
       durationMs: BURN_DURATION_MS,
       decayPerSecond: BURN_DECAY,
     });
+    // T2: spread fire to nearby bugs around each hit bug
+    if (tier >= 2 && bug) {
+      commands.push({
+        kind: "burnRadius",
+        cx: bug.x,
+        cy: bug.y,
+        radius: 60,
+        peakDps: BURN_DPS * 0.5,
+        durationMs: BURN_DURATION_MS,
+        decayPerSecond: BURN_DECAY,
+      });
+    }
+    // T3: trigger kernel panic explosion on each burning bug
+    if (tier >= 3) {
+      commands.push({
+        kind: "triggerKernelPanic",
+        targetIndex: idx,
+        splashRadius: 50,
+        damage: 2,
+      });
+    }
   }
 
   // Ground fire patch at tip
@@ -155,10 +178,11 @@ function buildPaintCommands(ctx: WeaponContext): WeaponCommand[] {
 }
 
 export function createSession(_ctx?: WeaponContext): HoldFireSession {
+  const tier = _ctx?.tier ?? 1;
   return {
     mode: "hold",
-    begin: buildTickCommands,
-    tick: buildTickCommands,
+    begin(ctx: WeaponContext): WeaponCommand[] { return buildTickCommands(ctx, tier); },
+    tick(ctx: WeaponContext): WeaponCommand[] { return buildTickCommands(ctx, tier); },
     paint: buildPaintCommands,
     end() {
       // No cleanup needed

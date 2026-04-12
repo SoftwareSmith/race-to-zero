@@ -86,19 +86,32 @@ export class BugEntity extends Entity {
   typeSpec: BugType | null;
   /** Speed-slow status effect applied by Freeze Cone. */
   slow: { multiplier: number; expiresAt: number } | null;
-  /** Poison DOT applied by Bug Spray. */
-  poison: { dps: number; expiresAt: number; accumulatedDmg: number } | null;
-  /** Burn DOT applied by Flamethrower. Decays exponentially after contact. */
+  /** Poison DOT applied by Bug Spray. Source weapon ID for kill attribution. */
+  poison: { dps: number; expiresAt: number; accumulatedDmg: number; sourceWeaponId?: string } | null;
+  /** Burn DOT applied by Flamethrower. Source weapon ID for kill attribution. */
   burn: {
     dps: number;
     expiresAt: number;
     accumulatedDmg: number;
     decayPerSecond: number;
+    sourceWeaponId?: string;
   } | null;
   /** Ensnare applied by Static Net — stops all movement; next click = instakill. */
   ensnare: { expiresAt: number; canInstakill: boolean } | null;
+  /** Charged by Chain Zap — amplifies damage taken (×1.1) and enables network propagation. */
+  charged: { expiresAt: number } | null;
+  /** Marked by Garbage Collector — amplifies damage taken (×1.2) and triggers execution. */
+  marked: { expiresAt: number } | null;
+  /** Unstable — consumed by Event Horizon; amplifies mark bonus to ×1.4 when combined. */
+  unstable: { expiresAt: number } | null;
+  /** Looped — periodic echo DOT damage. */
+  looped: { dps: number; expiresAt: number; accumulatedDmg: number } | null;
+  /** Ally state — bug is temporarily converted; stops targeting the player base. */
+  ally: { expiresAt: number } | null;
   /** Whether this bug's eventual death has already been credited to the player. */
   deathCredited: boolean;
+  /** Weapon ID that will receive kill credit for any pending DOT death. */
+  dotSourceWeaponId: string | null;
 
   constructor(opts: Partial<Entity> & { id?: string } = {}) {
     super(opts as Entity);
@@ -121,7 +134,13 @@ export class BugEntity extends Entity {
     this.poison = null;
     this.burn = null;
     this.ensnare = null;
+    this.charged = null;
+    this.marked = null;
+    this.unstable = null;
+    this.looped = null;
+    this.ally = null;
     this.deathCredited = false;
+    this.dotSourceWeaponId = null;
   }
 
   private syncTypeSpec() {
@@ -338,6 +357,11 @@ export class BugEntity extends Entity {
     if (this.ensnare && now >= this.ensnare.expiresAt) this.ensnare = null;
     if (this.poison && now >= this.poison.expiresAt) this.poison = null;
     if (this.burn && now >= this.burn.expiresAt) this.burn = null;
+    if (this.charged && now >= this.charged.expiresAt) this.charged = null;
+    if (this.marked && now >= this.marked.expiresAt) this.marked = null;
+    if (this.unstable && now >= this.unstable.expiresAt) this.unstable = null;
+    if (this.looped && now >= this.looped.expiresAt) this.looped = null;
+    if (this.ally && now >= this.ally.expiresAt) this.ally = null;
 
     // Tick poison DOT damage
     if (this.poison && (this.state as BugState) !== "dying" && (this.state as BugState) !== "dead") {
@@ -379,6 +403,24 @@ export class BugEntity extends Entity {
       }
     }
 
+    // Tick looped echo DOT damage
+    if (this.looped && (this.state as BugState) !== "dying" && (this.state as BugState) !== "dead") {
+      this.looped.accumulatedDmg += this.looped.dps * dt;
+      if (this.looped.accumulatedDmg >= 1) {
+        const dmgToApply = Math.floor(this.looped.accumulatedDmg);
+        this.looped.accumulatedDmg -= dmgToApply;
+        this.lastHitTime = performance.now();
+        this.hp = Math.max(0, this.hp - dmgToApply);
+        if (this.hp === 0) {
+          this.state = "dying";
+          this.deathProgress = 0;
+          this.vx = 0;
+          this.vy = 0;
+          this.deathCredited = false;
+        }
+      }
+    }
+
     // Ensnared bugs cannot move at all
     if (this.ensnare && now < this.ensnare.expiresAt) {
       this.vx = 0;
@@ -416,8 +458,19 @@ export class BugEntity extends Entity {
     const pointValue = this.typeSpec?.pointValue ?? 1;
 
     this.lastHitTime = performance.now();
+
+    // Status damage multipliers
+    const now2 = performance.now();
+    const isCharged = this.charged !== null && now2 < this.charged.expiresAt;
+    const isMarked = this.marked !== null && now2 < this.marked.expiresAt;
+    const isUnstable = this.unstable !== null && now2 < this.unstable.expiresAt;
+    let multiplier = 1.0;
+    if (frozen) multiplier *= 1.5;
+    if (isMarked) multiplier *= (isUnstable ? 1.4 : 1.2);
+    if (isCharged) multiplier *= 1.1;
+
     // Ensnared bugs can be instakilled by a click
-    const effectiveDamage = ensnared ? this.maxHp : damage;
+    const effectiveDamage = ensnared ? this.maxHp : Math.round(damage * multiplier);
     this.hp = Math.max(0, this.hp - effectiveDamage);
     if (this.hp === 0) {
       this.state = "dying";
@@ -431,7 +484,42 @@ export class BugEntity extends Entity {
     this.state = "flee";
     this.fleeTimer = 0.9 + Math.random() * 0.5;
     this.syncTypeSpec();
+    this.handleStatusInteractions();
     return { defeated: false, remainingHp: this.hp, pointValue: 0, frozen, poisoned, burning, ensnared };
+  }
+
+  /** Handle status combo interactions after a hit. */
+  handleStatusInteractions() {
+    const now = performance.now();
+    const isCharged = this.charged !== null && now < this.charged.expiresAt;
+    const isBurning = this.burn !== null && now < this.burn.expiresAt;
+    const isFrozen = this.slow !== null && now < this.slow.expiresAt;
+
+    // burning + charged → detonation: extra damage burst, clears charged
+    if (isBurning && isCharged) {
+      this.hp = Math.max(0, this.hp - 3);
+      this.charged = null;
+      if (this.hp === 0 && this.state !== "dying" && this.state !== "dead") {
+        this.state = "dying";
+        this.deathProgress = 0;
+        this.vx = 0;
+        this.vy = 0;
+        this.deathCredited = false;
+      }
+    }
+
+    // frozen + burning → extinguish burn, deal 2 bonus damage
+    if (isFrozen && isBurning) {
+      this.burn = null;
+      this.hp = Math.max(0, this.hp - 2);
+      if (this.hp === 0 && this.state !== "dying" && this.state !== "dead") {
+        this.state = "dying";
+        this.deathProgress = 0;
+        this.vx = 0;
+        this.vy = 0;
+        this.deathCredited = false;
+      }
+    }
   }
 
   /** Apply a Freeze Cone slow. Stacks to extend duration. */
@@ -472,6 +560,56 @@ export class BugEntity extends Entity {
     }
   }
 
+  /** Apply Chain Zap charged status — amplifies damage taken (×1.1), enables network propagation. */
+  applyCharged(durationMs: number) {
+    const now = performance.now();
+    if (this.charged && now < this.charged.expiresAt) {
+      this.charged.expiresAt = this.charged.expiresAt + durationMs;
+    } else {
+      this.charged = { expiresAt: now + durationMs };
+    }
+  }
+
+  /** Apply Garbage Collector mark — amplifies damage (×1.2, or ×1.4 when unstable). */
+  applyMarked(durationMs: number) {
+    const now = performance.now();
+    if (this.marked && now < this.marked.expiresAt) {
+      this.marked.expiresAt = this.marked.expiresAt + durationMs;
+    } else {
+      this.marked = { expiresAt: now + durationMs };
+    }
+  }
+
+  /** Apply unstable status — consumed by Event Horizon; doubles mark bonus when combined. */
+  applyUnstable(durationMs: number) {
+    const now = performance.now();
+    if (this.unstable && now < this.unstable.expiresAt) {
+      this.unstable.expiresAt = this.unstable.expiresAt + durationMs;
+    } else {
+      this.unstable = { expiresAt: now + durationMs };
+    }
+  }
+
+  /** Apply looped echo DOT — periodic damage over time. */
+  applyLooped(dps: number, durationMs: number) {
+    const now = performance.now();
+    if (this.looped && now < this.looped.expiresAt) {
+      this.looped.dps = Math.max(this.looped.dps, dps);
+      this.looped.expiresAt = Math.max(this.looped.expiresAt, now + durationMs);
+    } else {
+      this.looped = { dps, expiresAt: now + durationMs, accumulatedDmg: 0 };
+    }
+  }
+
+  /** Apply ally state — bug stops targeting the player base. */
+  applyAlly(durationMs: number) {
+    const now = performance.now();
+    this.ally = { expiresAt: now + durationMs };
+    // Stop movement, enter a neutral state
+    this.state = "patrol";
+    this.fleeTimer = null;
+  }
+
   /** Apply Static Net ensnare — completely immobilises; next hit = instakill. */
   applyEnsnare(durationMs: number) {
     this.ensnare = { expiresAt: performance.now() + durationMs, canInstakill: true };
@@ -510,6 +648,12 @@ export class BugEntity extends Entity {
     this.poison = null;
     this.burn = null;
     this.ensnare = null;
+    this.charged = null;
+    this.marked = null;
+    this.unstable = null;
+    this.looped = null;
+    this.ally = null;
+    this.dotSourceWeaponId = null;
     this.deathCredited = false;
     this.motionTime = Math.random() * 100;
     this.opacity = 1;

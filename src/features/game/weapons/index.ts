@@ -4,40 +4,40 @@
  */
 export type { WeaponDef, HitPattern } from "./types";
 
-import wrench from "./wrench";
+import hammer from "./hammer";
 import bugSpray from "./bugSpray";
 import freezeCone from "./freezeCone";
 import chainZap from "./chainZap";
 import flamethrower from "./flamethrower";
-import laserCutter from "./laserCutter";
+import tracerBloom from "./tracerBloom";
 import staticNet from "./staticNet";
 import nullPointer from "./nullPointer";
-import plasmaBomb from "./plasmaBomb";
+import forkBomb from "./forkBomb";
 import voidPulse from "./voidPulse";
 
 export const WEAPON_REGISTRY = [
-  wrench,
+  hammer,
   bugSpray,
   freezeCone,
   chainZap,
   flamethrower,
-  laserCutter,
+  tracerBloom,
   staticNet,
   nullPointer,
-  plasmaBomb,
+  forkBomb,
   voidPulse,
 ] as const;
 
 // ─── Self-registering weapon plugins ────────────────────────────────────────
 // Side-effect imports: each module calls register() at load time.
 // Import order matches WEAPON_REGISTRY for consistency.
-import "./wrench/index";
+import "./hammer/index";
 import "./bug-spray/index";
 import "./freeze-cone/index";
 import "./chain-zap/index";
 import "./flame/index";
-import "./laser-cutter/index";
+import "./tracer-bloom/index";
 import "./static-net/index";
 import "./null-pointer/index";
-import "./plasma-bomb/index";
+import "./fork-bomb/index";
 import "./void-pulse/index";

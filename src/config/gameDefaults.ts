@@ -1,3 +1,5 @@
+import type { SiegeWeaponId } from "@game/types";
+
 /**
  * Default game-engine simulation parameters.
  * Import DEFAULT_GAME_CONFIG to use the baseline values,
@@ -44,4 +46,21 @@ export const DEFAULT_GAME_CONFIG: GameConfig = {
   crowdRepathThreshold: 1.05,
   crowdSteerStrength: 1.55,
   crowdTargetPenalty: 68,
+};
+
+/**
+ * Per-weapon kill thresholds for tier evolution.
+ * [killsForT2, killsForT3] — tune these to adjust pacing.
+ */
+export const WEAPON_EVOLVE_THRESHOLDS: Record<SiegeWeaponId, [number, number]> = {
+  hammer:       [20, 60],
+  zapper:       [25, 70],
+  freeze:       [20, 60],
+  chain:        [25, 75],
+  flame:        [25, 75],
+  laser:        [20, 60],
+  shockwave:    [15, 50],
+  nullpointer:  [20, 60],
+  plasma:       [20, 60],
+  void:         [15, 50],
 };

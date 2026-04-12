@@ -25,6 +25,7 @@ const OVERLAY_EFFECT_WEAPONS = new Set<SiegeWeaponId>([
   "laser",
   "nullpointer",
   "void",
+  "plasma",
 ]);
 
 export interface WeaponEffectsState {
@@ -84,7 +85,7 @@ export function useWeaponEffects(): WeaponEffectsState {
         [weaponId]: startedAt,
       }));
 
-      if (weaponId === "wrench") {
+      if (weaponId === "hammer") {
         setHammerSwing(true);
       }
 

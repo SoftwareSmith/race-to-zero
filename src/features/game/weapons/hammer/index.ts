@@ -3,15 +3,15 @@
  * Import this file (or re-export from weapons/index.ts) to register the weapon.
  */
 
-// Relative import avoids ambiguity between this folder and the legacy wrench.ts
-import wrenchDef from "../wrench";
+// Relative import avoids ambiguity between this folder and the legacy hammer.ts
+import hammerDef from "../hammer";
 import { register } from "@game/weapons/runtime/registry";
 import type { WeaponEntry, WeaponContext, FireSession } from "@game/weapons/runtime/types";
 import { createSession } from "./behavior";
 
 const entry: WeaponEntry = {
-  weaponId: "wrench",
-  config: wrenchDef,
+  weaponId: "hammer",
+  config: hammerDef,
   createSession(ctx: WeaponContext): FireSession {
     return createSession(ctx);
   },
@@ -19,4 +19,4 @@ const entry: WeaponEntry = {
 
 register(entry);
 
-export { entry as wrenchEntry };
+export { entry as hammerEntry };

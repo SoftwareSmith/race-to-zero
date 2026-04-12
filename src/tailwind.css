@@ -6,6 +6,41 @@
   --font-mono: "IBM Plex Mono", monospace;
   --font-display: "Fraunces", serif;
 }
+@keyframes evolve-toast {
+  0% { opacity: 0; transform: translateY(10px); }
+  12% { opacity: 1; transform: translateY(0); }
+  75% { opacity: 1; transform: translateY(0); }
+  100% { opacity: 0; transform: translateY(-4px); }
+}
+
+/* Weapon slot evolution animation: scale + rotate wiggle */
+@keyframes weapon-evolve {
+  0%   { transform: scale(1) rotate(0deg); }
+  18%  { transform: scale(1.42) rotate(9deg); }
+  36%  { transform: scale(0.86) rotate(-6deg); }
+  55%  { transform: scale(1.18) rotate(3.5deg); }
+  78%  { transform: scale(0.96) rotate(-1.5deg); }
+  100% { transform: scale(1) rotate(0deg); }
+}
+
+/* Expanding ring burst that fires outward on evolution */
+@keyframes weapon-evolve-ring {
+  0%   { transform: scale(1); opacity: 1; }
+  100% { transform: scale(2.6); opacity: 0; }
+}
+
+/* T2 silver corner pip shimmer */
+@keyframes tier-pip-shimmer {
+  0%, 100% { opacity: 0.85; }
+  50%       { opacity: 1; box-shadow: 0 0 8px 2px rgba(148,163,184,0.6); }
+}
+
+/* T3 gold corner pip shimmer */
+@keyframes tier-pip-shimmer-gold {
+  0%, 100% { opacity: 0.85; }
+  50%       { opacity: 1; box-shadow: 0 0 10px 3px rgba(251,191,36,0.65); }
+}
+
 @keyframes all-clear-breathe {
   0%,
   100% {
@@ -175,6 +210,18 @@
   100% {
     opacity: 0;
     transform: translate(-50%, -50%) scale(0.05);
+  }
+}
+
+@keyframes core-dump-fade {
+  0% {
+    opacity: 1;
+  }
+  60% {
+    opacity: 0.85;
+  }
+  100% {
+    opacity: 0;
   }
 }
 

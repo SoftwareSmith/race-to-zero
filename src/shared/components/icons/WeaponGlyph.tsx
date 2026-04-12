@@ -13,8 +13,8 @@ const SVG_BASE = {
 };
 
 export default function WeaponGlyph({ className, id }: WeaponGlyphProps) {
-  // ── Wrench ─────────────────────────────────────────────────────────
-  if (id === "wrench") {
+  // ── Hammer ─────────────────────────────────────────────────────────
+  if (id === "hammer") {
     return (
       <svg
         className={className}
@@ -22,9 +22,17 @@ export default function WeaponGlyph({ className, id }: WeaponGlyphProps) {
         {...SVG_BASE}
         strokeWidth="1.7"
       >
-        <path d="M18.8 4.4a4.7 4.7 0 0 0-5.76 5.76L5.7 17.5a2.55 2.55 0 1 0 1.8 1.8l7.35-7.34a4.7 4.7 0 0 0 5.76-5.76l-2.58 2.58a1.2 1.2 0 0 1-1.7 0l-1.16-1.16a1.2 1.2 0 0 1 0-1.7z" />
-        <circle cx="5.2" cy="18.8" r="1.35" strokeWidth="1.4" />
-        <path d="M14.2 9.8l.95.95" strokeWidth="1.4" />
+        {/* Handle */}
+        <line x1="5" y1="19" x2="15" y2="9" strokeLinecap="round" />
+        {/* Hammerhead */}
+        <rect
+          x="13"
+          y="3"
+          width="8"
+          height="5"
+          rx="1.2"
+          transform="rotate(45 17 5.5)"
+        />
       </svg>
     );
   }
@@ -102,7 +110,7 @@ export default function WeaponGlyph({ className, id }: WeaponGlyphProps) {
     );
   }
 
-  // ── Directional Laser (gun side-view + beam) ───────────────────────
+  // ── Tracer Bloom (pulse route of linked blooms) ────────────────────
   if (id === "laser") {
     return (
       <svg
@@ -111,19 +119,15 @@ export default function WeaponGlyph({ className, id }: WeaponGlyphProps) {
         {...SVG_BASE}
         strokeWidth="1.6"
       >
-        {/* Gun body */}
-        <rect x="2" y="10" width="12" height="5" rx="1.2" />
-        {/* Barrel extension */}
-        <rect x="14" y="10.5" width="4.5" height="4" rx="0.8" />
-        {/* Beam */}
-        <line x1="18.5" y1="12.5" x2="23" y2="12.5" strokeWidth="2.2" />
-        {/* Iron sight / scope */}
-        <line x1="8" y1="10" x2="8" y2="7.5" />
-        <line x1="5.5" y1="7.5" x2="10.5" y2="7.5" />
-        {/* Grip */}
-        <path d="M4.5 15 L4.5 18.5 Q4.5 19.5 5.5 19.5 L7.5 19.5 Q8.5 19.5 8.5 18.5 L8.5 15" />
-        {/* Muzzle flash dot */}
-        <circle cx="23" cy="12.5" r="1.2" fill="currentColor" strokeWidth="0" />
+        <circle cx="5" cy="18" r="2" />
+        <circle cx="9.5" cy="14.5" r="2.1" />
+        <circle cx="14.5" cy="10.2" r="2.2" />
+        <circle cx="19" cy="6" r="2.4" />
+        <path d="M5 18 Q8.3 15.6 9.5 14.5" opacity="0.55" />
+        <path d="M9.5 14.5 Q12.2 12 14.5 10.2" opacity="0.65" />
+        <path d="M14.5 10.2 Q16.7 8.3 19 6" opacity="0.75" />
+        <path d="M19 3.6 L19 8.4" strokeWidth="1.2" />
+        <path d="M16.6 6 L21.4 6" strokeWidth="1.2" />
       </svg>
     );
   }
@@ -193,7 +197,7 @@ export default function WeaponGlyph({ className, id }: WeaponGlyphProps) {
     );
   }
 
-  // ── Plasma Arc (energised orb with radiating arcs) ─────────────────
+  // ── Fork Bomb (clustered duplicate payloads) ───────────────────────
   if (id === "plasma") {
     return (
       <svg
@@ -202,18 +206,15 @@ export default function WeaponGlyph({ className, id }: WeaponGlyphProps) {
         {...SVG_BASE}
         strokeWidth="1.6"
       >
-        {/* Central energised orb */}
-        <circle cx="12" cy="12" r="3.5" strokeWidth="1.4" />
-        {/* Radiating plasma arcs */}
-        <path d="M12 8.5 C10 6 7.5 7 8 9.5" strokeWidth="1.3" />
-        <path d="M15.5 12 C18 10 18 13.5 15.5 14.5" strokeWidth="1.3" />
-        <path d="M12 15.5 C14 18 16.5 17 16 14.5" strokeWidth="1.3" />
-        <path d="M8.5 12 C6 14 6 10.5 8.5 9.5" strokeWidth="1.3" />
-        {/* Cardinal sparks */}
-        <line x1="12" y1="3.5" x2="12" y2="2" strokeWidth="1.5" />
-        <line x1="20.5" y1="12" x2="22" y2="12" strokeWidth="1.5" />
-        <line x1="12" y1="20.5" x2="12" y2="22" strokeWidth="1.5" />
-        <line x1="3.5" y1="12" x2="2" y2="12" strokeWidth="1.5" />
+        <circle cx="12" cy="12" r="3.1" />
+        <circle cx="12" cy="5" r="2.1" />
+        <circle cx="19" cy="12" r="2.1" />
+        <circle cx="12" cy="19" r="2.1" />
+        <circle cx="5" cy="12" r="2.1" />
+        <path d="M12 8.9 L12 7.2" opacity="0.65" />
+        <path d="M15.1 12 L16.8 12" opacity="0.65" />
+        <path d="M12 15.1 L12 16.8" opacity="0.65" />
+        <path d="M8.9 12 L7.2 12" opacity="0.65" />
       </svg>
     );
   }

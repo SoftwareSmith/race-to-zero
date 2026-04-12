@@ -15,7 +15,7 @@ import { registeredIds, getEntry, hasEntry } from "../runtime/registry";
 import "../index";
 
 const EXPECTED_WEAPON_IDS = [
-  "wrench",
+  "hammer",
   "zapper",     // bug-spray
   "freeze",
   "chain",

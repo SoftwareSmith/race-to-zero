@@ -14,6 +14,17 @@ const chainZap: WeaponDef = {
   cooldownMs: 950,
   inputMode: "click",
   hint: "Click near a bug — arc bounces 3×, targets unfrozen bugs first",
+  tierTitles: ["Chain Zap", "Event Loop", "Distributed System"],
+  tierDetails: [
+    "Click near a bug to start a 3-strand plasma arc. Bounces up to 3 times, prefers unfrozen targets.",
+    "The loop never ends — arc bounces up to 6 times and each hit applies a Charged status, amplifying further damage.",
+    "Network propagation: all Charged bugs on the field are hit simultaneously with cascading reduced damage.",
+  ],
+  tierHints: [
+    "Click near a bug — arc bounces 3×, targets unfrozen bugs first",
+    "T2: 6 bounces + each hit applies Charged status",
+    "T3: All Charged bugs on screen get hit in a network pulse",
+  ],
 };
 
 export default chainZap;

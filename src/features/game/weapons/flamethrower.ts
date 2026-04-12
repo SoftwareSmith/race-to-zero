@@ -18,6 +18,17 @@ const flamethrower: WeaponDef = {
   cooldownMs: 200,
   inputMode: "hold",
   hint: "Hold to spray — move to paint a flamethrower trail; ground patch burns trespassers",
+  tierTitles: ["Stack Overflow", "Memory Leak", "Kernel Panic"],
+  tierDetails: [
+    "Spray napalm in a 70° cone. Rapid-fire stacks a hellfire inferno. Ground fire lingers at the cone tip.",
+    "Flame spreads — each burning bug ignites a secondary burn patch around itself, chaining fire to neighbours.",
+    "Critical heat: burning bugs overload and explode on their next burn tick, dealing AoE splash damage to nearby enemies.",
+  ],
+  tierHints: [
+    "Hold to spray — move to paint a trail; ground patch burns trespassers",
+    "T2: Flame spreads to bugs near each burn target",
+    "T3: Burning bugs detonate — chain their position toward other bugs",
+  ],
 };
 
 export default flamethrower;

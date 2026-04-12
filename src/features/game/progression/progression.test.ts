@@ -5,17 +5,17 @@ import {
 } from "./progression";
 
 describe("siege progression", () => {
-  it("starts with only wrench unlocked", () => {
+  it("starts with only hammer unlocked", () => {
     const stats = getSiegeCombatStats(0);
 
-    expect(stats.unlockedWeapons).toEqual(["wrench"]);
-    expect(stats.currentToolLabel).toBe("Wrench");
+    expect(stats.unlockedWeapons).toEqual(["hammer"]);
+    expect(stats.currentToolLabel).toBe("Hammer");
   });
 
   it("unlocks zapper at 12 kills", () => {
     const stats = getSiegeCombatStats(12);
 
-    expect(stats.unlockedWeapons).toContain("wrench");
+    expect(stats.unlockedWeapons).toContain("hammer");
     expect(stats.unlockedWeapons).toContain("zapper");
     expect(stats.unlockedWeapons).not.toContain("freeze");
   });
@@ -42,8 +42,8 @@ describe("siege progression", () => {
   });
 
   it("label reflects highest unlocked weapon", () => {
-    expect(getSiegeCombatStats(0).currentToolLabel).toBe("Wrench");
-    expect(getSiegeCombatStats(11).currentToolLabel).toBe("Wrench");
+    expect(getSiegeCombatStats(0).currentToolLabel).toBe("Hammer");
+    expect(getSiegeCombatStats(11).currentToolLabel).toBe("Hammer");
     expect(getSiegeCombatStats(12).currentToolLabel).toBe("Bug Zapper");
     expect(getSiegeCombatStats(100).currentToolLabel).toBe("Null Pointer");
   });

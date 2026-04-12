@@ -39,7 +39,7 @@ export function useSiegeGame({
     string | null
   >(null);
   const [selectedWeaponId, setSelectedWeaponId] =
-    useState<SiegeWeaponId>("wrench");
+    useState<SiegeWeaponId>("hammer");
   const [placingStructureId, setPlacingStructureId] = useState<StructureId | null>(null);
   const [placedStructures, setPlacedStructures] = useState<PlacedStructure[]>([]);
   const [agentCaptures, setAgentCaptures] = useState<Record<string, AgentCaptureState>>({});
@@ -58,7 +58,7 @@ export function useSiegeGame({
     setInteractiveInitialBugCounts(currentBugCounts);
     setInteractiveRemainingBugs(currentBugCount);
     setInteractiveSessionKey(`${Date.now()}`);
-    setSelectedWeaponId("wrench");
+    setSelectedWeaponId("hammer");
     setPlacedStructures([]);
     setPlacingStructureId(null);
     setAgentCaptures({});
@@ -195,7 +195,7 @@ export function useSiegeGame({
     if (debugMode) return;
     const stats = getSiegeCombatStats(interactiveKills, debugMode);
     const highest = stats.unlockedWeapons[stats.unlockedWeapons.length - 1];
-    if (highest && highest !== "wrench") {
+    if (highest && highest !== "hammer") {
       const timeoutId = window.setTimeout(() => {
         setSelectedWeaponId(highest);
       }, 0);

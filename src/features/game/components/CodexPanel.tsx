@@ -305,6 +305,10 @@ function WeaponEffectivenessRow({
 }) {
   const tone = getWeaponStateClasses(matchup.state);
   const effectiveness = getWeaponEffectiveness(matchup.state);
+  // BugWeaponId "wrench" maps to the renamed SiegeWeaponId "hammer"
+  const glyphId = (
+    weaponId === "wrench" ? "hammer" : weaponId
+  ) as import("@game/types").SiegeWeaponId;
 
   return (
     <Tooltip
@@ -314,7 +318,7 @@ function WeaponEffectivenessRow({
       triggerClassName="block w-full"
     >
       <MetricInfoCard
-        icon={<WeaponGlyph className="h-5 w-5" id={weaponId} />}
+        icon={<WeaponGlyph className="h-5 w-5" id={glyphId} />}
         iconClassName={cn(tone.tile)}
         label={weaponId}
         value={effectiveness}

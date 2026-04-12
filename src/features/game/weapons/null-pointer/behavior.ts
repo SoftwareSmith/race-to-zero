@@ -18,9 +18,15 @@ const DAMAGE = 3;
 const SPLASH_DAMAGE = 1;
 const SEEK_RADIUS = 500;
 const SPLASH_RADIUS = 60;
+const MARK_RADIUS = 80;
+// Absolute HP execute thresholds (≈ 1/3 and 1/2 of a typical 3-HP bug)
+const T1_EXECUTE_HP = 1;
+const T2_EXECUTE_HP = 2;
+const MARK_DURATION_MS = 6000;
 
 export function createSession(ctx: WeaponContext): ClickFireResult {
   const { engine, targetX, targetY, viewportX, viewportY, bounds } = ctx;
+  const tier = ctx.tier ?? 1;
   const commands: WeaponCommand[] = [];
 
   const targetIdx = engine.closestTargetIndex(targetX, targetY, SEEK_RADIUS);
@@ -49,6 +55,26 @@ export function createSession(ctx: WeaponContext): ClickFireResult {
     return { mode: "once", commands };
   }
 
+  // T3: emit auto-scaler pulse (kills all marked bugs below threshold globally)
+  if (tier >= 3) {
+    commands.push({ kind: "autoScalerPulse", hpThreshold: T2_EXECUTE_HP });
+  }
+
+  // T2+: apply marked to bug and nearby bugs  
+  if (tier >= 2) {
+    commands.push({ kind: "applyMarked", targetIndex: targetIdx, durationMs: MARK_DURATION_MS });
+    commands.push({
+      kind: "markedRadius",
+      cx: targetBug.x,
+      cy: targetBug.y,
+      radius: MARK_RADIUS,
+      durationMs: MARK_DURATION_MS,
+    });
+  } else {
+    // T1: apply mark to primary target only
+    commands.push({ kind: "applyMarked", targetIndex: targetIdx, durationMs: MARK_DURATION_MS });
+  }
+
   // Pixi: explosion + binary burst at bug position
   commands.push({
     kind: "spawnEffect",
@@ -72,6 +98,17 @@ export function createSession(ctx: WeaponContext): ClickFireResult {
     amount: DAMAGE,
     creditOnDeath: true,
   });
+
+  // Execute if HP is low enough
+  const executeHpLimit = tier >= 2 ? T2_EXECUTE_HP : T1_EXECUTE_HP;
+  if ((targetBug.hp ?? 1) <= executeHpLimit && targetBug.marked) {
+    commands.push({
+      kind: "damage",
+      targetIndex: targetIdx,
+      amount: 99,
+      creditOnDeath: true,
+    });
+  }
 
   // Splash damage on nearby bugs (excluding primary)
   const splashIndexes = engine

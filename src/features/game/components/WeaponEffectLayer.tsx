@@ -6,7 +6,8 @@
  * an expanding circle.
  */
 
-import type { CSSProperties } from "react";
+import type { CSSProperties, ReactNode } from "react";
+import { createPortal } from "react-dom";
 import type { WeaponEffectEvent } from "@game/types";
 
 // ── Freeze Blast: expanding ice ring + fade ──────────────────────────────────
@@ -263,149 +264,62 @@ function ChainEffect({
   );
 }
 
-// ── Directional Laser: beam with glow halo ───────────────────────────────────
+// ── Tracer Bloom: linked route of pulse blooms ───────────────────────────────
 
-// ── Laser Disc: bouncing path as SVG line segments with glow ─────────────────
-
-function LaserBeamEffect({
+function TracerBloomEffect({
   x,
   y,
-  angle,
-  segments,
+  chainNodes,
 }: {
   x: number;
   y: number;
-  angle?: number;
-  segments?: Array<{ x1: number; y1: number; x2: number; y2: number }>;
+  chainNodes?: Array<{ x: number; y: number }>;
 }) {
-  if (segments && segments.length > 0) {
-    const allX = segments.flatMap((s) => [s.x1, s.x2]);
-    const allY = segments.flatMap((s) => [s.y1, s.y2]);
-    const svgLeft = Math.min(...allX) - 16;
-    const svgTop = Math.min(...allY) - 16;
-    const svgW = Math.max(...allX) - svgLeft + 32;
-    const svgH = Math.max(...allY) - svgTop + 32;
-
-    return (
-      <svg
-        aria-hidden="true"
-        className="pointer-events-none fixed [animation:laser-beam-fade_400ms_ease-out_forwards]"
-        style={{
-          left: svgLeft,
-          top: svgTop,
-          width: svgW,
-          height: svgH,
-          overflow: "visible",
-        }}
-        viewBox={`${svgLeft} ${svgTop} ${svgW} ${svgH}`}
-      >
-        <defs>
-          <filter id="laser-glow">
-            <feGaussianBlur stdDeviation="3" result="blur" />
-            <feMerge>
-              <feMergeNode in="blur" />
-              <feMergeNode in="SourceGraphic" />
-            </feMerge>
-          </filter>
-        </defs>
-        {segments.map((seg, i) => (
-          <g key={i}>
-            {/* Glow halo */}
-            <line
-              x1={seg.x1}
-              y1={seg.y1}
-              x2={seg.x2}
-              y2={seg.y2}
-              stroke="rgba(248,113,113,0.25)"
-              strokeWidth="10"
-              strokeLinecap="round"
-            />
-            {/* Core beam */}
-            <line
-              x1={seg.x1}
-              y1={seg.y1}
-              x2={seg.x2}
-              y2={seg.y2}
-              stroke="#f87171"
-              strokeWidth="2.5"
-              strokeLinecap="round"
-              filter="url(#laser-glow)"
-            />
-          </g>
-        ))}
-        {/* Bounce markers */}
-        {segments.slice(1).map((seg, i) => (
-          <circle
-            key={`b-${i}`}
-            cx={seg.x1}
-            cy={seg.y1}
-            r="5"
-            fill="#fff"
-            opacity="0.85"
-            filter="url(#laser-glow)"
-          />
-        ))}
-        {/* Origin dot */}
-        <circle
-          cx={segments[0].x1}
-          cy={segments[0].y1}
-          r="4"
-          fill="#fff"
-          opacity="0.7"
-        />
-      </svg>
-    );
-  }
-
-  // Fallback: single line from origin along angle
-  const rad = angle ?? 0;
-  const length = Math.max(window.innerWidth, window.innerHeight) * 1.5;
-  const cos = Math.cos(rad);
-  const sin = Math.sin(rad);
-  const x1 = x - cos * length;
-  const y1 = y - sin * length;
-  const x2 = x + cos * length;
-  const y2 = y + sin * length;
+  const nodes = chainNodes && chainNodes.length > 0 ? chainNodes : [{ x, y }];
+  const allX = nodes.map((node) => node.x);
+  const allY = nodes.map((node) => node.y);
+  const svgLeft = Math.min(...allX) - 48;
+  const svgTop = Math.min(...allY) - 48;
+  const svgW = Math.max(...allX) - svgLeft + 96;
+  const svgH = Math.max(...allY) - svgTop + 96;
 
   return (
     <svg
       aria-hidden="true"
-      className="pointer-events-none fixed inset-0 [animation:laser-beam-fade_320ms_ease-out_forwards]"
+      className="pointer-events-none fixed [animation:laser-beam-fade_520ms_ease-out_forwards]"
       style={{
-        left: 0,
-        top: 0,
-        width: "100vw",
-        height: "100vh",
+        left: svgLeft,
+        top: svgTop,
+        width: svgW,
+        height: svgH,
         overflow: "visible",
       }}
-      viewBox={`0 0 ${window.innerWidth} ${window.innerHeight}`}
+      viewBox={`0 0 ${svgW} ${svgH}`}
     >
-      <line
-        x1={x1}
-        y1={y1}
-        x2={x2}
-        y2={y2}
-        stroke="rgba(248,113,113,0.18)"
-        strokeWidth="14"
-      />
-      <line
-        x1={x1}
-        y1={y1}
-        x2={x2}
-        y2={y2}
-        stroke="#f87171"
-        strokeWidth="3"
-        filter="drop-shadow(0 0 5px rgba(248,113,113,0.7))"
-        strokeLinecap="round"
-      />
-      <circle
-        cx={x}
-        cy={y}
-        r="5"
-        fill="#fff"
-        opacity="0.8"
-        filter="drop-shadow(0 0 6px rgba(248,113,113,1))"
-      />
+      {nodes.map((node, index) => {
+        const cx = node.x - svgLeft;
+        const cy = node.y - svgTop;
+        const radius = 16 + index * 1.5;
+        return (
+          <g key={index}>
+            <circle
+              cx={cx}
+              cy={cy}
+              r={radius}
+              fill="rgba(251,113,133,0.14)"
+              stroke="rgba(251,113,133,0.55)"
+              strokeWidth="1.5"
+            />
+            <circle
+              cx={cx}
+              cy={cy}
+              r="5"
+              fill="#ffe4e6"
+              filter="drop-shadow(0 0 8px rgba(251,113,133,0.95))"
+            />
+          </g>
+        );
+      })}
     </svg>
   );
 }
@@ -549,86 +463,99 @@ function NullPointerEffect({
 // ── Void Pulse: animated spinning black hole ──────────────────────────────────
 
 function VoidPulseEffect({ x, y }: { x: number; y: number }) {
+  // Use a full-screen fixed inset-0 wrapper so the outer element has real
+  // viewport dimensions. A zero-size fixed element (width/height 0) can lose
+  // its viewport anchor in Chrome's compositing model when WebGL canvas
+  // siblings are present, causing the effect to scroll with the page.
   return (
-    <div
-      aria-hidden="true"
-      className="pointer-events-none fixed [animation:void-field-pulse_2200ms_ease-out_forwards]"
-      style={{ left: x, top: y, width: 0, height: 0, overflow: "visible" }}
-    >
-      {/* Outer gravitational field */}
+    <div aria-hidden="true" className="pointer-events-none fixed inset-0">
+      {/* Anchor point at the click position; animation applied here */}
       <div
+        className="[animation:void-field-pulse_2200ms_ease-out_forwards]"
         style={{
           position: "absolute",
-          width: 600,
-          height: 600,
-          left: -300,
-          top: -300,
-          borderRadius: "50%",
-          pointerEvents: "none",
-          background:
-            "radial-gradient(circle, rgba(124,58,237,0.18) 0%, rgba(76,29,149,0.08) 45%, transparent 70%)",
+          left: x,
+          top: y,
+          width: 0,
+          height: 0,
+          overflow: "visible",
         }}
-      />
-      {/* Outer accretion ring – slow spin */}
-      <div
-        style={{
-          position: "absolute",
-          width: 180,
-          height: 180,
-          left: -90,
-          top: -90,
-          borderRadius: "50%",
-          border: "1.5px dashed rgba(167,139,250,0.5)",
-          boxShadow: "0 0 24px rgba(139,92,246,0.3)",
-          pointerEvents: "none",
-          animation: "agent-ring-spin 2.5s linear infinite",
-        }}
-      />
-      {/* Inner accretion ring – fast reverse spin */}
-      <div
-        style={{
-          position: "absolute",
-          width: 110,
-          height: 110,
-          left: -55,
-          top: -55,
-          borderRadius: "50%",
-          border: "2px dashed rgba(192,132,252,0.65)",
-          boxShadow: "0 0 14px rgba(147,51,234,0.4)",
-          pointerEvents: "none",
-          animation: "agent-ring-spin 1.4s linear infinite reverse",
-        }}
-      />
-      {/* Photon ring glow */}
-      <div
-        style={{
-          position: "absolute",
-          width: 66,
-          height: 66,
-          left: -33,
-          top: -33,
-          borderRadius: "50%",
-          pointerEvents: "none",
-          boxShadow:
-            "0 0 0 2.5px rgba(192,132,252,0.9), 0 0 18px rgba(147,51,234,0.7), 0 0 40px rgba(124,58,237,0.3)",
-          animation: "structure-pulse 0.8s ease-in-out infinite",
-        }}
-      />
-      {/* Hard black core */}
-      <div
-        style={{
-          position: "absolute",
-          width: 44,
-          height: 44,
-          left: -22,
-          top: -22,
-          borderRadius: "50%",
-          pointerEvents: "none",
-          background:
-            "radial-gradient(circle, #000 55%, rgba(76,29,149,0.8) 100%)",
-          boxShadow: "0 0 22px rgba(124,58,237,0.7)",
-        }}
-      />
+      >
+        {/* Outer gravitational field */}
+        <div
+          style={{
+            position: "absolute",
+            width: 600,
+            height: 600,
+            left: -300,
+            top: -300,
+            borderRadius: "50%",
+            pointerEvents: "none",
+            background:
+              "radial-gradient(circle, rgba(124,58,237,0.18) 0%, rgba(76,29,149,0.08) 45%, transparent 70%)",
+          }}
+        />
+        {/* Outer accretion ring – slow spin */}
+        <div
+          style={{
+            position: "absolute",
+            width: 180,
+            height: 180,
+            left: -90,
+            top: -90,
+            borderRadius: "50%",
+            border: "1.5px dashed rgba(167,139,250,0.5)",
+            boxShadow: "0 0 24px rgba(139,92,246,0.3)",
+            pointerEvents: "none",
+            animation: "agent-ring-spin 2.5s linear infinite",
+          }}
+        />
+        {/* Inner accretion ring – fast reverse spin */}
+        <div
+          style={{
+            position: "absolute",
+            width: 110,
+            height: 110,
+            left: -55,
+            top: -55,
+            borderRadius: "50%",
+            border: "2px dashed rgba(192,132,252,0.65)",
+            boxShadow: "0 0 14px rgba(147,51,234,0.4)",
+            pointerEvents: "none",
+            animation: "agent-ring-spin 1.4s linear infinite reverse",
+          }}
+        />
+        {/* Photon ring glow */}
+        <div
+          style={{
+            position: "absolute",
+            width: 66,
+            height: 66,
+            left: -33,
+            top: -33,
+            borderRadius: "50%",
+            pointerEvents: "none",
+            boxShadow:
+              "0 0 0 2.5px rgba(192,132,252,0.9), 0 0 18px rgba(147,51,234,0.7), 0 0 40px rgba(124,58,237,0.3)",
+            animation: "structure-pulse 0.8s ease-in-out infinite",
+          }}
+        />
+        {/* Hard black core */}
+        <div
+          style={{
+            position: "absolute",
+            width: 44,
+            height: 44,
+            left: -22,
+            top: -22,
+            borderRadius: "50%",
+            pointerEvents: "none",
+            background:
+              "radial-gradient(circle, #000 55%, rgba(76,29,149,0.8) 100%)",
+            boxShadow: "0 0 22px rgba(124,58,237,0.7)",
+          }}
+        />
+      </div>
     </div>
   );
 }
@@ -699,42 +626,63 @@ function StaticNetEffect({ x, y }: { x: number; y: number }) {
   );
 }
 
-// ── Plasma Bomb: implosion ring ───────────────────────────────────────────────
+// ── Fork Bomb: clustered duplicate detonations ───────────────────────────────
 
-function PlasmaBombEffect({ x, y }: { x: number; y: number }) {
+function ForkBombEffect({
+  x,
+  y,
+  chainNodes,
+}: {
+  x: number;
+  y: number;
+  chainNodes?: Array<{ x: number; y: number }>;
+}) {
+  const nodes = chainNodes && chainNodes.length > 0 ? chainNodes : [{ x, y }];
+  const allX = nodes.map((node) => node.x);
+  const allY = nodes.map((node) => node.y);
+  const svgLeft = Math.min(...allX) - 56;
+  const svgTop = Math.min(...allY) - 56;
+  const svgW = Math.max(...allX) - svgLeft + 112;
+  const svgH = Math.max(...allY) - svgTop + 112;
+
   return (
-    <>
-      {/* Implosion inward ring */}
-      <div
-        aria-hidden="true"
-        className="pointer-events-none fixed rounded-full [animation:plasma-implosion_400ms_ease-in_forwards]"
-        style={{
-          left: x,
-          top: y,
-          width: 340,
-          height: 340,
-          background:
-            "radial-gradient(circle, transparent 40%, rgba(96,165,250,0.35) 70%, transparent 100%)",
-          transform: "translate(-50%, -50%)",
-        }}
-      />
-      {/* Explosion ring (delayed) */}
-      <div
-        aria-hidden="true"
-        className="pointer-events-none fixed rounded-full [animation:shockwave-expand_900ms_ease-out_400ms_forwards]"
-        style={{
-          left: x,
-          top: y,
-          width: 380,
-          height: 380,
-          background:
-            "radial-gradient(circle, rgba(59,130,246,0.4) 0%, rgba(29,78,216,0.15) 55%, transparent 75%)",
-          boxShadow: "0 0 60px 16px rgba(59,130,246,0.18)",
-          transform: "translate(-50%, -50%)",
-          opacity: 0,
-        }}
-      />
-    </>
+    <svg
+      aria-hidden="true"
+      className="pointer-events-none fixed [animation:core-dump-fade_650ms_ease-out_forwards]"
+      style={{
+        left: svgLeft,
+        top: svgTop,
+        width: svgW,
+        height: svgH,
+        overflow: "visible",
+      }}
+      viewBox={`0 0 ${svgW} ${svgH}`}
+    >
+      {nodes.map((node, index) => {
+        const cx = node.x - svgLeft;
+        const cy = node.y - svgTop;
+        const outerRadius = index === 0 ? 24 : 18;
+        return (
+          <g key={index}>
+            <circle
+              cx={cx}
+              cy={cy}
+              r={outerRadius}
+              fill="rgba(96,165,250,0.14)"
+              stroke="rgba(147,197,253,0.7)"
+              strokeWidth="1.6"
+            />
+            <circle
+              cx={cx}
+              cy={cy}
+              r={outerRadius * 0.48}
+              fill="rgba(219,234,254,0.32)"
+              filter="drop-shadow(0 0 8px rgba(96,165,250,0.9))"
+            />
+          </g>
+        );
+      })}
+    </svg>
   );
 }
 
@@ -747,7 +695,7 @@ interface WeaponEffectLayerProps {
 export default function WeaponEffectLayer({ effects }: WeaponEffectLayerProps) {
   if (effects.length === 0) return null;
 
-  return (
+  const layer: ReactNode = (
     <>
       {effects.map((effect) => {
         switch (effect.weapon) {
@@ -761,7 +709,12 @@ export default function WeaponEffectLayer({ effects }: WeaponEffectLayerProps) {
             );
           case "plasma":
             return (
-              <PlasmaBombEffect key={effect.id} x={effect.x} y={effect.y} />
+              <ForkBombEffect
+                key={effect.id}
+                x={effect.x}
+                y={effect.y}
+                chainNodes={effect.chainNodes}
+              />
             );
           case "freeze":
             return (
@@ -784,12 +737,11 @@ export default function WeaponEffectLayer({ effects }: WeaponEffectLayerProps) {
             );
           case "laser":
             return (
-              <LaserBeamEffect
+              <TracerBloomEffect
                 key={effect.id}
                 x={effect.x}
                 y={effect.y}
-                angle={effect.angle}
-                segments={effect.segments}
+                chainNodes={effect.chainNodes}
               />
             );
           case "nullpointer":
@@ -808,4 +760,7 @@ export default function WeaponEffectLayer({ effects }: WeaponEffectLayerProps) {
       })}
     </>
   );
+
+  if (typeof document === "undefined") return layer;
+  return createPortal(layer, document.body);
 }

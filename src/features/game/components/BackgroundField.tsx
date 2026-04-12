@@ -44,7 +44,11 @@ import { createEffectEvent, isEffectAlive } from "@game/utils/weaponEffects";
 import VfxCanvas from "@game/components/VfxCanvas";
 import type { VfxEngine } from "@game/engine/VfxEngine";
 import { triggerWeaponShake } from "@game/utils/screenShake";
-import type { WeaponContext, ExecutionContext, PersistentFireSession } from "@game/weapons/runtime/types";
+import type {
+  WeaponContext,
+  ExecutionContext,
+  PersistentFireSession,
+} from "@game/weapons/runtime/types";
 import { getEntry, hasEntry } from "@game/weapons/runtime/registry";
 import { executeCommands } from "@game/weapons/runtime/executor";
 
@@ -266,8 +270,17 @@ interface BugCanvasProps {
     angle: number;
     phase: "aim" | "fire";
   }) => void;
+  onTeslaFire?: (data: { structureId: string }) => void;
   gameConfig?: GameConfig;
   hammerPositionRef?: { current: { x: number; y: number } };
+  getWeaponTier?: (id: SiegeWeaponId) => import("@game/types").WeaponTier;
+  onWeaponEvolution?: (
+    weaponId: SiegeWeaponId,
+    newTier: import("@game/types").WeaponTier,
+  ) => void;
+  initialEvolutionStates?: Partial<
+    Record<SiegeWeaponId, import("@game/types").WeaponEvolutionState>
+  >;
 }
 
 const BugCanvas = memo(function BugCanvas({
@@ -280,7 +293,7 @@ const BugCanvas = memo(function BugCanvas({
   onWeaponFire,
   placingStructureId,
   onStructurePlace,
-  selectedWeaponId = "wrench",
+  selectedWeaponId = "hammer",
   bugCounts,
   sceneProfile,
   sessionKey,
@@ -290,8 +303,12 @@ const BugCanvas = memo(function BugCanvas({
   onStructureKill,
   onAgentAbsorb,
   onTurretFire,
+  onTeslaFire,
   gameConfig,
   hammerPositionRef,
+  getWeaponTier = () => 1 as import("@game/types").WeaponTier,
+  onWeaponEvolution,
+  initialEvolutionStates,
 }: BugCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const swarmRef = useRef<any | null>(null);
@@ -305,6 +322,7 @@ const BugCanvas = memo(function BugCanvas({
   const onStructureKillRef = useRef(onStructureKill);
   const onAgentAbsorbRef = useRef(onAgentAbsorb);
   const onTurretFireRef = useRef(onTurretFire);
+  const onTeslaFireRef = useRef(onTeslaFire);
   const onWeaponFireRef = useRef(onWeaponFire);
   const vfxRef = useRef<VfxEngine | null>(null);
   const blackHoleVfxIdRef = useRef<string | null>(null);
@@ -492,10 +510,13 @@ const BugCanvas = memo(function BugCanvas({
                 },
               );
             }
+            onTeslaFireRef.current?.({ structureId: data.structureId });
           } catch {
             void 0;
           }
         },
+        onWeaponEvolution: onWeaponEvolution ?? undefined,
+        initialEvolutionStates: initialEvolutionStates ?? undefined,
       });
       // store original baseSpeed so we can apply UI speedMultiplier without compounding
       try {
@@ -594,6 +615,10 @@ const BugCanvas = memo(function BugCanvas({
   useEffect(() => {
     onTurretFireRef.current = onTurretFire;
   }, [onTurretFire]);
+
+  useEffect(() => {
+    onTeslaFireRef.current = onTeslaFire;
+  }, [onTeslaFire]);
 
   useEffect(() => {
     onWeaponFireRef.current = onWeaponFire;
@@ -1225,6 +1250,8 @@ const BugCanvas = memo(function BugCanvas({
               bounds: _b,
               now: performance.now(),
               engine: swarmRef.current as unknown as WeaponContext["engine"],
+              tier: getWeaponTier(holdWeaponId),
+              weaponId: holdWeaponId,
             };
             const eCtx: ExecutionContext = {
               engine: swarmRef.current as unknown as ExecutionContext["engine"],
@@ -1428,6 +1455,8 @@ const BugCanvas = memo(function BugCanvas({
           bounds,
           now: performance.now(),
           engine: engine as unknown as WeaponContext["engine"],
+          tier: getWeaponTier(weaponId),
+          weaponId,
         };
         const _np_eCtx: ExecutionContext = {
           engine: engine as unknown as ExecutionContext["engine"],
@@ -1537,7 +1566,7 @@ const BugCanvas = memo(function BugCanvas({
             break;
           }
           case "plasma": {
-            // Plasma Bomb: implosion first, then explosion
+            // Fork Bomb: clustered detonations around the click point
             vfx.spawnPlasmaImplosion(targetX, targetY, 170);
             setTimeout(() => {
               if (vfxRef.current) {
@@ -1574,7 +1603,7 @@ const BugCanvas = memo(function BugCanvas({
           case "nullpointer":
             // VFX handled in seeking dispatch at bug position — skip here
             break;
-          case "wrench":
+          case "hammer":
             vfx.addCrack(targetX, targetY);
             break;
           case "freeze":
@@ -1590,7 +1619,7 @@ const BugCanvas = memo(function BugCanvas({
       if (canvasRef.current) triggerWeaponShake(canvasRef.current, weaponId);
 
       if (weaponDef.hitPattern === "point") {
-        // ── Wrench: hit nearest bug within radius ────────────────
+        // ── Hammer: hit nearest bug within radius ────────────────
         onWeaponFireRef.current?.(weaponId, fireX, fireY);
 
         let hitCandidate: { distance: number; index: number } | null = null;
@@ -2344,6 +2373,17 @@ interface BackgroundFieldProps {
   terminatorMode: boolean;
   tone: Tone;
   gameConfig?: GameConfig;
+  /** Returns the current evolution tier for a given weapon. Defaults to T1 when not provided. */
+  getWeaponTier?: (id: SiegeWeaponId) => import("@game/types").WeaponTier;
+  /** Called when a weapon evolves to a new tier. */
+  onWeaponEvolution?: (
+    weaponId: SiegeWeaponId,
+    newTier: import("@game/types").WeaponTier,
+  ) => void;
+  /** Initial evolution states loaded from localStorage. */
+  initialEvolutionStates?: Partial<
+    Record<SiegeWeaponId, import("@game/types").WeaponEvolutionState>
+  >;
 }
 
 const BackgroundField = memo(function BackgroundField({
@@ -2361,13 +2401,16 @@ const BackgroundField = memo(function BackgroundField({
   onAgentAbsorb,
   placingStructureId,
   remainingBugCount,
-  selectedWeaponId = "wrench",
+  selectedWeaponId = "hammer",
   showParticleCount,
   showTerminatorStatusBadge = true,
   siegeZones = [],
   terminatorMode,
   gameConfig,
   tone,
+  getWeaponTier = () => 1 as import("@game/types").WeaponTier,
+  onWeaponEvolution,
+  initialEvolutionStates,
 }: BackgroundFieldProps) {
   const normalizedBugCounts = useMemo(() => bugCounts, [bugCounts]);
   const totalBugCount = useMemo(
@@ -2400,6 +2443,9 @@ const BackgroundField = memo(function BackgroundField({
   const [turretLastFireTimes, setTurretLastFireTimes] = useState<
     Record<string, number>
   >({});
+  const [teslaLastFireTimes, setTeslaLastFireTimes] = useState<
+    Record<string, number>
+  >({});
   const hammerPositionRef = useRef({ x: 0, y: 0 });
   const weaponCursorRef = useRef<HTMLDivElement | null>(null);
   const hammerMoveFrameRef = useRef<number | null>(null);
@@ -2414,6 +2460,7 @@ const BackgroundField = memo(function BackgroundField({
     const timeoutId = window.setTimeout(() => {
       setCursorLastFireTimes({});
       setTurretLastFireTimes({});
+      setTeslaLastFireTimes({});
     }, 0);
 
     return () => {
@@ -2437,6 +2484,13 @@ const BackgroundField = memo(function BackgroundField({
     },
     [],
   );
+
+  const handleTeslaFire = useCallback((data: { structureId: string }) => {
+    setTeslaLastFireTimes((prev) => ({
+      ...prev,
+      [data.structureId]: performance.now(),
+    }));
+  }, []);
 
   const handleWeaponFire = useCallback(
     (
@@ -2469,8 +2523,8 @@ const BackgroundField = memo(function BackgroundField({
         ...prev,
         [weapon]: startedAt,
       }));
-      // Always swing wrench cursor on any wrench fire (hit or miss)
-      if (weapon === "wrench") {
+      // Always swing hammer cursor on any hammer fire (hit or miss)
+      if (weapon === "hammer") {
         setHammerSwing(true);
       }
       // Notify parent so it can update reload bar state
@@ -2771,11 +2825,15 @@ const BackgroundField = memo(function BackgroundField({
         onStructureKill={terminatorMode ? handleStructureKill : undefined}
         onAgentAbsorb={terminatorMode ? onAgentAbsorb : undefined}
         onTurretFire={terminatorMode ? handleTurretFire : undefined}
+        onTeslaFire={terminatorMode ? handleTeslaFire : undefined}
         placingStructureId={terminatorMode ? placingStructureId : null}
         onStructurePlace={terminatorMode ? onStructurePlace : undefined}
         selectedWeaponId={selectedWeaponId}
         onWeaponFire={terminatorMode ? handleWeaponFire : undefined}
         hammerPositionRef={hammerPositionRef}
+        getWeaponTier={getWeaponTier}
+        onWeaponEvolution={onWeaponEvolution}
+        initialEvolutionStates={initialEvolutionStates}
       />
       {effectiveBugCount === 0 ? (
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_35%,rgba(187,247,208,0.12),transparent_28%),radial-gradient(circle_at_60%_68%,rgba(125,211,252,0.08),transparent_34%)] [animation:all-clear-breathe_6s_ease-in-out_infinite]" />
@@ -2786,12 +2844,13 @@ const BackgroundField = memo(function BackgroundField({
           structures={placedStructures}
           agentCaptures={agentCaptures}
           turretLastFireTimes={turretLastFireTimes}
+          teslaLastFireTimes={teslaLastFireTimes}
         />
       ) : null}
       {terminatorMode ? (
         <WeaponCursor
           hideSystemCursor={
-            selectedWeaponId === "wrench" || !!placingStructureId
+            selectedWeaponId === "hammer" || !!placingStructureId
           }
           lastFiredAt={cursorLastFireTimes[selectedWeaponId]}
           structureId={placingStructureId ?? undefined}

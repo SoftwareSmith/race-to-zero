@@ -18,6 +18,17 @@ const bugSpray: WeaponDef = {
   cooldownMs: 150,
   inputMode: "hold",
   hint: "Hold to spray a cone — bugs are Poisoned; toxic cloud lingers 3 s",
+  tierTitles: ["Patch Deployment", "Hotfix", "Rolling Deployment"],
+  tierDetails: [
+    "Aerosol cone sprays 50° of noxious mist. Bugs hit are Poisoned — 0.5 dmg/s for 4 s. Toxic Cloud lingers.",
+    "Hotfix rush — after the initial cone, secondary poison clouds erupt around each poisoned bug.",
+    "Rolling deployment — cone expands into a growing circular ring that spreads poison across the entire field.",
+  ],
+  tierHints: [
+    "Hold to spray a cone — bugs are Poisoned; toxic cloud lingers 3 s",
+    "T2: Secondary poison clouds erupt around each freshly poisoned bug",
+    "T3: Expanding ring — poison spreads across the whole field",
+  ],
 };
 
 export default bugSpray;

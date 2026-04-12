@@ -5,13 +5,13 @@
 
 import { useEffect, useState } from "react";
 import type { AgentCaptureState, PlacedStructure } from "@game/types";
-import WeaponGlyph from "@shared/components/icons/WeaponGlyph";
 import { STRUCTURE_DEFS } from "@config/structureConfig";
 
 interface StructureLayerProps {
   structures: PlacedStructure[];
   agentCaptures?: Record<string, AgentCaptureState>;
   turretLastFireTimes?: Record<string, number>;
+  teslaLastFireTimes?: Record<string, number>;
 }
 
 /** Agent commentary lines based on absorb progress */
@@ -32,6 +32,7 @@ export default function StructureLayer({
   structures,
   agentCaptures,
   turretLastFireTimes,
+  teslaLastFireTimes,
 }: StructureLayerProps) {
   const [now, setNow] = useState(() => Date.now());
 
@@ -73,6 +74,8 @@ export default function StructureLayer({
             : null;
         const turretLastFiredAt = turretLastFireTimes?.[s.id];
         const turretCooldownMs = 2000;
+        const teslaLastFiredAt = teslaLastFireTimes?.[s.id];
+        const teslaCooldownMs = 2500;
 
         return (
           <div
@@ -161,7 +164,23 @@ export default function StructureLayer({
                 >
                   <div className="absolute inset-[5px] rounded-full border border-cyan-200/18 [animation:laser-cursor-breathe_1.8s_ease-in-out_infinite]" />
                   <div className="text-cyan-100 [animation:laser-cursor-breathe_1.2s_ease-in-out_infinite]">
-                    <WeaponGlyph className="h-5 w-5" id="laser" />
+                    {/* Crosshair icon — distinct from weapon HUD glyph */}
+                    <svg
+                      viewBox="0 0 20 20"
+                      width="20"
+                      height="20"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="1.5"
+                      strokeLinecap="round"
+                    >
+                      <circle cx="10" cy="10" r="4.5" />
+                      <circle cx="10" cy="10" r="7.5" opacity="0.5" />
+                      <line x1="10" y1="1" x2="10" y2="4" />
+                      <line x1="10" y1="16" x2="10" y2="19" />
+                      <line x1="1" y1="10" x2="4" y2="10" />
+                      <line x1="16" y1="10" x2="19" y2="10" />
+                    </svg>
                   </div>
                   <div
                     className="absolute left-1/2 top-1/2 h-1.5 w-1.5 rounded-full bg-cyan-100"
@@ -244,52 +263,56 @@ export default function StructureLayer({
                 >
                   <span className="text-lg leading-none">⚡</span>
                 </div>
+                {/* Reload bar */}
+                <div
+                  className="absolute h-1.5 w-12 overflow-hidden rounded-full border border-yellow-400/20 bg-slate-950/80"
+                  style={{
+                    top: 26,
+                    left: -24,
+                    boxShadow: `0 0 10px ${color}18`,
+                  }}
+                >
+                  <div
+                    key={teslaLastFiredAt}
+                    className="h-full rounded-full"
+                    style={{
+                      background: `linear-gradient(90deg, ${color}, ${color}cc)`,
+                      ...(teslaLastFiredAt != null
+                        ? {
+                            animation: `reload-drain ${teslaCooldownMs}ms linear forwards`,
+                          }
+                        : { width: "100%" }),
+                    }}
+                  />
+                </div>
               </>
             ) : isFirewall ? (
-              /* ── Firewall: flame column + countdown bar ── */
+              /* ── Firewall: arc-slash energy blades rotating each tick ── */
               <>
-                {/* Flame tongue 1 — central, tallest */}
-                <div
-                  className="pointer-events-none absolute [animation:fire-flicker_380ms_ease-in-out_infinite]"
-                  style={{
-                    width: 28,
-                    height: 180,
-                    left: -26,
-                    top: -90,
-                    background: `linear-gradient(to top, ${color}00 0%, ${color}66 30%, ${color}99 60%, ${color}55 80%, ${color}00 100%)`,
-                    boxShadow: `0 0 22px 6px ${color}30`,
-                    borderRadius: "50%",
-                    filter: "blur(3px)",
-                  }}
-                />
-                {/* Flame tongue 2 — left, shorter */}
-                <div
-                  className="pointer-events-none absolute [animation:fire-flicker-2_420ms_ease-in-out_infinite]"
-                  style={{
-                    width: 20,
-                    height: 140,
-                    left: -14,
-                    top: -85,
-                    background: `linear-gradient(to top, ${color}00 0%, ${color}44 35%, ${color}77 65%, ${color}33 85%, ${color}00 100%)`,
-                    borderRadius: "50%",
-                    filter: "blur(3.5px)",
-                    opacity: 0.85,
-                  }}
-                />
-                {/* Flame tongue 3 — right, narrowest */}
-                <div
-                  className="pointer-events-none absolute [animation:fire-flicker-3_350ms_ease-in-out_infinite]"
-                  style={{
-                    width: 16,
-                    height: 120,
-                    left: -8,
-                    top: -88,
-                    background: `linear-gradient(to top, ${color}00 0%, ${color}33 40%, ${color}66 70%, ${color}22 90%, ${color}00 100%)`,
-                    borderRadius: "50%",
-                    filter: "blur(4px)",
-                    opacity: 0.7,
-                  }}
-                />
+                {(() => {
+                  const slashPhase = Math.floor(now / 380);
+                  const angles = [0, 1, 2].map(
+                    (i) => (slashPhase * 137 + i * 127) % 360,
+                  );
+                  return angles.map((angle, i) => (
+                    <div
+                      key={i}
+                      className="pointer-events-none absolute"
+                      style={{
+                        width: 6,
+                        height: 160,
+                        left: -3,
+                        top: -80,
+                        background: `linear-gradient(to bottom, transparent 0%, ${color}00 5%, ${color}88 35%, ${color}cc 50%, ${color}88 65%, ${color}00 95%, transparent 100%)`,
+                        borderRadius: "50%",
+                        filter: "blur(2px)",
+                        transform: `rotate(${angle}deg)`,
+                        boxShadow: `0 0 12px 2px ${color}44`,
+                        opacity: 0.9,
+                      }}
+                    />
+                  ));
+                })()}
                 {/* Core icon */}
                 <div
                   className="absolute flex h-10 w-10 items-center justify-center rounded-full border-2"
@@ -318,50 +341,39 @@ export default function StructureLayer({
                 </div>
               </>
             ) : (
-              /* ── Agent: progress ring + commentary text ── */
+              /* ── Agent: terminal-badge design, larger footprint ── */
               <>
-                {/* Rotating dashed ambient ring */}
-                <div
-                  className="pointer-events-none absolute rounded-full border-2 border-dashed border-cyan-400/25"
-                  style={{
-                    width: 72,
-                    height: 72,
-                    left: -36,
-                    top: -36,
-                    animation: "agent-ring-spin 8s linear infinite",
-                  }}
-                />
-                {/* Progress ring overlay */}
-                {isAbsorbing || isDone || isFailed ? (
+                {/* Progress ring — 60px SVG to match larger body */}
+                {(isAbsorbing || isDone || isFailed) && (
                   <div
                     className="pointer-events-none absolute"
-                    style={{ width: 52, height: 52, left: -26, top: -26 }}
+                    style={{ width: 72, height: 72, left: -36, top: -36 }}
                   >
                     <svg
-                      viewBox="0 0 52 52"
-                      width="52"
-                      height="52"
+                      viewBox="0 0 72 72"
+                      width="72"
+                      height="72"
                       style={{ position: "absolute", inset: 0 }}
                     >
                       <circle
-                        cx="26"
-                        cy="26"
-                        r="22"
+                        cx="36"
+                        cy="36"
+                        r="30"
                         fill="none"
                         stroke={`${color}22`}
                         strokeWidth="3"
                       />
                       {isAbsorbing ? (
                         <circle
-                          cx="26"
-                          cy="26"
-                          r="22"
+                          cx="36"
+                          cy="36"
+                          r="30"
                           fill="none"
                           stroke={color}
                           strokeWidth="3"
                           strokeLinecap="round"
-                          strokeDasharray={`${2 * Math.PI * 22}`}
-                          strokeDashoffset={`${2 * Math.PI * 22 * (1 - progress)}`}
+                          strokeDasharray={`${2 * Math.PI * 30}`}
+                          strokeDashoffset={`${2 * Math.PI * 30 * (1 - progress)}`}
                           style={{
                             transformOrigin: "center",
                             transform: "rotate(-90deg)",
@@ -370,9 +382,9 @@ export default function StructureLayer({
                         />
                       ) : isDone ? (
                         <circle
-                          cx="26"
-                          cy="26"
-                          r="22"
+                          cx="36"
+                          cy="36"
+                          r="30"
                           fill="none"
                           stroke="#4ade80"
                           strokeWidth="3"
@@ -384,14 +396,14 @@ export default function StructureLayer({
                         />
                       ) : (
                         <circle
-                          cx="26"
-                          cy="26"
-                          r="22"
+                          cx="36"
+                          cy="36"
+                          r="30"
                           fill="none"
                           stroke="#f87171"
                           strokeWidth="3"
                           strokeLinecap="round"
-                          strokeDasharray={`${(2 * Math.PI * 22 * progress * 360) / 360} ${2 * Math.PI * 22}`}
+                          strokeDasharray={`${(2 * Math.PI * 30 * progress * 360) / 360} ${2 * Math.PI * 30}`}
                           style={{
                             transformOrigin: "center",
                             transform: "rotate(-90deg)",
@@ -402,46 +414,46 @@ export default function StructureLayer({
                       )}
                     </svg>
                   </div>
-                ) : null}
-                {/* Icon */}
+                )}
+                {/* Badge body */}
                 <div
-                  className="absolute flex h-9 w-9 items-center justify-center rounded-full border text-sm"
+                  className="absolute flex h-14 w-14 items-center justify-center rounded-xl border-2"
                   style={{
-                    left: -18,
-                    top: -18,
-                    borderColor: `${color}60`,
-                    background: `${color}18`,
-                    boxShadow: `0 0 12px ${color}40`,
+                    left: -28,
+                    top: -28,
+                    borderColor: `${color}70`,
+                    background: `radial-gradient(circle at 40% 38%, ${color}28 0%, rgba(3,7,18,0.92) 100%)`,
+                    boxShadow: `0 0 20px ${color}45`,
                   }}
                 >
-                  <span className="leading-none text-base">🤖</span>
-                  {/* Done/fail badge */}
-                  {isDone ? (
+                  <span className="text-2xl leading-none">🤖</span>
+                  {isDone && (
                     <div
-                      className="absolute inset-0 flex items-center justify-center text-xs font-bold text-green-400"
+                      className="absolute inset-0 flex items-center justify-center text-sm font-bold text-green-400"
                       style={{
                         animation: "agent-absorb-done 0.9s ease-out forwards",
                       }}
                     >
                       ✓
                     </div>
-                  ) : isFailed ? (
+                  )}
+                  {isFailed && (
                     <div
-                      className="absolute inset-0 flex items-center justify-center text-xs font-bold text-red-400"
+                      className="absolute inset-0 flex items-center justify-center text-sm font-bold text-red-400"
                       style={{
                         animation: "agent-absorb-fail 0.7s ease-out forwards",
                       }}
                     >
                       ✕
                     </div>
-                  ) : null}
+                  )}
                 </div>
                 {/* Commentary text */}
-                {agentLabel ? (
+                {agentLabel && (
                   <div
                     className="absolute whitespace-nowrap rounded-full border border-white/10 bg-black/78 px-2 py-1 font-mono text-[0.68rem] font-semibold shadow-[0_6px_16px_rgba(0,0,0,0.3)]"
                     style={{
-                      bottom: 26,
+                      bottom: 36,
                       left: 0,
                       transform: "translateX(-50%)",
                       color: agentLabel.color,
@@ -449,7 +461,7 @@ export default function StructureLayer({
                   >
                     {agentLabel.text}
                   </div>
-                ) : null}
+                )}
               </>
             )}
           </div>

@@ -157,12 +157,89 @@ export function executeCommands(
           cmd.collapseDamage,
         );
         if (started) {
-          // VFX is spawned via a spawnEffect / createBlackHole descriptor
-          // emitted alongside this command by the weapon plugin.
           void started;
         }
         break;
       }
+
+      // ── evolution-era status singles ────────────────────────────────────
+      case "applyCharged": {
+        const bug = ctx.engine.getAllBugs()[cmd.targetIndex] as any;
+        if (bug && typeof bug.applyCharged === "function") {
+          bug.applyCharged(cmd.durationMs);
+        }
+        break;
+      }
+
+      case "applyMarked": {
+        const bug = ctx.engine.getAllBugs()[cmd.targetIndex] as any;
+        if (bug && typeof bug.applyMarked === "function") {
+          bug.applyMarked(cmd.durationMs);
+        }
+        break;
+      }
+
+      case "applyUnstable": {
+        const bug = ctx.engine.getAllBugs()[cmd.targetIndex] as any;
+        if (bug && typeof bug.applyUnstable === "function") {
+          bug.applyUnstable(cmd.durationMs);
+        }
+        break;
+      }
+
+      case "applyLooped": {
+        const bug = ctx.engine.getAllBugs()[cmd.targetIndex] as any;
+        if (bug && typeof bug.applyLooped === "function") {
+          bug.applyLooped(cmd.dps, cmd.durationMs);
+        }
+        break;
+      }
+
+      // ── evolution-era radius effects ────────────────────────────────────
+      case "chargedRadius":
+        ctx.engine.applyChargedInRadius(cmd.cx, cmd.cy, cmd.radius, cmd.durationMs);
+        break;
+
+      case "markedRadius":
+        ctx.engine.applyMarkedInRadius(cmd.cx, cmd.cy, cmd.radius, cmd.durationMs);
+        break;
+
+      case "unstableRadius":
+        ctx.engine.applyUnstableInRadius(cmd.cx, cmd.cy, cmd.radius, cmd.durationMs);
+        break;
+
+      // ── evolution-era world-state commands ──────────────────────────────
+      case "propagateChargedNetwork":
+        ctx.engine.propagateChargedNetwork(cmd.sourceIndex, cmd.damage, cmd.falloff);
+        break;
+
+      case "applyGlobalSlow":
+        ctx.engine.applyGlobalSlow(cmd.multiplier, cmd.durationMs);
+        break;
+
+      case "startDeadlockCluster":
+        ctx.engine.startDeadlockCluster(cmd.cx, cmd.cy, cmd.radius, cmd.pullDurationMs);
+        break;
+
+      case "splitBug":
+        ctx.engine.splitBug(cmd.targetIndex);
+        break;
+
+      case "allyBug":
+        ctx.engine.allyBug(cmd.targetIndex, cmd.durationMs);
+        break;
+
+      case "startEventHorizon":
+        ctx.engine.startEventHorizon(cmd.x, cmd.y, cmd.radius, cmd.durationMs);
+        break;
+
+      case "triggerKernelPanic":
+        ctx.engine.triggerKernelPanicExplosion(cmd.targetIndex, cmd.splashRadius, cmd.damage);
+        break;
+
+      case "autoScalerPulse":
+        ctx.engine.triggerAutoScalerPulse(cmd.hpThreshold);
+        break;
 
       // ── visual effects ────────────────────────────────────────────────────
       case "spawnEffect":

@@ -18,7 +18,7 @@ export function applyEffectDescriptor(
   ctx: ExecutionContext,
 ): void {
   // Cast to any for internal VfxEngine methods accessed as private (as any)
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+   
   const vfx = ctx.vfx as any;
 
   switch (descriptor.type) {

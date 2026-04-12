@@ -3,9 +3,10 @@ import { DEFAULT_GAME_CONFIG } from "./types";
 import { BugEntity } from "./BugEntity";
 import { Entity } from "./Entity";
 import { getBugVariantMaxHp } from "../../../constants/bugs";
-import type { StructureId } from "../types";
+import type { StructureId, SiegeWeaponId, WeaponTier, WeaponEvolutionState } from "../types";
 import { hasEntry, getEntry } from "@game/structures/runtime/registry";
 import type { StructureTickContext, StructureGameEngine } from "@game/structures/runtime/types";
+import { WEAPON_EVOLVE_THRESHOLDS } from "@config/gameDefaults";
 // Trigger all structure plugin self-registrations at Engine load time.
 import "@game/structures/index";
 
@@ -85,6 +86,10 @@ export interface EngineOptions {
     structureId: string;
     nodes: Array<{ x: number; y: number }>;
   }) => void;
+  /** Called whenever a weapon evolves to a new tier */
+  onWeaponEvolution?: (weaponId: SiegeWeaponId, newTier: WeaponTier) => void;
+  /** Initial evolution states loaded from localStorage */
+  initialEvolutionStates?: Partial<Record<SiegeWeaponId, WeaponEvolutionState>>;
 }
 
 export class Engine {
@@ -127,6 +132,13 @@ export class Engine {
   }) => void;
   private structures: StructureEntry[] = [];
   private elapsedMs = 0;
+  /** Per-weapon kill counts and tiers for the evolution system. */
+  weaponEvolutionStates: Map<SiegeWeaponId, WeaponEvolutionState>;
+  onWeaponEvolution?: (weaponId: SiegeWeaponId, newTier: WeaponTier) => void;
+  /** Active deadlock cluster pulls: each entry pulls bugs toward (cx,cy) until expiresAt. */
+  private deadlockClusters: Array<{ cx: number; cy: number; radius: number; expiresAt: number }> = [];
+  /** Active event horizons: consume unstable bugs on contact. */
+  private eventHorizons: Array<{ x: number; y: number; radius: number; expiresAt: number }> = [];
 
   /**
    * Black hole state for Void Pulse.
@@ -156,6 +168,41 @@ export class Engine {
     this.onAgentAbsorb = opts.onAgentAbsorb;
     this.onTurretFire = opts.onTurretFire;
     this.onTeslaFire = opts.onTeslaFire;
+    this.onWeaponEvolution = opts.onWeaponEvolution;
+    const allIds: SiegeWeaponId[] = ["hammer", "zapper", "freeze", "chain", "flame", "laser", "shockwave", "nullpointer", "plasma", "void"];
+    this.weaponEvolutionStates = new Map(
+      allIds.map((id) => [
+        id,
+        opts.initialEvolutionStates?.[id] ?? { tier: 1, kills: 0 },
+      ]),
+    );
+  }
+
+  /** Record a weapon kill and check for evolution. */
+  recordWeaponKill(weaponId: SiegeWeaponId | undefined | null): void {
+    if (!weaponId) return;
+    const state = this.weaponEvolutionStates.get(weaponId);
+    if (!state || state.tier >= 3) return;
+    state.kills++;
+    this.checkEvolution(weaponId);
+  }
+
+  private checkEvolution(weaponId: SiegeWeaponId): void {
+    const state = this.weaponEvolutionStates.get(weaponId);
+    if (!state) return;
+    const [t1Threshold, t2Threshold] = WEAPON_EVOLVE_THRESHOLDS[weaponId];
+    if (state.tier === 1 && state.kills >= t1Threshold) {
+      state.tier = 2;
+      this.onWeaponEvolution?.(weaponId, 2);
+    } else if (state.tier === 2 && state.kills >= t2Threshold) {
+      state.tier = 3;
+      this.onWeaponEvolution?.(weaponId, 3);
+    }
+  }
+
+  /** Get all current evolution states (for persistence). */
+  getWeaponEvolutionStates(): Map<SiegeWeaponId, WeaponEvolutionState> {
+    return this.weaponEvolutionStates;
   }
 
   setSize(w: number, h: number) {
@@ -412,6 +459,10 @@ export class Engine {
       // handle dead entities: move to pool and remove from active list once
       if ((ent as any).state === "dead") {
         const be = ent as any as BugEntity;
+        // Attribute DOT kills to the source weapon
+        if (be.dotSourceWeaponId) {
+          this.recordWeaponKill(be.dotSourceWeaponId as SiegeWeaponId);
+        }
         try {
           this.onEntityDeath?.(be.x, be.y, be.variant, {
             credited: be.deathCredited,
@@ -430,15 +481,19 @@ export class Engine {
 
     // tick structures AFTER entity updates so position fields reflect the current frame
     this.tickStructures(dt * 1000);
+    // tick T3 evolution effects (deadlock clusters, event horizons)
+    this.tickEvolutionEffects(dt * 1000);
   }
 
-  handleHit(index: number, damage = 1, creditOnDeath = false) {
+  handleHit(index: number, damage = 1, creditOnDeath = false, weaponId?: SiegeWeaponId) {
     const e = this.entities[index];
     if (!e) return null;
     if (typeof (e as any).onHit === "function") {
       const res = (e as any).onHit(damage);
       if (res.defeated && "deathCredited" in (e as any)) {
         (e as any).deathCredited = creditOnDeath;
+        // Credit direct kills immediately (DOT kills are credited in the update loop)
+        this.recordWeaponKill(weaponId);
       }
       return {
         defeated: res.defeated,
@@ -795,6 +850,167 @@ export class Engine {
     ctx.clearRect(0, 0, this.width, this.height);
     for (const ent of this.entities) {
       ent.render(ctx, alpha);
+    }
+  }
+
+  // ── T3 / Evolution-era Engine methods ───────────────────────────────
+
+  applyChargedInRadius(cx: number, cy: number, radius: number, durationMs: number): void {
+    for (const e of this.entities) {
+      const bug = e as any;
+      if (bug.state === "dead" || bug.state === "dying") continue;
+      if (Math.hypot(e.x - cx, e.y - cy) <= radius && typeof bug.applyCharged === "function") {
+        bug.applyCharged(durationMs);
+      }
+    }
+  }
+
+  applyMarkedInRadius(cx: number, cy: number, radius: number, durationMs: number): void {
+    for (const e of this.entities) {
+      const bug = e as any;
+      if (bug.state === "dead" || bug.state === "dying") continue;
+      if (Math.hypot(e.x - cx, e.y - cy) <= radius && typeof bug.applyMarked === "function") {
+        bug.applyMarked(durationMs);
+      }
+    }
+  }
+
+  applyUnstableInRadius(cx: number, cy: number, radius: number, durationMs: number): void {
+    for (const e of this.entities) {
+      const bug = e as any;
+      if (bug.state === "dead" || bug.state === "dying") continue;
+      if (Math.hypot(e.x - cx, e.y - cy) <= radius && typeof bug.applyUnstable === "function") {
+        bug.applyUnstable(durationMs);
+      }
+    }
+  }
+
+  /** Hits all charged bugs with decaying damage (hop falloff per charged bug encountered). */
+  propagateChargedNetwork(sourceIndex: number, damage: number, falloff: number): void {
+    let currentDmg = damage;
+    for (const e of this.entities) {
+      const bug = e as any;
+      if (bug.state === "dead" || bug.state === "dying") continue;
+      if (bug.charged && currentDmg >= 1) {
+        bug.hp = Math.max(0, bug.hp - Math.round(currentDmg));
+        bug.lastHitTime = performance.now();
+        if (bug.hp === 0) {
+          bug.state = "dying";
+          bug.deathProgress = 0;
+          bug.vx = 0;
+          bug.vy = 0;
+          bug.deathCredited = false;
+        }
+        currentDmg *= falloff;
+      }
+    }
+  }
+
+  applyGlobalSlow(multiplier: number, durationMs: number): void {
+    for (const e of this.entities) {
+      const bug = e as any;
+      if (bug.state === "dead" || bug.state === "dying") continue;
+      if (typeof bug.applyFreeze === "function") bug.applyFreeze(multiplier, durationMs);
+    }
+  }
+
+  /** Pull bugs within radius toward centroid for the given duration. */
+  startDeadlockCluster(cx: number, cy: number, radius: number, pullDurationMs: number): void {
+    this.deadlockClusters.push({ cx, cy, radius, expiresAt: this.elapsedMs + pullDurationMs });
+  }
+
+  /** Reduce target to 50% HP and spawn a second half-HP clone nearby. */
+  splitBug(index: number): void {
+    const e = this.entities[index] as any;
+    if (!e || e.state === "dead" || e.state === "dying") return;
+    e.hp = Math.max(1, Math.ceil(e.maxHp / 2));
+    // Spawn clone from pool
+    const clone = this.pool.pop() ?? new BugEntity();
+    clone.x = e.x + (Math.random() - 0.5) * 40;
+    clone.y = e.y + (Math.random() - 0.5) * 40;
+    clone.maxHp = e.maxHp;
+    clone.hp = Math.max(1, Math.ceil(e.maxHp / 2));
+    clone.variant = e.variant;
+    clone.state = "patrol";
+    clone.deathCredited = false;
+    clone.deathProgress = 0;
+    clone.dotSourceWeaponId = null;
+    clone.slow = null; clone.poison = null; clone.burn = null; clone.ensnare = null;
+    clone.charged = null; clone.marked = null; clone.unstable = null; clone.looped = null; clone.ally = null;
+    this.entities.push(clone);
+  }
+
+  /** Put a bug in ally state — it stops targeting the player base. */
+  allyBug(index: number, durationMs: number): void {
+    const e = this.entities[index] as any;
+    if (!e || e.state === "dead" || e.state === "dying") return;
+    if (typeof e.applyAlly === "function") e.applyAlly(durationMs);
+  }
+
+  /** Leave a persistent trap zone that instantly kills unstable bugs on contact. */
+  startEventHorizon(x: number, y: number, radius: number, durationMs: number): void {
+    this.eventHorizons.push({ x, y, radius, expiresAt: this.elapsedMs + durationMs });
+  }
+
+  /** AoE explosion centered on a burning bug — called by T3 Kernel Panic behavior. */
+  triggerKernelPanicExplosion(index: number, splashRadius: number, damage: number): void {
+    const src = this.entities[index] as any;
+    if (!src) return;
+    const { x, y } = src;
+    for (let i = 0; i < this.entities.length; i++) {
+      if (i === index) continue;
+      const e = this.entities[i] as any;
+      if (e.state === "dead" || e.state === "dying") continue;
+      if (Math.hypot(e.x - x, e.y - y) <= splashRadius) {
+        this.handleHit(i, damage);
+      }
+    }
+  }
+
+  /** Kill all marked bugs below the given HP threshold globally. */
+  triggerAutoScalerPulse(hpThreshold: number): void {
+    for (const e of this.entities) {
+      const bug = e as any;
+      if (bug.state === "dead" || bug.state === "dying") continue;
+      if (bug.marked && (bug.hp / (bug.maxHp || 1)) <= hpThreshold) {
+        bug.hp = 0;
+        bug.state = "dying";
+        bug.deathProgress = 0;
+        bug.vx = 0;
+        bug.vy = 0;
+        bug.deathCredited = false;
+      }
+    }
+  }
+
+  /** Must be called each update tick to process deadlock cluster pulls and event horizon kills. */
+  private tickEvolutionEffects(dtMs: number): void {
+    // Deadlock cluster pulls
+    this.deadlockClusters = this.deadlockClusters.filter(c => c.expiresAt > this.elapsedMs);
+    for (const cluster of this.deadlockClusters) {
+      for (const e of this.entities) {
+        const bug = e as any;
+        if (bug.state === "dead" || bug.state === "dying") continue;
+        const dx = cluster.cx - bug.x;
+        const dy = cluster.cy - bug.y;
+        const dist = Math.hypot(dx, dy);
+        if (dist < 1 || dist > cluster.radius) continue;
+        const pull = 1.8 * (dtMs / 16);
+        bug.x += (dx / dist) * pull;
+        bug.y += (dy / dist) * pull;
+      }
+    }
+    // Event horizon unstable-bug consumption
+    this.eventHorizons = this.eventHorizons.filter(h => h.expiresAt > this.elapsedMs);
+    for (const hz of this.eventHorizons) {
+      for (let i = 0; i < this.entities.length; i++) {
+        const bug = this.entities[i] as any;
+        if (bug.state === "dead" || bug.state === "dying") continue;
+        if (bug.unstable && Math.hypot(bug.x - hz.x, bug.y - hz.y) <= hz.radius) {
+          bug.unstable = null;
+          this.handleHit(i, bug.maxHp ?? 99);
+        }
+      }
     }
   }
 }

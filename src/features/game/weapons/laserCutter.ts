@@ -2,18 +2,16 @@ import type { WeaponDef } from "./types";
 
 const laserCutter: WeaponDef = {
   id: "laser",
-  title: "Laser Disc",
+  title: "Tracer Bloom",
   unlockKills: 68,
   detail:
-    "Fires a bouncing laser disc that ricochets off up to 2 walls. Hits any bug in its path. Spark crowns erupt at each wall bounce point.",
+    "Paints a route from the core to your click, detonating 4 pulse blooms along the way. Each bloom clips nearby bugs without using bounce-line logic.",
   hitPattern: "line",
-  hitRadius: 28,
-  bouncingDisc: true,
-  maxBounces: 1,
-  effectColor: "#f87171",
-  cooldownMs: 1100,
+  hitRadius: 42,
+  effectColor: "#fb7185",
+  cooldownMs: 950,
   inputMode: "click",
-  hint: "Click to fire — disc bounces off 2 walls, hits bugs along the path",
+  hint: "Click to lay a bloom route — 4 bursts detonate between the core and target",
 };
 
 export default laserCutter;

@@ -5,11 +5,11 @@
  * Dependency direction:  plugin → contracts (never contracts → plugin)
  */
 
-import type { SiegeWeaponId } from "@game/types";
+import type { SiegeWeaponId, WeaponTier } from "@game/types";
 import type { WeaponDef } from "@game/weapons/types";
 
 // ─── Re-exports ────────────────────────────────────────────────────────────────
-export type { SiegeWeaponId, WeaponDef };
+export type { SiegeWeaponId, WeaponDef, WeaponTier };
 
 // ---------------------------------------------------------------------------
 // Game engine interface
@@ -23,6 +23,11 @@ export interface BugSnapshot {
   readonly variant: string;
   readonly hp?: number;
   readonly size?: number;
+  readonly charged?: boolean;
+  readonly marked?: boolean;
+  readonly unstable?: boolean;
+  readonly looped?: boolean;
+  readonly ally?: boolean;
 }
 
 export interface HitResult {
@@ -72,6 +77,7 @@ export interface GameEngine {
     index: number,
     damage: number,
     creditOnDeath: boolean,
+    weaponId?: SiegeWeaponId,
   ): HitResult | null;
   getAllBugs(): BugSnapshot[];
   applyPoisonInRadius(
@@ -104,6 +110,18 @@ export interface GameEngine {
     collapseDamage: number,
   ): boolean;
   getBlackHole(): BlackHoleState | null;
+  // ── Evolution-era additions ──────────────────────────────────────────────
+  applyChargedInRadius(cx: number, cy: number, radius: number, durationMs: number): void;
+  applyMarkedInRadius(cx: number, cy: number, radius: number, durationMs: number): void;
+  applyUnstableInRadius(cx: number, cy: number, radius: number, durationMs: number): void;
+  propagateChargedNetwork(sourceIndex: number, damage: number, falloff: number): void;
+  applyGlobalSlow(multiplier: number, durationMs: number): void;
+  startDeadlockCluster(cx: number, cy: number, radius: number, pullDurationMs: number): void;
+  splitBug(index: number): void;
+  allyBug(index: number, durationMs: number): void;
+  startEventHorizon(x: number, y: number, radius: number, durationMs: number): void;
+  triggerKernelPanicExplosion(index: number, splashRadius: number, damage: number): void;
+  triggerAutoScalerPulse(hpThreshold: number): void;
 }
 
 // ---------------------------------------------------------------------------
@@ -136,6 +154,10 @@ export interface WeaponContext {
   /** performance.now() at fire time */
   readonly now: number;
   readonly engine: GameEngine;
+  /** Current evolution tier of the weapon being fired. */
+  readonly tier: WeaponTier;
+  /** The weapon ID being fired (for kill attribution in commands). */
+  readonly weaponId: SiegeWeaponId;
 }
 
 // ---------------------------------------------------------------------------
@@ -321,6 +343,21 @@ export type WeaponCommand =
       durationMs: number;
       collapseDamage: number;
     }
+  | { kind: "applyCharged"; targetIndex: number; durationMs: number }
+  | { kind: "applyMarked"; targetIndex: number; durationMs: number }
+  | { kind: "applyUnstable"; targetIndex: number; durationMs: number }
+  | { kind: "applyLooped"; targetIndex: number; dps: number; durationMs: number }
+  | { kind: "chargedRadius"; cx: number; cy: number; radius: number; durationMs: number }
+  | { kind: "markedRadius"; cx: number; cy: number; radius: number; durationMs: number }
+  | { kind: "unstableRadius"; cx: number; cy: number; radius: number; durationMs: number }
+  | { kind: "propagateChargedNetwork"; sourceIndex: number; damage: number; falloff: number }
+  | { kind: "applyGlobalSlow"; multiplier: number; durationMs: number }
+  | { kind: "startDeadlockCluster"; cx: number; cy: number; radius: number; pullDurationMs: number }
+  | { kind: "splitBug"; targetIndex: number }
+  | { kind: "allyBug"; targetIndex: number; durationMs: number }
+  | { kind: "startEventHorizon"; x: number; y: number; radius: number; durationMs: number }
+  | { kind: "triggerKernelPanic"; targetIndex: number; splashRadius: number; damage: number }
+  | { kind: "autoScalerPulse"; hpThreshold: number }
   | { kind: "spawnEffect"; descriptor: WeaponEffectDescriptor };
 
 // ---------------------------------------------------------------------------
@@ -348,7 +385,7 @@ export interface HoldFireSession {
 }
 
 /**
- * Persistent weapon (void pulse, plasma bomb two-phase).
+ * Persistent weapon (currently void pulse).
  * begin() starts the effect; the caller checks active to gate re-fire;
  * abort() cancels any pending timers before destruction.
  */

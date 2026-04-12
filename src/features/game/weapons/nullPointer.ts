@@ -15,6 +15,17 @@ const nullPointer: WeaponDef = {
   cooldownMs: 3000,
   inputMode: "seeking",
   hint: "Click anywhere — missile curves to highest-HP bug, binary burst on impact",
+  tierTitles: ["Garbage Collector", "Mark & Sweep", "Auto-Scaler"],
+  tierDetails: [
+    "Homing missile locks onto the highest-HP bug. Deals 3 dmg + 60px splash. Executes bugs below 33% HP.",
+    "Mark & Sweep — applies Marked status to the target and nearby bugs. Increases execution threshold to 50% HP.",
+    "Auto-Scaler — periodic global pulse instantly executes all Marked bugs below the HP threshold.",
+  ],
+  tierHints: [
+    "Click anywhere — missile curves to highest-HP bug, binary burst on impact",
+    "T2: Marks the target + nearby bugs; executes at 50% HP",
+    "T3: Auto-Scaler pulse kills all Marked bugs below threshold globally",
+  ],
 };
 
 export default nullPointer;

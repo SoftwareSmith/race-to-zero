@@ -10,7 +10,7 @@ import { useCallback } from "react";
 import type { RefObject, MutableRefObject } from "react";
 import type Engine from "@game/engine/Engine";
 import type { VfxEngine } from "@game/engine/VfxEngine";
-import type { SiegeWeaponId } from "@game/types";
+import type { SiegeWeaponId, WeaponTier } from "@game/types";
 import type {
   WeaponContext,
   ExecutionContext,
@@ -52,6 +52,8 @@ interface UseWeaponSessionOptions {
     viewportY: number,
     extras?: OverlayExtras,
   ) => void;
+  /** Returns the current evolution tier for a weapon. Defaults to 1 when absent. */
+  getWeaponTier?: (id: SiegeWeaponId) => WeaponTier;
 }
 
 function resolveFire(
@@ -81,6 +83,7 @@ function buildContext(
   viewportY: number,
   targetX: number,
   targetY: number,
+  weaponId: SiegeWeaponId,
 ): WeaponContext | null {
   const engine = opts.engineRef.current;
   const bounds = opts.boundsRef.current;
@@ -98,6 +101,8 @@ function buildContext(
     bounds,
     now: performance.now(),
     engine: engine as unknown as WeaponContext["engine"],
+    tier: opts.getWeaponTier ? opts.getWeaponTier(weaponId) : 1,
+    weaponId,
   };
 }
 
@@ -203,12 +208,12 @@ export function useWeaponSession(
         opts.hammerPositionRef,
       );
 
-      const wCtx = buildContext(opts, viewportX, viewportY, targetX, targetY);
+      const wCtx = buildContext(opts, viewportX, viewportY, targetX, targetY, weaponId);
       if (!wCtx) return false;
 
       const session = entry.createSession(wCtx);
 
-      // For persistent weapons (void pulse, plasma bomb): store & begin
+      // For persistent weapons (currently void pulse): store & begin
       if (session.mode === "persistent") {
         const existing = getPersistentSession(weaponId);
         if (existing?.active) return true; // block re-fire while active
@@ -257,7 +262,7 @@ export function useWeaponSession(
         opts.hammerPositionRef,
       );
 
-      const wCtx = buildContext(opts, viewportX, viewportY, targetX, targetY);
+      const wCtx = buildContext(opts, viewportX, viewportY, targetX, targetY, weaponId);
       if (!wCtx) return null;
 
       const session = entry.createSession(wCtx) as HoldFireSession;
@@ -294,7 +299,7 @@ export function useWeaponSession(
         opts.hammerPositionRef,
       );
 
-      const wCtx = buildContext(opts, viewportX, viewportY, targetX, targetY);
+      const wCtx = buildContext(opts, viewportX, viewportY, targetX, targetY, weaponId);
       if (!wCtx) return;
 
       const eCtx = buildExecContext(opts, weaponId, viewportX, viewportY);
@@ -318,7 +323,7 @@ export function useWeaponSession(
         opts.hammerPositionRef,
       );
 
-      const wCtx = buildContext(opts, viewportX, viewportY, targetX, targetY);
+      const wCtx = buildContext(opts, viewportX, viewportY, targetX, targetY, weaponId);
       if (!wCtx) return;
 
       const eCtx = buildExecContext(opts, weaponId, viewportX, viewportY);
@@ -362,7 +367,7 @@ export function useWeaponSession(
         opts.hammerPositionRef,
       );
 
-      const wCtx = buildContext(opts, viewportX, viewportY, targetX, targetY);
+      const wCtx = buildContext(opts, viewportX, viewportY, targetX, targetY, weaponId);
       if (!wCtx) return null;
 
       const session = entry.createSession(wCtx) as PersistentFireSession;

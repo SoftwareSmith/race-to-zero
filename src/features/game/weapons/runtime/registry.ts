@@ -18,7 +18,7 @@ import type {
 
 const _entries = new Map<SiegeWeaponId, WeaponEntry>();
 
-/** Active persistent sessions (void pulse, plasma bomb two-phase). */
+/** Active persistent sessions (currently void pulse). */
 const _persistentSessions = new Map<SiegeWeaponId, PersistentFireSession>();
 
 /** Active hold sessions (flame, bug spray). Cleared on mouseup. */

@@ -20,7 +20,7 @@ const CURSOR_THEME: Record<
   SiegeWeaponId,
   { accent: string; aura: string; ringClassName?: string; size: number }
 > = {
-  wrench: {
+  hammer: {
     accent: "#fbbf24",
     aura: "0 0 22px rgba(251,191,36,0.32)",
     size: 48,
@@ -152,7 +152,7 @@ function CursorReticle({
   const guide = Math.round(size * 0.22);
   const inner = Math.round(size * 0.42);
   const showOuterRing = !!theme.ringClassName;
-  const showInnerRing = weaponId !== "wrench";
+  const showInnerRing = weaponId !== "hammer";
   const showCrosshair = weaponId === "laser" || weaponId === "nullpointer";
 
   return (
@@ -315,19 +315,19 @@ export default function WeaponCursor({
     >
       <div
         className={
-          weaponId === "wrench" && swinging
+          weaponId === "hammer" && swinging
             ? "[animation:weapon-cursor-swing_180ms_ease-out]"
             : undefined
         }
         style={{
           transformOrigin:
-            weaponId === "wrench" && !structureId ? "18% 18%" : "50% 50%",
+            weaponId === "hammer" && !structureId ? "18% 18%" : "50% 50%",
         }}
       >
         <div
           style={{
             transform:
-              weaponId === "wrench" && !structureId
+              weaponId === "hammer" && !structureId
                 ? "translate(-30%, -28%)"
                 : undefined,
           }}

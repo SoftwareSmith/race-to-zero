@@ -33,6 +33,7 @@ const MAX_FIRE_TRAIL_DECALS = 36;
 interface Particle {
   gfx: Graphics;
   x: number;
+  y: number;
   vx: number;
   vy: number;
   ax: number;
@@ -890,7 +891,7 @@ export class VfxEngine {
     }
   }
 
-  // ── Plasma Bomb: inward clockwise implosion spiral ────────────────────────
+  // ── Legacy implosion spiral effect (unused by current loadout) ───────────
 
   spawnPlasmaImplosion(x: number, y: number, radiusPx: number): void {
     if (!this.initialized) return;

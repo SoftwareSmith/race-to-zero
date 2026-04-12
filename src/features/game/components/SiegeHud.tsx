@@ -1,6 +1,7 @@
 import Tooltip from "@shared/components/Tooltip";
 import WeaponGlyph from "@shared/components/icons/WeaponGlyph";
 import { STRUCTURE_DEFS } from "@config/structureConfig";
+import { cn } from "@shared/utils/cn";
 import type {
   SiegeWeaponId,
   StructureId,
@@ -23,7 +24,12 @@ function weaponTooltip(
   }
   const mode = INPUT_MODE_LABEL[snapshot.inputMode] ?? snapshot.inputMode;
   const selected = isSelected ? " ✓" : "";
-  return `${snapshot.title} [${mode}]${selected} — ${snapshot.hint}`;
+  const tierLabel = snapshot.tier >= 2 ? ` [T${snapshot.tier}]` : "";
+  const progress =
+    snapshot.killsToNextTier != null
+      ? ` · ${snapshot.killsToNextTier} kills → T${snapshot.tier + 1}`
+      : " · MAX TIER";
+  return `${snapshot.title} [${mode}]${tierLabel}${selected}${progress} — ${snapshot.hint}`;
 }
 
 interface SiegeHudProps {
@@ -32,6 +38,8 @@ interface SiegeHudProps {
   interactiveKills: number;
   interactivePoints: number;
   interactiveRemainingBugs: number;
+  /** Weapon ID that just evolved — drives the wiggle+burst animation. */
+  justEvolvedWeaponId?: SiegeWeaponId | null;
   lastFireTimes?: Partial<Record<SiegeWeaponId, number>>;
   onArmStructure?: (id: StructureId) => void;
   onExit: () => void;
@@ -44,11 +52,40 @@ interface SiegeHudProps {
   weaponSnapshots: WeaponProgressSnapshot[];
 }
 
+/** Outer slot wrapper — colour-coded by tier (bronze/silver/gold). */
+function getTierSlotClassName(snapshot: WeaponProgressSnapshot) {
+  const base = "relative rounded-[14px] border p-1.5 text-sm text-stone-200";
+  if (!snapshot.locked) {
+    if (snapshot.tier >= 3) {
+      // Gold  — T3
+      return cn(
+        base,
+        "border-amber-400/38 bg-[linear-gradient(135deg,rgba(120,53,15,0.22),rgba(0,0,0,0.24))] shadow-[0_0_14px_rgba(251,191,36,0.18)]",
+      );
+    }
+    if (snapshot.tier >= 2) {
+      // Silver — T2
+      return cn(
+        base,
+        "border-slate-400/32 bg-[linear-gradient(135deg,rgba(100,116,139,0.14),rgba(0,0,0,0.22))] shadow-[0_0_10px_rgba(148,163,184,0.12)]",
+      );
+    }
+  }
+  // Bronze / locked — T1 default
+  return cn(base, "border-white/8 bg-black/18");
+}
+
 function getWeaponButtonClassName(
   snapshot: WeaponProgressSnapshot,
   isSelected: boolean,
 ) {
   if (isSelected) {
+    if (snapshot.tier >= 3) {
+      return "inline-flex h-9 w-9 items-center justify-center rounded-xl border border-amber-300/55 bg-amber-500/22 text-amber-50 shadow-[0_0_22px_rgba(251,191,36,0.32)]";
+    }
+    if (snapshot.tier >= 2) {
+      return "inline-flex h-9 w-9 items-center justify-center rounded-xl border border-slate-300/50 bg-slate-400/20 text-slate-50 shadow-[0_0_20px_rgba(148,163,184,0.26)]";
+    }
     return "inline-flex h-9 w-9 items-center justify-center rounded-xl border border-sky-300/40 bg-sky-400/16 text-sky-50 shadow-[0_0_20px_rgba(56,189,248,0.18)]";
   }
 
@@ -56,6 +93,12 @@ function getWeaponButtonClassName(
     return "inline-flex h-9 w-9 items-center justify-center rounded-xl border border-white/6 bg-white/4 text-stone-500 opacity-65";
   }
 
+  if (snapshot.tier >= 3) {
+    return "inline-flex h-9 w-9 items-center justify-center rounded-xl border border-amber-400/32 bg-amber-500/14 text-amber-100 transition-colors duration-150 hover:border-amber-300/52 hover:bg-amber-400/22 hover:text-amber-50";
+  }
+  if (snapshot.tier >= 2) {
+    return "inline-flex h-9 w-9 items-center justify-center rounded-xl border border-slate-400/30 bg-slate-500/12 text-slate-100 transition-colors duration-150 hover:border-slate-300/48 hover:bg-slate-400/18 hover:text-slate-50";
+  }
   return "inline-flex h-9 w-9 items-center justify-center rounded-xl border border-emerald-400/20 bg-emerald-500/8 text-emerald-100 transition-colors duration-150 hover:border-sky-400/30 hover:bg-sky-500/10 hover:text-sky-100";
 }
 
@@ -65,6 +108,7 @@ export default function SiegeHud({
   interactiveKills,
   interactivePoints,
   interactiveRemainingBugs,
+  justEvolvedWeaponId,
   lastFireTimes,
   onArmStructure,
   onExit,
@@ -152,17 +196,38 @@ export default function SiegeHud({
           >
             {weaponSnapshots.map((snapshot) => {
               const isSelected = snapshot.id === selectedWeaponId;
+              const isEvolving = justEvolvedWeaponId === snapshot.id;
               return (
                 <Tooltip
                   key={snapshot.id}
                   content={weaponTooltip(snapshot, isSelected)}
                 >
                   <div
-                    className="relative overflow-hidden rounded-[14px] border border-white/8 bg-black/18 p-1.5 text-sm text-stone-200"
+                    className={getTierSlotClassName(snapshot)}
                     data-current={isSelected ? "true" : "false"}
                     data-locked={snapshot.locked ? "true" : "false"}
                     data-testid={`weapon-${snapshot.id}`}
+                    style={
+                      isEvolving
+                        ? {
+                            animation:
+                              "weapon-evolve 720ms cubic-bezier(0.34,1.56,0.64,1) forwards",
+                          }
+                        : undefined
+                    }
                   >
+                    {/* Evolution ring burst — expands outward and fades */}
+                    {isEvolving && (
+                      <div
+                        className={cn(
+                          "pointer-events-none absolute inset-[-3px] z-20 rounded-[17px] border-2 [animation:weapon-evolve-ring_650ms_ease-out_forwards]",
+                          snapshot.tier >= 3
+                            ? "border-amber-400/90"
+                            : "border-slate-300/90",
+                        )}
+                      />
+                    )}
+
                     {snapshot.locked ? (
                       <div
                         aria-label={`${snapshot.title} weapon (locked)`}
@@ -187,6 +252,36 @@ export default function SiegeHud({
                         <WeaponGlyph className="h-5 w-5" id={snapshot.id} />
                       </button>
                     )}
+
+                    {/* Tier pip badge — silver (T2) or gold (T3) corner medallion */}
+                    {!snapshot.locked && snapshot.tier >= 2 ? (
+                      <div className="absolute -right-1 -top-1 z-10">
+                        {snapshot.tier >= 3 ? (
+                          <span
+                            className="flex h-[18px] w-[18px] items-center justify-center rounded-full border border-amber-400/60 bg-amber-500/90 text-[0.4rem] font-black leading-none text-amber-100"
+                            style={{
+                              animation:
+                                "tier-pip-shimmer-gold 2.4s ease-in-out infinite",
+                            }}
+                            aria-label="Tier 3"
+                          >
+                            III
+                          </span>
+                        ) : (
+                          <span
+                            className="flex h-[18px] w-[18px] items-center justify-center rounded-full border border-slate-400/55 bg-slate-500/90 text-[0.4rem] font-black leading-none text-slate-100"
+                            style={{
+                              animation:
+                                "tier-pip-shimmer 2.8s ease-in-out infinite",
+                            }}
+                            aria-label="Tier 2"
+                          >
+                            II
+                          </span>
+                        )}
+                      </div>
+                    ) : null}
+
                     {/* Reload bar: drains from full (right) to empty over cooldownMs */}
                     {!snapshot.locked &&
                     snapshot.cooldownMs > 0 &&
@@ -194,7 +289,14 @@ export default function SiegeHud({
                       <div className="absolute bottom-0 left-0 right-0 h-0.5 overflow-hidden rounded-b-[14px]">
                         <div
                           key={lastFireTimes[snapshot.id]}
-                          className="h-full bg-sky-400/80"
+                          className={cn(
+                            "h-full",
+                            snapshot.tier >= 3
+                              ? "bg-amber-400/80"
+                              : snapshot.tier >= 2
+                                ? "bg-slate-300/80"
+                                : "bg-sky-400/80",
+                          )}
                           style={{
                             animation: `reload-drain ${snapshot.cooldownMs}ms linear forwards`,
                           }}

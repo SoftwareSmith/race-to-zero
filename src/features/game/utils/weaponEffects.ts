@@ -8,15 +8,15 @@ import type { SiegeWeaponId, WeaponEffectEvent } from "@game/types";
 
 /** Duration in ms each weapon's fire animation plays before cleanup. */
 export const EFFECT_DURATION: Record<SiegeWeaponId, number> = {
-  wrench: 520,
+  hammer: 520,
   zapper: 1400,
   freeze: 700,
   chain: 1200,
   flame: 3000,
-  laser: 400,
+  laser: 560,
   shockwave: 1200,
   nullpointer: 1500,
-  plasma: 1100,
+  plasma: 760,
   void: 2500,
 };
 

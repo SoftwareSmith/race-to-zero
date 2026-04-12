@@ -17,10 +17,13 @@ import {
 const DAMAGE = 2;
 const CHAIN_RADIUS = 90;
 const MAX_BOUNCES = 3;
+const MAX_BOUNCES_T2 = 6;
 
 export function createSession(ctx: WeaponContext): ClickFireResult {
   const { engine, targetX, targetY, viewportX, viewportY, bounds } = ctx;
+  const tier = ctx.tier ?? 1;
   const commands: WeaponCommand[] = [];
+  const maxBounces = tier >= 2 ? MAX_BOUNCES_T2 : MAX_BOUNCES;
 
   const initial = findNearestBugInRadius(
     engine,
@@ -52,7 +55,7 @@ export function createSession(ctx: WeaponContext): ClickFireResult {
 
   const chainIndexes = [
     initial.index,
-    ...chainFn(initial.index, CHAIN_RADIUS, MAX_BOUNCES),
+    ...chainFn(initial.index, CHAIN_RADIUS, maxBounces),
   ];
 
   const bugs = engine.getAllBugs();
@@ -81,6 +84,20 @@ export function createSession(ctx: WeaponContext): ClickFireResult {
       targetIndex: idx,
       amount: DAMAGE,
       creditOnDeath: true,
+    });
+    // T2+: apply Charged status to each hit bug
+    if (tier >= 2) {
+      commands.push({ kind: "applyCharged", targetIndex: idx, durationMs: 5000 });
+    }
+  }
+
+  // T3: propagate charged network after hitting the chain
+  if (tier >= 3 && chainIndexes.length > 0) {
+    commands.push({
+      kind: "propagateChargedNetwork",
+      sourceIndex: chainIndexes[0],
+      damage: 1,
+      falloff: 0.7,
     });
   }
 
