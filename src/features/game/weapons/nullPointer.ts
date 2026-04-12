@@ -3,6 +3,9 @@ import type { WeaponDef } from "./types";
 const nullPointer: WeaponDef = {
   id: "nullpointer",
   title: "Null Pointer",
+  typeLabel: "Precision",
+  typeHint: "Tracks the highest-value bug and converts setup into clean executions.",
+  weaponType: "precision",
   unlockKills: 95,
   detail:
     "Homing missile that locks onto the highest-HP bug on screen. Curves to target over 0.6 s. Deals 3 dmg + 60px splash. Leaves a binary data burst (1s and 0s fly outward) and a tracer trail.",

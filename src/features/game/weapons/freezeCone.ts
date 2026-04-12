@@ -3,6 +3,9 @@ import type { WeaponDef } from "./types";
 const freezeCone: WeaponDef = {
   id: "freeze",
   title: "Freeze Blast",
+  typeLabel: "Cryo",
+  typeHint: "Controls space by slowing or pinning fast threats in place.",
+  weaponType: "cryo",
   unlockKills: 25,
   detail:
     "Radial ice burst centred on click. Slows all bugs in a 180 px radius by 65% for 3.5 s. Snowflakes linger at the blast site. A second hit on a frozen bug extends the duration.",

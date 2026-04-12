@@ -3,6 +3,9 @@ import type { WeaponDef } from "./types";
 const chainZap: WeaponDef = {
   id: "chain",
   title: "Chain Zap",
+  typeLabel: "Electric",
+  typeHint: "Jumps between clustered targets and rewards charged setups.",
+  weaponType: "electric",
   unlockKills: 38,
   detail:
     "Click near a bug to start a 3-strand plasma arc. Lightning hops up to 3 times — each node emits a spark crown. Prioritises unfrozen bugs (synergy with Freeze Cone). Final bug leaves an electric afterglow.",

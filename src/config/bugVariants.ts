@@ -39,8 +39,18 @@ export interface CrawlProfile {
 
 // ── Weapon matchup types ──────────────────────────────────────────────────────
 
-export type BugWeaponId = "wrench" | "zapper" | "freeze" | "shockwave" | "nullpointer";
-export type BugWeaponMatchupState = "favored" | "steady" | "risky";
+export type BugWeaponId =
+  | "hammer"
+  | "zapper"
+  | "freeze"
+  | "chain"
+  | "flame"
+  | "laser"
+  | "shockwave"
+  | "nullpointer"
+  | "plasma"
+  | "void";
+export type BugWeaponMatchupState = "favored" | "steady" | "risky" | "immune";
 
 export interface BugWeaponMatchup {
   note: string;
@@ -97,10 +107,10 @@ function steadyMatchups(
   overrides: Partial<BugWeaponMatchups> = {},
 ): BugWeaponMatchups {
   return {
-    wrench: {
+    hammer: {
       note: "Serviceable cleanup, but not the primary answer.",
       state: "steady",
-      ...overrides.wrench,
+      ...overrides.hammer,
     },
     zapper: {
       note: "Manages spread with EMP bursts, but timing matters more than raw output.",
@@ -112,6 +122,21 @@ function steadyMatchups(
       state: "steady",
       ...overrides.freeze,
     },
+    chain: {
+      note: "Good at linking clustered bugs, but not always the cleanest answer.",
+      state: "steady",
+      ...overrides.chain,
+    },
+    flame: {
+      note: "Pressure tool that matters most when bugs stay in the burn zone.",
+      state: "steady",
+      ...overrides.flame,
+    },
+    laser: {
+      note: "Reliable line pressure, best when the route is already clear.",
+      state: "steady",
+      ...overrides.laser,
+    },
     shockwave: {
       note: "Useful for clearing surrounding pressure, not a direct counter.",
       state: "steady",
@@ -121,6 +146,16 @@ function steadyMatchups(
       note: "Reserve for high-HP targets; overkill against low-threat types.",
       state: "steady",
       ...overrides.nullpointer,
+    },
+    plasma: {
+      note: "Cluster breaker that shines when multiple bugs overlap.",
+      state: "steady",
+      ...overrides.plasma,
+    },
+    void: {
+      note: "Control option for elite bugs; too slow for disposable cleanup.",
+      state: "steady",
+      ...overrides.void,
     },
   };
 }
@@ -174,7 +209,7 @@ export const BUG_VARIANT_DEFS: Record<BugVariant, BugVariantDef> = {
     socialAffinity: 0.6,
     preferredRegion: "middle",
     weaponMatchups: steadyMatchups({
-      wrench: {
+      hammer: {
         note: "Fine for single cleanup once a straggler is already isolated.",
         state: "steady",
       },
@@ -182,9 +217,29 @@ export const BUG_VARIANT_DEFS: Record<BugVariant, BugVariantDef> = {
         note: "Best answer when Glitchlings are flooding in clusters and visual noise is building.",
         state: "favored",
       },
+      chain: {
+        note: "Electric bounce can miss the smallest runners when the field is loose.",
+        state: "risky",
+      },
+      flame: {
+        note: "Flammable swarm fodder — flames shred them fast and force panic movement.",
+        state: "favored",
+      },
+      laser: {
+        note: "Works, but the route setup is usually overkill for a 1-HP target.",
+        state: "steady",
+      },
       shockwave: {
         note: "Massive overkill on a 1-HP type, but clears the whole swarm in one blast.",
         state: "favored",
+      },
+      plasma: {
+        note: "Explosions erase clustered Glitchlings, but single targets waste the payload.",
+        state: "steady",
+      },
+      void: {
+        note: "Too small and disposable — the gravity well is the wrong answer here.",
+        state: "immune",
       },
     }),
   },
@@ -237,7 +292,7 @@ export const BUG_VARIANT_DEFS: Record<BugVariant, BugVariantDef> = {
     socialAffinity: 0.2,
     preferredRegion: "middle",
     weaponMatchups: steadyMatchups({
-      wrench: {
+      hammer: {
         note: "Can get stuck trading one-for-one while the patrol route keeps pressure alive.",
         state: "risky",
       },
@@ -247,6 +302,14 @@ export const BUG_VARIANT_DEFS: Record<BugVariant, BugVariantDef> = {
       },
       freeze: {
         note: "Slowing patrol routes gives you crucial breathing room to follow up.",
+        state: "favored",
+      },
+      chain: {
+        note: "Electric arcs catch patrol formations cleanly and reward grouped pressure.",
+        state: "favored",
+      },
+      flame: {
+        note: "Burning lanes slows the patrol advance, but it is more pressure than counterplay.",
         state: "favored",
       },
     }),
@@ -300,16 +363,44 @@ export const BUG_VARIANT_DEFS: Record<BugVariant, BugVariantDef> = {
     socialAffinity: -0.3,
     preferredRegion: "interior",
     weaponMatchups: steadyMatchups({
-      wrench: {
+      hammer: {
         note: "Closing distance gives Nullify too much room to steal the center lane back.",
         state: "risky",
+      },
+      zapper: {
+        note: "Armored shell shrugs off toxin pressure before poison can matter.",
+        state: "immune",
       },
       freeze: {
         note: "Best tool against Nullify — halving its speed turns the fast stalker into an easy target.",
         state: "favored",
       },
+      chain: {
+        note: "Electric arcs punish clustered elites and stay effective once the shell is exposed.",
+        state: "favored",
+      },
+      flame: {
+        note: "Armor blunts the burn — useful for space control, not direct deletion.",
+        state: "risky",
+      },
+      laser: {
+        note: "Precision beams cut through the interior lane and delete high-value pressure.",
+        state: "favored",
+      },
+      shockwave: {
+        note: "Static lockdown is solid, but the real value comes from follow-up damage.",
+        state: "favored",
+      },
       nullpointer: {
         note: "Reliable single-target solution once Nullify is in the interior and you need a guaranteed hit.",
+        state: "favored",
+      },
+      plasma: {
+        note: "Heavy clustered blasts do real work once multiple high-threat bugs overlap.",
+        state: "favored",
+      },
+      void: {
+        note: "Gravity control keeps interior elites contained and turns their size against them.",
         state: "favored",
       },
     }),
@@ -364,9 +455,21 @@ export const BUG_VARIANT_DEFS: Record<BugVariant, BugVariantDef> = {
     preferredRegion: "middle",
     iconVariant: "urgent",
     weaponMatchups: steadyMatchups({
-      wrench: {
+      hammer: {
         note: "Too volatile to rely on close-range cleanup alone once the outbreak is moving.",
         state: "risky",
+      },
+      freeze: {
+        note: "ZeroDay runs too hot and too erratically — cryo control does not stick.",
+        state: "immune",
+      },
+      flame: {
+        note: "Fast outbreaks slip through the burn window before thermal damage ramps.",
+        state: "risky",
+      },
+      laser: {
+        note: "Precision beams track the chaos better than most tools and keep damage honest.",
+        state: "favored",
       },
       shockwave: {
         note: "Clears surrounding pressure and softens ZeroDay when surrounded by a swarm.",
@@ -374,6 +477,10 @@ export const BUG_VARIANT_DEFS: Record<BugVariant, BugVariantDef> = {
       },
       nullpointer: {
         note: "The most reliable answer — locks onto ZeroDay regardless of how erratically it moves.",
+        state: "favored",
+      },
+      void: {
+        note: "Singularity control finally pins the outbreak in place long enough to finish it.",
         state: "favored",
       },
     }),

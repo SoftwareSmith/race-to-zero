@@ -3,6 +3,9 @@ import type { WeaponDef } from "./types";
 const hammer: WeaponDef = {
   id: "hammer",
   title: "Hammer",
+  typeLabel: "Blunt",
+  typeHint: "Crushes armored targets and stays reliable when precision is tight.",
+  weaponType: "blunt",
   unlockKills: 0,
   detail:
     "Heavy impact strike. Deals 2 damage — one-shots Glitchlings on contact and leaves a persistent crack at the hit point.",

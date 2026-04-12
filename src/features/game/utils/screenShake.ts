@@ -15,6 +15,8 @@ export const SHAKE_PRESETS: Partial<Record<string, { intensity: number; duration
   plasma:      { intensity: 5,  duration: 280 },
   void:        { intensity: 10, duration: 500 },
   flame:       { intensity: 2,  duration: 150 },
+  weak:        { intensity: 2,  duration: 120 },
+  tierup:      { intensity: 12, duration: 560 },
 };
 
 let activeShake: gsap.core.Tween | null = null;
@@ -65,6 +67,16 @@ export function triggerWeaponShake(
   weaponId: string,
 ): void {
   const preset = SHAKE_PRESETS[weaponId];
+  if (preset) {
+    triggerShake(el, preset.intensity, preset.duration);
+  }
+}
+
+export function triggerNamedShake(
+  el: HTMLElement,
+  presetName: string,
+): void {
+  const preset = SHAKE_PRESETS[presetName];
   if (preset) {
     triggerShake(el, preset.intensity, preset.duration);
   }

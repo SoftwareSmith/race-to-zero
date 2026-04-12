@@ -7,6 +7,8 @@ import type { StructureId, SiegeWeaponId, WeaponTier, WeaponEvolutionState } fro
 import { hasEntry, getEntry } from "@game/structures/runtime/registry";
 import type { StructureTickContext, StructureGameEngine } from "@game/structures/runtime/types";
 import { WEAPON_EVOLVE_THRESHOLDS } from "@config/gameDefaults";
+import { applyMatchupDamage, getBugWeaponMatchup } from "@game/combat/weaponMatchups";
+import type { BugVariant } from "../../../types/dashboard";
 // Trigger all structure plugin self-registrations at Engine load time.
 import "@game/structures/index";
 
@@ -488,8 +490,22 @@ export class Engine {
   handleHit(index: number, damage = 1, creditOnDeath = false, weaponId?: SiegeWeaponId) {
     const e = this.entities[index];
     if (!e) return null;
+    const matchup = weaponId
+      ? getBugWeaponMatchup((e as any).variant as BugVariant, weaponId)
+      : "steady";
+    const adjustedDamage = applyMatchupDamage(damage, matchup);
+    if (matchup === "immune") {
+      return {
+        defeated: false,
+        matchup,
+        remainingHp: (e as any).hp ?? 0,
+        pointValue: 0,
+        frozen: false,
+        variant: (e as any).variant,
+      };
+    }
     if (typeof (e as any).onHit === "function") {
-      const res = (e as any).onHit(damage);
+      const res = (e as any).onHit(adjustedDamage);
       if (res.defeated && "deathCredited" in (e as any)) {
         (e as any).deathCredited = creditOnDeath;
         // Credit direct kills immediately (DOT kills are credited in the update loop)
@@ -497,6 +513,7 @@ export class Engine {
       }
       return {
         defeated: res.defeated,
+        matchup,
         remainingHp: res.remainingHp,
         pointValue: res.pointValue ?? 1,
         frozen: res.frozen ?? false,
@@ -709,11 +726,15 @@ export class Engine {
 
   // ── Status-effect area applicators ─────────────────────────────────
 
-  applyPoisonInRadius(cx: number, cy: number, radius: number, dps: number, durationMs: number): void {
+  applyPoisonInRadius(cx: number, cy: number, radius: number, dps: number, durationMs: number, weaponId?: SiegeWeaponId): void {
     for (const e of this.entities) {
       const bug = e as any;
       if (bug.state === "dead" || bug.state === "dying") continue;
       if (Math.hypot(e.x - cx, e.y - cy) <= radius) {
+        if (weaponId) {
+          const matchup = getBugWeaponMatchup(bug.variant as BugVariant, weaponId);
+          if (matchup === "immune") continue;
+        }
         if (typeof bug.applyPoison === "function") bug.applyPoison(dps, durationMs);
       }
     }
@@ -726,12 +747,17 @@ export class Engine {
     peakDps: number,
     durationMs: number,
     decayPerSecond = 3.2,
+    weaponId?: SiegeWeaponId,
   ): void {
     for (const e of this.entities) {
       const bug = e as any;
       if (bug.state === "dead" || bug.state === "dying") continue;
       const dist = Math.hypot(e.x - cx, e.y - cy);
       if (dist > radius) continue;
+      if (weaponId) {
+        const matchup = getBugWeaponMatchup(bug.variant as BugVariant, weaponId);
+        if (matchup === "immune") continue;
+      }
       const normalized = dist / Math.max(1, radius);
       const intensity = 0.2 + 0.8 * Math.exp(-3.2 * normalized * normalized);
       if (typeof bug.applyBurn === "function") {
@@ -740,11 +766,15 @@ export class Engine {
     }
   }
 
-  applyEnsnareInRadius(cx: number, cy: number, radius: number, durationMs: number): void {
+  applyEnsnareInRadius(cx: number, cy: number, radius: number, durationMs: number, weaponId?: SiegeWeaponId): void {
     for (const e of this.entities) {
       const bug = e as any;
       if (bug.state === "dead" || bug.state === "dying") continue;
       if (Math.hypot(e.x - cx, e.y - cy) <= radius) {
+        if (weaponId) {
+          const matchup = getBugWeaponMatchup(bug.variant as BugVariant, weaponId);
+          if (matchup === "immune") continue;
+        }
         if (typeof bug.applyEnsnare === "function") bug.applyEnsnare(durationMs);
       }
     }
@@ -906,10 +936,14 @@ export class Engine {
     }
   }
 
-  applyGlobalSlow(multiplier: number, durationMs: number): void {
+  applyGlobalSlow(multiplier: number, durationMs: number, weaponId?: SiegeWeaponId): void {
     for (const e of this.entities) {
       const bug = e as any;
       if (bug.state === "dead" || bug.state === "dying") continue;
+      if (weaponId) {
+        const matchup = getBugWeaponMatchup(bug.variant as BugVariant, weaponId);
+        if (matchup === "immune") continue;
+      }
       if (typeof bug.applyFreeze === "function") bug.applyFreeze(multiplier, durationMs);
     }
   }

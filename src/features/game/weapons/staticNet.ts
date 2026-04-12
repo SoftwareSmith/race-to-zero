@@ -4,6 +4,9 @@ import type { WeaponDef } from "./types";
 const staticNet: WeaponDef = {
   id: "shockwave",
   title: "Static Net",
+  typeLabel: "Electric",
+  typeHint: "Locks enemies in place so follow-up hits feel guaranteed.",
+  weaponType: "electric",
   unlockKills: 82,
   detail:
     "Expands a wire-mesh net to 200px over 0.4 s. All bugs inside are Ensnared — completely immobilised for 3 s. Click any ensnared bug for an instant kill. Net dissolves with a scatter burst. 4 s cooldown.",

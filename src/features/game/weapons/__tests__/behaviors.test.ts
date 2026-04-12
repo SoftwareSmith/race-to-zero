@@ -21,6 +21,7 @@ import { _resetForTests } from "../runtime/registry";
 function makeHitResult(overrides: Partial<HitResult> = {}): HitResult {
   return {
     defeated: false,
+    matchup: "steady",
     remainingHp: 2,
     pointValue: 1,
     frozen: false,

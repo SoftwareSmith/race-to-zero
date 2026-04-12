@@ -12,6 +12,8 @@ import {
   Application,
   Container,
   Graphics,
+  Text,
+  TextStyle,
   type ColorSource,
 } from "pixi.js";
 // ── Particle types ────────────────────────────────────────────────────────────
@@ -70,6 +72,16 @@ interface LightningArc {
   color: number; // hex int
 }
 
+interface FloatingLabel {
+  text: Text;
+  x: number;
+  y: number;
+  vy: number;
+  age: number;
+  maxAge: number;
+  scaleFrom: number;
+}
+
 // ── Noise helper ──────────────────────────────────────────────────────────────
 
 function hash(n: number): number {
@@ -108,10 +120,12 @@ export class VfxEngine {
   private normalContainer!: Container;     // smoke, debris
   private decalContainer!: Container;      // persistent marks
   private lightningGfx!: Graphics;         // redrawn each tick
+  private labelContainer!: Container;
 
   private particles: Particle[] = [];
   private decals: Decal[] = [];
   private lightningArcs: LightningArc[] = [];
+  private floatingLabels: FloatingLabel[] = [];
 
   private gfxPool: Graphics[] = [];
   private initialized = false;
@@ -142,11 +156,13 @@ export class VfxEngine {
     this.normalContainer = new Container();
     this.lightningGfx = new Graphics();
     this.additiveContainer = new Container();
+    this.labelContainer = new Container();
 
     this.app.stage.addChild(this.decalContainer);
     this.app.stage.addChild(this.normalContainer);
     this.app.stage.addChild(this.lightningGfx);
     this.app.stage.addChild(this.additiveContainer);
+    this.app.stage.addChild(this.labelContainer);
 
     this.initialized = true;
   }
@@ -1074,6 +1090,114 @@ export class VfxEngine {
     }
   }
 
+  spawnHitNumber(
+    x: number,
+    y: number,
+    damage: number,
+    matchup: "effective" | "normal" | "weak" = "normal",
+  ): void {
+    const color =
+      matchup === "effective"
+        ? 0x4ade80
+        : matchup === "weak"
+          ? 0xa8a29e
+          : 0xffffff;
+    this.addFloatingLabel(x, y, `${damage}`, color, 1, 900, 42);
+  }
+
+  spawnImmune(x: number, y: number): void {
+    this.addFloatingLabel(x, y, "IMMUNE", 0xffffff, 0.9, 1050, 30);
+    for (let i = 0; i < 6; i++) {
+      const angle = (i / 6) * Math.PI * 2;
+      const speed = 70 + Math.random() * 50;
+      this.spawnParticle({
+        x,
+        y,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed,
+        life: 220 + Math.random() * 120,
+        size: 2 + Math.random() * 3,
+        type: PType.SPARK,
+        r: 255,
+        g: 255,
+        b: 255,
+        additive: true,
+      });
+    }
+  }
+
+  spawnStatusApply(x: number, y: number, status: "burn" | "freeze" | "poison" | "charged"): void {
+    const spec = {
+      burn: { color: 0xf97316, text: "FIRE" },
+      charged: { color: 0x22d3ee, text: "CHARGED" },
+      freeze: { color: 0x93c5fd, text: "SLOW" },
+      poison: { color: 0x4ade80, text: "POISON" },
+    }[status];
+    this.addFloatingLabel(x, y, spec.text, spec.color, 0.78, 780, 24);
+  }
+
+  spawnLevelUp(x: number, y: number): void {
+    this.addFloatingLabel(x, y, "TIER UP", 0xfbbf24, 1.1, 1200, 48);
+    const gfx = this.acquireGfx();
+    gfx.x = x;
+    gfx.y = y;
+    gfx.circle(0, 0, 18);
+    gfx.stroke({ color: 0xfbbf24, width: 3, alpha: 0.95 });
+    this.decalContainer.addChild(gfx);
+    this.decals.push({
+      gfx,
+      createdAt: performance.now(),
+      lifetime: 650,
+      initialAlpha: 1,
+      container: this.decalContainer,
+    });
+  }
+
+  private addFloatingLabel(
+    x: number,
+    y: number,
+    value: string,
+    color: number,
+    scaleFrom: number,
+    maxAge: number,
+    riseSpeed: number,
+  ): void {
+    if (!this.initialized) return;
+    const text = new Text({
+      text: value,
+      style: new TextStyle({
+        align: "center",
+        dropShadow: {
+          alpha: 0.45,
+          angle: Math.PI / 2,
+          blur: 4,
+          color: 0x000000,
+          distance: 2,
+        },
+        fill: color,
+        fontFamily: "ui-monospace, SFMono-Regular, monospace",
+        fontSize: 13,
+        fontWeight: "700",
+        letterSpacing: 1.1,
+        stroke: { color: 0x000000, width: 3 },
+      }),
+    });
+    text.anchor.set(0.5);
+    text.x = x;
+    text.y = y;
+    text.scale.set(scaleFrom);
+    this.labelContainer.addChild(text);
+    this.floatingLabels.push({
+      text,
+      x,
+      y,
+      vy: riseSpeed,
+      age: 0,
+      maxAge,
+      scaleFrom,
+    });
+  }
+
   // ── Laser: tracer line ────────────────────────────────────────────────────
 
   addTracerLine(x1: number, y1: number, x2: number, y2: number, durationMs: number): void {
@@ -1261,6 +1385,28 @@ export class VfxEngine {
     for (const a of deadArcs) {
       this.lightningArcs = this.lightningArcs.filter(x => x !== a);
     }
+
+    const deadLabels: FloatingLabel[] = [];
+    for (const label of this.floatingLabels) {
+      label.age += dtMs;
+      if (label.age >= label.maxAge) {
+        deadLabels.push(label);
+        continue;
+      }
+      const progress = label.age / label.maxAge;
+      const alpha = 1 - progress * progress;
+      label.y -= label.vy * (dtMs / 1000);
+      label.text.x = label.x;
+      label.text.y = label.y;
+      label.text.alpha = alpha;
+      const scale = label.scaleFrom + progress * 0.08;
+      label.text.scale.set(scale);
+    }
+    for (const label of deadLabels) {
+      label.text.removeFromParent();
+      label.text.destroy();
+      this.floatingLabels = this.floatingLabels.filter((entry) => entry !== label);
+    }
   }
 
   private _drawLightningArc(arc: LightningArc, alpha: number, now: number): void {
@@ -1340,6 +1486,8 @@ export class VfxEngine {
     this.decals.forEach(d => this.releaseDecal(d));
     this.decals = [];
     this.lightningArcs = [];
+    this.floatingLabels.forEach((label) => label.text.destroy());
+    this.floatingLabels = [];
     this.gfxPool.forEach(g => g.destroy());
     this.gfxPool = [];
     this.app.destroy(true, { children: true, texture: true });

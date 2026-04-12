@@ -2,7 +2,7 @@
  * Weapon module types — a single weapon owns its def, hit pattern, and VFX spec.
  */
 
-import type { SiegeWeaponId } from "@game/types";
+import type { SiegeWeaponId, WeaponType } from "@game/types";
 import type { WeaponTier } from "@game/types";
 
 export type { SiegeWeaponId };
@@ -21,6 +21,9 @@ export type HitPattern =
 export interface WeaponDef {
   id: SiegeWeaponId;
   title: string;
+  typeHint: string;
+  typeLabel: string;
+  weaponType: WeaponType;
   unlockKills: number;
   detail: string;
   hitPattern: HitPattern;

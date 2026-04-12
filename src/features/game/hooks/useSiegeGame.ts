@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { BugCounts } from "../../../types/dashboard";
 import {
   getSiegeCombatStats,
+  getNextWeaponUnlock,
   getSiegeWeaponSnapshots,
 } from "@game/progression/progression";
 import { WEAPON_DEFS } from "@config/weaponConfig";
@@ -47,6 +48,8 @@ export function useSiegeGame({
   const [interactiveSessionKey, setInteractiveSessionKey] = useState<
     string | null
   >(null);
+  const [killStreak, setKillStreak] = useState(0);
+  const [streakMultiplier, setStreakMultiplier] = useState(1);
   const [selectedWeaponId, setSelectedWeaponId] =
     useState<SiegeWeaponId>("hammer");
   const [placingStructureId, setPlacingStructureId] = useState<StructureId | null>(null);
@@ -54,6 +57,7 @@ export function useSiegeGame({
   const [agentCaptures, setAgentCaptures] = useState<Record<string, AgentCaptureState>>({});
   const [lastFireTimes, setLastFireTimes] = useState<Record<SiegeWeaponId, number>>({} as Record<SiegeWeaponId, number>);
   const phaseTimerRef = useRef<number | null>(null);
+  const lastKillAtRef = useRef<number | null>(null);
 
   const interactiveMode = siegePhase !== "idle";
 
@@ -66,6 +70,9 @@ export function useSiegeGame({
     setInteractiveInitialBugCounts(currentBugCounts);
     setInteractiveRemainingBugs(currentBugCount);
     setInteractiveSessionKey(`${Date.now()}`);
+    setKillStreak(0);
+    setStreakMultiplier(1);
+    lastKillAtRef.current = null;
     setSelectedWeaponId("hammer");
     setPlacedStructures([]);
     setPlacingStructureId(null);
@@ -148,13 +155,24 @@ export function useSiegeGame({
       if (!payload.defeated) {
         return;
       }
+      const now = performance.now();
+      const nextStreak =
+        lastKillAtRef.current != null && now - lastKillAtRef.current <= 1200
+          ? killStreak + 1
+          : 1;
+      lastKillAtRef.current = now;
+
       const earned = payload.pointValue ?? 1;
       const frozenBonus = payload.frozen ? 1 : 0;
+      setKillStreak(nextStreak);
+      setStreakMultiplier(
+        nextStreak >= 10 ? 2 : nextStreak >= 5 ? 1.5 : nextStreak >= 3 ? 1.2 : 1,
+      );
       setInteractiveKills((v) => v + 1);
       setInteractiveRemainingBugs((v) => Math.max(0, v - 1));
       setInteractivePoints((v) => v + earned + frozenBonus);
     },
-    [],
+    [killStreak],
   );
 
   const handleAgentAbsorb = useCallback(
@@ -252,6 +270,26 @@ export function useSiegeGame({
     };
   }, []);
 
+  useEffect(() => {
+    if (!interactiveMode || killStreak === 0) {
+      return undefined;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      if (
+        lastKillAtRef.current != null &&
+        performance.now() - lastKillAtRef.current >= 1200
+      ) {
+        setKillStreak(0);
+        setStreakMultiplier(1);
+      }
+    }, 1250);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [interactiveMode, killStreak]);
+
   const displayedBugCounts = interactiveMode
     ? interactiveInitialBugCounts
     : currentBugCounts;
@@ -268,6 +306,10 @@ export function useSiegeGame({
         evolutionStates,
       ),
     [debugMode, evolutionStates, interactiveKills, selectedWeaponId],
+  );
+  const nextWeaponUnlock = useMemo(
+    () => getNextWeaponUnlock(interactiveKills, debugMode),
+    [debugMode, interactiveKills],
   );
 
   const toggleDebugMode = useCallback(() => {
@@ -305,7 +347,9 @@ export function useSiegeGame({
     interactivePoints,
     interactiveRemainingBugs,
     interactiveSessionKey,
+    killStreak,
     lastFireTimes,
+    nextWeaponUnlock,
     placedCountByType,
     placedStructures,
     placingStructureId,
@@ -315,6 +359,7 @@ export function useSiegeGame({
     setInteractiveMode: (v: boolean) =>
       v ? enterInteractiveMode() : exitInteractiveMode(),
     siegePhase,
+    streakMultiplier,
     toggleDebugMode,
     weaponSnapshots,
   };

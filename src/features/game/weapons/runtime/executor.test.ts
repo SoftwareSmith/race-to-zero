@@ -7,6 +7,7 @@ function makeHitResult(overrides: Partial<HitResult> = {}): HitResult {
   return {
     defeated: true,
     frozen: false,
+    matchup: "steady",
     pointValue: 1,
     remainingHp: 0,
     variant: "low",

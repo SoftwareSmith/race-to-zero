@@ -4,6 +4,9 @@ import type { WeaponDef } from "./types";
 const bugSpray: WeaponDef = {
   id: "zapper",
   title: "Bug Spray",
+  typeLabel: "Toxin",
+  typeHint: "Poisons swarms and rewards area denial over burst damage.",
+  weaponType: "toxin",
   unlockKills: 12,
   detail:
     "Aerosol cone sprays 50° of noxious mist. Bugs hit are Poisoned — 0.5 dmg/s for 4 s. Leaves a glowing Toxic Cloud on impact that poisons bugs passing through it for 3 s.",

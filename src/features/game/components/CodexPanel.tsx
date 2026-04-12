@@ -8,23 +8,44 @@ import type {
   BugWeaponMatchup,
   BugWeaponMatchupState,
 } from "@game/engine/bugCodex";
+import { WEAPON_DEFS } from "@config/weaponConfig";
 import {
   BUG_VARIANT_CONFIG,
   getBugVariantColor,
   getBugVariantMaxHp,
 } from "../../../constants/bugs";
 import type { BugVariant } from "../../../types/dashboard";
+import type { SiegeWeaponId, WeaponType } from "@game/types";
 import { getColoredSvgUrl } from "@game/utils/bugSprite";
 import { cn } from "@shared/utils/cn";
 import WeaponGlyph from "@shared/components/icons/WeaponGlyph";
 import Tooltip from "@shared/components/Tooltip";
 import MetricInfoCard from "@dashboard/components/MetricInfoCard";
+import Tabs from "@shared/components/Tabs";
 
 interface CodexPanelProps {
   containerRef: RefObject<HTMLDivElement | null>;
   onMenuToggle: () => void;
   open: boolean;
 }
+
+type CodexView = "bugs" | "weapons";
+
+const CODEX_TABS = [
+  { id: "bugs", label: "Bugs" },
+  { id: "weapons", label: "Weapons" },
+] as const;
+
+const WEAPON_TYPE_ORDER: WeaponType[] = [
+  "blunt",
+  "toxin",
+  "cryo",
+  "thermal",
+  "electric",
+  "precision",
+  "plasma",
+  "gravity",
+];
 
 const BUILTIN_ICON_VARIANTS: BugVariant[] = ["low", "medium", "high", "urgent"];
 
@@ -80,11 +101,22 @@ function getPresenceLabel(presence: number) {
 
 function getWeaponEffectiveness(state: BugWeaponMatchupState) {
   if (state === "favored") return 88;
+  if (state === "immune") return 6;
   if (state === "risky") return 28;
   return 58;
 }
 
 function getWeaponStateClasses(state: BugWeaponMatchupState) {
+  if (state === "immune") {
+    return {
+      badge: "border-rose-400/24 bg-rose-500/12 text-rose-100",
+      panel: "border-rose-400/16 bg-rose-500/8",
+      tile: "border-rose-300/16 bg-rose-400/10 text-rose-50",
+      fill: "bg-rose-500/90",
+      glow: "0 0 18px rgba(251,113,133,0.45)",
+    };
+  }
+
   if (state === "favored") {
     return {
       badge: "border-emerald-400/24 bg-emerald-500/12 text-emerald-100",
@@ -305,10 +337,7 @@ function WeaponEffectivenessRow({
 }) {
   const tone = getWeaponStateClasses(matchup.state);
   const effectiveness = getWeaponEffectiveness(matchup.state);
-  // BugWeaponId "wrench" maps to the renamed SiegeWeaponId "hammer"
-  const glyphId = (
-    weaponId === "wrench" ? "hammer" : weaponId
-  ) as import("@game/types").SiegeWeaponId;
+  const glyphId = weaponId as SiegeWeaponId;
 
   return (
     <Tooltip
@@ -333,6 +362,117 @@ function WeaponEffectivenessRow({
         className={cn("min-h-[5.9rem]", tone.panel)}
       />
     </Tooltip>
+  );
+}
+
+function WeaponTypeCard({
+  bugEntries,
+  type,
+}: {
+  bugEntries: Array<[string, BugType]>;
+  type: WeaponType;
+}) {
+  const weapons = WEAPON_DEFS.filter((weapon) => weapon.weaponType === type);
+  if (weapons.length === 0) {
+    return null;
+  }
+
+  const lead = weapons[0];
+  const bugsByState = {
+    favored: [] as Array<[string, BugType]>,
+    immune: [] as Array<[string, BugType]>,
+    risky: [] as Array<[string, BugType]>,
+  };
+
+  for (const [bugId, entry] of bugEntries) {
+    const states = weapons.map(
+      (weapon) => entry.weaponMatchups[weapon.id].state,
+    );
+    if (states.includes("favored")) bugsByState.favored.push([bugId, entry]);
+    if (states.includes("immune")) bugsByState.immune.push([bugId, entry]);
+    if (states.includes("risky")) bugsByState.risky.push([bugId, entry]);
+  }
+
+  return (
+    <section className="rounded-[24px] border border-white/10 bg-white/[0.03] p-4">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <SectionEyebrow>Weapon Type</SectionEyebrow>
+          <h3 className="mt-1 text-[1.15rem] font-semibold tracking-[-0.03em] text-stone-50">
+            {lead.typeLabel}
+          </h3>
+          <p className="mt-1 max-w-[36rem] text-sm leading-6 text-stone-400">
+            {lead.typeHint}
+          </p>
+        </div>
+      </div>
+
+      <div className="mt-4 grid gap-3 md:grid-cols-2">
+        {weapons.map((weapon) => (
+          <div
+            key={weapon.id}
+            className="rounded-[18px] border border-white/8 bg-black/20 p-3"
+          >
+            <div className="flex items-center gap-3">
+              <div className="flex h-11 w-11 items-center justify-center rounded-[14px] border border-white/10 bg-white/[0.04] text-stone-50">
+                <WeaponGlyph className="h-5 w-5" id={weapon.id} />
+              </div>
+              <div className="min-w-0">
+                <p className="truncate text-sm font-semibold text-stone-100">
+                  {weapon.title}
+                </p>
+                <p className="text-xs uppercase tracking-[0.16em] text-stone-500">
+                  T1 {weapon.tierTitles?.[0] ?? weapon.title} · T2{" "}
+                  {weapon.tierTitles?.[1] ?? weapon.title} · T3{" "}
+                  {weapon.tierTitles?.[2] ?? weapon.title}
+                </p>
+              </div>
+            </div>
+            <p className="mt-3 text-xs leading-5 text-stone-400">
+              Unlocks at {weapon.unlockKills} bugs fixed.
+            </p>
+          </div>
+        ))}
+      </div>
+
+      <div className="mt-5 grid gap-3 md:grid-cols-3">
+        {(
+          [
+            ["Favored", bugsByState.favored, "text-emerald-200"],
+            ["Risky", bugsByState.risky, "text-amber-200"],
+            ["Immune", bugsByState.immune, "text-rose-200"],
+          ] as const
+        ).map(([label, bugs, tone]) => (
+          <div
+            key={label}
+            className="rounded-[18px] border border-white/8 bg-black/16 p-3"
+          >
+            <p
+              className={cn(
+                "text-[0.65rem] font-semibold uppercase tracking-[0.18em]",
+                tone,
+              )}
+            >
+              {label}
+            </p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {bugs.length > 0 ? (
+                bugs.map(([bugId, entry]) => (
+                  <span
+                    key={bugId}
+                    className="inline-flex items-center rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-1 text-xs text-stone-200"
+                  >
+                    {entry.name}
+                  </span>
+                ))
+              ) : (
+                <span className="text-xs text-stone-500">None</span>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+    </section>
   );
 }
 
@@ -502,6 +642,7 @@ export default function CodexPanel({
   open,
 }: CodexPanelProps) {
   const codex = useMemo(() => getCodex(), []);
+  const [activeView, setActiveView] = useState<CodexView>("bugs");
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -509,6 +650,7 @@ export default function CodexPanel({
       // When the codex is opened, reset any previous selection so it
       // always starts on the list view. Defer to avoid synchronous
       // setState inside an effect.
+      setActiveView("bugs");
       const t = setTimeout(() => setSelectedId(null), 0);
       return () => clearTimeout(t);
     }
@@ -659,12 +801,18 @@ export default function CodexPanel({
                     <>
                       {/* eyebrow intentionally hidden on list view */}
                       <h2 className="mt-1 text-[1.55rem] font-semibold tracking-[-0.04em] text-stone-50">
-                        {selectedEntry ? selectedEntry.name : "Bug Codex"}
+                        {activeView === "weapons"
+                          ? "Weapon Codex"
+                          : selectedEntry
+                            ? selectedEntry.name
+                            : "Bug Codex"}
                       </h2>
                       <p className="mt-2 max-w-[40rem] text-sm leading-6 text-stone-300">
-                        {selectedEntry
-                          ? "Review full encounter details, pressure profile, and field notes for the selected bug."
-                          : "Scout the swarm, a pocket catalog of the midnight bugs that keep engineers up."}
+                        {activeView === "weapons"
+                          ? "Review weapon types, tier names, and which bugs each damage family punishes or fails against."
+                          : selectedEntry
+                            ? "Review full encounter details, pressure profile, and field notes for the selected bug."
+                            : "Scout the swarm, a pocket catalog of the midnight bugs that keep engineers up."}
                       </p>
                     </>
                   )}
@@ -690,7 +838,15 @@ export default function CodexPanel({
                 </div>
               </div>
 
-              {selectedEntry && selectedVariant ? (
+              <div className="relative border-b border-white/8 px-5 py-3">
+                <Tabs
+                  activeTab={activeView as any}
+                  onChange={(tabId) => setActiveView(tabId as CodexView)}
+                  tabs={CODEX_TABS as any}
+                />
+              </div>
+
+              {activeView === "bugs" && selectedEntry && selectedVariant ? (
                 <div className="flex-1 overflow-hidden px-5 py-4 mb-6">
                   <div className="mx-auto flex h-full w-full max-w-[46rem] flex-col gap-4">
                     <DossierStats
@@ -705,7 +861,7 @@ export default function CodexPanel({
                     />
                   </div>
                 </div>
-              ) : (
+              ) : activeView === "bugs" ? (
                 <div className="flex-1 overflow-y-auto px-5 py-5">
                   <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-2">
                     {entries.map(([id, entry]) => (
@@ -714,6 +870,18 @@ export default function CodexPanel({
                         id={id}
                         entry={entry}
                         onSelect={handleSelectEntry}
+                      />
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <div className="flex-1 overflow-y-auto px-5 py-5">
+                  <div className="space-y-4">
+                    {WEAPON_TYPE_ORDER.map((type) => (
+                      <WeaponTypeCard
+                        key={type}
+                        bugEntries={entries}
+                        type={type}
                       />
                     ))}
                   </div>

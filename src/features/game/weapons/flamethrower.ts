@@ -3,6 +3,9 @@ import type { WeaponDef } from "./types";
 const flamethrower: WeaponDef = {
   id: "flame",
   title: "Flamethrower",
+  typeLabel: "Thermal",
+  typeHint: "Ignites flammable bugs and turns clustered lanes into panic zones.",
+  weaponType: "thermal",
   unlockKills: 52,
   detail:
     "Spray napalm in a 70° cone. Rapid-fire stacks a hellfire inferno. A ground fire patch lingers at the cone tip for 1.5 s, burning any bug that walks through it. Char marks persist.",

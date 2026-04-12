@@ -18,6 +18,23 @@ export type SiegeWeaponId =
   | "plasma"
   | "void";
 
+export type WeaponType =
+  | "blunt"
+  | "toxin"
+  | "cryo"
+  | "thermal"
+  | "electric"
+  | "precision"
+  | "plasma"
+  | "gravity";
+
+export type WeaponMatchupState = "favored" | "steady" | "risky" | "immune";
+
+export interface WeaponMatchupSummaryItem {
+  state: WeaponMatchupState;
+  variant: "low" | "medium" | "high" | "urgent";
+}
+
 /** Current evolution tier of a weapon (1 = base, 2 = enhanced, 3 = catastrophic). */
 export type WeaponTier = 1 | 2 | 3;
 
@@ -63,8 +80,12 @@ export interface WeaponProgressSnapshot {
   id: SiegeWeaponId;
   inputMode: "click" | "directional" | "seeking" | "hold";
   locked: boolean;
+  matchupSummary: WeaponMatchupSummaryItem[];
   progressText: string;
   title: string;
+  typeHint: string;
+  typeLabel: string;
+  unlockKills: number;
   /** Current evolution tier (1–3). */
   tier: WeaponTier;
   /** Kills earned with this weapon so far. */

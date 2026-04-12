@@ -239,6 +239,7 @@ interface BugCanvasProps {
     structureId?: string,
   ) => void;
   selectedWeaponId?: SiegeWeaponId;
+  streakMultiplier?: number;
   bugCounts: BugCounts;
   sceneProfile: SceneProfile;
   sessionKey: string;
@@ -297,6 +298,7 @@ const BugCanvas = memo(function BugCanvas({
   placingStructureId,
   onStructurePlace,
   selectedWeaponId = "hammer",
+  streakMultiplier = 1,
   bugCounts,
   sceneProfile,
   sessionKey,
@@ -532,7 +534,14 @@ const BugCanvas = memo(function BugCanvas({
             void 0;
           }
         },
-        onWeaponEvolution: onWeaponEvolution ?? undefined,
+        onWeaponEvolution: (weaponId, newTier) => {
+          const bounds = boundsRef.current;
+          vfxRef.current?.spawnLevelUp?.(
+            Math.round((bounds.width || w) * 0.5),
+            Math.round(Math.max(72, (bounds.height || h) * 0.24)),
+          );
+          onWeaponEvolution?.(weaponId, newTier);
+        },
         initialEvolutionStates: initialEvolutionStates ?? undefined,
       });
       // store original baseSpeed so we can apply UI speedMultiplier without compounding
@@ -1273,6 +1282,7 @@ const BugCanvas = memo(function BugCanvas({
             const eCtx: ExecutionContext = {
               engine: swarmRef.current as unknown as ExecutionContext["engine"],
               vfx: vfxRef.current,
+              damageMultiplier: streakMultiplier,
               canvas: canvasRef.current,
               bounds: _b,
               viewportX: _vx,
@@ -1483,6 +1493,7 @@ const BugCanvas = memo(function BugCanvas({
         const _np_eCtx: ExecutionContext = {
           engine: engine as unknown as ExecutionContext["engine"],
           vfx: vfxRef.current,
+          damageMultiplier: streakMultiplier,
           canvas: canvasRef.current,
           bounds,
           viewportX: fireX,
@@ -2394,6 +2405,7 @@ interface BackgroundFieldProps {
   placingStructureId?: StructureId | null;
   remainingBugCount?: number;
   selectedWeaponId?: SiegeWeaponId;
+  streakMultiplier?: number;
   showParticleCount: boolean;
   showTerminatorStatusBadge?: boolean;
   siegeZones?: SiegeZoneRect[];
@@ -2432,6 +2444,7 @@ const BackgroundField = memo(function BackgroundField({
   placingStructureId,
   remainingBugCount,
   selectedWeaponId = "hammer",
+  streakMultiplier = 1,
   showParticleCount,
   showTerminatorStatusBadge = true,
   siegeZones = [],
@@ -2860,6 +2873,7 @@ const BackgroundField = memo(function BackgroundField({
         placingStructureId={terminatorMode ? placingStructureId : null}
         onStructurePlace={terminatorMode ? onStructurePlace : undefined}
         selectedWeaponId={selectedWeaponId}
+        streakMultiplier={streakMultiplier}
         onWeaponFire={terminatorMode ? handleWeaponFire : undefined}
         hammerPositionRef={hammerPositionRef}
         getWeaponTier={getWeaponTier}

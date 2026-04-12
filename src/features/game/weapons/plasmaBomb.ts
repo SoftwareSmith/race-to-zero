@@ -4,6 +4,9 @@ import type { WeaponDef } from "./types";
 const forkBomb: WeaponDef = {
   id: "plasma",
   title: "Fork Bomb",
+  typeLabel: "Plasma",
+  typeHint: "Breaks dense bug packs with overlapping explosive bursts.",
+  weaponType: "plasma",
   unlockKills: 110,
   detail:
     "Duplicates the payload on impact: one central blast and 4 satellite bursts detonate around the click point, shredding packed bug clusters without radial beam lines.",

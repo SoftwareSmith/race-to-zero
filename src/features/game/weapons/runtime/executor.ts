@@ -11,7 +11,21 @@
  */
 
 import type { WeaponCommand, ExecutionContext } from "@game/weapons/runtime/types";
-import { applyEffectDescriptor, triggerShakeForWeapon } from "@game/weapons/effects/adapter";
+import { applyEffectDescriptor, triggerNamedScreenShake, triggerShakeForWeapon } from "@game/weapons/effects/adapter";
+import { getBugWeaponMatchup, getMatchupFeedbackTone } from "@game/combat/weaponMatchups";
+import type { BugVariant } from "../../../../types/dashboard";
+
+function maybeSpawnImmuneFeedback(ctx: ExecutionContext, targetIndex: number) {
+  const bug = ctx.engine.getAllBugs()[targetIndex];
+  if (!bug) return true;
+  const matchup = getBugWeaponMatchup(bug.variant as BugVariant, ctx.weaponId);
+  if (matchup !== "immune") return false;
+  (ctx.vfx as any)?.spawnImmune?.(
+    Math.round(bug.x + ctx.bounds.left),
+    Math.round(bug.y + ctx.bounds.top),
+  );
+  return true;
+}
 
 /** Execute a list of weapon commands against the provided context. */
 export function executeCommands(
@@ -19,6 +33,9 @@ export function executeCommands(
   ctx: ExecutionContext,
 ): void {
   if (commands.length === 0) return;
+
+  let shouldShake = false;
+  let weakShake = false;
 
   for (const cmd of commands) {
     switch (cmd.kind) {
@@ -47,6 +64,18 @@ export function executeCommands(
             pointValue: result.pointValue,
             frozen: result.frozen,
           });
+          if (result.matchup === "immune") {
+            (ctx.vfx as any)?.spawnImmune?.(vx, vy);
+          } else if (cmd.amount > 0) {
+            shouldShake = true;
+            weakShake = weakShake || result.matchup === "risky";
+            (ctx.vfx as any)?.spawnHitNumber?.(
+              vx,
+              vy,
+              Math.max(0, cmd.amount),
+              getMatchupFeedbackTone(result.matchup),
+            );
+          }
           ctx.updateQaLastHit({
             defeated: result.defeated,
             remainingHp: result.remainingHp,
@@ -60,25 +89,49 @@ export function executeCommands(
 
       // ── per-bug status effects ────────────────────────────────────────────
       case "applyPoison": {
+        if (maybeSpawnImmuneFeedback(ctx, cmd.targetIndex)) {
+          break;
+        }
         const bug = ctx.engine.getAllBugs()[cmd.targetIndex] as any;
         if (bug && typeof bug.applyPoison === "function") {
           bug.applyPoison(cmd.dps, cmd.durationMs);
+          (ctx.vfx as any)?.spawnStatusApply?.(
+            Math.round(bug.x + ctx.bounds.left),
+            Math.round(bug.y + ctx.bounds.top),
+            "poison",
+          );
         }
         break;
       }
 
       case "applyBurn": {
+        if (maybeSpawnImmuneFeedback(ctx, cmd.targetIndex)) {
+          break;
+        }
         const bug = ctx.engine.getAllBugs()[cmd.targetIndex] as any;
         if (bug && typeof bug.applyBurn === "function") {
           bug.applyBurn(cmd.dps, cmd.durationMs, cmd.decayPerSecond);
+          (ctx.vfx as any)?.spawnStatusApply?.(
+            Math.round(bug.x + ctx.bounds.left),
+            Math.round(bug.y + ctx.bounds.top),
+            "burn",
+          );
         }
         break;
       }
 
       case "applyFreeze": {
+        if (maybeSpawnImmuneFeedback(ctx, cmd.targetIndex)) {
+          break;
+        }
         const bug = ctx.engine.getAllBugs()[cmd.targetIndex] as any;
         if (bug && typeof bug.applyFreeze === "function") {
           bug.applyFreeze(cmd.intensity, cmd.durationMs);
+          (ctx.vfx as any)?.spawnStatusApply?.(
+            Math.round(bug.x + ctx.bounds.left),
+            Math.round(bug.y + ctx.bounds.top),
+            "freeze",
+          );
         }
         break;
       }
@@ -107,6 +160,7 @@ export function executeCommands(
           cmd.radius,
           cmd.dps,
           cmd.durationMs,
+          ctx.weaponId,
         );
         break;
 
@@ -118,6 +172,7 @@ export function executeCommands(
           cmd.peakDps,
           cmd.durationMs,
           cmd.decayPerSecond,
+          ctx.weaponId,
         );
         break;
 
@@ -127,6 +182,7 @@ export function executeCommands(
           cmd.cy,
           cmd.radius,
           cmd.durationMs,
+          ctx.weaponId,
         );
         break;
 
@@ -138,10 +194,11 @@ export function executeCommands(
           cmd.radius,
           cmd.dps,
           cmd.durationMs,
+          ctx.weaponId,
         );
         const engine = ctx.engine;
         const intId = window.setInterval(() => {
-          engine.applyPoisonInRadius(cmd.cx, cmd.cy, cmd.radius, cmd.dps, cmd.durationMs);
+          engine.applyPoisonInRadius(cmd.cx, cmd.cy, cmd.radius, cmd.dps, cmd.durationMs, ctx.weaponId);
         }, cmd.intervalMs);
         window.setTimeout(() => window.clearInterval(intId), cmd.totalMs + 50);
         break;
@@ -165,9 +222,17 @@ export function executeCommands(
 
       // ── evolution-era status singles ────────────────────────────────────
       case "applyCharged": {
+        if (maybeSpawnImmuneFeedback(ctx, cmd.targetIndex)) {
+          break;
+        }
         const bug = ctx.engine.getAllBugs()[cmd.targetIndex] as any;
         if (bug && typeof bug.applyCharged === "function") {
           bug.applyCharged(cmd.durationMs);
+          (ctx.vfx as any)?.spawnStatusApply?.(
+            Math.round(bug.x + ctx.bounds.left),
+            Math.round(bug.y + ctx.bounds.top),
+            "charged",
+          );
         }
         break;
       }
@@ -215,7 +280,7 @@ export function executeCommands(
         break;
 
       case "applyGlobalSlow":
-        ctx.engine.applyGlobalSlow(cmd.multiplier, cmd.durationMs);
+        ctx.engine.applyGlobalSlow(cmd.multiplier, cmd.durationMs, ctx.weaponId);
         break;
 
       case "startDeadlockCluster":
@@ -255,6 +320,9 @@ export function executeCommands(
     }
   }
 
-  // Auto screen-shake after any non-empty command batch
-  triggerShakeForWeapon(ctx.canvas, ctx.weaponId);
+  if (shouldShake && weakShake) {
+    triggerNamedScreenShake(ctx.canvas, "weak");
+  } else if (shouldShake) {
+    triggerShakeForWeapon(ctx.canvas, ctx.weaponId);
+  }
 }

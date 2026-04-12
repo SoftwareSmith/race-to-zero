@@ -9,6 +9,7 @@ import { WEAPON_DEFS, WEAPON_UNLOCK_THRESHOLDS } from "@config/weaponConfig";
 import { STRUCTURE_DEFS } from "@config/structureConfig";
 import { WEAPON_EVOLVE_THRESHOLDS } from "@config/gameDefaults";
 import type { StructureId } from "@game/types";
+import { getWeaponMatchupSummary } from "@game/combat/weaponMatchups";
 
 const WEAPON_LABELS: Record<SiegeWeaponId, string> = {
   hammer: "Hammer",
@@ -39,6 +40,25 @@ export function getSiegeCombatStats(
     WEAPON_LABELS[unlockedWeapons[unlockedWeapons.length - 1]];
 
   return { unlockedWeapons, currentToolLabel, unlockedStructures };
+}
+
+export function getNextWeaponUnlock(totalFixed: number, debugMode = false) {
+  if (debugMode) {
+    return null;
+  }
+
+  const nextWeapon = WEAPON_DEFS.find((weapon) => totalFixed < weapon.unlockKills);
+  if (!nextWeapon) {
+    return null;
+  }
+
+  return {
+    current: totalFixed,
+    remaining: Math.max(0, nextWeapon.unlockKills - totalFixed),
+    unlockKills: nextWeapon.unlockKills,
+    weaponId: nextWeapon.id,
+    weaponTitle: nextWeapon.title,
+  };
 }
 
 export function getSiegeWeaponSnapshots(
@@ -72,11 +92,15 @@ export function getSiegeWeaponSnapshots(
       id: weapon.id,
       title: tierTitle,
       hint: weapon.tierHints?.[tier - 1] ?? weapon.hint,
+      typeLabel: weapon.typeLabel,
+      typeHint: weapon.typeHint,
       inputMode: weapon.inputMode,
       cooldownMs: weapon.cooldownMs,
       locked: !unlocked,
       current: weapon.id === selectedId,
       detail: weapon.tierDetails?.[tier - 1] ?? weapon.detail,
+      unlockKills: weapon.unlockKills,
+      matchupSummary: getWeaponMatchupSummary(weapon.id),
       tier,
       weaponKills,
       killsToNextTier,

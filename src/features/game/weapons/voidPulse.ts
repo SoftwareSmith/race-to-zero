@@ -8,6 +8,9 @@ import type { WeaponDef } from "./types";
 const voidPulse: WeaponDef = {
   id: "void",
   title: "Void Pulse",
+  typeLabel: "Gravity",
+  typeHint: "Pulls elite bugs into collapse zones and rewards timing over spam.",
+  weaponType: "gravity",
   unlockKills: 130,
   detail:
     "Creates a miniature black hole that grows for 2 s, pulling every bug within 300px inward. Bugs touching the core take 1 dmg/tick. On collapse: 300px shockring deals 2 dmg. One active at a time. 6 s cooldown.",

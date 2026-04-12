@@ -22,6 +22,7 @@ import { useWeaponEvolution } from "@game/hooks/useWeaponEvolution";
 import { WEAPON_DEFS } from "@config/weaponConfig";
 import type { SiegeWeaponId, WeaponTier } from "@game/types";
 import { cn } from "@shared/utils/cn";
+import { triggerNamedShake } from "@game/utils/screenShake";
 
 function AppContent() {
   const dashboard = useDashboardContext();
@@ -32,6 +33,7 @@ function AppContent() {
     currentBugCounts: dashboard.currentBugCounts,
     evolutionStates,
   });
+  const dashboardRef = useRef<HTMLDivElement | null>(null);
   const [evolutionToast, setEvolutionToast] = useState<string | null>(null);
   const [justEvolvedWeaponId, setJustEvolvedWeaponId] =
     useState<SiegeWeaponId | null>(null);
@@ -44,12 +46,14 @@ function AppContent() {
       const newTitle = def?.tierTitles?.[newTier - 1] ?? weaponId;
       setEvolutionToast(`${prevTitle} → ${newTitle}`);
       setTimeout(() => setEvolutionToast(null), 3500);
+      if (dashboardRef.current) {
+        triggerNamedShake(dashboardRef.current, "tierup");
+      }
       setJustEvolvedWeaponId(weaponId);
       setTimeout(() => setJustEvolvedWeaponId(null), 800);
     },
     [onEvolution],
   );
-  const dashboardRef = useRef<HTMLDivElement | null>(null);
 
   const siegeZones = useSiegeZones({
     active: siegeGame.interactiveMode,
@@ -126,6 +130,9 @@ function AppContent() {
         selectedWeaponId={
           siegeGame.interactiveMode ? siegeGame.selectedWeaponId : undefined
         }
+        streakMultiplier={
+          siegeGame.interactiveMode ? siegeGame.streakMultiplier : 1
+        }
         showParticleCount={
           siegeGame.interactiveMode ? false : dashboard.showParticleCount
         }
@@ -193,6 +200,7 @@ function AppContent() {
                 interactiveKills={siegeGame.interactiveKills}
                 interactivePoints={siegeGame.interactivePoints}
                 interactiveRemainingBugs={siegeGame.interactiveRemainingBugs}
+                killStreak={siegeGame.killStreak}
                 onArmStructure={siegeGame.armStructure}
                 onExit={handleExitInteractiveMode}
                 onSelectWeapon={siegeGame.selectWeapon}
@@ -202,6 +210,8 @@ function AppContent() {
                 selectedWeaponId={siegeGame.selectedWeaponId}
                 lastFireTimes={siegeGame.lastFireTimes}
                 justEvolvedWeaponId={justEvolvedWeaponId}
+                nextWeaponUnlock={siegeGame.nextWeaponUnlock}
+                streakMultiplier={siegeGame.streakMultiplier}
                 unlockedStructures={siegeGame.combatStats.unlockedStructures}
                 weaponSnapshots={siegeGame.weaponSnapshots}
               />

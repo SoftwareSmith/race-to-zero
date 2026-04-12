@@ -3,6 +3,9 @@ import type { WeaponDef } from "./types";
 const tracerBloom: WeaponDef = {
   id: "laser",
   title: "Tracer Bloom",
+  typeLabel: "Precision",
+  typeHint: "Picks apart priority targets and scales hardest off existing status effects.",
+  weaponType: "precision",
   unlockKills: 68,
   detail:
     "Paints a route from the core to your click, detonating 4 pulse blooms along the way. Each bloom clips nearby bugs without using bounce-line logic.",

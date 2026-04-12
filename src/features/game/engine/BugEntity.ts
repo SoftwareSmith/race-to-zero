@@ -336,12 +336,20 @@ export class BugEntity extends Entity {
       desired.y += away.y * 2.2;
     }
 
+    const now = performance.now();
+    const isBurnPanicking = this.burn !== null && now < this.burn.expiresAt && this.burn.dps > 0.3;
+    if (isBurnPanicking) {
+      desired.x += (Math.random() - 0.5) * 1.6;
+      desired.y += (Math.random() - 0.5) * 1.6;
+    }
+
     const desiredDirection = normalizeVector(desired.x, desired.y);
     const desiredHeading =
       desiredDirection.x === 0 && desiredDirection.y === 0
         ? this.heading
         : Math.atan2(desiredDirection.y, desiredDirection.x);
-    const maxTurn = config.turnSpeed * this.turnRate * dt;
+    const turnMultiplier = isBurnPanicking ? 1.8 : 1;
+    const maxTurn = config.turnSpeed * this.turnRate * turnMultiplier * dt;
     this.heading += clamp(
       getAngleDelta(this.heading, desiredHeading),
       -maxTurn,
@@ -352,7 +360,6 @@ export class BugEntity extends Entity {
     const edgeFactor = 1 - wallSteering.pressure * 0.12;
     const speedBoost = this.state === "flee" ? 1.22 : 1;
     // Apply status effects
-    const now = performance.now();
     if (this.slow && now >= this.slow.expiresAt) this.slow = null;
     if (this.ensnare && now >= this.ensnare.expiresAt) this.ensnare = null;
     if (this.poison && now >= this.poison.expiresAt) this.poison = null;
@@ -431,7 +438,8 @@ export class BugEntity extends Entity {
     }
 
     const slowMult = this.slow ? this.slow.multiplier : 1;
-    const desiredSpeed = config.baseSpeed * this.cruiseSpeed * edgeFactor * speedBoost * slowMult;
+    const burnSpeedBoost = isBurnPanicking ? 1.18 : 1;
+    const desiredSpeed = config.baseSpeed * this.cruiseSpeed * edgeFactor * speedBoost * slowMult * burnSpeedBoost;
     const currentSpeed = getLength(this.vx, this.vy);
     const nextSpeed = currentSpeed + (desiredSpeed - currentSpeed) * Math.min(1, dt * 4.2);
     this.vx = Math.cos(this.heading) * nextSpeed;
@@ -667,6 +675,7 @@ export class BugEntity extends Entity {
     const typeSpec = this.syncTypeSpec();
     const color = typeSpec?.color;
     const sizeMultiplier = typeSpec?.size ?? 1;
+    const now = performance.now();
     drawBugSprite(ctx2d, {
       x: renderX,
       y: renderY,
@@ -675,6 +684,17 @@ export class BugEntity extends Entity {
       opacity: this.opacity,
       variant: this.variant,
       color: color ?? undefined,
+      timeMs: now,
+      statusFlags: {
+        ally: this.ally !== null && now < this.ally.expiresAt,
+        burn: this.burn !== null && now < this.burn.expiresAt,
+        charged: this.charged !== null && now < this.charged.expiresAt,
+        ensnare: this.ensnare !== null && now < this.ensnare.expiresAt,
+        freeze: this.slow !== null && now < this.slow.expiresAt,
+        marked: this.marked !== null && now < this.marked.expiresAt,
+        poison: this.poison !== null && now < this.poison.expiresAt,
+        unstable: this.unstable !== null && now < this.unstable.expiresAt,
+      },
     });
   }
 }

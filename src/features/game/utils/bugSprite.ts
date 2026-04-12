@@ -11,10 +11,32 @@ export interface BugSpriteOptions {
   opacity?: number;
   rotation?: number;
   size: number;
+  statusFlags?: {
+    ally?: boolean;
+    burn?: boolean;
+    charged?: boolean;
+    ensnare?: boolean;
+    freeze?: boolean;
+    marked?: boolean;
+    poison?: boolean;
+    unstable?: boolean;
+  };
+  timeMs?: number;
   variant?: BugVariant;
   x: number;
   y: number;
 }
+
+const STATUS_TINTS = {
+  ally: "rgba(0, 255, 140, 0.40)",
+  burn: "rgba(255, 80, 0, 0.45)",
+  charged: "rgba(0, 230, 255, 0.35)",
+  ensnare: "rgba(255, 230, 100, 0.40)",
+  freeze: "rgba(100, 200, 255, 0.40)",
+  marked: "rgba(180, 80, 255, 0.40)",
+  poison: "rgba(80, 220, 60, 0.35)",
+  unstable: "rgba(150, 0, 255, 0.50)",
+} as const;
 
 const BUG_RAW_SVGS: Record<BugVariant, string> = {
   high: highRaw,
@@ -154,6 +176,8 @@ export function drawBugSprite(
     opacity,
     rotation = 0,
     size,
+    statusFlags,
+    timeMs = 0,
     variant = "low",
     x,
     y,
@@ -163,7 +187,10 @@ export function drawBugSprite(
   const baseColor = color ?? getBugVariantColor(variant);
 
   const finalOpacity = opacity ?? config.defaultOpacity;
-  const finalSize = size * config.baseScale;
+  const burnScale = statusFlags?.burn
+    ? 1 + Math.sin(timeMs * 0.05) * 0.02
+    : 1;
+  const finalSize = size * config.baseScale * burnScale;
 
   const img = getCachedImage(variant, baseColor);
 
@@ -182,6 +209,22 @@ export function drawBugSprite(
       finalSize,
     );
 
+    if (statusFlags) {
+      for (const [key, tint] of Object.entries(STATUS_TINTS) as Array<
+        [keyof typeof STATUS_TINTS, string]
+      >) {
+        if (!statusFlags[key]) {
+          continue;
+        }
+
+        ctx.save();
+        ctx.globalCompositeOperation = "source-atop";
+        ctx.fillStyle = tint;
+        ctx.fillRect(-finalSize / 2, -finalSize / 2, finalSize, finalSize);
+        ctx.restore();
+      }
+    }
+
     ctx.restore();
   };
 
@@ -196,6 +239,19 @@ export function drawBugSprite(
     ctx.fillStyle = darkenColor(baseColor, config.darken);
 
     drawFallbackBug(ctx);
+
+    if (statusFlags) {
+      for (const [key, tint] of Object.entries(STATUS_TINTS) as Array<
+        [keyof typeof STATUS_TINTS, string]
+      >) {
+        if (!statusFlags[key]) {
+          continue;
+        }
+        ctx.globalCompositeOperation = "source-atop";
+        ctx.fillStyle = tint;
+        ctx.fillRect(-12, -12, 24, 24);
+      }
+    }
 
     ctx.restore();
   }

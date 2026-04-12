@@ -6,6 +6,7 @@
  */
 
 import type { SiegeWeaponId, WeaponTier } from "@game/types";
+import type { WeaponMatchupState } from "@game/types";
 import type { WeaponDef } from "@game/weapons/types";
 
 // ─── Re-exports ────────────────────────────────────────────────────────────────
@@ -32,6 +33,7 @@ export interface BugSnapshot {
 
 export interface HitResult {
   defeated: boolean;
+  matchup: WeaponMatchupState;
   remainingHp: number;
   pointValue: number;
   frozen: boolean;
@@ -86,6 +88,7 @@ export interface GameEngine {
     radius: number,
     dps: number,
     durationMs: number,
+    weaponId?: SiegeWeaponId,
   ): void;
   applyBurnInRadius(
     cx: number,
@@ -94,12 +97,14 @@ export interface GameEngine {
     peakDps: number,
     durationMs: number,
     decayPerSecond?: number,
+    weaponId?: SiegeWeaponId,
   ): void;
   applyEnsnareInRadius(
     cx: number,
     cy: number,
     radius: number,
     durationMs: number,
+    weaponId?: SiegeWeaponId,
   ): void;
   startBlackHole(
     x: number,
@@ -115,7 +120,7 @@ export interface GameEngine {
   applyMarkedInRadius(cx: number, cy: number, radius: number, durationMs: number): void;
   applyUnstableInRadius(cx: number, cy: number, radius: number, durationMs: number): void;
   propagateChargedNetwork(sourceIndex: number, damage: number, falloff: number): void;
-  applyGlobalSlow(multiplier: number, durationMs: number): void;
+  applyGlobalSlow(multiplier: number, durationMs: number, weaponId?: SiegeWeaponId): void;
   startDeadlockCluster(cx: number, cy: number, radius: number, pullDurationMs: number): void;
   splitBug(index: number): void;
   allyBug(index: number, durationMs: number): void;
@@ -431,6 +436,7 @@ export interface ExecutionContext {
   readonly engine: GameEngine;
   /** VfxEngine instance — may be null during tests. */
   readonly vfx: unknown;
+  readonly damageMultiplier?: number;
   /** Canvas element used for screen shake — null during tests. */
   readonly canvas: HTMLElement | null;
   readonly bounds: CanvasBounds;

@@ -7,7 +7,7 @@
  */
 
 import type { WeaponEffectDescriptor, ExecutionContext } from "@game/weapons/runtime/types";
-import { triggerWeaponShake } from "@game/utils/screenShake";
+import { triggerNamedShake, triggerWeaponShake } from "@game/utils/screenShake";
 
 /**
  * Apply a single WeaponEffectDescriptor using the execution context.
@@ -206,4 +206,11 @@ export function triggerShakeForWeapon(
   weaponId: string,
 ): void {
   if (canvas) triggerWeaponShake(canvas, weaponId);
+}
+
+export function triggerNamedScreenShake(
+  canvas: HTMLElement | null,
+  presetName: string,
+): void {
+  if (canvas) triggerNamedShake(canvas, presetName);
 }
