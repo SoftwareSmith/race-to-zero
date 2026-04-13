@@ -15,8 +15,13 @@ import type {
   PersistentFireSession,
   HoldFireSession,
 } from "@game/weapons/runtime/types";
+import type { WeaponEffectEvent } from "@game/types";
+import type { ReactNode } from "react";
 
 const _entries = new Map<SiegeWeaponId, WeaponEntry>();
+const _overlayRenderers = new Map<SiegeWeaponId, WeaponOverlayRenderer>();
+
+export type WeaponOverlayRenderer = (effect: WeaponEffectEvent) => ReactNode;
 
 /** Active persistent sessions (currently void pulse). */
 const _persistentSessions = new Map<SiegeWeaponId, PersistentFireSession>();
@@ -37,6 +42,13 @@ export function register(entry: WeaponEntry): void {
   _entries.set(entry.weaponId, entry);
 }
 
+export function registerOverlay(
+  weaponId: SiegeWeaponId,
+  renderer: WeaponOverlayRenderer,
+): void {
+  _overlayRenderers.set(weaponId, renderer);
+}
+
 // ─── Lookup ──────────────────────────────────────────────────────────────────
 
 export function hasEntry(id: SiegeWeaponId): boolean {
@@ -45,6 +57,12 @@ export function hasEntry(id: SiegeWeaponId): boolean {
 
 export function getEntry(id: SiegeWeaponId): WeaponEntry | undefined {
   return _entries.get(id);
+}
+
+export function getOverlayRenderer(
+  id: SiegeWeaponId,
+): WeaponOverlayRenderer | undefined {
+  return _overlayRenderers.get(id);
 }
 
 /** All registered weapon IDs — useful for registry integrity checks. */
@@ -90,6 +108,7 @@ export function clearHoldSession(id: SiegeWeaponId): void {
 /** Clear all state — call between test cases. */
 export function _resetForTests(): void {
   _entries.clear();
+  _overlayRenderers.clear();
   _persistentSessions.clear();
   _holdSessions.clear();
 }

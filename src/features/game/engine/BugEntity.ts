@@ -2,6 +2,7 @@ import { Entity } from "./Entity";
 import { drawBugSprite } from "@game/utils/bugSprite";
 import { DEFAULT_GAME_CONFIG } from "./types";
 import { getCodex, type CrawlProfile, type BugType } from "./bugCodex";
+import { EntityState, isTerminalEntityState } from "../types";
 
 function clamp(value: number, min: number, max: number) {
   return Math.max(min, Math.min(max, value));
@@ -54,7 +55,7 @@ function perlin1D(position: number, seed: number) {
   return lerp(leftInfluence, rightInfluence, fade(local)) * 2;
 }
 
-type BugState = "patrol" | "flee" | "dying" | "dead";
+type BugState = "patrol" | "flee" | EntityState.Dying | EntityState.Dead;
 
 interface BugUpdateContext {
   getNeighbors: (e: BugEntity, r: number) => BugEntity[];
@@ -259,7 +260,7 @@ export class BugEntity extends Entity {
     const config = ctx.config ?? DEFAULT_GAME_CONFIG;
     const bounds = ctx.bounds ?? { width: 800, height: 600 };
 
-    if (this.state === "dying") {
+    if (this.state === EntityState.Dying) {
       this.deathProgress += dt / this.deathDuration;
       this.opacity = Math.max(0, 1 - this.deathProgress);
       this.size = Math.max(
@@ -267,12 +268,12 @@ export class BugEntity extends Entity {
         this.baseSize * (1 - this.deathProgress * 0.72),
       );
       if (this.deathProgress >= 1) {
-        this.state = "dead";
+        this.state = EntityState.Dead;
       }
       return;
     }
 
-    if (this.state === "dead") {
+    if (this.state === EntityState.Dead) {
       return;
     }
 
@@ -371,7 +372,7 @@ export class BugEntity extends Entity {
     if (this.ally && now >= this.ally.expiresAt) this.ally = null;
 
     // Tick poison DOT damage
-    if (this.poison && (this.state as BugState) !== "dying" && (this.state as BugState) !== "dead") {
+    if (this.poison && !isTerminalEntityState(this.state)) {
       this.poison.accumulatedDmg += this.poison.dps * dt;
       if (this.poison.accumulatedDmg >= 1) {
         const dmgToApply = Math.floor(this.poison.accumulatedDmg);
@@ -379,7 +380,7 @@ export class BugEntity extends Entity {
         this.lastHitTime = performance.now();
         this.hp = Math.max(0, this.hp - dmgToApply);
         if (this.hp === 0) {
-          this.state = "dying";
+          this.state = EntityState.Dying;
           this.deathProgress = 0;
           this.vx = 0;
           this.vy = 0;
@@ -389,7 +390,7 @@ export class BugEntity extends Entity {
     }
 
     // Tick burn DOT damage with exponential decay so bugs still burn after leaving flame
-    if (this.burn && (this.state as BugState) !== "dying" && (this.state as BugState) !== "dead") {
+    if (this.burn && !isTerminalEntityState(this.state)) {
       this.burn.dps *= Math.exp(-this.burn.decayPerSecond * dt);
       this.burn.accumulatedDmg += this.burn.dps * dt;
       if (this.burn.accumulatedDmg >= 1) {
@@ -398,7 +399,7 @@ export class BugEntity extends Entity {
         this.lastHitTime = performance.now();
         this.hp = Math.max(0, this.hp - dmgToApply);
         if (this.hp === 0) {
-          this.state = "dying";
+          this.state = EntityState.Dying;
           this.deathProgress = 0;
           this.vx = 0;
           this.vy = 0;
@@ -411,7 +412,7 @@ export class BugEntity extends Entity {
     }
 
     // Tick looped echo DOT damage
-    if (this.looped && (this.state as BugState) !== "dying" && (this.state as BugState) !== "dead") {
+    if (this.looped && !isTerminalEntityState(this.state)) {
       this.looped.accumulatedDmg += this.looped.dps * dt;
       if (this.looped.accumulatedDmg >= 1) {
         const dmgToApply = Math.floor(this.looped.accumulatedDmg);
@@ -419,7 +420,7 @@ export class BugEntity extends Entity {
         this.lastHitTime = performance.now();
         this.hp = Math.max(0, this.hp - dmgToApply);
         if (this.hp === 0) {
-          this.state = "dying";
+          this.state = EntityState.Dying;
           this.deathProgress = 0;
           this.vx = 0;
           this.vy = 0;
@@ -454,7 +455,7 @@ export class BugEntity extends Entity {
   }
 
   onHit(damage = 1) {
-    if (this.state === "dead" || this.state === "dying") {
+    if (isTerminalEntityState(this.state)) {
       return { defeated: false, remainingHp: 0, pointValue: 0, frozen: false, poisoned: false, burning: false, ensnared: false };
     }
 
@@ -481,7 +482,7 @@ export class BugEntity extends Entity {
     const effectiveDamage = ensnared ? this.maxHp : Math.round(damage * multiplier);
     this.hp = Math.max(0, this.hp - effectiveDamage);
     if (this.hp === 0) {
-      this.state = "dying";
+      this.state = EntityState.Dying;
       this.deathProgress = 0;
       this.vx = 0;
       this.vy = 0;
@@ -507,8 +508,8 @@ export class BugEntity extends Entity {
     if (isBurning && isCharged) {
       this.hp = Math.max(0, this.hp - 3);
       this.charged = null;
-      if (this.hp === 0 && this.state !== "dying" && this.state !== "dead") {
-        this.state = "dying";
+      if (this.hp === 0 && !isTerminalEntityState(this.state)) {
+        this.state = EntityState.Dying;
         this.deathProgress = 0;
         this.vx = 0;
         this.vy = 0;
@@ -520,8 +521,8 @@ export class BugEntity extends Entity {
     if (isFrozen && isBurning) {
       this.burn = null;
       this.hp = Math.max(0, this.hp - 2);
-      if (this.hp === 0 && this.state !== "dying" && this.state !== "dead") {
-        this.state = "dying";
+      if (this.hp === 0 && !isTerminalEntityState(this.state)) {
+        this.state = EntityState.Dying;
         this.deathProgress = 0;
         this.vx = 0;
         this.vy = 0;
@@ -646,7 +647,7 @@ export class BugEntity extends Entity {
 
   /** Apply an impulse and trigger flee state (Pulse Cannon knockback). */
   knockback(dx: number, dy: number) {
-    if (this.state === "dying" || this.state === "dead") return;
+    if (isTerminalEntityState(this.state)) return;
     this.vx += dx;
     this.vy += dy;
     this.heading = Math.atan2(this.vy, this.vx);

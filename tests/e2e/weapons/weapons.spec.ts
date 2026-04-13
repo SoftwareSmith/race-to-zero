@@ -259,7 +259,6 @@ test("all weapon UIs render without console errors", async ({ page }) => {
 
   const hud = page.getByTestId("siege-hud");
   await expect(hud).toBeVisible();
-  await expect(hud.getByText("Weapons")).toBeVisible();
 
   await errs.expectNoClientErrors();
 });

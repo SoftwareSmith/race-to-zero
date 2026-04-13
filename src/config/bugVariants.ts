@@ -9,6 +9,7 @@
  * is consolidated here.
  */
 
+import type { SiegeWeaponId, WeaponMatchupState } from "@game/types";
 import type { BugVariant } from "../types/dashboard";
 
 // ── Crawl behaviour types ─────────────────────────────────────────────────────
@@ -39,18 +40,8 @@ export interface CrawlProfile {
 
 // ── Weapon matchup types ──────────────────────────────────────────────────────
 
-export type BugWeaponId =
-  | "hammer"
-  | "zapper"
-  | "freeze"
-  | "chain"
-  | "flame"
-  | "laser"
-  | "shockwave"
-  | "nullpointer"
-  | "plasma"
-  | "void";
-export type BugWeaponMatchupState = "favored" | "steady" | "risky" | "immune";
+export type BugWeaponId = SiegeWeaponId;
+export type BugWeaponMatchupState = WeaponMatchupState;
 
 export interface BugWeaponMatchup {
   note: string;

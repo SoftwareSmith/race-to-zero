@@ -2,10 +2,12 @@
  * Void Pulse — self-registering plugin entry point.
  */
 
+import { createElement } from "react";
 import { def } from "./constants";
-import { register } from "@game/weapons/runtime/registry";
+import { register, registerOverlay } from "@game/weapons/runtime/registry";
 import type { WeaponEntry, WeaponContext, FireSession } from "@game/weapons/runtime/types";
 import { createSession } from "./behavior";
+import { VoidPulseOverlay } from "./overlay";
 
 const entry: WeaponEntry = {
   weaponId: def.id,
@@ -16,5 +18,12 @@ const entry: WeaponEntry = {
 };
 
 register(entry);
+registerOverlay(def.id, (effect) =>
+  createElement(VoidPulseOverlay, {
+    key: effect.id,
+    x: effect.x,
+    y: effect.y,
+  }),
+);
 
 export { entry as voidPulseEntry };

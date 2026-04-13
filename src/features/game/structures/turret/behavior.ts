@@ -13,6 +13,7 @@ import type {
   StructureBehavior,
 } from "@game/structures/runtime/types";
 import { STRUCTURE_DEFS } from "@config/structureConfig";
+import { isTerminalEntityState } from "@game/types";
 
 const SHOOT_RADIUS = 150;
 const SHOOT_INTERVAL_MS = 2500;
@@ -38,7 +39,7 @@ export const turretBehavior: StructureBehavior = {
         let bestIdx = -1;
         for (let j = 0; j < bugs.length; j++) {
           const e = bugs[j] as any;
-          if (e.state === "dead" || e.state === "dying") continue;
+          if (isTerminalEntityState(e.state)) continue;
           const d = Math.hypot(e.x - ap.targetX, e.y - ap.targetY);
           if (d < bestDist) {
             bestDist = d;
@@ -80,7 +81,7 @@ export const turretBehavior: StructureBehavior = {
     let bestIdx = -1;
     for (let i = 0; i < bugs.length; i++) {
       const e = bugs[i] as any;
-      if (e.state === "dead" || e.state === "dying") continue;
+      if (isTerminalEntityState(e.state)) continue;
       const dist = Math.hypot(e.x - entry.x, e.y - entry.y);
       if (dist <= SHOOT_RADIUS && dist < bestDist) {
         bestDist = dist;

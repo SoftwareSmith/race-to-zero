@@ -5,17 +5,16 @@ test("arms siege mode from the dashboard", async ({ page }) => {
 
   await page.getByRole("button", { name: "Open interactive bug game" }).click();
 
-  const hud = page.getByTestId("siege-hud");
+  const statsHud = page.getByTestId("siege-hud");
 
-  await expect(hud).toBeVisible();
+  await expect(statsHud).toBeVisible();
   await expect(page.getByRole("button", { name: "Back to dashboard" })).toBeVisible();
-  await expect(hud.getByText("Bugs")).toBeVisible();
-  await expect(hud.getByText("Kills")).toBeVisible();
-  await expect(hud.getByText("Weapons")).toBeVisible();
-  await expect(hud.getByText("Active tool")).toHaveCount(0);
+  await expect(statsHud.getByText("Bugs")).toBeVisible();
+  await expect(statsHud.getByText("Kills")).toBeVisible();
+  await expect(statsHud.getByText("Active tool")).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Open interactive bug game" })).toHaveCount(0);
 
-  const box = await hud.boundingBox();
+  const box = await statsHud.boundingBox();
   expect(box?.width ?? 0).toBeLessThan(380);
 });
 

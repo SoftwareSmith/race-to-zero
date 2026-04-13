@@ -1,3 +1,4 @@
+import { WeaponMatchup } from "@game/types";
 import type {
   SiegeWeaponId,
   WeaponMatchupState,
@@ -13,7 +14,7 @@ export function getBugWeaponMatchup(
   weaponId: SiegeWeaponId,
 ): WeaponMatchupState {
   const entry = getCodex()[variant];
-  return entry?.weaponMatchups?.[weaponId]?.state ?? "steady";
+  return entry?.weaponMatchups?.[weaponId]?.state ?? WeaponMatchup.Steady;
 }
 
 export function getWeaponMatchupSummary(
@@ -32,20 +33,20 @@ export function applyMatchupDamage(
   if (damage <= 0) {
     return 0;
   }
-  if (matchup === "immune") {
+  if (matchup === WeaponMatchup.Immune) {
     return 0;
   }
-  if (matchup === "favored") {
+  if (matchup === WeaponMatchup.Favored) {
     return Math.max(1, Math.round(damage * 1.5));
   }
-  if (matchup === "risky") {
+  if (matchup === WeaponMatchup.Risky) {
     return Math.max(0, Math.floor(damage * 0.5));
   }
   return damage;
 }
 
 export function getMatchupFeedbackTone(matchup: WeaponMatchupState) {
-  if (matchup === "favored") return "effective" as const;
-  if (matchup === "risky") return "weak" as const;
+  if (matchup === WeaponMatchup.Favored) return "effective" as const;
+  if (matchup === WeaponMatchup.Risky) return "weak" as const;
   return "normal" as const;
 }

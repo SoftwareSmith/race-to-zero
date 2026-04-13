@@ -11,6 +11,7 @@ import type {
   ClickFireResult,
   WeaponCommand,
 } from "@game/weapons/runtime/types";
+import { WeaponId, WeaponTier } from "@game/types";
 import { canvasToViewport } from "@game/weapons/runtime/targetingHelpers";
 
 const DAMAGE = 1;
@@ -31,7 +32,7 @@ export function createSession(ctx: WeaponContext): ClickFireResult {
     viewportY,
     bounds,
   } = ctx;
-  const tier = ctx.tier ?? 1;
+  const tier = ctx.tier ?? WeaponTier.TIER_ONE;
   const commands: WeaponCommand[] = [];
 
   const hitSet = new Set<number>();
@@ -66,7 +67,12 @@ export function createSession(ctx: WeaponContext): ClickFireResult {
     viewportNodes.push(canvasToViewport(bloomX, bloomY, bounds));
   }
 
-  const bonusDmg = tier >= 3 ? T3_BONUS_DAMAGE : tier >= 2 ? T2_BONUS_DAMAGE : 0;
+  const bonusDmg =
+    tier >= WeaponTier.TIER_THREE
+      ? T3_BONUS_DAMAGE
+      : tier >= WeaponTier.TIER_TWO
+        ? T2_BONUS_DAMAGE
+        : 0;
 
   for (const idx of hitSet) {
     const bug = bugs[idx];
@@ -84,7 +90,7 @@ export function createSession(ctx: WeaponContext): ClickFireResult {
     kind: "spawnEffect",
     descriptor: {
       type: "overlayEffect",
-      weaponId: "laser",
+      weaponId: WeaponId.TracerBloom,
       viewportX,
       viewportY,
       extras: { chainNodes: viewportNodes },

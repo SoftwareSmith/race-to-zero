@@ -21,7 +21,7 @@ interface TooltipProps {
 function Tooltip({
   content,
   children,
-  triggerClassName = "inline-flex",
+  triggerClassName = "inline-flex !cursor-pointer",
 }: TooltipProps) {
   const triggerRef = useRef<HTMLSpanElement | null>(null);
   const tooltipRef = useRef<HTMLSpanElement | null>(null);
@@ -105,7 +105,7 @@ function Tooltip({
             <span
               ref={tooltipRef}
               id={tooltipId}
-              className="pointer-events-none fixed z-[100] w-72 rounded-2xl border border-stone-800 bg-stone-950/98 px-4 py-3 text-left text-sm leading-6 text-stone-100 shadow-[0_20px_45px_rgba(28,25,23,0.3)]"
+              className="pointer-events-none fixed z-[240] w-72 rounded-2xl border border-stone-800 bg-stone-950/98 px-4 py-3 text-left text-sm leading-6 text-stone-100 shadow-[0_20px_45px_rgba(28,25,23,0.3)]"
               role="tooltip"
               style={{
                 left: `${position.left}px`,

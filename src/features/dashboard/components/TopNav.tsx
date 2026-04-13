@@ -41,7 +41,7 @@ const TopNav = memo(function TopNav({
 }: TopNavProps) {
   return (
     <div
-      className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between"
+      className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between"
       onMouseDownCapture={() => onInteract()}
       onTouchStartCapture={() => onInteract()}
     >

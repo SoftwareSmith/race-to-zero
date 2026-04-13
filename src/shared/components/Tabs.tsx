@@ -27,7 +27,7 @@ const Tabs = memo(function Tabs({ tabs, activeTab, onChange }: TabsProps) {
   return (
     <div
       aria-label="Dashboard sections"
-      className="inline-flex rounded-full border border-white/6 bg-white/[0.02] p-0.5 shadow-[0_8px_18px_rgba(0,0,0,0.12)] backdrop-blur-xl"
+      className="inline-flex rounded-full border border-white/6 bg-white/[0.03] p-0.5 shadow-[0_8px_18px_rgba(0,0,0,0.12)] backdrop-blur-xl"
       role="tablist"
     >
       {tabs.map((tab) => {
@@ -38,7 +38,7 @@ const Tabs = memo(function Tabs({ tabs, activeTab, onChange }: TabsProps) {
             key={tab.id}
             aria-selected={isActive}
             className={cn(
-              "rounded-full px-3.5 py-1.5 text-[0.82rem] font-semibold transition duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300/40",
+              "rounded-full px-3 py-1.5 text-[0.76rem] font-semibold transition duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300/40",
               isActive
                 ? "bg-sky-400/8 text-sky-100 shadow-[inset_0_0_0_1px_rgba(56,189,248,0.14)]"
                 : "text-stone-400 hover:bg-white/4 hover:text-stone-100",

@@ -12,7 +12,13 @@
  */
 
 import { WeaponId } from "@game/types";
-import type { WeaponDef } from "@game/weapons/types";
+import {
+  HitPattern,
+  WeaponInputMode,
+  type WeaponDef,
+} from "@game/weapons/types";
+import { NULL_POINTER_TIERS } from "./helpers";
+import { OVERLAY_EFFECT_DURATION_MS } from "./vfx";
 
 // ─── Identity ────────────────────────────────────────────────────────────────
 
@@ -21,8 +27,6 @@ export const ID = WeaponId.NullPointer;
 // ─── Tier evolution ──────────────────────────────────────────────────────────
 
 /** [kills to reach T2, kills to reach T3] */
-export const EVOLVE_THRESHOLDS: [number, number] = [20, 60];
-
 // ─── Cursor ──────────────────────────────────────────────────────────────────
 
 export const CURSOR = {
@@ -50,32 +54,22 @@ export const T2_EXECUTE_HP = 2;
 
 export const def: WeaponDef = {
   id: ID,
-  title: "Null Pointer",
+  title: NULL_POINTER_TIERS[0].title,
   typeLabel: "Precision",
   typeHint: "Tracks the highest-value bug and converts setup into clean executions.",
   weaponType: "precision",
   unlockKills: 95,
-  detail:
-    "Homing missile that locks onto the highest-HP bug on screen. Curves to target over 0.6 s. Deals 3 dmg + 60px splash. Leaves a binary data burst (1s and 0s fly outward) and a tracer trail.",
-  hitPattern: "seeking",
+  detail: NULL_POINTER_TIERS[0].detail,
+  hitPattern: HitPattern.Seeking,
   hitRadius: SEEK_RADIUS,
+  cursor: CURSOR,
+  overlayEffectDurationMs: OVERLAY_EFFECT_DURATION_MS,
   damage: DAMAGE,
   seekRadius: SEEK_RADIUS,
   splashRadius: SPLASH_RADIUS,
   effectColor: CURSOR.accent,
   cooldownMs: 3000,
-  inputMode: "seeking",
-  evolveThresholds: EVOLVE_THRESHOLDS,
-  hint: "Click anywhere — missile curves to highest-HP bug, binary burst on impact",
-  tierTitles: ["Garbage Collector", "Mark & Sweep", "Auto-Scaler"],
-  tierDetails: [
-    "Homing missile locks onto the highest-HP bug. Deals 3 dmg + 60px splash. Executes bugs below 33% HP.",
-    "Mark & Sweep — applies Marked status to the target and nearby bugs. Increases execution threshold to 50% HP.",
-    "Auto-Scaler — periodic global pulse instantly executes all Marked bugs below the HP threshold.",
-  ],
-  tierHints: [
-    "Click anywhere — missile curves to highest-HP bug, binary burst on impact",
-    "T2: Marks the target + nearby bugs; executes at 50% HP",
-    "T3: Auto-Scaler pulse kills all Marked bugs below threshold globally",
-  ],
+  inputMode: WeaponInputMode.Seeking,
+  tiers: NULL_POINTER_TIERS,
+  hint: NULL_POINTER_TIERS[0].hint,
 };

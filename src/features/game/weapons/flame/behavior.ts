@@ -12,6 +12,7 @@ import type {
   HoldFireSession,
   WeaponCommand,
 } from "@game/weapons/runtime/types";
+import { WeaponId, WeaponTier } from "@game/types";
 import { coneAngleAway } from "@game/weapons/runtime/targetingHelpers";
 
 // Match flamethrower.ts + BackgroundField handler values
@@ -30,7 +31,10 @@ const TRAIL_PATCH_MS = 180;
 const TRAIL_BURN_DPS = 4.5;
 const TRAIL_BURN_MS = 400;
 
-function buildTickCommands(ctx: WeaponContext, tier = 1): WeaponCommand[] {
+function buildTickCommands(
+  ctx: WeaponContext,
+  tier = WeaponTier.TIER_ONE,
+): WeaponCommand[] {
   const { engine, targetX, targetY, centerX, centerY } = ctx;
   const flameDir = coneAngleAway(targetX, targetY, centerX, centerY);
   const commands: WeaponCommand[] = [];
@@ -65,7 +69,7 @@ function buildTickCommands(ctx: WeaponContext, tier = 1): WeaponCommand[] {
       decayPerSecond: BURN_DECAY,
     });
     // T2: spread fire to nearby bugs around each hit bug
-    if (tier >= 2 && bug) {
+    if (tier >= WeaponTier.TIER_TWO && bug) {
       commands.push({
         kind: "burnRadius",
         cx: bug.x,
@@ -77,7 +81,7 @@ function buildTickCommands(ctx: WeaponContext, tier = 1): WeaponCommand[] {
       });
     }
     // T3: trigger kernel panic explosion on each burning bug
-    if (tier >= 3) {
+    if (tier >= WeaponTier.TIER_THREE) {
       commands.push({
         kind: "triggerKernelPanic",
         targetIndex: idx,
@@ -126,7 +130,7 @@ function buildTickCommands(ctx: WeaponContext, tier = 1): WeaponCommand[] {
     kind: "spawnEffect",
     descriptor: {
       type: "overlayEffect",
-      weaponId: "flame",
+      weaponId: WeaponId.Flame,
       viewportX: ctx.viewportX,
       viewportY: ctx.viewportY,
       extras: { angle: (flameDir * Math.PI) / 180 },
@@ -178,7 +182,7 @@ function buildPaintCommands(ctx: WeaponContext): WeaponCommand[] {
 }
 
 export function createSession(_ctx?: WeaponContext): HoldFireSession {
-  const tier = _ctx?.tier ?? 1;
+  const tier = _ctx?.tier ?? WeaponTier.TIER_ONE;
   return {
     mode: "hold",
     begin(ctx: WeaponContext): WeaponCommand[] { return buildTickCommands(ctx, tier); },

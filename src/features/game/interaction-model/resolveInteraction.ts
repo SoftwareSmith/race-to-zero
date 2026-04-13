@@ -1,3 +1,4 @@
+import { WeaponMatchup } from "@game/types";
 import type {
   AppliedStatus,
   BugDefinition,
@@ -14,38 +15,38 @@ function hasTypeMatch(list: WeaponType[] | undefined, weaponType: WeaponType) {
 
 function getOutcome(weapon: WeaponConfig, bug: BugDefinition): InteractionStrength {
   if (hasTypeMatch(bug.immuneTo, weapon.type)) {
-    return "immune";
+    return WeaponMatchup.Immune;
   }
 
   if (hasTypeMatch(bug.weakTo, weapon.type)) {
-    return "strong";
+    return WeaponMatchup.Strong;
   }
 
   if (weapon.type === "fire" && bug.traits.includes("flammable")) {
-    return "strong";
+    return WeaponMatchup.Strong;
   }
 
   if (hasTypeMatch(bug.resistantTo, weapon.type)) {
-    return "weak";
+    return WeaponMatchup.Weak;
   }
 
   if (bug.traits.includes("armored") && weapon.type !== "blunt") {
-    return "weak";
+    return WeaponMatchup.Weak;
   }
 
-  return "normal";
+  return WeaponMatchup.Neutral;
 }
 
 function getDamage(baseDamage: number, outcome: InteractionStrength) {
-  if (outcome === "immune") {
+  if (outcome === WeaponMatchup.Immune) {
     return 0;
   }
 
-  if (outcome === "strong") {
+  if (outcome === WeaponMatchup.Strong) {
     return Math.round(baseDamage * 1.5);
   }
 
-  if (outcome === "weak") {
+  if (outcome === WeaponMatchup.Weak) {
     return Math.max(1, Math.floor(baseDamage * 0.5));
   }
 
@@ -68,7 +69,7 @@ function resolveStatuses(
       continue;
     }
 
-    if (outcome === "immune") {
+    if (outcome === WeaponMatchup.Immune) {
       blockedStatuses.push(status.id);
       continue;
     }
@@ -91,11 +92,11 @@ export function resolveInteraction(
   const statusResult = resolveStatuses(weapon, bug, outcome);
   const notes = [...statusResult.notes];
 
-  if (outcome === "strong") {
+  if (outcome === WeaponMatchup.Strong) {
     notes.push(`${weapon.name} is strong against ${bug.name}.`);
-  } else if (outcome === "weak") {
+  } else if (outcome === WeaponMatchup.Weak) {
     notes.push(`${weapon.name} is weak against ${bug.name}.`);
-  } else if (outcome === "immune") {
+  } else if (outcome === WeaponMatchup.Immune) {
     notes.push(`${bug.name} is immune to ${weapon.type} damage.`);
   }
 

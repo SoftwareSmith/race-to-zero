@@ -1,17 +1,17 @@
 import { useCallback, useState } from "react";
-import type { SiegeWeaponId, WeaponTier, WeaponEvolutionState } from "@game/types";
+import { ALL_WEAPON_IDS, WeaponTier } from "@game/types";
+import type { SiegeWeaponId, WeaponEvolutionState } from "@game/types";
+import { WEAPON_DEFS } from "@config/weaponConfig";
 import type { WeaponDef } from "@game/weapons/types";
-import { WEAPON_EVOLVE_THRESHOLDS } from "@config/gameDefaults";
+import {
+  getKillsToNextTier as getNextTierKillDelta,
+  getWeaponTierTitle,
+} from "@game/weapons/progression";
 
 export type EvolutionStatesRecord = Partial<Record<SiegeWeaponId, WeaponEvolutionState>>;
 
-const ALL_IDS: SiegeWeaponId[] = [
-  "hammer", "zapper", "freeze", "chain", "flame",
-  "laser", "shockwave", "nullpointer", "plasma", "void",
-];
-
 const DEFAULT_STATES: EvolutionStatesRecord = Object.fromEntries(
-  ALL_IDS.map((id) => [id, { tier: 1 as WeaponTier, kills: 0 }]),
+  ALL_WEAPON_IDS.map((id) => [id, { tier: WeaponTier.TIER_ONE, kills: 0 }]),
 ) as EvolutionStatesRecord;
 
 export function useWeaponEvolution() {
@@ -45,7 +45,7 @@ export function useWeaponEvolution() {
   /** Get the current tier for a weapon. */
   const getWeaponTier = useCallback(
     (id: SiegeWeaponId): WeaponTier => {
-      return (evolutionStates[id]?.tier ?? 1) as WeaponTier;
+      return evolutionStates[id]?.tier ?? WeaponTier.TIER_ONE;
     },
     [evolutionStates],
   );
@@ -53,8 +53,8 @@ export function useWeaponEvolution() {
   /** Get the tier-appropriate display title for a weapon. */
   const getWeaponTitle = useCallback(
     (id: SiegeWeaponId, weaponDef: WeaponDef): string => {
-      const tier = evolutionStates[id]?.tier ?? 1;
-      return weaponDef.tierTitles?.[tier - 1] ?? weaponDef.title;
+      const tier = evolutionStates[id]?.tier ?? WeaponTier.TIER_ONE;
+      return getWeaponTierTitle(weaponDef, tier);
     },
     [evolutionStates],
   );
@@ -63,9 +63,9 @@ export function useWeaponEvolution() {
   const getKillsToNextTier = useCallback(
     (id: SiegeWeaponId): { kills: number; needed: number } | null => {
       const state = evolutionStates[id];
-      if (!state || state.tier >= 3) return null;
-      const thresholds = WEAPON_EVOLVE_THRESHOLDS[id];
-      const needed = state.tier === 1 ? thresholds[0] : thresholds[1];
+      if (!state) return null;
+      const needed = getNextTierKillDelta(weaponDefById[id], state);
+      if (needed == null) return null;
       return { kills: state.kills, needed };
     },
     [evolutionStates],
@@ -86,3 +86,7 @@ export function useWeaponEvolution() {
     resetEvolution,
   };
 }
+
+const weaponDefById = Object.fromEntries(
+  WEAPON_DEFS.map((weapon) => [weapon.id, weapon]),
+) as Record<SiegeWeaponId, WeaponDef>;

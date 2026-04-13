@@ -12,6 +12,7 @@ import type {
   StructureBehavior,
 } from "@game/structures/runtime/types";
 import { STRUCTURE_DEFS } from "@config/structureConfig";
+import { isTerminalEntityState } from "@game/types";
 
 const WALL_HALF_WIDTH = 20;
 const DAMAGE_INTERVAL_MS = 800;
@@ -29,7 +30,7 @@ export const firewallBehavior: StructureBehavior = {
     const bugs = engine.getEntities();
     for (let i = 0; i < bugs.length; i++) {
       const e = bugs[i] as any;
-      if (e.state === "dead" || e.state === "dying") continue;
+      if (isTerminalEntityState(e.state)) continue;
       if (Math.abs(e.x - entry.x) <= WALL_HALF_WIDTH) {
         const result = engine.handleHit(i, 1, true);
         if (result?.defeated) {

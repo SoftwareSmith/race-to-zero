@@ -186,7 +186,7 @@ function ChartFallback({ className = "" }: { className?: string }) {
   return (
     <div
       className={cn(
-        "min-h-[420px] rounded-[26px] border border-white/10 bg-[linear-gradient(180deg,rgba(10,12,18,0.96),rgba(19,23,32,0.96))] p-5 text-stone-400",
+        "flex h-full min-h-[240px] items-center rounded-[24px] border border-white/10 bg-[linear-gradient(180deg,rgba(10,12,18,0.96),rgba(19,23,32,0.96))] p-4 text-sm text-stone-400",
         className,
       )}
     >
@@ -236,8 +236,8 @@ export const OverviewView = memo(function OverviewView({
   );
 
   return (
-    <div className="grid gap-6">
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+    <div className="grid h-full min-h-0 gap-3 grid-rows-[auto_minmax(0,1fr)]">
+      <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-5">
         {metricCards.map((metricCard) => (
           <MetricCard
             key={metricCard.label}
@@ -250,11 +250,11 @@ export const OverviewView = memo(function OverviewView({
         ))}
       </div>
 
-      <div className="grid gap-5 xl:grid-cols-[minmax(0,1.35fr)_minmax(340px,0.85fr)]">
-        <Suspense fallback={<ChartFallback className="min-h-[420px]" />}>
+      <div className="grid min-h-0 gap-3 xl:grid-cols-[minmax(0,1.25fr)_minmax(320px,0.75fr)]">
+        <Suspense fallback={<ChartFallback className="h-full" />}>
           <ChartCard
             chartKey="bug-burndown"
-            className="min-h-[420px]"
+            className="h-full min-h-0"
             data={deadlineBurndownData}
             onHoverStateChange={onChartFocusChange}
             siegeMode={siegeMode}
@@ -262,10 +262,10 @@ export const OverviewView = memo(function OverviewView({
             title="Bug burndown"
           />
         </Suspense>
-        <Suspense fallback={<ChartFallback className="min-h-[420px]" />}>
+        <Suspense fallback={<ChartFallback className="h-full" />}>
           <ChartCard
             chartKey="priority-breakdown"
-            className="min-h-[420px]"
+            className="h-full min-h-0"
             data={priorityChartData}
             description="Breakdown of the open backlog by priority so the biggest risk pockets are visible without hovering."
             onHoverStateChange={onChartFocusChange}
@@ -327,8 +327,8 @@ export const PeriodsView = memo(function PeriodsView({
   );
 
   return (
-    <div className="grid gap-6">
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+    <div className="grid h-full min-h-0 gap-3 grid-rows-[auto_minmax(0,1fr)]">
+      <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-4">
         {metricCards.map((metricCard) => (
           <MetricCard
             key={metricCard.label}
@@ -341,11 +341,11 @@ export const PeriodsView = memo(function PeriodsView({
         ))}
       </div>
 
-      <div className="grid gap-5 xl:grid-cols-[minmax(0,1.35fr)_minmax(340px,0.85fr)]">
-        <Suspense fallback={<ChartFallback className="min-h-[420px]" />}>
+      <div className="grid min-h-0 gap-3 xl:grid-cols-[minmax(0,1.25fr)_minmax(320px,0.75fr)]">
+        <Suspense fallback={<ChartFallback className="h-full" />}>
           <ChartCard
             chartKey="comparison-timeline"
-            className="min-h-[420px]"
+            className="h-full min-h-0"
             data={comparisonTimelineData}
             onHoverStateChange={onChartFocusChange}
             siegeMode={siegeMode}
@@ -353,10 +353,10 @@ export const PeriodsView = memo(function PeriodsView({
             title="Created vs completed over time"
           />
         </Suspense>
-        <Suspense fallback={<ChartFallback className="min-h-[420px]" />}>
+        <Suspense fallback={<ChartFallback className="h-full" />}>
           <ChartCard
             chartKey="comparison-summary"
-            className="min-h-[420px]"
+            className="h-full min-h-0"
             data={comparisonSummaryData}
             description="Each x-axis group is one metric type, with current and previous period bars paired so the change is easy to read."
             onHoverStateChange={onChartFocusChange}

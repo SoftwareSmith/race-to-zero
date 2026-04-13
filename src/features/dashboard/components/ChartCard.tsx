@@ -96,7 +96,7 @@ const ChartCard = memo(function ChartCard({
     <article
       data-siege-panel={chartKey}
       className={cn(
-        "group relative overflow-hidden rounded-[26px] border border-white/10 bg-[linear-gradient(180deg,rgba(10,12,18,0.96),rgba(19,23,32,0.96))] p-5 text-stone-50 shadow-[0_24px_60px_rgba(0,0,0,0.34)] transition duration-200 hover:-translate-y-1 hover:shadow-[0_30px_70px_rgba(0,0,0,0.38)]",
+        "group relative flex h-full min-h-0 flex-col overflow-hidden rounded-[24px] border border-white/10 bg-[linear-gradient(180deg,rgba(10,12,18,0.96),rgba(19,23,32,0.96))] p-4 text-stone-50 shadow-[0_20px_46px_rgba(0,0,0,0.32)] transition duration-200 hover:-translate-y-0.5 hover:shadow-[0_24px_56px_rgba(0,0,0,0.36)]",
         siegeMode
           ? "border-red-500/18 bg-[linear-gradient(180deg,rgba(25,10,14,0.96),rgba(19,23,32,0.96))]"
           : "",
@@ -120,11 +120,11 @@ const ChartCard = memo(function ChartCard({
       <div className="absolute inset-x-8 top-0 h-px bg-gradient-to-r from-transparent via-white/35 to-transparent opacity-0 transition duration-200 group-hover:opacity-100" />
       <div className="relative">
         <div>
-          <h3 className="mt-2 font-display text-3xl leading-tight tracking-[-0.04em] text-stone-50">
+          <h3 className="mt-1 font-display text-[1.8rem] leading-tight tracking-[-0.04em] text-stone-50 sm:text-[2.1rem]">
             {title}
           </h3>
           {description ? (
-            <p className="mt-3 w-full text-sm leading-7 text-stone-300">
+            <p className="mt-2 w-full text-[0.8rem] leading-6 text-stone-300">
               {description}
             </p>
           ) : null}
@@ -132,8 +132,8 @@ const ChartCard = memo(function ChartCard({
 
         <div
           className={cn(
-            "h-[320px] sm:h-[360px]",
-            description ? "mt-6" : "mt-4",
+            "h-[220px] sm:h-[240px] xl:h-[min(32vh,280px)]",
+            description ? "mt-4" : "mt-3",
           )}
         >
           {variant === "bar" ? (
@@ -144,7 +144,7 @@ const ChartCard = memo(function ChartCard({
         </div>
 
         {summary ? (
-          <p className="mt-4 max-w-2xl text-sm leading-6 text-stone-400">
+          <p className="mt-3 max-w-2xl text-[0.76rem] leading-5 text-stone-400">
             {summary}
           </p>
         ) : null}

@@ -3,11 +3,11 @@
  */
 
 import { WeaponId } from "@game/types";
-import type { WeaponDef } from "@game/weapons/types";
+import { HitPattern, WeaponInputMode, type WeaponDef } from "@game/weapons/types";
+import { HAMMER_TIERS } from "./helpers";
+import { OVERLAY_EFFECT_DURATION_MS } from "./vfx";
 
 export const ID = WeaponId.Hammer;
-
-export const EVOLVE_THRESHOLDS: [number, number] = [20, 60];
 
 export const CURSOR = {
   accent: "#fbbf24",
@@ -22,30 +22,20 @@ export const T3_ALLY_DURATION_MS = 8000;
 
 export const def: WeaponDef = {
   id: ID,
-  title: "Hammer",
+  title: HAMMER_TIERS[0].title,
   typeLabel: "Blunt",
   typeHint: "Crushes armored targets and stays reliable when precision is tight.",
   weaponType: "blunt",
   unlockKills: 0,
-  detail:
-    "Heavy impact strike. Deals 2 damage — one-shots Glitchlings on contact and leaves a persistent crack at the hit point.",
-  hitPattern: "point",
+  detail: HAMMER_TIERS[0].detail,
+  hitPattern: HitPattern.Single,
   hitRadius: SEARCH_RADIUS,
+  cursor: CURSOR,
+  overlayEffectDurationMs: OVERLAY_EFFECT_DURATION_MS,
   damage: DAMAGE,
   effectColor: CURSOR.accent,
   cooldownMs: 300,
-  inputMode: "click",
-  evolveThresholds: EVOLVE_THRESHOLDS,
-  hint: "Click directly on a bug to smash it",
-  tierTitles: ["Hammer", "Refactor Tool", "Rewrite Engine"],
-  tierDetails: [
-    "Heavy impact strike. Deals 2 damage — one-shots Glitchlings on contact and leaves a crack decal.",
-    "Refactor — if the target is above 50% HP, it splits into two half-HP bugs (divide and conquer).",
-    "Rewrite from scratch — converts the hit bug to an ally for 8 s; it stops targeting the player base.",
-  ],
-  tierHints: [
-    "Click directly on a bug to smash it",
-    "T2: High-HP bugs split into two half-HP clones",
-    "T3: Convert the hit bug to an ally for 8 seconds",
-  ],
+  inputMode: WeaponInputMode.Click,
+  hint: HAMMER_TIERS[0].hint,
+  tiers: HAMMER_TIERS,
 };

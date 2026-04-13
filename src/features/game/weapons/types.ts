@@ -8,14 +8,53 @@ import type { WeaponTier } from "@game/types";
 export type { SiegeWeaponId };
 
 /** How hit-detection is resolved for a weapon. */
-export type HitPattern =
-  | "point"
-  | "line"
-  | "area"
-  | "cone"
-  | "chain"
-  | "seeking"
-  | "blackhole";
+export enum HitPattern {
+  Single = "point",
+  Line = "line",
+  Area = "area",
+  Cone = "cone",
+  Chain = "chain",
+  Seeking = "seeking",
+  BlackHole = "blackhole",
+}
+
+export enum WeaponInputMode {
+  Click = "click",
+  Directional = "directional",
+  Seeking = "seeking",
+  Hold = "hold",
+}
+
+export interface CursorConfig {
+  accent: string;
+  aura: string;
+  size: number;
+  showCrosshair: boolean;
+  ringClassName?: string;
+}
+
+export interface WeaponTierVfxDefinition {
+  intensity: "basic" | "amplified" | "catastrophic";
+  summary: string;
+}
+
+export interface WeaponTierBehaviorDefinition {
+  summary: string;
+}
+
+export interface WeaponTierDefinition {
+  tier: WeaponTier;
+  title: string;
+  detail: string;
+  hint: string;
+  effectColor?: string;
+  evolveAtKills?: number;
+  hitPattern?: HitPattern;
+  config?: Partial<WeaponDef>;
+  vfx?: WeaponTierVfxDefinition;
+  behavior?: WeaponTierBehaviorDefinition;
+  evolution?: WeaponTierDefinition;
+}
 
 /** Per-weapon static definition. */
 export interface WeaponDef {
@@ -28,6 +67,8 @@ export interface WeaponDef {
   detail: string;
   hitPattern: HitPattern;
   hitRadius: number;
+  cursor: CursorConfig;
+  overlayEffectDurationMs: number;
   damage?: number;
   hitOrientation?: "horizontal" | "vertical";
   snapAngle?: boolean;
@@ -60,24 +101,9 @@ export interface WeaponDef {
   blackHoleDurationMs?: number;
   blackHoleRadius?: number;
   blackHoleCoreRadius?: number;
-  inputMode: "click" | "directional" | "seeking" | "hold";
+  inputMode: WeaponInputMode;
   hint: string;
   effectColor: string;
   cooldownMs: number;
-  /**
-   * Display names for each tier: [T1, T2, T3].
-   * T1 falls back to `title` if not provided.
-   */
-  tierTitles?: [string, string, string];
-  /**
-   * Kill thresholds to evolve: [kills needed for T2, kills needed for T3].
-   * Referenced from WEAPON_EVOLVE_THRESHOLDS in gameDefaults when not overridden here.
-   */
-  evolveThresholds?: [number, number];
-  /** Per-tier detail overrides: [T1, T2, T3]. Falls back to `detail` when absent. */
-  tierDetails?: [string, string, string];
-  /** Per-tier hint overrides: [T1, T2, T3]. Falls back to `hint` when absent. */
-  tierHints?: [string, string, string];
-  /** Optional per-tier effect colour overrides: [T1, T2, T3]. */
-  tierEffectColors?: [string, string, string];
+  tiers: readonly WeaponTierDefinition[];
 }

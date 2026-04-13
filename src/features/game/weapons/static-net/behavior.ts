@@ -10,6 +10,7 @@ import type {
   ClickFireResult,
   WeaponCommand,
 } from "@game/weapons/runtime/types";
+import { WeaponId, WeaponTier } from "@game/types";
 
 const HIT_RADIUS = 200;
 const ENSNARE_DURATION_MS = 3000;
@@ -18,10 +19,10 @@ const T3_DEADLOCK_DURATION_MS = 4000;
 
 export function createSession(ctx: WeaponContext): ClickFireResult {
   const { targetX, targetY, viewportX, viewportY, engine } = ctx;
-  const tier = ctx.tier ?? 1;
+  const tier = ctx.tier ?? WeaponTier.TIER_ONE;
   const commands: WeaponCommand[] = [];
 
-  if (tier >= 3) {
+  if (tier >= WeaponTier.TIER_THREE) {
     // T3: Deadlock Cluster — pulls all bugs toward centroid
     commands.push({
       kind: "startDeadlockCluster",
@@ -40,7 +41,7 @@ export function createSession(ctx: WeaponContext): ClickFireResult {
       durationMs: ENSNARE_DURATION_MS,
     });
 
-    if (tier >= 2) {
+    if (tier >= WeaponTier.TIER_TWO) {
       // T2: knockback — push all bugs outward from the net center
       const bugs = engine.getAllBugs();
       for (const idx of engine.radiusHitTest(targetX, targetY, HIT_RADIUS)) {
@@ -82,7 +83,7 @@ export function createSession(ctx: WeaponContext): ClickFireResult {
     kind: "spawnEffect",
     descriptor: {
       type: "overlayEffect",
-      weaponId: "shockwave",
+      weaponId: WeaponId.StaticNet,
       viewportX,
       viewportY,
     },

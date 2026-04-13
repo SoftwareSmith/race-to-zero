@@ -13,6 +13,39 @@
   100% { opacity: 0; transform: translateY(-4px); }
 }
 
+@keyframes hud-notch-arrive {
+  0% {
+    opacity: 0;
+    transform: translateY(-14px) scale(0.97);
+  }
+
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes hud-progress-scan {
+  0% {
+    transform: translateX(-130%);
+  }
+
+  100% {
+    transform: translateX(260%);
+  }
+}
+
+@keyframes hud-weapon-breathe {
+  0%,
+  100% {
+    box-shadow: 0 0 0 rgba(56, 189, 248, 0.16);
+  }
+
+  50% {
+    box-shadow: 0 0 28px rgba(56, 189, 248, 0.24);
+  }
+}
+
 /* Weapon slot evolution animation: scale + rotate wiggle */
 @keyframes weapon-evolve {
   0%   { transform: scale(1) rotate(0deg); }
@@ -260,6 +293,20 @@
 body.wrench-cursor-active,
 body.wrench-cursor-active * {
   cursor: none !important;
+}
+
+body.cursor-none [data-hud-cursor="default"],
+body.cursor-none [data-hud-cursor="default"] *,
+body.wrench-cursor-active [data-hud-cursor="default"],
+body.wrench-cursor-active [data-hud-cursor="default"] * {
+  cursor: default !important;
+}
+
+body.cursor-none [data-hud-cursor="pointer"],
+body.cursor-none [data-hud-cursor="pointer"] *,
+body.wrench-cursor-active [data-hud-cursor="pointer"],
+body.wrench-cursor-active [data-hud-cursor="pointer"] * {
+  cursor: pointer !important;
 }
 
 @keyframes laser-cursor-breathe {

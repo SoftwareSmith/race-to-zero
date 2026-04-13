@@ -11,6 +11,7 @@ import type {
   ClickFireResult,
   WeaponCommand,
 } from "@game/weapons/runtime/types";
+import { WeaponId, WeaponTier } from "@game/types";
 import { canvasToViewport } from "@game/weapons/runtime/targetingHelpers";
 
 const DAMAGE = 2;
@@ -26,7 +27,7 @@ const BURST_OFFSETS = [
 
 export function createSession(ctx: WeaponContext): ClickFireResult {
   const { engine, targetX, targetY, viewportX, viewportY, bounds } = ctx;
-  const tier = ctx.tier ?? 1;
+  const tier = ctx.tier ?? WeaponTier.TIER_ONE;
   const commands: WeaponCommand[] = [];
 
   const hitSet = new Set<number>();
@@ -59,7 +60,7 @@ export function createSession(ctx: WeaponContext): ClickFireResult {
     viewportNodes.push(canvasToViewport(burstX, burstY, bounds));
 
     // T2: secondary explosions from each directly hit bug
-    if (tier >= 2) {
+    if (tier >= WeaponTier.TIER_TWO) {
       for (const idx of burstHits) {
         const bug = engine.getAllBugs()[idx];
         if (bug) {
@@ -76,7 +77,7 @@ export function createSession(ctx: WeaponContext): ClickFireResult {
   }
 
   // T3: recursive cascade — extra outer ring detonations
-  if (tier >= 3) {
+  if (tier >= WeaponTier.TIER_THREE) {
     const ringOffsets = [
       { x: 90, y: 0 }, { x: -90, y: 0 }, { x: 0, y: 90 }, { x: 0, y: -90 },
       { x: 65, y: 65 }, { x: -65, y: 65 }, { x: 65, y: -65 }, { x: -65, y: -65 },
@@ -102,7 +103,7 @@ export function createSession(ctx: WeaponContext): ClickFireResult {
     kind: "spawnEffect",
     descriptor: {
       type: "overlayEffect",
-      weaponId: "plasma",
+      weaponId: WeaponId.ForkBomb,
       viewportX,
       viewportY,
       extras: { chainNodes: viewportNodes },

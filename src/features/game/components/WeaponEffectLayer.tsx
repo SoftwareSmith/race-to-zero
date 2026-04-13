@@ -12,55 +12,7 @@
 import type { ReactNode } from "react";
 import { createPortal } from "react-dom";
 import type { WeaponEffectEvent } from "@game/types";
-
-// ── Per-weapon overlay imports ────────────────────────────────────────────────
-
-import { FreezeOverlay } from "@game/weapons/freeze-cone/overlay";
-import { ChainOverlay } from "@game/weapons/chain-zap/overlay";
-import { TracerBloomOverlay } from "@game/weapons/tracer-bloom/overlay";
-import { NullPointerOverlay } from "@game/weapons/null-pointer/overlay";
-import { StaticNetOverlay } from "@game/weapons/static-net/overlay";
-import { ForkBombOverlay } from "@game/weapons/fork-bomb/overlay";
-import { VoidPulseOverlay } from "@game/weapons/void-pulse/overlay";
-
-// ── Handler map: weaponId → render function ───────────────────────────────────
-//
-// Each handler receives the WeaponEffectEvent and returns a ReactNode.
-// Weapons without a visual overlay are not listed (returns null by default).
-
-type OverlayRenderer = (effect: WeaponEffectEvent) => ReactNode;
-
-const overlayHandlers: Partial<
-  Record<WeaponEffectEvent["weapon"], OverlayRenderer>
-> = {
-  freeze: (e) => <FreezeOverlay key={e.id} x={e.x} y={e.y} angle={e.angle} />,
-  chain: (e) => (
-    <ChainOverlay
-      key={e.id}
-      x={e.x}
-      y={e.y}
-      chainNodes={e.chainNodes}
-      jagOffsets={e.jagOffsets}
-    />
-  ),
-  laser: (e) => (
-    <TracerBloomOverlay key={e.id} x={e.x} y={e.y} chainNodes={e.chainNodes} />
-  ),
-  nullpointer: (e) => (
-    <NullPointerOverlay
-      key={e.id}
-      x={e.x}
-      y={e.y}
-      targetX={e.targetX}
-      targetY={e.targetY}
-    />
-  ),
-  shockwave: (e) => <StaticNetOverlay key={e.id} x={e.x} y={e.y} />,
-  plasma: (e) => (
-    <ForkBombOverlay key={e.id} x={e.x} y={e.y} chainNodes={e.chainNodes} />
-  ),
-  void: (e) => <VoidPulseOverlay key={e.id} x={e.x} y={e.y} />,
-};
+import { getOverlayRenderer } from "@game/weapons/runtime/registry";
 
 // ── Layer component ───────────────────────────────────────────────────────────
 
@@ -74,7 +26,7 @@ export default function WeaponEffectLayer({ effects }: WeaponEffectLayerProps) {
   const layer: ReactNode = (
     <>
       {effects.map(
-        (effect) => overlayHandlers[effect.weapon]?.(effect) ?? null,
+        (effect) => getOverlayRenderer(effect.weapon)?.(effect) ?? null,
       )}
     </>
   );

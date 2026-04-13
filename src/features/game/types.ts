@@ -10,24 +10,49 @@ export interface SiegeZoneRect {
  * Named weapon ID constants — use these instead of string literals.
  * e.g. WeaponId.NullPointer instead of "nullpointer"
  */
-export const WeaponId = {
-  Hammer:      "hammer",
-  BugSpray:    "zapper",
-  Freeze:      "freeze",
-  ChainZap:    "chain",
-  Flame:       "flame",
-  TracerBloom: "laser",
-  StaticNet:   "shockwave",
-  NullPointer: "nullpointer",
-  ForkBomb:    "plasma",
-  VoidPulse:   "void",
-} as const;
+export enum WeaponId {
+  Hammer = "hammer",
+  BugSpray = "zapper",
+  Freeze = "freeze",
+  ChainZap = "chain",
+  Flame = "flame",
+  TracerBloom = "laser",
+  StaticNet = "shockwave",
+  NullPointer = "nullpointer",
+  ForkBomb = "plasma",
+  VoidPulse = "void",
+}
 
 /** Union of all valid weapon ID strings. */
-export type WeaponId = (typeof WeaponId)[keyof typeof WeaponId];
+export type SiegeWeaponId = `${WeaponId}`;
+
+export const ALL_WEAPON_IDS: readonly SiegeWeaponId[] = [
+  WeaponId.Hammer,
+  WeaponId.BugSpray,
+  WeaponId.Freeze,
+  WeaponId.ChainZap,
+  WeaponId.Flame,
+  WeaponId.TracerBloom,
+  WeaponId.StaticNet,
+  WeaponId.NullPointer,
+  WeaponId.ForkBomb,
+  WeaponId.VoidPulse,
+] as const;
 
 /** @deprecated Use WeaponId instead. Kept as alias for backward compatibility. */
-export type SiegeWeaponId = WeaponId;
+export type WeaponIdValue = SiegeWeaponId;
+
+export enum EntityState {
+  Alive = "alive",
+  Dying = "dying",
+  Dead = "dead",
+}
+
+export function isTerminalEntityState(
+  state: string | null | undefined,
+): state is EntityState.Dead | EntityState.Dying {
+  return state === EntityState.Dead || state === EntityState.Dying;
+}
 
 export type WeaponType =
   | "blunt"
@@ -39,7 +64,17 @@ export type WeaponType =
   | "plasma"
   | "gravity";
 
-export type WeaponMatchupState = "favored" | "steady" | "risky" | "immune";
+export enum WeaponMatchup {
+  Strong = "favored",
+  Neutral = "steady",
+  Weak = "risky",
+  Immune = "immune",
+  Favored = "favored",
+  Steady = "steady",
+  Risky = "risky",
+}
+
+export type WeaponMatchupState = `${WeaponMatchup}`;
 
 export interface WeaponMatchupSummaryItem {
   state: WeaponMatchupState;
@@ -48,16 +83,16 @@ export interface WeaponMatchupSummaryItem {
 
 /**
  * Named tier constants — use these instead of magic numbers.
- * e.g. WeaponTier.Enhanced instead of 2
+ * e.g. WeaponTier.TIER_TWO instead of 2
  */
-export const WeaponTier = {
-  Base:        1,
-  Enhanced:    2,
-  Catastrophic: 3,
-} as const;
+export enum WeaponTier {
+  TIER_ONE = 1,
+  TIER_TWO = 2,
+  TIER_THREE = 3,
+}
 
 /** Current evolution tier of a weapon (1 = base, 2 = enhanced, 3 = catastrophic). */
-export type WeaponTier = (typeof WeaponTier)[keyof typeof WeaponTier];
+export type WeaponTierValue = WeaponTier;
 
 /** Per-weapon kill count and tier for the current siege session. */
 export interface WeaponEvolutionState {

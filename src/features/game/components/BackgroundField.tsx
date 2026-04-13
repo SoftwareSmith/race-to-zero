@@ -49,17 +49,19 @@ import type {
   ExecutionContext,
   PersistentFireSession,
 } from "@game/weapons/runtime/types";
+import { HitPattern } from "@game/weapons/types";
 import { getEntry, hasEntry } from "@game/weapons/runtime/registry";
 import { executeCommands } from "@game/weapons/runtime/executor";
+import { WeaponId } from "@game/types";
 
 const TARGET_FRAME_MS = 1000 / 24;
 const TRANSITION_EASING = 0.08;
 const OVERLAY_EFFECT_WEAPONS = new Set<SiegeWeaponId>([
-  "freeze",
-  "chain",
-  "laser",
-  "nullpointer",
-  "void",
+  WeaponId.Freeze,
+  WeaponId.ChainZap,
+  WeaponId.TracerBloom,
+  WeaponId.NullPointer,
+  WeaponId.VoidPulse,
 ]);
 
 function interpolate(
@@ -1084,7 +1086,7 @@ const BugCanvas = memo(function BugCanvas({
 
       // now apply hits (point/line/cone logic)
       // copy the remaining portion from original handler: hitPattern handling
-      if (weaponDef.hitPattern === "point") {
+      if (weaponDef.hitPattern === HitPattern.Single) {
         onWeaponFireRef.current?.(weaponId, clientX, clientY);
         let hitCandidate: { distance: number; index: number } | null = null;
         try {
@@ -1165,7 +1167,7 @@ const BugCanvas = memo(function BugCanvas({
             });
           }
         }
-      } else if (weaponDef.hitPattern === "line") {
+      } else if (weaponDef.hitPattern === HitPattern.Line) {
         // For brevity, keep existing line behavior unchanged: call existing code path by
         // synthesizing a quick line dispatch similar to original handler.
         // (Original complex line logic remains in the main handler; for hold weapons
@@ -1656,7 +1658,7 @@ const BugCanvas = memo(function BugCanvas({
       }
       if (canvasRef.current) triggerWeaponShake(canvasRef.current, weaponId);
 
-      if (weaponDef.hitPattern === "point") {
+      if (weaponDef.hitPattern === HitPattern.Single) {
         // ── Hammer: hit nearest bug within radius ────────────────
         onWeaponFireRef.current?.(weaponId, fireX, fireY);
 
@@ -1742,7 +1744,7 @@ const BugCanvas = memo(function BugCanvas({
             });
           }
         }
-      } else if (weaponDef.hitPattern === "line") {
+      } else if (weaponDef.hitPattern === HitPattern.Line) {
         // ── Laser: bouncing disc or legacy beam ────────────────
         if (weaponDef.bouncingDisc) {
           // Bouncing disc: fire from center toward click, reflect off canvas walls
@@ -1925,7 +1927,7 @@ const BugCanvas = memo(function BugCanvas({
             }
           }
         } // end else (legacy beam)
-      } else if (weaponDef.hitPattern === "blackhole") {
+      } else if (weaponDef.hitPattern === HitPattern.BlackHole) {
         // ── Void Pulse: persistent gravity well ─────────────────
         onWeaponFireRef.current?.(weaponId, fireX, fireY);
         const started =
@@ -1943,7 +1945,7 @@ const BugCanvas = memo(function BugCanvas({
           const bhId = vfxRef.current.createBlackHole(targetX, targetY);
           blackHoleVfxIdRef.current = bhId;
         }
-      } else if (weaponDef.hitPattern === "area") {
+      } else if (weaponDef.hitPattern === HitPattern.Area) {
         // ── Pulse / Bomb / Shockwave / Zapper ───────────────────
         onWeaponFireRef.current?.(weaponId, fireX, fireY);
 
@@ -2032,7 +2034,7 @@ const BugCanvas = memo(function BugCanvas({
             });
           }
         }
-      } else if (weaponDef.hitPattern === "cone") {
+      } else if (weaponDef.hitPattern === HitPattern.Cone) {
         // ── Flame / Bug Spray: cone spray from click toward center ──────
         const angleDeg =
           (Math.atan2(centerY - targetY, centerX - targetX) * 180) / Math.PI;
@@ -2121,7 +2123,7 @@ const BugCanvas = memo(function BugCanvas({
             });
           }
         }
-      } else if (weaponDef.hitPattern === "chain") {
+      } else if (weaponDef.hitPattern === HitPattern.Chain) {
         // ── Chain Zap: bounce lightning between nearby bugs ──────
         let hitCandidate: { distance: number; index: number } | null = null;
 
@@ -2235,7 +2237,7 @@ const BugCanvas = memo(function BugCanvas({
             y: vy,
           });
         }
-      } else if (weaponDef.hitPattern === "seeking") {
+      } else if (weaponDef.hitPattern === HitPattern.Seeking) {
         // ── Pointer / Null Pointer: auto-seek closest bug ────────
         let targetIdx = -1;
 

@@ -5,9 +5,9 @@
 import { useEffect, useRef } from "react";
 import type React from "react";
 import { WEAPON_DEFS } from "@config/weaponConfig";
+import { WeaponId } from "@game/types";
 import type { SiegeWeaponId, StructureId } from "@game/types";
 import WeaponGlyph from "@shared/components/icons/WeaponGlyph";
-import { cursorHandlers } from "@game/weapons/handlers";
 
 interface WeaponCursorProps {
   hideSystemCursor?: boolean;
@@ -16,9 +16,6 @@ interface WeaponCursorProps {
   weaponId: SiegeWeaponId;
   swinging?: boolean;
 }
-
-// Per-weapon cursor config now lives in each weapon's constants.ts.
-// cursorHandlers assembles them into a single lookup map.
 
 function CursorReticle({
   lastFiredAt,
@@ -92,14 +89,15 @@ function CursorReticle({
     );
   }
 
-  const theme = cursorHandlers[weaponId];
-  const cooldownMs =
-    WEAPON_DEFS.find((weapon) => weapon.id === weaponId)?.cooldownMs ?? 0;
+  const weaponDef = WEAPON_DEFS.find((weapon) => weapon.id === weaponId);
+  if (!weaponDef) return null;
+  const theme = weaponDef.cursor;
+  const cooldownMs = weaponDef.cooldownMs;
   const size = theme.size;
   const guide = Math.round(size * 0.22);
   const inner = Math.round(size * 0.42);
   const showOuterRing = !!theme.ringClassName;
-  const showInnerRing = weaponId !== "hammer";
+  const showInnerRing = weaponId !== WeaponId.Hammer;
   const showCrosshair = theme.showCrosshair;
 
   return (

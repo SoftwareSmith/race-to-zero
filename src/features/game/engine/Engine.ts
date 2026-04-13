@@ -3,7 +3,8 @@ import { DEFAULT_GAME_CONFIG } from "./types";
 import { BugEntity } from "./BugEntity";
 import { Entity } from "./Entity";
 import { getBugVariantMaxHp } from "../../../constants/bugs";
-import type { StructureId, SiegeWeaponId, WeaponTier, WeaponEvolutionState } from "../types";
+import { ALL_WEAPON_IDS, EntityState, WeaponMatchup, WeaponTier, isTerminalEntityState } from "../types";
+import type { StructureId, SiegeWeaponId, WeaponEvolutionState } from "../types";
 import { hasEntry, getEntry } from "@game/structures/runtime/registry";
 import type { StructureTickContext, StructureGameEngine } from "@game/structures/runtime/types";
 import { WEAPON_EVOLVE_THRESHOLDS } from "@config/gameDefaults";
@@ -178,11 +179,10 @@ export class Engine {
     this.onTurretFire = opts.onTurretFire;
     this.onTeslaFire = opts.onTeslaFire;
     this.onWeaponEvolution = opts.onWeaponEvolution;
-    const allIds: SiegeWeaponId[] = ["hammer", "zapper", "freeze", "chain", "flame", "laser", "shockwave", "nullpointer", "plasma", "void"];
     this.weaponEvolutionStates = new Map(
-      allIds.map((id) => [
+      ALL_WEAPON_IDS.map((id) => [
         id,
-        opts.initialEvolutionStates?.[id] ?? { tier: 1, kills: 0 },
+        opts.initialEvolutionStates?.[id] ?? { tier: WeaponTier.TIER_ONE, kills: 0 },
       ]),
     );
   }
@@ -191,7 +191,7 @@ export class Engine {
   recordWeaponKill(weaponId: SiegeWeaponId | undefined | null): void {
     if (!weaponId) return;
     const state = this.weaponEvolutionStates.get(weaponId);
-    if (!state || state.tier >= 3) return;
+    if (!state || state.tier >= WeaponTier.TIER_THREE) return;
     state.kills++;
     this.checkEvolution(weaponId);
   }
@@ -200,12 +200,12 @@ export class Engine {
     const state = this.weaponEvolutionStates.get(weaponId);
     if (!state) return;
     const [t1Threshold, t2Threshold] = WEAPON_EVOLVE_THRESHOLDS[weaponId];
-    if (state.tier === 1 && state.kills >= t1Threshold) {
-      state.tier = 2;
-      this.onWeaponEvolution?.(weaponId, 2);
-    } else if (state.tier === 2 && state.kills >= t2Threshold) {
-      state.tier = 3;
-      this.onWeaponEvolution?.(weaponId, 3);
+    if (state.tier === WeaponTier.TIER_ONE && state.kills >= t1Threshold) {
+      state.tier = WeaponTier.TIER_TWO;
+      this.onWeaponEvolution?.(weaponId, WeaponTier.TIER_TWO);
+    } else if (state.tier === WeaponTier.TIER_TWO && state.kills >= t2Threshold) {
+      state.tier = WeaponTier.TIER_THREE;
+      this.onWeaponEvolution?.(weaponId, WeaponTier.TIER_THREE);
     }
   }
 
@@ -322,7 +322,7 @@ export class Engine {
     let best: { index: number; distance: number } | null = null;
     for (let i = 0; i < this.entities.length; i++) {
       const e = this.entities[i] as any;
-      if (e.state === "dead" || e.state === "dying") continue;
+      if (isTerminalEntityState(e.state)) continue;
       const dx = x - e.x;
       const dy = y - e.y;
       const dist = Math.hypot(dx, dy);
@@ -347,7 +347,7 @@ export class Engine {
 
     for (let i = 0; i < this.entities.length; i++) {
       const e = this.entities[i] as any;
-      if (e.state === "dead" || e.state === "dying") continue;
+      if (isTerminalEntityState(e.state)) continue;
 
       // Closest point on segment to entity center
       let t = 0;
@@ -375,7 +375,7 @@ export class Engine {
 
     for (let i = 0; i < this.entities.length; i++) {
       const e = this.entities[i] as any;
-      if (e.state === "dead" || e.state === "dying") continue;
+      if (isTerminalEntityState(e.state)) continue;
 
       const dist = Math.hypot(e.x - cx, e.y - cy);
       if (dist <= radius + Math.max((e.size ?? 12) * 0.5, 8)) {
@@ -466,7 +466,7 @@ export class Engine {
       ent.y = Math.min(this.height, Math.max(0, ent.y));
 
       // handle dead entities: move to pool and remove from active list once
-      if ((ent as any).state === "dead") {
+      if ((ent as any).state === EntityState.Dead) {
         const be = ent as any as BugEntity;
         // Attribute DOT kills to the source weapon
         if (be.dotSourceWeaponId) {
@@ -499,9 +499,9 @@ export class Engine {
     if (!e) return null;
     const matchup = weaponId
       ? getBugWeaponMatchup((e as any).variant as BugVariant, weaponId)
-      : "steady";
+      : WeaponMatchup.Steady;
     const adjustedDamage = applyMatchupDamage(damage, matchup);
-    if (matchup === "immune") {
+    if (matchup === WeaponMatchup.Immune) {
       return {
         defeated: false,
         matchup,
@@ -550,7 +550,7 @@ export class Engine {
 
     for (let i = 0; i < this.entities.length; i++) {
       const e = this.entities[i] as any;
-      if (e.state === "dead" || e.state === "dying") continue;
+      if (isTerminalEntityState(e.state)) continue;
 
       const dx = e.x - cx;
       const dy = e.y - cy;
@@ -599,7 +599,7 @@ export class Engine {
       for (let i = 0; i < this.entities.length; i++) {
         if (visited.has(i)) continue;
         const e = this.entities[i] as any;
-        if (e.state === "dead" || e.state === "dying") continue;
+        if (isTerminalEntityState(e.state)) continue;
         const dist = Math.hypot(current.x - e.x, current.y - e.y);
         if (dist <= chainRadius && dist < bestDist) {
           bestDist = dist;
@@ -632,7 +632,7 @@ export class Engine {
 
     for (let i = 0; i < this.entities.length; i++) {
       const e = this.entities[i] as any;
-      if (e.state === "dead" || e.state === "dying") continue;
+      if (isTerminalEntityState(e.state)) continue;
       const dist = Math.hypot(e.x - cx, e.y - cy);
       if (dist > useRadius) continue;
       const hp = e.hp ?? 1;
@@ -736,11 +736,11 @@ export class Engine {
   applyPoisonInRadius(cx: number, cy: number, radius: number, dps: number, durationMs: number, weaponId?: SiegeWeaponId): void {
     for (const e of this.entities) {
       const bug = e as any;
-      if (bug.state === "dead" || bug.state === "dying") continue;
+      if (isTerminalEntityState(bug.state)) continue;
       if (Math.hypot(e.x - cx, e.y - cy) <= radius) {
         if (weaponId) {
           const matchup = getBugWeaponMatchup(bug.variant as BugVariant, weaponId);
-          if (matchup === "immune") continue;
+          if (matchup === WeaponMatchup.Immune) continue;
         }
         if (typeof bug.applyPoison === "function") bug.applyPoison(dps, durationMs, weaponId);
       }
@@ -758,12 +758,12 @@ export class Engine {
   ): void {
     for (const e of this.entities) {
       const bug = e as any;
-      if (bug.state === "dead" || bug.state === "dying") continue;
+      if (isTerminalEntityState(bug.state)) continue;
       const dist = Math.hypot(e.x - cx, e.y - cy);
       if (dist > radius) continue;
       if (weaponId) {
         const matchup = getBugWeaponMatchup(bug.variant as BugVariant, weaponId);
-        if (matchup === "immune") continue;
+        if (matchup === WeaponMatchup.Immune) continue;
       }
       const normalized = dist / Math.max(1, radius);
       const intensity = 0.2 + 0.8 * Math.exp(-3.2 * normalized * normalized);
@@ -776,11 +776,11 @@ export class Engine {
   applyEnsnareInRadius(cx: number, cy: number, radius: number, durationMs: number, weaponId?: SiegeWeaponId): void {
     for (const e of this.entities) {
       const bug = e as any;
-      if (bug.state === "dead" || bug.state === "dying") continue;
+      if (isTerminalEntityState(bug.state)) continue;
       if (Math.hypot(e.x - cx, e.y - cy) <= radius) {
         if (weaponId) {
           const matchup = getBugWeaponMatchup(bug.variant as BugVariant, weaponId);
-          if (matchup === "immune") continue;
+          if (matchup === WeaponMatchup.Immune) continue;
         }
         if (typeof bug.applyEnsnare === "function") bug.applyEnsnare(durationMs);
       }
@@ -821,7 +821,7 @@ export class Engine {
     // Gravity pull towards core
     for (let index = 0; index < this.entities.length; index++) {
       const bug = this.entities[index] as any;
-      if (bug.state === "dead" || bug.state === "dying") continue;
+      if (isTerminalEntityState(bug.state)) continue;
       const dx = x - bug.x;
       const dy = y - bug.y;
       const dist = Math.hypot(dx, dy);
@@ -860,7 +860,7 @@ export class Engine {
       for (let i = 0; i < this.entities.length; i++) {
         if (visited.has(i)) continue;
         const e = this.entities[i] as any;
-        if (e.state === "dead" || e.state === "dying") continue;
+        if (isTerminalEntityState(e.state)) continue;
         const dist = Math.hypot(current.x - e.x, current.y - e.y);
         if (dist > chainRadius) continue;
         const now = performance.now();
@@ -897,7 +897,7 @@ export class Engine {
   applyChargedInRadius(cx: number, cy: number, radius: number, durationMs: number): void {
     for (const e of this.entities) {
       const bug = e as any;
-      if (bug.state === "dead" || bug.state === "dying") continue;
+      if (isTerminalEntityState(bug.state)) continue;
       if (Math.hypot(e.x - cx, e.y - cy) <= radius && typeof bug.applyCharged === "function") {
         bug.applyCharged(durationMs);
       }
@@ -907,7 +907,7 @@ export class Engine {
   applyMarkedInRadius(cx: number, cy: number, radius: number, durationMs: number): void {
     for (const e of this.entities) {
       const bug = e as any;
-      if (bug.state === "dead" || bug.state === "dying") continue;
+      if (isTerminalEntityState(bug.state)) continue;
       if (Math.hypot(e.x - cx, e.y - cy) <= radius && typeof bug.applyMarked === "function") {
         bug.applyMarked(durationMs);
       }
@@ -917,7 +917,7 @@ export class Engine {
   applyUnstableInRadius(cx: number, cy: number, radius: number, durationMs: number): void {
     for (const e of this.entities) {
       const bug = e as any;
-      if (bug.state === "dead" || bug.state === "dying") continue;
+      if (isTerminalEntityState(bug.state)) continue;
       if (Math.hypot(e.x - cx, e.y - cy) <= radius && typeof bug.applyUnstable === "function") {
         bug.applyUnstable(durationMs);
       }
@@ -934,12 +934,12 @@ export class Engine {
     let currentDmg = damage;
     for (const e of this.entities) {
       const bug = e as any;
-      if (bug.state === "dead" || bug.state === "dying") continue;
+      if (isTerminalEntityState(bug.state)) continue;
       if (bug.charged && currentDmg >= 1) {
         bug.hp = Math.max(0, bug.hp - Math.round(currentDmg));
         bug.lastHitTime = performance.now();
         if (bug.hp === 0) {
-          bug.state = "dying";
+          bug.state = EntityState.Dying;
           bug.deathProgress = 0;
           bug.vx = 0;
           bug.vy = 0;
@@ -954,10 +954,10 @@ export class Engine {
   applyGlobalSlow(multiplier: number, durationMs: number, weaponId?: SiegeWeaponId): void {
     for (const e of this.entities) {
       const bug = e as any;
-      if (bug.state === "dead" || bug.state === "dying") continue;
+      if (isTerminalEntityState(bug.state)) continue;
       if (weaponId) {
         const matchup = getBugWeaponMatchup(bug.variant as BugVariant, weaponId);
-        if (matchup === "immune") continue;
+        if (matchup === WeaponMatchup.Immune) continue;
       }
       if (typeof bug.applyFreeze === "function") bug.applyFreeze(multiplier, durationMs);
     }
@@ -971,7 +971,7 @@ export class Engine {
   /** Reduce target to 50% HP and spawn a second half-HP clone nearby. */
   splitBug(index: number): void {
     const e = this.entities[index] as any;
-    if (!e || e.state === "dead" || e.state === "dying") return;
+    if (!e || isTerminalEntityState(e.state)) return;
     e.hp = Math.max(1, Math.ceil(e.maxHp / 2));
     // Spawn clone from pool
     const clone = this.pool.pop() ?? new BugEntity();
@@ -992,7 +992,7 @@ export class Engine {
   /** Put a bug in ally state — it stops targeting the player base. */
   allyBug(index: number, durationMs: number): void {
     const e = this.entities[index] as any;
-    if (!e || e.state === "dead" || e.state === "dying") return;
+    if (!e || isTerminalEntityState(e.state)) return;
     if (typeof e.applyAlly === "function") e.applyAlly(durationMs);
   }
 
@@ -1026,7 +1026,7 @@ export class Engine {
     for (let i = 0; i < this.entities.length; i++) {
       if (i === index) continue;
       const e = this.entities[i] as any;
-      if (e.state === "dead" || e.state === "dying") continue;
+      if (isTerminalEntityState(e.state)) continue;
       if (Math.hypot(e.x - x, e.y - y) <= splashRadius) {
         this.handleHit(i, damage, false, weaponId);
       }
@@ -1037,10 +1037,10 @@ export class Engine {
   triggerAutoScalerPulse(hpThreshold: number, weaponId?: SiegeWeaponId): void {
     for (const e of this.entities) {
       const bug = e as any;
-      if (bug.state === "dead" || bug.state === "dying") continue;
+      if (isTerminalEntityState(bug.state)) continue;
       if (bug.marked && (bug.hp / (bug.maxHp || 1)) <= hpThreshold) {
         bug.hp = 0;
-        bug.state = "dying";
+        bug.state = EntityState.Dying;
         bug.deathProgress = 0;
         bug.vx = 0;
         bug.vy = 0;
@@ -1057,7 +1057,7 @@ export class Engine {
     for (const cluster of this.deadlockClusters) {
       for (const e of this.entities) {
         const bug = e as any;
-        if (bug.state === "dead" || bug.state === "dying") continue;
+        if (isTerminalEntityState(bug.state)) continue;
         const dx = cluster.cx - bug.x;
         const dy = cluster.cy - bug.y;
         const dist = Math.hypot(dx, dy);
@@ -1072,7 +1072,7 @@ export class Engine {
     for (const hz of this.eventHorizons) {
       for (let i = 0; i < this.entities.length; i++) {
         const bug = this.entities[i] as any;
-        if (bug.state === "dead" || bug.state === "dying") continue;
+        if (isTerminalEntityState(bug.state)) continue;
         if (bug.unstable && Math.hypot(bug.x - hz.x, bug.y - hz.y) <= hz.radius) {
           bug.unstable = null;
           this.handleHit(i, bug.maxHp ?? 99, false, hz.weaponId);

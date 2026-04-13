@@ -11,6 +11,7 @@ import type {
   StructureBehavior,
 } from "@game/structures/runtime/types";
 import { STRUCTURE_DEFS } from "@config/structureConfig";
+import { isTerminalEntityState } from "@game/types";
 
 const ATTRACT_RADIUS = 280;
 const ORBIT_SPEED = 0.65;   // tangential pixels per tick
@@ -24,7 +25,7 @@ export const lanternBehavior: StructureBehavior = {
     const bugs = ctx.engine.getEntities();
     for (let i = 0; i < bugs.length; i++) {
       const e = bugs[i] as any;
-      if (e.state === "dead" || e.state === "dying") continue;
+      if (isTerminalEntityState(e.state)) continue;
       const dx = entry.x - e.x;
       const dy = entry.y - e.y;
       const dist = Math.hypot(dx, dy);

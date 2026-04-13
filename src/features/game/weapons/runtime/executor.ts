@@ -13,13 +13,14 @@
 import type { WeaponCommand, ExecutionContext } from "@game/weapons/runtime/types";
 import { applyEffectDescriptor, triggerNamedScreenShake, triggerShakeForWeapon } from "@game/weapons/effects/adapter";
 import { getBugWeaponMatchup, getMatchupFeedbackTone } from "@game/combat/weaponMatchups";
+import { WeaponMatchup } from "@game/types";
 import type { BugVariant } from "../../../../types/dashboard";
 
 function maybeSpawnImmuneFeedback(ctx: ExecutionContext, targetIndex: number) {
   const bug = ctx.engine.getAllBugs()[targetIndex];
   if (!bug) return true;
   const matchup = getBugWeaponMatchup(bug.variant as BugVariant, ctx.weaponId);
-  if (matchup !== "immune") return false;
+  if (matchup !== WeaponMatchup.Immune) return false;
   (ctx.vfx as any)?.spawnImmune?.(
     Math.round(bug.x + ctx.bounds.left),
     Math.round(bug.y + ctx.bounds.top),
@@ -64,11 +65,11 @@ export function executeCommands(
             pointValue: result.pointValue,
             frozen: result.frozen,
           });
-          if (result.matchup === "immune") {
+          if (result.matchup === WeaponMatchup.Immune) {
             (ctx.vfx as any)?.spawnImmune?.(vx, vy);
           } else if (cmd.amount > 0) {
             shouldShake = true;
-            weakShake = weakShake || result.matchup === "risky";
+            weakShake = weakShake || result.matchup === WeaponMatchup.Risky;
             (ctx.vfx as any)?.spawnHitNumber?.(
               vx,
               vy,

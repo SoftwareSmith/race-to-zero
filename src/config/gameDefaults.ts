@@ -1,5 +1,6 @@
 import type { SiegeWeaponId } from "@game/types";
-import { evolveThresholds } from "@game/weapons/handlers";
+import { WEAPON_REGISTRY } from "@game/weapons";
+import { getWeaponEvolutionThresholds } from "@game/weapons/progression";
 
 /**
  * Default game-engine simulation parameters.
@@ -53,4 +54,7 @@ export const DEFAULT_GAME_CONFIG: GameConfig = {
  * Per-weapon kill thresholds for tier evolution.
  * [killsForT2, killsForT3] — tune these to adjust pacing.
  */
-export const WEAPON_EVOLVE_THRESHOLDS: Record<SiegeWeaponId, [number, number]> = evolveThresholds;
+export const WEAPON_EVOLVE_THRESHOLDS: Record<SiegeWeaponId, [number, number]> =
+  Object.fromEntries(
+    WEAPON_REGISTRY.map((weapon) => [weapon.id, getWeaponEvolutionThresholds(weapon)]),
+  ) as Record<SiegeWeaponId, [number, number]>;

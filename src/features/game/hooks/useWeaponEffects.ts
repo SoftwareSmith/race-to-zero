@@ -14,19 +14,11 @@
 
 import { useState, useCallback, useRef } from "react";
 import type { Dispatch, SetStateAction } from "react";
+import { WeaponId } from "@game/types";
 import type { SiegeWeaponId, WeaponEffectEvent } from "@game/types";
 import type { OverlayExtras } from "@game/weapons/runtime/types";
+import { getOverlayRenderer } from "@game/weapons/runtime/registry";
 import { createEffectEvent, isEffectAlive } from "@game/utils/weaponEffects";
-
-/** Weapons that receive a full SVG overlay effect event. */
-const OVERLAY_EFFECT_WEAPONS = new Set<SiegeWeaponId>([
-  "freeze",
-  "chain",
-  "laser",
-  "nullpointer",
-  "void",
-  "plasma",
-]);
 
 export interface WeaponEffectsState {
   /** Current overlay effect events for WeaponEffectLayer. */
@@ -71,7 +63,7 @@ export function useWeaponEffects(): WeaponEffectsState {
     ) => {
       let startedAt = performance.now();
 
-      if (OVERLAY_EFFECT_WEAPONS.has(weaponId)) {
+      if (getOverlayRenderer(weaponId)) {
         const event = createEffectEvent(weaponId, viewportX, viewportY, extras);
         startedAt = event.startedAt;
         setWeaponEffects((prev) => {
@@ -85,7 +77,7 @@ export function useWeaponEffects(): WeaponEffectsState {
         [weaponId]: startedAt,
       }));
 
-      if (weaponId === "hammer") {
+      if (weaponId === WeaponId.Hammer) {
         setHammerSwing(true);
       }
 

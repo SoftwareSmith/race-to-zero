@@ -9,6 +9,7 @@ import type {
   BugWeaponMatchupState,
 } from "@game/engine/bugCodex";
 import { WEAPON_DEFS } from "@config/weaponConfig";
+import { WeaponMatchup } from "@game/types";
 import {
   BUG_VARIANT_CONFIG,
   getBugVariantColor,
@@ -22,6 +23,7 @@ import WeaponGlyph from "@shared/components/icons/WeaponGlyph";
 import Tooltip from "@shared/components/Tooltip";
 import MetricInfoCard from "@dashboard/components/MetricInfoCard";
 import Tabs from "@shared/components/Tabs";
+import { getWeaponTiers } from "@game/weapons/progression";
 
 interface CodexPanelProps {
   containerRef: RefObject<HTMLDivElement | null>;
@@ -100,14 +102,14 @@ function getPresenceLabel(presence: number) {
 }
 
 function getWeaponEffectiveness(state: BugWeaponMatchupState) {
-  if (state === "favored") return 88;
-  if (state === "immune") return 6;
-  if (state === "risky") return 28;
+  if (state === WeaponMatchup.Favored) return 88;
+  if (state === WeaponMatchup.Immune) return 6;
+  if (state === WeaponMatchup.Risky) return 28;
   return 58;
 }
 
 function getWeaponStateClasses(state: BugWeaponMatchupState) {
-  if (state === "immune") {
+  if (state === WeaponMatchup.Immune) {
     return {
       badge: "border-rose-400/24 bg-rose-500/12 text-rose-100",
       panel: "border-rose-400/16 bg-rose-500/8",
@@ -117,7 +119,7 @@ function getWeaponStateClasses(state: BugWeaponMatchupState) {
     };
   }
 
-  if (state === "favored") {
+  if (state === WeaponMatchup.Favored) {
     return {
       badge: "border-emerald-400/24 bg-emerald-500/12 text-emerald-100",
       panel: "border-emerald-400/16 bg-emerald-500/8",
@@ -127,7 +129,7 @@ function getWeaponStateClasses(state: BugWeaponMatchupState) {
     };
   }
 
-  if (state === "risky") {
+  if (state === WeaponMatchup.Risky) {
     return {
       badge: "border-amber-400/24 bg-amber-500/12 text-amber-100",
       panel: "border-amber-400/16 bg-amber-500/8",
@@ -356,7 +358,7 @@ function WeaponEffectivenessRow({
         progressStyle={{
           background: accent.metricFillGradient,
         }}
-        isHighlighted={matchup.state === "favored"}
+        isHighlighted={matchup.state === WeaponMatchup.Favored}
         valueClassName={accent.metricValueClass}
         valueAccentClass={accent.metricValueClass}
         className={cn("min-h-[5.9rem]", tone.panel)}
@@ -388,9 +390,12 @@ function WeaponTypeCard({
     const states = weapons.map(
       (weapon) => entry.weaponMatchups[weapon.id].state,
     );
-    if (states.includes("favored")) bugsByState.favored.push([bugId, entry]);
-    if (states.includes("immune")) bugsByState.immune.push([bugId, entry]);
-    if (states.includes("risky")) bugsByState.risky.push([bugId, entry]);
+    if (states.includes(WeaponMatchup.Favored))
+      bugsByState.favored.push([bugId, entry]);
+    if (states.includes(WeaponMatchup.Immune))
+      bugsByState.immune.push([bugId, entry]);
+    if (states.includes(WeaponMatchup.Risky))
+      bugsByState.risky.push([bugId, entry]);
   }
 
   return (
@@ -422,9 +427,9 @@ function WeaponTypeCard({
                   {weapon.title}
                 </p>
                 <p className="text-xs uppercase tracking-[0.16em] text-stone-500">
-                  T1 {weapon.tierTitles?.[0] ?? weapon.title} · T2{" "}
-                  {weapon.tierTitles?.[1] ?? weapon.title} · T3{" "}
-                  {weapon.tierTitles?.[2] ?? weapon.title}
+                  {getWeaponTiers(weapon)
+                    .map((tier) => `T${tier.tier} ${tier.title}`)
+                    .join(" · ")}
                 </p>
               </div>
             </div>

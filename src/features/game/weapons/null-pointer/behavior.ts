@@ -12,6 +12,7 @@ import type {
   ClickFireResult,
   WeaponCommand,
 } from "@game/weapons/runtime/types";
+import { WeaponTier } from "@game/types";
 import { canvasToViewport } from "@game/weapons/runtime/targetingHelpers";
 import {
   ID,
@@ -21,13 +22,21 @@ import {
   SPLASH_RADIUS,
   MARK_RADIUS,
   MARK_DURATION_MS,
-  T1_EXECUTE_HP,
-  T2_EXECUTE_HP,
 } from "./constants";
+import {
+  canSpreadMarks,
+  canTriggerAutoScaler,
+  getExecuteHpLimit,
+} from "./helpers";
+import {
+  createBinaryBurst,
+  createImpactExplosion,
+  createTargetingOverlay,
+} from "./vfx";
 
 export function createSession(ctx: WeaponContext): ClickFireResult {
   const { engine, targetX, targetY, viewportX, viewportY, bounds } = ctx;
-  const tier = ctx.tier ?? 1;
+  const tier = ctx.tier ?? WeaponTier.TIER_ONE;
   const commands: WeaponCommand[] = [];
 
   const targetIdx = engine.closestTargetIndex(targetX, targetY, SEEK_RADIUS);
@@ -38,31 +47,21 @@ export function createSession(ctx: WeaponContext): ClickFireResult {
     : { x: viewportX, y: viewportY };
 
   // Always emit overlay — null pointer is in OVERLAY_EFFECT_WEAPONS
-  commands.push({
-    kind: "spawnEffect",
-    descriptor: {
-      type: "overlayEffect",
-      weaponId: ID,
-      viewportX,
-      viewportY,
-      extras: {
-        targetX: seekTargetVp.x,
-        targetY: seekTargetVp.y,
-      },
-    },
-  });
+  commands.push(
+    createTargetingOverlay(viewportX, viewportY, seekTargetVp.x, seekTargetVp.y),
+  );
 
   if (targetIdx < 0 || !targetBug) {
     return { mode: "once", commands };
   }
 
   // T3: emit auto-scaler pulse (kills all marked bugs below threshold globally)
-  if (tier >= 3) {
-    commands.push({ kind: "autoScalerPulse", hpThreshold: T2_EXECUTE_HP });
+  if (canTriggerAutoScaler(tier)) {
+    commands.push({ kind: "autoScalerPulse", hpThreshold: getExecuteHpLimit(tier) });
   }
 
   // T2+: apply marked to bug and nearby bugs
-  if (tier >= 2) {
+  if (canSpreadMarks(tier)) {
     commands.push({ kind: "applyMarked", targetIndex: targetIdx, durationMs: MARK_DURATION_MS });
     commands.push({
       kind: "markedRadius",
@@ -77,20 +76,8 @@ export function createSession(ctx: WeaponContext): ClickFireResult {
   }
 
   // Pixi: explosion + binary burst at bug position
-  commands.push({
-    kind: "spawnEffect",
-    descriptor: {
-      type: "explosion",
-      x: targetBug.x,
-      y: targetBug.y,
-      radius: 120,
-      colorHex: 0xfb7185,
-    },
-  });
-  commands.push({
-    kind: "spawnEffect",
-    descriptor: { type: "binaryBurst", x: targetBug.x, y: targetBug.y },
-  });
+  commands.push(createImpactExplosion(targetBug.x, targetBug.y));
+  commands.push(createBinaryBurst(targetBug.x, targetBug.y));
 
   // Primary target damage
   commands.push({
@@ -101,7 +88,7 @@ export function createSession(ctx: WeaponContext): ClickFireResult {
   });
 
   // Execute if HP is low enough
-  const executeHpLimit = tier >= 2 ? T2_EXECUTE_HP : T1_EXECUTE_HP;
+  const executeHpLimit = getExecuteHpLimit(tier);
   if ((targetBug.hp ?? 1) <= executeHpLimit && targetBug.marked) {
     commands.push({
       kind: "damage",

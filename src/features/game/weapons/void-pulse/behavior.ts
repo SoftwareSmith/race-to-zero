@@ -18,6 +18,7 @@ import type {
   PersistentFireSession,
   WeaponCommand,
 } from "@game/weapons/runtime/types";
+import { WeaponId, WeaponTier } from "@game/types";
 
 const DAMAGE = 2; // collapse shockring damage
 const BLACK_HOLE_RADIUS = 300;
@@ -30,7 +31,7 @@ const T3_EVENT_HORIZON_DURATION_MS = 5000;
 
 export function createSession(ctx: WeaponContext): PersistentFireSession {
   const { targetX, targetY, viewportX, viewportY, engine } = ctx;
-  const tier = ctx.tier ?? 1;
+  const tier = ctx.tier ?? WeaponTier.TIER_ONE;
 
   // Singleton guard — refuse if a black hole is already active
   if (engine.getBlackHole()?.active) {
@@ -72,7 +73,7 @@ export function createSession(ctx: WeaponContext): PersistentFireSession {
         _active = false;
         _collapseTimer = null;
         // T3: spawn persistent event horizon trap after collapse
-        if (tier >= 3) {
+        if (tier >= WeaponTier.TIER_THREE) {
           engine.startEventHorizon(
             targetX,
             targetY,
@@ -95,14 +96,14 @@ export function createSession(ctx: WeaponContext): PersistentFireSession {
         kind: "spawnEffect",
         descriptor: {
           type: "overlayEffect",
-          weaponId: "void",
+          weaponId: WeaponId.VoidPulse,
           viewportX,
           viewportY,
         },
       });
 
       // T2+: burn DoT ring during the gravity well phase
-      if (tier >= 2) {
+      if (tier >= WeaponTier.TIER_TWO) {
         commands.push({
           kind: "burnRadius",
           cx: targetX,

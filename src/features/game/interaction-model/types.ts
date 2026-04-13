@@ -1,10 +1,12 @@
+import type { WeaponMatchupState } from "@game/types";
+
 export type WeaponType = "blunt" | "fire" | "electric";
 
 export type BugTrait = "armored" | "flammable";
 
 export type StatusEffectId = "burn";
 
-export type InteractionStrength = "strong" | "normal" | "weak" | "immune";
+export type InteractionStrength = WeaponMatchupState;
 
 export interface StatusEffectDefinition {
   id: StatusEffectId;

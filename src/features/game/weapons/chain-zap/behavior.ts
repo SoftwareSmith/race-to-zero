@@ -9,6 +9,7 @@ import type {
   ClickFireResult,
   WeaponCommand,
 } from "@game/weapons/runtime/types";
+import { WeaponId, WeaponTier } from "@game/types";
 import {
   findNearestBugInRadius,
   canvasToViewport,
@@ -21,9 +22,9 @@ const MAX_BOUNCES_T2 = 6;
 
 export function createSession(ctx: WeaponContext): ClickFireResult {
   const { engine, targetX, targetY, viewportX, viewportY, bounds } = ctx;
-  const tier = ctx.tier ?? 1;
+  const tier = ctx.tier ?? WeaponTier.TIER_ONE;
   const commands: WeaponCommand[] = [];
-  const maxBounces = tier >= 2 ? MAX_BOUNCES_T2 : MAX_BOUNCES;
+  const maxBounces = tier >= WeaponTier.TIER_TWO ? MAX_BOUNCES_T2 : MAX_BOUNCES;
 
   const initial = findNearestBugInRadius(
     engine,
@@ -38,7 +39,7 @@ export function createSession(ctx: WeaponContext): ClickFireResult {
       kind: "spawnEffect",
       descriptor: {
         type: "overlayEffect",
-        weaponId: "chain",
+        weaponId: WeaponId.ChainZap,
         viewportX,
         viewportY,
         extras: { chainNodes: [] },
@@ -86,13 +87,13 @@ export function createSession(ctx: WeaponContext): ClickFireResult {
       creditOnDeath: true,
     });
     // T2+: apply Charged status to each hit bug
-    if (tier >= 2) {
+    if (tier >= WeaponTier.TIER_TWO) {
       commands.push({ kind: "applyCharged", targetIndex: idx, durationMs: 5000 });
     }
   }
 
   // T3: propagate charged network after hitting the chain
-  if (tier >= 3 && chainIndexes.length > 0) {
+  if (tier >= WeaponTier.TIER_THREE && chainIndexes.length > 0) {
     commands.push({
       kind: "propagateChargedNetwork",
       sourceIndex: chainIndexes[0],
@@ -133,7 +134,7 @@ export function createSession(ctx: WeaponContext): ClickFireResult {
     kind: "spawnEffect",
     descriptor: {
       type: "overlayEffect",
-      weaponId: "chain",
+      weaponId: WeaponId.ChainZap,
       viewportX,
       viewportY,
       extras: { chainNodes: viewportChainNodes },

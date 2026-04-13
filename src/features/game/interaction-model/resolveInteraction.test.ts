@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { WeaponMatchup } from "@game/types";
 
 import { fireResistantBug } from "./bugs/fireResistantBug";
 import { resolveInteraction } from "./resolveInteraction";
@@ -17,7 +18,7 @@ const fireWeapon: WeaponConfig = {
 describe("resolveInteraction", () => {
   it("keeps blunt weapons readable and direct", () => {
     expect(resolveInteraction(hammerWeapon.config, fireResistantBug)).toEqual({
-      outcome: "normal",
+      outcome: WeaponMatchup.Neutral,
       damage: 2,
       appliedStatuses: [],
       blockedStatuses: [],
@@ -27,7 +28,7 @@ describe("resolveInteraction", () => {
 
   it("returns immune cleanly instead of hiding it in effects", () => {
     expect(resolveInteraction(fireWeapon, fireResistantBug)).toEqual({
-      outcome: "immune",
+      outcome: WeaponMatchup.Immune,
       damage: 0,
       appliedStatuses: [],
       blockedStatuses: ["burn"],
@@ -47,7 +48,7 @@ describe("resolveInteraction", () => {
     };
 
     expect(resolveInteraction(electricWeapon, fireResistantBug)).toEqual({
-      outcome: "weak",
+      outcome: WeaponMatchup.Weak,
       damage: 2,
       appliedStatuses: [],
       blockedStatuses: [],

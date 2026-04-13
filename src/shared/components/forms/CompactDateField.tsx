@@ -24,7 +24,7 @@ export default function CompactDateField({
   return (
     <label
       className={cn(
-        "flex h-9 min-w-[128px] items-center gap-2 rounded-full border border-white/6 bg-white/[0.02] px-3 text-sm shadow-[0_8px_18px_rgba(0,0,0,0.1)] transition duration-200 backdrop-blur-xl",
+        "flex h-8 min-w-[118px] items-center gap-2 rounded-full border border-white/6 bg-white/[0.03] px-3 text-sm shadow-[0_8px_18px_rgba(0,0,0,0.1)] transition duration-200 backdrop-blur-xl",
         disabled
           ? "cursor-default opacity-38"
           : "hover:border-white/10 hover:bg-white/[0.04]",
@@ -34,7 +34,7 @@ export default function CompactDateField({
         {label}
       </span>
       <input
-        className="min-w-0 flex-1 bg-transparent text-[0.82rem] font-medium text-stone-100 outline-none disabled:cursor-default"
+        className="min-w-0 flex-1 bg-transparent text-[0.76rem] font-medium text-stone-100 outline-none disabled:cursor-default"
         disabled={disabled}
         max={bounds.max}
         min={bounds.min}

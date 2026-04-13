@@ -9,6 +9,7 @@ import type {
   ClickFireResult,
   WeaponCommand,
 } from "@game/weapons/runtime/types";
+import { WeaponId, WeaponTier } from "@game/types";
 
 const HIT_RADIUS = 180;
 const FREEZE_INTENSITY = 0.35; // 1 - 0.35 = 65% slow
@@ -17,19 +18,19 @@ const ENSNARE_DURATION_MS = 3500;
 
 export function createSession(ctx: WeaponContext): ClickFireResult {
   const { engine, targetX, targetY, viewportX, viewportY } = ctx;
-  const tier = ctx.tier ?? 1;
+  const tier = ctx.tier ?? WeaponTier.TIER_ONE;
   const commands: WeaponCommand[] = [];
 
   const hitIndexes = engine.radiusHitTest(targetX, targetY, HIT_RADIUS);
 
-  if (tier >= 3) {
+  if (tier >= WeaponTier.TIER_THREE) {
     // T3: global slow — hits every bug on the field
     commands.push({
       kind: "applyGlobalSlow",
       multiplier: FREEZE_INTENSITY,
       durationMs: FREEZE_DURATION_MS,
     });
-  } else if (tier >= 2) {
+  } else if (tier >= WeaponTier.TIER_TWO) {
     // T2: full ensnare instead of slow
     for (const idx of hitIndexes) {
       commands.push({
@@ -57,7 +58,7 @@ export function createSession(ctx: WeaponContext): ClickFireResult {
       type: "explosion",
       x: targetX,
       y: targetY,
-      radius: tier >= 3 ? 600 : HIT_RADIUS,
+      radius: tier >= WeaponTier.TIER_THREE ? 600 : HIT_RADIUS,
       colorHex: 0x93c5fd,
     },
   });
@@ -67,8 +68,8 @@ export function createSession(ctx: WeaponContext): ClickFireResult {
       type: "snowflakeDecals",
       x: targetX,
       y: targetY,
-      count: tier >= 3 ? 60 : 24,
-      radius: tier >= 3 ? 600 : 200,
+      count: tier >= WeaponTier.TIER_THREE ? 60 : 24,
+      radius: tier >= WeaponTier.TIER_THREE ? 600 : 200,
     },
   });
 
@@ -77,7 +78,7 @@ export function createSession(ctx: WeaponContext): ClickFireResult {
     kind: "spawnEffect",
     descriptor: {
       type: "overlayEffect",
-      weaponId: "freeze",
+      weaponId: WeaponId.Freeze,
       viewportX,
       viewportY,
     },

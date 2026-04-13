@@ -3,11 +3,11 @@
  */
 
 import { WeaponId } from "@game/types";
-import type { WeaponDef } from "@game/weapons/types";
+import { HitPattern, WeaponInputMode, type WeaponDef } from "@game/weapons/types";
+import { BUG_SPRAY_TIERS } from "./helpers";
+import { OVERLAY_EFFECT_DURATION_MS } from "./vfx";
 
 export const ID = WeaponId.BugSpray;
-
-export const EVOLVE_THRESHOLDS: [number, number] = [25, 70];
 
 export const CURSOR = {
   accent: "#fde047",
@@ -18,15 +18,16 @@ export const CURSOR = {
 
 export const def: WeaponDef = {
   id: ID,
-  title: "Bug Spray",
+  title: BUG_SPRAY_TIERS[0].title,
   typeLabel: "Toxin",
   typeHint: "Poisons swarms and rewards area denial over burst damage.",
   weaponType: "toxin",
   unlockKills: 12,
-  detail:
-    "Aerosol cone sprays 50° of noxious mist. Bugs hit are Poisoned — 0.5 dmg/s for 4 s. Leaves a glowing Toxic Cloud on impact that poisons bugs passing through it for 3 s.",
-  hitPattern: "cone",
+  detail: BUG_SPRAY_TIERS[0].detail,
+  hitPattern: HitPattern.Cone,
   hitRadius: 120,
+  cursor: CURSOR,
+  overlayEffectDurationMs: OVERLAY_EFFECT_DURATION_MS,
   coneArcDeg: 80,
   damage: 0,
   applyPoison: true,
@@ -34,18 +35,7 @@ export const def: WeaponDef = {
   poisonDurationMs: 4000,
   effectColor: CURSOR.accent,
   cooldownMs: 150,
-  inputMode: "hold",
-  evolveThresholds: EVOLVE_THRESHOLDS,
-  hint: "Hold to spray a cone — bugs are Poisoned; toxic cloud lingers 3 s",
-  tierTitles: ["Patch Deployment", "Hotfix", "Rolling Deployment"],
-  tierDetails: [
-    "Aerosol cone sprays 50° of noxious mist. Bugs hit are Poisoned — 0.5 dmg/s for 4 s. Toxic Cloud lingers.",
-    "Hotfix rush — after the initial cone, secondary poison clouds erupt around each poisoned bug.",
-    "Rolling deployment — cone expands into a growing circular ring that spreads poison across the entire field.",
-  ],
-  tierHints: [
-    "Hold to spray a cone — bugs are Poisoned; toxic cloud lingers 3 s",
-    "T2: Secondary poison clouds erupt around each freshly poisoned bug",
-    "T3: Expanding ring — poison spreads across the whole field",
-  ],
+  inputMode: WeaponInputMode.Hold,
+  hint: BUG_SPRAY_TIERS[0].hint,
+  tiers: BUG_SPRAY_TIERS,
 };

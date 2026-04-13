@@ -3,11 +3,11 @@
  */
 
 import { WeaponId } from "@game/types";
-import type { WeaponDef } from "@game/weapons/types";
+import { HitPattern, WeaponInputMode, type WeaponDef } from "@game/weapons/types";
+import { CHAIN_ZAP_TIERS } from "./helpers";
+import { OVERLAY_EFFECT_DURATION_MS } from "./vfx";
 
 export const ID = WeaponId.ChainZap;
-
-export const EVOLVE_THRESHOLDS: [number, number] = [25, 75];
 
 export const CURSOR = {
   accent: "#6ee7b7",
@@ -20,31 +20,21 @@ export const CURSOR = {
 
 export const def: WeaponDef = {
   id: ID,
-  title: "Chain Zap",
+  title: CHAIN_ZAP_TIERS[0].title,
   typeLabel: "Electric",
   typeHint: "Jumps between clustered targets and rewards charged setups.",
   weaponType: "electric",
   unlockKills: 38,
-  detail:
-    "Click near a bug to start a 3-strand plasma arc. Lightning hops up to 3 times — each node emits a spark crown. Prioritises unfrozen bugs (synergy with Freeze Cone). Final bug leaves an electric afterglow.",
-  hitPattern: "chain",
+  detail: CHAIN_ZAP_TIERS[0].detail,
+  hitPattern: HitPattern.Chain,
   hitRadius: 90,
+  cursor: CURSOR,
+  overlayEffectDurationMs: OVERLAY_EFFECT_DURATION_MS,
   damage: 2,
   chainMaxBounces: 3,
   effectColor: CURSOR.accent,
   cooldownMs: 950,
-  inputMode: "click",
-  evolveThresholds: EVOLVE_THRESHOLDS,
-  hint: "Click near a bug — arc bounces 3×, targets unfrozen bugs first",
-  tierTitles: ["Chain Zap", "Event Loop", "Distributed System"],
-  tierDetails: [
-    "Click near a bug to start a 3-strand plasma arc. Bounces up to 3 times, prefers unfrozen targets.",
-    "The loop never ends — arc bounces up to 6 times and each hit applies a Charged status, amplifying further damage.",
-    "Network propagation: all Charged bugs on the field are hit simultaneously with cascading reduced damage.",
-  ],
-  tierHints: [
-    "Click near a bug — arc bounces 3×, targets unfrozen bugs first",
-    "T2: 6 bounces + each hit applies Charged status",
-    "T3: All Charged bugs on screen get hit in a network pulse",
-  ],
+  inputMode: WeaponInputMode.Click,
+  hint: CHAIN_ZAP_TIERS[0].hint,
+  tiers: CHAIN_ZAP_TIERS,
 };

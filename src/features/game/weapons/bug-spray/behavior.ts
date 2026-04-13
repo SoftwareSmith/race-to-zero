@@ -11,6 +11,7 @@ import type {
   HoldFireSession,
   WeaponCommand,
 } from "@game/weapons/runtime/types";
+import { WeaponId, WeaponTier } from "@game/types";
 import { coneAngleAway } from "@game/weapons/runtime/targetingHelpers";
 
 // Spray params
@@ -30,12 +31,12 @@ const T3_CLOUD_MS = 3200;
 
 function buildTickCommands(ctx: WeaponContext): WeaponCommand[] {
   const { targetX, targetY, centerX, centerY } = ctx;
-  const tier = ctx.tier ?? 1;
+  const tier = ctx.tier ?? WeaponTier.TIER_ONE;
   const sprayAngle = coneAngleAway(targetX, targetY, centerX, centerY);
   const commands: WeaponCommand[] = [];
 
-  const cloudRadius = tier >= 3 ? T3_CLOUD_RADIUS : CLOUD_RADIUS;
-  const cloudMs = tier >= 3 ? T3_CLOUD_MS : CLOUD_MS;
+  const cloudRadius = tier >= WeaponTier.TIER_THREE ? T3_CLOUD_RADIUS : CLOUD_RADIUS;
+  const cloudMs = tier >= WeaponTier.TIER_THREE ? T3_CLOUD_MS : CLOUD_MS;
 
   // Note: we do NOT apply individual applyPoison per bug here.
   // The repeatPoisonRadius cloud below re-poisons every 400 ms for 2.4-3.2 s,
@@ -55,7 +56,7 @@ function buildTickCommands(ctx: WeaponContext): WeaponCommand[] {
   });
 
   // T2+: secondary poison cloud around each bug caught in the main spray
-  if (tier >= 2) {
+  if (tier >= WeaponTier.TIER_TWO) {
     const bugs = ctx.engine.getAllBugs();
     for (const idx of ctx.engine.radiusHitTest(targetX, targetY, cloudRadius)) {
       const bug = bugs[idx];
@@ -98,7 +99,7 @@ function buildTickCommands(ctx: WeaponContext): WeaponCommand[] {
     kind: "spawnEffect",
     descriptor: {
       type: "overlayEffect",
-      weaponId: "zapper",
+      weaponId: WeaponId.BugSpray,
       viewportX: ctx.viewportX,
       viewportY: ctx.viewportY,
       extras: { angle: sprayAngle * (Math.PI / 180) },

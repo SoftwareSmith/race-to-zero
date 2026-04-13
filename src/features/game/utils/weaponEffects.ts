@@ -4,21 +4,14 @@
  * after their animation completes.
  */
 
+import { WEAPON_DEFS } from "@config/weaponConfig";
+import { WeaponId } from "@game/types";
 import type { SiegeWeaponId, WeaponEffectEvent } from "@game/types";
 
 /** Duration in ms each weapon's fire animation plays before cleanup. */
-export const EFFECT_DURATION: Record<SiegeWeaponId, number> = {
-  hammer: 520,
-  zapper: 1400,
-  freeze: 700,
-  chain: 1200,
-  flame: 3000,
-  laser: 560,
-  shockwave: 1200,
-  nullpointer: 1500,
-  plasma: 760,
-  void: 2500,
-};
+export const EFFECT_DURATION: Record<SiegeWeaponId, number> = Object.fromEntries(
+  WEAPON_DEFS.map((weapon) => [weapon.id, weapon.overlayEffectDurationMs]),
+) as Record<SiegeWeaponId, number>;
 
 /** Returns true if the effect animation is still playing. */
 export function isEffectAlive(event: WeaponEffectEvent, now: number): boolean {
@@ -41,7 +34,11 @@ export function createEffectEvent(
 ): WeaponEffectEvent {
   // Pre-seed stable jag offsets for chain zap so arcs don't flicker on re-renders
   let jagOffsets: number[] | undefined;
-  if (weapon === "chain" && extras?.chainNodes && extras.chainNodes.length > 1) {
+  if (
+    weapon === WeaponId.ChainZap &&
+    extras?.chainNodes &&
+    extras.chainNodes.length > 1
+  ) {
     const segCount = extras.chainNodes.length - 1;
     jagOffsets = [];
     for (let i = 0; i < segCount; i++) {

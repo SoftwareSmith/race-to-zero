@@ -2,7 +2,8 @@
  * Weapon registry — single source of truth.
  * Import WEAPON_DEFS from here instead of from weaponConfig.ts in new code.
  */
-export type { WeaponDef, HitPattern } from "./types";
+export { HitPattern, WeaponInputMode } from "./types";
+export type { WeaponDef } from "./types";
 
 import { def as hammer }      from "./hammer/constants";
 import { def as bugSpray }    from "./bug-spray/constants";

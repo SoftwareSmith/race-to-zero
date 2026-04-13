@@ -3,11 +3,11 @@
  */
 
 import { WeaponId } from "@game/types";
-import type { WeaponDef } from "@game/weapons/types";
+import { HitPattern, WeaponInputMode, type WeaponDef } from "@game/weapons/types";
+import { TRACER_BLOOM_TIERS } from "./helpers";
+import { OVERLAY_EFFECT_DURATION_MS } from "./vfx";
 
 export const ID = WeaponId.TracerBloom;
-
-export const EVOLVE_THRESHOLDS: [number, number] = [20, 60];
 
 export const CURSOR = {
   accent: "#f87171",
@@ -18,29 +18,19 @@ export const CURSOR = {
 
 export const def: WeaponDef = {
   id: ID,
-  title: "Tracer Bloom",
+  title: TRACER_BLOOM_TIERS[0].title,
   typeLabel: "Precision",
   typeHint: "Picks apart priority targets and scales hardest off existing status effects.",
   weaponType: "precision",
   unlockKills: 68,
-  detail:
-    "Paints a route from the core to your click, detonating 4 pulse blooms along the way. Each bloom clips nearby bugs without using bounce-line logic.",
-  hitPattern: "line",
+  detail: TRACER_BLOOM_TIERS[0].detail,
+  hitPattern: HitPattern.Line,
   hitRadius: 38,
+  cursor: CURSOR,
+  overlayEffectDurationMs: OVERLAY_EFFECT_DURATION_MS,
   effectColor: CURSOR.accent,
   cooldownMs: 900,
-  inputMode: "click",
-  evolveThresholds: EVOLVE_THRESHOLDS,
-  hint: "Click to lay a bloom route — 4 bursts detonate between the core and target",
-  tierTitles: ["Debug Trace", "Deep Trace", "Full Profiling"],
-  tierDetails: [
-    "Paints a route from the core to your click, detonating 4 pulse blooms along the way.",
-    "Deep inspection — each bloom deals +2 bonus damage to Charged or Marked bugs caught in the blast.",
-    "Full profiling — all bloom charges deal +3 bonus to status-afflicted bugs; overlay maps all active bugs.",
-  ],
-  tierHints: [
-    "Click to lay a bloom route — 4 bursts detonate between core and target",
-    "T2: +2 bonus damage to Charged or Marked bugs",
-    "T3: +3 bonus to any status-afflicted bug; full coverage",
-  ],
+  inputMode: WeaponInputMode.Click,
+  hint: TRACER_BLOOM_TIERS[0].hint,
+  tiers: TRACER_BLOOM_TIERS,
 };

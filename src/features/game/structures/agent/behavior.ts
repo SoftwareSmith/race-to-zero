@@ -15,6 +15,7 @@ import type {
   BugSnapshot,
 } from "@game/structures/runtime/types";
 import { STRUCTURE_DEFS } from "@config/structureConfig";
+import { isTerminalEntityState } from "@game/types";
 
 const CAPTURE_RADIUS = 80;
 const PULL_DURATION_MS = 500;
@@ -83,7 +84,7 @@ export const agentBehavior: StructureBehavior = {
     let bestIdx = -1;
     for (let i = 0; i < bugs.length; i++) {
       const e = bugs[i] as any;
-      if (e.state === "dead" || e.state === "dying") continue;
+      if (isTerminalEntityState(e.state)) continue;
       const dist = Math.hypot(e.x - entry.x, e.y - entry.y);
       if (dist <= CAPTURE_RADIUS && dist < bestDist) {
         bestDist = dist;

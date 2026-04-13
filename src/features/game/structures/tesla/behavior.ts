@@ -11,6 +11,7 @@ import type {
   StructureBehavior,
 } from "@game/structures/runtime/types";
 import { STRUCTURE_DEFS } from "@config/structureConfig";
+import { isTerminalEntityState } from "@game/types";
 
 const SHOOT_RADIUS = 120;
 const SHOOT_INTERVAL_MS = 2500;
@@ -30,7 +31,7 @@ export const teslaBehavior: StructureBehavior = {
     const candidates: Array<{ idx: number; dist: number }> = [];
     for (let i = 0; i < bugs.length; i++) {
       const e = bugs[i] as any;
-      if (e.state === "dead" || e.state === "dying") continue;
+      if (isTerminalEntityState(e.state)) continue;
       const dist = Math.hypot(e.x - entry.x, e.y - entry.y);
       if (dist <= SHOOT_RADIUS) candidates.push({ idx: i, dist });
     }

@@ -3,11 +3,11 @@
  */
 
 import { WeaponId } from "@game/types";
-import type { WeaponDef } from "@game/weapons/types";
+import { HitPattern, WeaponInputMode, type WeaponDef } from "@game/weapons/types";
+import { STATIC_NET_TIERS } from "./helpers";
+import { OVERLAY_EFFECT_DURATION_MS } from "./vfx";
 
 export const ID = WeaponId.StaticNet;
-
-export const EVOLVE_THRESHOLDS: [number, number] = [15, 50];
 
 export const CURSOR = {
   accent: "#a78bfa",
@@ -18,32 +18,22 @@ export const CURSOR = {
 
 export const def: WeaponDef = {
   id: ID,
-  title: "Static Net",
+  title: STATIC_NET_TIERS[0].title,
   typeLabel: "Electric",
   typeHint: "Locks enemies in place so follow-up hits feel guaranteed.",
   weaponType: "electric",
   unlockKills: 82,
-  detail:
-    "Expands a wire-mesh net to 200px over 0.4 s. All bugs inside are Ensnared — completely immobilised for 3 s. Click any ensnared bug for an instant kill. Net dissolves with a scatter burst. 4 s cooldown.",
-  hitPattern: "area",
+  detail: STATIC_NET_TIERS[0].detail,
+  hitPattern: HitPattern.Area,
   hitRadius: 200,
+  cursor: CURSOR,
+  overlayEffectDurationMs: OVERLAY_EFFECT_DURATION_MS,
   damage: 0,
   applyEnsnare: true,
   ensnareDurationMs: 3000,
   effectColor: "#e2e8f0",
   cooldownMs: 4000,
-  inputMode: "click",
-  evolveThresholds: EVOLVE_THRESHOLDS,
-  hint: "Click to cast a net — ensnared bugs are frozen; click them to instakill",
-  tierTitles: ["Thread Lock", "Mutex", "Deadlock Cluster"],
-  tierDetails: [
-    "Expands a wire-mesh net to 200px. All bugs inside are Ensnared for 3 s. Click any ensnared bug to instakill.",
-    "Mutex contention — ensnared bugs are also pushed apart by knockback, breaking their cluster formation.",
-    "Deadlock — bugs are pulled together toward a single centroid point, crushing the cluster.",
-  ],
-  tierHints: [
-    "Click to cast a net — ensnared bugs are frozen; click them to instakill",
-    "T2: Ensnared bugs get knockback — scattered apart",
-    "T3: Deadlock pulls all bugs to one point instead",
-  ],
+  inputMode: WeaponInputMode.Click,
+  hint: STATIC_NET_TIERS[0].hint,
+  tiers: STATIC_NET_TIERS,
 };

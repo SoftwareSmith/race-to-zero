@@ -5,11 +5,17 @@ import type {
   WeaponEvolutionState,
   WeaponTier,
 } from "@game/types";
+import { WeaponTier as WeaponTierEnum } from "@game/types";
 import { WEAPON_DEFS, WEAPON_UNLOCK_THRESHOLDS } from "@config/weaponConfig";
 import { STRUCTURE_DEFS } from "@config/structureConfig";
-import { WEAPON_EVOLVE_THRESHOLDS } from "@config/gameDefaults";
 import type { StructureId } from "@game/types";
 import { getWeaponMatchupSummary } from "@game/combat/weaponMatchups";
+import {
+  getKillsToNextTier,
+  getWeaponTierDetail,
+  getWeaponTierHint,
+  getWeaponTierTitle,
+} from "@game/weapons/progression";
 
 const WEAPON_LABELS: Record<SiegeWeaponId, string> = {
   hammer: "Hammer",
@@ -74,31 +80,21 @@ export function getSiegeWeaponSnapshots(
     const unlocked = unlockedSet.has(weapon.id);
     const remaining = Math.max(0, weapon.unlockKills - totalFixed);
     const evo = evolutionStates?.[weapon.id];
-    const tier: WeaponTier = evo?.tier ?? 1;
+    const tier: WeaponTier = evo?.tier ?? WeaponTierEnum.TIER_ONE;
     const weaponKills = evo?.kills ?? 0;
-    const thresholds = WEAPON_EVOLVE_THRESHOLDS[weapon.id];
-    const killsToNextTier: number | null =
-      tier === 3
-        ? null
-        : tier === 2
-          ? Math.max(0, thresholds[1] - weaponKills)
-          : Math.max(0, thresholds[0] - weaponKills);
-
-    // Use tier-appropriate title
-    const tierTitle =
-      weapon.tierTitles?.[tier - 1] ?? weapon.title;
+    const killsToNextTier = getKillsToNextTier(weapon, evo);
 
     return {
       id: weapon.id,
-      title: tierTitle,
-      hint: weapon.tierHints?.[tier - 1] ?? weapon.hint,
+      title: getWeaponTierTitle(weapon, tier),
+      hint: getWeaponTierHint(weapon, tier),
       typeLabel: weapon.typeLabel,
       typeHint: weapon.typeHint,
       inputMode: weapon.inputMode,
       cooldownMs: weapon.cooldownMs,
       locked: !unlocked,
       current: weapon.id === selectedId,
-      detail: weapon.tierDetails?.[tier - 1] ?? weapon.detail,
+      detail: getWeaponTierDetail(weapon, tier),
       unlockKills: weapon.unlockKills,
       matchupSummary: getWeaponMatchupSummary(weapon.id),
       tier,
