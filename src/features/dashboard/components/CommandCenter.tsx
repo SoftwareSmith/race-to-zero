@@ -44,21 +44,13 @@ function CommandCenter({
     <Surface
       data-siege-panel="command-center"
       className={cn(
-        "relative overflow-hidden border-white/10 px-4 py-3 before:pointer-events-none before:absolute before:inset-0 before:rounded-[28px] before:opacity-100 after:pointer-events-none after:absolute after:inset-0 after:rounded-[28px] after:opacity-100",
-        siegeMode
-          ? "overflow-hidden border-red-500/18 before:bg-[radial-gradient(circle_at_top_left,rgba(248,113,113,0.16),transparent_42%)] after:bg-[linear-gradient(180deg,transparent,rgba(12,14,20,0.34))]"
-          : "",
+        "relative overflow-hidden border-0 px-3.5 py-2.5 before:pointer-events-none before:absolute before:inset-0 before:rounded-[28px] before:opacity-100 after:pointer-events-none after:absolute after:inset-0 after:rounded-[28px] after:opacity-100",
         statusGlowClassName,
       )}
       tone="strong"
     >
-      {siegeMode ? (
-        <div className="pointer-events-none absolute right-5 top-5 rounded-full border border-red-200/20 bg-red-500/10 px-2 py-1 text-[0.54rem] font-semibold uppercase tracking-[0.22em] text-red-100/78">
-          Threat focus
-        </div>
-      ) : null}
       <div className="relative">
-        <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+        <div className="flex flex-col gap-2.5 xl:flex-row xl:items-center xl:justify-between">
           <div className="w-full">
             <div className="flex flex-wrap items-center gap-3">
               <p className="text-[0.62rem] font-semibold uppercase tracking-[0.28em] text-stone-500">
@@ -70,7 +62,7 @@ function CommandCenter({
             </div>
           </div>
 
-          <div className="grid gap-2 md:grid-cols-3 xl:min-w-[42rem]">
+          <div className="grid gap-2 md:grid-cols-3 xl:min-w-[36rem]">
             <div
               className={cn(
                 "rounded-[18px] border px-3 py-2.5",

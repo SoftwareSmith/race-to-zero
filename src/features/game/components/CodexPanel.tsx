@@ -1,22 +1,25 @@
 import type { CSSProperties, RefObject } from "react";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import { MenuIconButton } from "@shared/components/MenuControls";
 import { getCodex } from "@game/engine/bugCodex";
 import type {
   BugType,
   BugWeaponId,
   BugWeaponMatchup,
-  BugWeaponMatchupState,
 } from "@game/engine/bugCodex";
 import { WEAPON_DEFS } from "@config/weaponConfig";
-import { WeaponMatchup } from "@game/types";
 import {
   BUG_VARIANT_CONFIG,
   getBugVariantColor,
   getBugVariantMaxHp,
 } from "../../../constants/bugs";
 import type { BugVariant } from "../../../types/dashboard";
-import type { SiegeWeaponId, WeaponType } from "@game/types";
+import {
+  WeaponMatchup,
+  type SiegeWeaponId,
+  type WeaponType,
+} from "@game/types";
 import { getColoredSvgUrl } from "@game/utils/bugSprite";
 import { cn } from "@shared/utils/cn";
 import WeaponGlyph from "@shared/components/icons/WeaponGlyph";
@@ -24,6 +27,17 @@ import Tooltip from "@shared/components/Tooltip";
 import MetricInfoCard from "@dashboard/components/MetricInfoCard";
 import Tabs from "@shared/components/Tabs";
 import { getWeaponTiers } from "@game/weapons/progression";
+import {
+  getBehaviorLabel,
+  getPresenceLabel,
+  getResilienceLabel,
+  getSpeedLabel,
+  getThreatLabel,
+  getVariantAccent,
+  getWeaponEffectiveness,
+  getWeaponStateClasses,
+  type VariantAccent,
+} from "./codexPanel.helpers";
 
 interface CodexPanelProps {
   containerRef: RefObject<HTMLDivElement | null>;
@@ -65,190 +79,6 @@ function getAffinityLabel(affinity = 0) {
   if (affinity >= 0.35) return "Tends to hunt in packs";
   if (affinity <= -0.2) return "Prefers to hunt alone";
   return "Flexible hunting style";
-}
-
-function getThreatLabel(variant: BugVariant) {
-  if (variant === "urgent") return "Critical";
-  if (variant === "high") return "High";
-  if (variant === "medium") return "Medium";
-  return "Low";
-}
-
-function getBehaviorLabel(behavior: BugType["profile"]["behavior"]) {
-  if (behavior === "panic") return "Erratic";
-  if (behavior === "stalk") return "Hunter";
-  if (behavior === "patrol") return "Patrol";
-  return "Skitter";
-}
-
-function getSpeedLabel(entry: BugType) {
-  if (entry.profile.speedMultiplier >= 1.02) return "Moves quickly";
-  if (entry.profile.speedMultiplier <= 0.86) return "Slow mover";
-  return "Steady pace";
-}
-
-function getResilienceLabel(hp: number) {
-  if (hp >= 4) return "Very tanky";
-  if (hp >= 3) return "Tough";
-  if (hp >= 2) return "Moderately durable";
-  return "Fragile";
-}
-
-function getPresenceLabel(presence: number) {
-  if (presence >= 88) return "Very visible";
-  if (presence >= 72) return "Notable on the board";
-  if (presence >= 56) return "Easily missed at a glance";
-  return "Low presence";
-}
-
-function getWeaponEffectiveness(state: BugWeaponMatchupState) {
-  if (state === WeaponMatchup.Favored) return 88;
-  if (state === WeaponMatchup.Immune) return 6;
-  if (state === WeaponMatchup.Risky) return 28;
-  return 58;
-}
-
-function getWeaponStateClasses(state: BugWeaponMatchupState) {
-  if (state === WeaponMatchup.Immune) {
-    return {
-      badge: "border-rose-400/24 bg-rose-500/12 text-rose-100",
-      panel: "border-rose-400/16 bg-rose-500/8",
-      tile: "border-rose-300/16 bg-rose-400/10 text-rose-50",
-      fill: "bg-rose-500/90",
-      glow: "0 0 18px rgba(251,113,133,0.45)",
-    };
-  }
-
-  if (state === WeaponMatchup.Favored) {
-    return {
-      badge: "border-emerald-400/24 bg-emerald-500/12 text-emerald-100",
-      panel: "border-emerald-400/16 bg-emerald-500/8",
-      tile: "border-emerald-300/16 bg-emerald-400/10 text-emerald-50",
-      fill: "bg-emerald-500/90",
-      glow: "0 0 18px rgba(52,211,153,0.45)",
-    };
-  }
-
-  if (state === WeaponMatchup.Risky) {
-    return {
-      badge: "border-amber-400/24 bg-amber-500/12 text-amber-100",
-      panel: "border-amber-400/16 bg-amber-500/8",
-      tile: "border-amber-300/16 bg-amber-400/10 text-amber-50",
-      fill: "bg-amber-500/90",
-      glow: "0 0 18px rgba(251,191,36,0.4)",
-    };
-  }
-
-  return {
-    badge: "border-sky-400/18 bg-sky-500/10 text-sky-100",
-    panel: "border-white/8 bg-white/[0.03]",
-    tile: "border-white/8 bg-white/[0.04] text-stone-100",
-    fill: "bg-sky-400/90",
-    glow: "0 0 16px rgba(56,189,248,0.38)",
-  };
-}
-
-type VariantAccent = ReturnType<typeof getVariantAccent>;
-
-function getVariantAccent(variant: BugVariant) {
-  function hexToRgb(hex: string) {
-    const cleaned = hex.replace("#", "");
-    const bigint = parseInt(cleaned, 16);
-    const r = (bigint >> 16) & 255;
-    const g = (bigint >> 8) & 255;
-    const b = bigint & 255;
-    return `${r},${g},${b}`;
-  }
-
-  // Explicit hex mapping per visual variant to ensure the progress gradient
-  // matches the accent colors (avoid using BUG_VARIANT_CONFIG which may
-  // contain sprite/base colors that aren't the UI accent colors).
-  const VARIANT_HEX: Record<BugVariant, string> = {
-    low: "#10b981", // emerald-500
-    medium: "#f59e0b", // amber-500
-    high: "#ef4444", // red-500
-    urgent: "#a78bfa", // violet-400/500
-  };
-
-  const baseRgb = hexToRgb(VARIANT_HEX[variant]);
-  const fullGradient = `linear-gradient(90deg, rgba(${baseRgb},1) 0%, rgba(${baseRgb},0) 100%)`;
-  if (variant === "urgent") {
-    return {
-      badgeClass:
-        "border-violet-400/30 bg-violet-500/14 text-violet-100 shadow-[0_0_22px_rgba(167,139,250,0.18)]",
-      iconBorderClass: "border-violet-400/30",
-      metricValueClass:
-        "border-violet-400/36 bg-violet-500/36 text-violet-100 shadow-[0_0_20px_rgba(167,139,250,0.18)]",
-      metricFillClass: "bg-violet-500",
-      metricGlow: "0 0 32px rgba(167,139,250,0.52)",
-      metricGlowStrong: "0 0 44px rgba(167,139,250,0.68)",
-      behaviorClass: "border-fuchsia-400/20 bg-fuchsia-500/10 text-fuchsia-100",
-      cardClass: "from-violet-500/12 via-fuchsia-500/6 to-black/20",
-      iconHalo: "rgba(167,139,250,0.34)",
-      iconPanel: "from-violet-500/18 via-fuchsia-500/8 to-red-500/12",
-      washA: "rgba(167,139,250,0.18)",
-      washB: "rgba(244,63,94,0.14)",
-      metricFillGradient: fullGradient,
-    };
-  }
-
-  if (variant === "high") {
-    return {
-      badgeClass:
-        "border-red-400/28 bg-red-500/14 text-red-100 shadow-[0_0_22px_rgba(248,113,113,0.16)]",
-      iconBorderClass: "border-red-400/28",
-      metricValueClass:
-        "border-red-400/36 bg-red-500/36 text-red-100 shadow-[0_0_20px_rgba(248,113,113,0.18)]",
-      metricFillClass: "bg-red-500",
-      metricGlow: "0 0 32px rgba(248,113,113,0.52)",
-      metricGlowStrong: "0 0 44px rgba(248,113,113,0.68)",
-      behaviorClass: "border-orange-400/20 bg-orange-500/10 text-orange-100",
-      cardClass: "from-red-500/12 via-orange-500/6 to-black/20",
-      iconHalo: "rgba(248,113,113,0.28)",
-      iconPanel: "from-red-500/18 via-orange-500/8 to-sky-400/10",
-      washA: "rgba(248,113,113,0.16)",
-      washB: "rgba(251,146,60,0.12)",
-      metricFillGradient: fullGradient,
-    };
-  }
-
-  if (variant === "medium") {
-    return {
-      badgeClass:
-        "border-amber-400/28 bg-amber-500/12 text-amber-100 shadow-[0_0_22px_rgba(251,191,36,0.15)]",
-      iconBorderClass: "border-amber-400/28",
-      metricValueClass:
-        "border-amber-400/36 bg-amber-500/36 text-amber-100 shadow-[0_0_20px_rgba(251,191,36,0.18)]",
-      metricFillClass: "bg-amber-500",
-      metricGlow: "0 0 30px rgba(251,191,36,0.5)",
-      metricGlowStrong: "0 0 42px rgba(251,191,36,0.64)",
-      behaviorClass: "border-orange-300/18 bg-orange-400/10 text-orange-100",
-      cardClass: "from-amber-500/12 via-orange-500/6 to-black/20",
-      iconHalo: "rgba(251,191,36,0.22)",
-      iconPanel: "from-amber-500/16 via-orange-500/8 to-sky-400/10",
-      washA: "rgba(251,191,36,0.16)",
-      washB: "rgba(249,115,22,0.10)",
-      metricFillGradient: fullGradient,
-    };
-  }
-
-  return {
-    badgeClass:
-      "border-emerald-400/22 bg-emerald-500/10 text-emerald-100 shadow-[0_0_18px_rgba(16,185,129,0.12)]",
-    iconBorderClass: "border-emerald-400/22",
-    metricValueClass:
-      "border-emerald-400/32 bg-emerald-500/32 text-emerald-100 shadow-[0_0_18px_rgba(16,185,129,0.16)]",
-    metricFillClass: "bg-emerald-500",
-    metricGlow: "0 0 30px rgba(45,212,191,0.5)",
-    metricGlowStrong: "0 0 42px rgba(45,212,191,0.66)",
-    behaviorClass: "border-sky-400/16 bg-sky-500/8 text-sky-100",
-    cardClass: "from-emerald-500/12 via-cyan-500/6 to-black/20",
-    iconHalo: "rgba(45,212,191,0.18)",
-    iconPanel: "from-emerald-500/14 via-cyan-500/6 to-white/8",
-    washA: "rgba(45,212,191,0.14)",
-    washB: "rgba(56,189,248,0.10)",
-    metricFillGradient: fullGradient,
-  };
 }
 
 function Badge({
@@ -710,6 +540,7 @@ export default function CodexPanel({
       <MenuIconButton
         ariaLabel="Open bug codex"
         onClick={handleMenuButtonClick}
+        open={open}
         tooltip="Open the bug codex and review bug types."
       >
         <svg
@@ -736,169 +567,175 @@ export default function CodexPanel({
         </svg>
       </MenuIconButton>
 
-      {open ? (
-        <>
-          <button
-            aria-label="Close bug codex"
-            className="fixed inset-0 z-40 bg-black/45 backdrop-blur-[2px]"
-            onClick={onMenuToggle}
-            type="button"
-          />
-          <div
-            className="fixed inset-x-4 top-[8vh] z-50 mx-auto flex max-h-[78vh] w-full max-w-[58rem] overflow-hidden rounded-[28px] border border-white/10 shadow-[0_30px_90px_rgba(0,0,0,0.52)] backdrop-blur-xl"
-            style={backdropStyle}
-          >
-            <div className="pointer-events-none absolute inset-0 overflow-hidden">
-              <div
-                className="absolute left-[14%] top-[14%] h-40 w-40 rounded-full blur-3xl transition duration-500"
-                style={{ background: backdropAccent.washA }}
+      {open && typeof document !== "undefined"
+        ? createPortal(
+            <>
+              <button
+                aria-label="Close bug codex"
+                className="fixed inset-0 z-[260] bg-black/45 backdrop-blur-[2px]"
+                onClick={onMenuToggle}
+                type="button"
               />
               <div
-                className="absolute right-[10%] top-[24%] h-32 w-32 rounded-full blur-3xl transition duration-500"
-                style={{ background: backdropAccent.washB }}
-              />
-              <div className="absolute inset-0 opacity-[0.06] [background-image:radial-gradient(circle_at_1px_1px,rgba(255,255,255,0.7)_1px,transparent_0)] [background-size:20px_20px]" />
-            </div>
+                className="fixed inset-x-4 top-[8vh] z-[270] mx-auto flex max-h-[78vh] w-full max-w-[58rem] overflow-hidden rounded-[28px] border border-white/10 shadow-[0_30px_90px_rgba(0,0,0,0.52)] backdrop-blur-xl"
+                data-codex-modal-root="true"
+                style={backdropStyle}
+              >
+                <div className="pointer-events-none absolute inset-0 overflow-hidden">
+                  <div
+                    className="absolute left-[14%] top-[14%] h-40 w-40 rounded-full blur-3xl transition duration-500"
+                    style={{ background: backdropAccent.washA }}
+                  />
+                  <div
+                    className="absolute right-[10%] top-[24%] h-32 w-32 rounded-full blur-3xl transition duration-500"
+                    style={{ background: backdropAccent.washB }}
+                  />
+                  <div className="absolute inset-0 opacity-[0.06] [background-image:radial-gradient(circle_at_1px_1px,rgba(255,255,255,0.7)_1px,transparent_0)] [background-size:20px_20px]" />
+                </div>
 
-            <div className="relative flex min-w-0 flex-1 flex-col">
-              <div className="relative flex items-start justify-between gap-4 border-b border-white/8 px-5 py-4">
-                <div className="min-w-0 flex-1 pr-28">
-                  {selectedEntry && selectedVariant ? (
-                    <>
-                      <div className="flex min-w-0 flex-wrap items-center gap-3">
-                        <div className="flex min-w-0 items-center gap-3">
-                          <div
-                            className={cn(
-                              "flex h-14 w-14 shrink-0 items-center justify-center rounded-[18px] border bg-gradient-to-br p-3 shadow-[0_0_24px_rgba(0,0,0,0.18)]",
-                              selectedAccent.iconPanel,
-                              selectedAccent.iconBorderClass,
-                            )}
-                          >
-                            <img
-                              alt=""
-                              className="h-8 w-8 object-contain"
-                              src={getTabIconSrc(
-                                selectedEntry,
-                                selectedId ?? fallbackId,
-                              )}
-                            />
+                <div className="relative flex min-w-0 flex-1 flex-col">
+                  <div className="relative flex items-start justify-between gap-4 border-b border-white/8 px-5 py-4">
+                    <div className="min-w-0 flex-1 pr-28">
+                      {selectedEntry && selectedVariant ? (
+                        <>
+                          <div className="flex min-w-0 flex-wrap items-center gap-3">
+                            <div className="flex min-w-0 items-center gap-3">
+                              <div
+                                className={cn(
+                                  "flex h-14 w-14 shrink-0 items-center justify-center rounded-[18px] border bg-gradient-to-br p-3 shadow-[0_0_24px_rgba(0,0,0,0.18)]",
+                                  selectedAccent.iconPanel,
+                                  selectedAccent.iconBorderClass,
+                                )}
+                              >
+                                <img
+                                  alt=""
+                                  className="h-8 w-8 object-contain"
+                                  src={getTabIconSrc(
+                                    selectedEntry,
+                                    selectedId ?? fallbackId,
+                                  )}
+                                />
+                              </div>
+
+                              <h3 className="min-w-0 truncate text-[1.4rem] font-semibold tracking-[-0.03em] text-stone-50">
+                                {selectedEntry.name}
+                              </h3>
+                            </div>
+
+                            <div className="flex flex-wrap items-center gap-2">
+                              <Badge className={selectedAccent.badgeClass}>
+                                {getThreatLabel(selectedVariant)}
+                              </Badge>
+                              <Badge className={selectedAccent.behaviorClass}>
+                                {getBehaviorLabel(
+                                  selectedEntry.profile.behavior,
+                                )}
+                              </Badge>
+                            </div>
                           </div>
 
-                          <h3 className="min-w-0 truncate text-[1.4rem] font-semibold tracking-[-0.03em] text-stone-50">
-                            {selectedEntry.name}
-                          </h3>
-                        </div>
+                          <div className="mt-2 px-1">
+                            <p className="max-w-[44rem] text-sm leading-6 text-stone-300">
+                              {selectedEntry.description}
+                            </p>
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          {/* eyebrow intentionally hidden on list view */}
+                          <h2 className="mt-1 text-[1.55rem] font-semibold tracking-[-0.04em] text-stone-50">
+                            {activeView === "weapons"
+                              ? "Weapon Codex"
+                              : selectedEntry
+                                ? selectedEntry.name
+                                : "Bug Codex"}
+                          </h2>
+                          <p className="mt-2 max-w-[40rem] text-sm leading-6 text-stone-300">
+                            {activeView === "weapons"
+                              ? "Review weapon types, tier names, and which bugs each damage family punishes or fails against."
+                              : selectedEntry
+                                ? "Review full encounter details, pressure profile, and field notes for the selected bug."
+                                : "Scout the swarm, a pocket catalog of the midnight bugs that keep engineers up."}
+                          </p>
+                        </>
+                      )}
+                    </div>
 
-                        <div className="flex flex-wrap items-center gap-2">
-                          <Badge className={selectedAccent.badgeClass}>
-                            {getThreatLabel(selectedVariant)}
-                          </Badge>
-                          <Badge className={selectedAccent.behaviorClass}>
-                            {getBehaviorLabel(selectedEntry.profile.behavior)}
-                          </Badge>
-                        </div>
-                      </div>
+                    <div className="absolute right-5 top-4 z-20 flex items-center gap-2">
+                      {selectedEntry ? (
+                        <button
+                          className="rounded-full border border-white/10 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.14em] text-stone-300 transition hover:border-white/20 hover:text-stone-100"
+                          onClick={handleBackToGrid}
+                          type="button"
+                        >
+                          Back
+                        </button>
+                      ) : null}
+                      <button
+                        className="rounded-full border border-white/10 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.14em] text-stone-300 transition hover:border-white/20 hover:text-stone-100"
+                        onClick={onMenuToggle}
+                        type="button"
+                      >
+                        Close
+                      </button>
+                    </div>
+                  </div>
 
-                      <div className="mt-2 px-1">
-                        <p className="max-w-[44rem] text-sm leading-6 text-stone-300">
-                          {selectedEntry.description}
-                        </p>
+                  <div className="relative border-b border-white/8 px-5 py-3">
+                    <Tabs
+                      activeTab={activeView as any}
+                      onChange={(tabId) => setActiveView(tabId as CodexView)}
+                      tabs={CODEX_TABS as any}
+                    />
+                  </div>
+
+                  {activeView === "bugs" && selectedEntry && selectedVariant ? (
+                    <div className="flex-1 overflow-hidden px-5 py-4 mb-6">
+                      <div className="mx-auto flex h-full w-full max-w-[46rem] flex-col gap-4">
+                        <DossierStats
+                          accent={selectedAccent}
+                          activeEntry={selectedEntry}
+                          activeMaxHp={selectedMaxHp}
+                          activeVariantConfig={selectedVariantConfig}
+                        />
+                        <FieldNotes
+                          activeEntry={selectedEntry}
+                          accent={selectedAccent}
+                        />
                       </div>
-                    </>
+                    </div>
+                  ) : activeView === "bugs" ? (
+                    <div className="flex-1 overflow-y-auto px-5 py-5">
+                      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-2">
+                        {entries.map(([id, entry]) => (
+                          <SummaryCard
+                            key={id}
+                            id={id}
+                            entry={entry}
+                            onSelect={handleSelectEntry}
+                          />
+                        ))}
+                      </div>
+                    </div>
                   ) : (
-                    <>
-                      {/* eyebrow intentionally hidden on list view */}
-                      <h2 className="mt-1 text-[1.55rem] font-semibold tracking-[-0.04em] text-stone-50">
-                        {activeView === "weapons"
-                          ? "Weapon Codex"
-                          : selectedEntry
-                            ? selectedEntry.name
-                            : "Bug Codex"}
-                      </h2>
-                      <p className="mt-2 max-w-[40rem] text-sm leading-6 text-stone-300">
-                        {activeView === "weapons"
-                          ? "Review weapon types, tier names, and which bugs each damage family punishes or fails against."
-                          : selectedEntry
-                            ? "Review full encounter details, pressure profile, and field notes for the selected bug."
-                            : "Scout the swarm, a pocket catalog of the midnight bugs that keep engineers up."}
-                      </p>
-                    </>
+                    <div className="flex-1 overflow-y-auto px-5 py-5">
+                      <div className="space-y-4">
+                        {WEAPON_TYPE_ORDER.map((type) => (
+                          <WeaponTypeCard
+                            key={type}
+                            bugEntries={entries}
+                            type={type}
+                          />
+                        ))}
+                      </div>
+                    </div>
                   )}
                 </div>
-
-                <div className="absolute right-5 top-4 z-20 flex items-center gap-2">
-                  {selectedEntry ? (
-                    <button
-                      className="rounded-full border border-white/10 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.14em] text-stone-300 transition hover:border-white/20 hover:text-stone-100"
-                      onClick={handleBackToGrid}
-                      type="button"
-                    >
-                      Back
-                    </button>
-                  ) : null}
-                  <button
-                    className="rounded-full border border-white/10 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.14em] text-stone-300 transition hover:border-white/20 hover:text-stone-100"
-                    onClick={onMenuToggle}
-                    type="button"
-                  >
-                    Close
-                  </button>
-                </div>
               </div>
-
-              <div className="relative border-b border-white/8 px-5 py-3">
-                <Tabs
-                  activeTab={activeView as any}
-                  onChange={(tabId) => setActiveView(tabId as CodexView)}
-                  tabs={CODEX_TABS as any}
-                />
-              </div>
-
-              {activeView === "bugs" && selectedEntry && selectedVariant ? (
-                <div className="flex-1 overflow-hidden px-5 py-4 mb-6">
-                  <div className="mx-auto flex h-full w-full max-w-[46rem] flex-col gap-4">
-                    <DossierStats
-                      accent={selectedAccent}
-                      activeEntry={selectedEntry}
-                      activeMaxHp={selectedMaxHp}
-                      activeVariantConfig={selectedVariantConfig}
-                    />
-                    <FieldNotes
-                      activeEntry={selectedEntry}
-                      accent={selectedAccent}
-                    />
-                  </div>
-                </div>
-              ) : activeView === "bugs" ? (
-                <div className="flex-1 overflow-y-auto px-5 py-5">
-                  <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-2">
-                    {entries.map(([id, entry]) => (
-                      <SummaryCard
-                        key={id}
-                        id={id}
-                        entry={entry}
-                        onSelect={handleSelectEntry}
-                      />
-                    ))}
-                  </div>
-                </div>
-              ) : (
-                <div className="flex-1 overflow-y-auto px-5 py-5">
-                  <div className="space-y-4">
-                    {WEAPON_TYPE_ORDER.map((type) => (
-                      <WeaponTypeCard
-                        key={type}
-                        bugEntries={entries}
-                        type={type}
-                      />
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-        </>
-      ) : null}
+            </>,
+            document.body,
+          )
+        : null}
     </div>
   );
 }

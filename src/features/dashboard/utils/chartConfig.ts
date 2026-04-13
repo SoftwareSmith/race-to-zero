@@ -31,11 +31,14 @@ export function getLineChartOptions(
         textAlign: "center",
       },
       legend: {
+        position: "top",
+        align: "center",
         labels: {
           usePointStyle: true,
           boxWidth: 10,
           color: "#cbd5e1",
-          padding: 18,
+          padding: 10,
+          pointStyleWidth: 18,
           font: {
             size: 12,
             weight: 600,

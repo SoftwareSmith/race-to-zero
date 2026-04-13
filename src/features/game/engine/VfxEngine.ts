@@ -82,6 +82,18 @@ interface FloatingLabel {
   scaleFrom: number;
 }
 
+type StatusLabel = "burn" | "freeze" | "poison" | "charged";
+
+const STATUS_APPLY_SPECS: Record<
+  StatusLabel,
+  { color: number; text: string }
+> = {
+  burn: { color: 0xf97316, text: "FIRE" },
+  charged: { color: 0x22d3ee, text: "CHARGED" },
+  freeze: { color: 0x93c5fd, text: "SLOW" },
+  poison: { color: 0x4ade80, text: "POISON" },
+};
+
 // ── Noise helper ──────────────────────────────────────────────────────────────
 
 function hash(n: number): number {
@@ -109,6 +121,28 @@ function lerpColor(
 
 function toHex(r: number, g: number, b: number): number {
   return ((r & 0xff) << 16) | ((g & 0xff) << 8) | (b & 0xff);
+}
+
+function retainActiveItems<T>(
+  items: T[],
+  expiredItems: Set<T>,
+  onExpire: (item: T) => void,
+) {
+  if (expiredItems.size === 0) {
+    return items;
+  }
+
+  const activeItems: T[] = [];
+  for (const item of items) {
+    if (expiredItems.has(item)) {
+      onExpire(item);
+      continue;
+    }
+
+    activeItems.push(item);
+  }
+
+  return activeItems;
 }
 
 // ── VfxEngine ────────────────────────────────────────────────────────────────
@@ -183,6 +217,34 @@ export class VfxEngine {
     d.gfx.clear();
     d.gfx.removeFromParent();
     this.gfxPool.push(d.gfx);
+  }
+
+  private trimDecalsByLabel(label: string, maxCount: number): void {
+    let matchingCount = 0;
+
+    for (const decal of this.decals) {
+      if (decal.gfx.label === label) {
+        matchingCount += 1;
+      }
+    }
+
+    if (matchingCount < maxCount) {
+      return;
+    }
+
+    const keptDecals: Decal[] = [];
+
+    for (const decal of this.decals) {
+      if (decal.gfx.label === label && matchingCount >= maxCount) {
+        this.releaseDecal(decal);
+        matchingCount -= 1;
+        continue;
+      }
+
+      keptDecals.push(decal);
+    }
+
+    this.decals = keptDecals;
   }
 
   // ── Particle factory ──────────────────────────────────────────────────────
@@ -490,14 +552,7 @@ export class VfxEngine {
    */
   addCharMark(x: number, y: number, radius = 40): void {
     if (!this.initialized) return;
-    const MAX_CHAR = 12;
-    while (this.decals.filter(d => d.gfx.label === "char").length >= MAX_CHAR) {
-      const oldest = this.decals.find(d => d.gfx.label === "char");
-      if (oldest) {
-        this.releaseDecal(oldest);
-        this.decals = this.decals.filter(d => d !== oldest);
-      } else break;
-    }
+    this.trimDecalsByLabel("char", 12);
     const gfx = this.acquireGfx();
     gfx.label = "char";
     gfx.x = x;
@@ -647,7 +702,7 @@ export class VfxEngine {
       gfx.x = sx;
       gfx.y = sy;
       const spikes = 6;
-    const outerLen = 4 + Math.random() * 14;
+      const outerLen = 4 + Math.random() * 14;
       const innerLen = outerLen * 0.38;
       for (let s = 0; s < spikes; s++) {
         const a = (s / spikes) * Math.PI * 2;
@@ -777,12 +832,7 @@ export class VfxEngine {
   addFireTrailStamp(x: number, y: number, radiusPx = 56, durationMs = 180): void {
     if (!this.initialized) return;
 
-    while (this.decals.filter((d) => d.gfx.label === "fireTrail").length >= MAX_FIRE_TRAIL_DECALS) {
-      const oldest = this.decals.find((d) => d.gfx.label === "fireTrail");
-      if (!oldest) break;
-      this.releaseDecal(oldest);
-      this.decals = this.decals.filter((d) => d !== oldest);
-    }
+    this.trimDecalsByLabel("fireTrail", MAX_FIRE_TRAIL_DECALS);
 
     if (this.decals.length >= MAX_DECALS) {
       const oldest = this.decals.shift();
@@ -1126,13 +1176,8 @@ export class VfxEngine {
     }
   }
 
-  spawnStatusApply(x: number, y: number, status: "burn" | "freeze" | "poison" | "charged"): void {
-    const spec = {
-      burn: { color: 0xf97316, text: "FIRE" },
-      charged: { color: 0x22d3ee, text: "CHARGED" },
-      freeze: { color: 0x93c5fd, text: "SLOW" },
-      poison: { color: 0x4ade80, text: "POISON" },
-    }[status];
+  spawnStatusApply(x: number, y: number, status: StatusLabel): void {
+    const spec = STATUS_APPLY_SPECS[status];
     this.addFloatingLabel(x, y, spec.text, spec.color, 0.78, 780, 24);
   }
 
@@ -1340,10 +1385,11 @@ export class VfxEngine {
         gfx.fill({ color: toHex(r, g, b), alpha: 1 });
       }
     }
-    for (const p of deadParticles) {
-      this.releaseParticle(p);
-      this.particles = this.particles.filter(x => x !== p);
-    }
+    this.particles = retainActiveItems(
+      this.particles,
+      new Set(deadParticles),
+      (particle) => this.releaseParticle(particle),
+    );
 
     // Update decals (fade out)
     const deadDecals: Decal[] = [];
@@ -1363,10 +1409,11 @@ export class VfxEngine {
         d.gfx.y += bvy * (dtMs / 1000);
       }
     }
-    for (const d of deadDecals) {
-      this.releaseDecal(d);
-      this.decals = this.decals.filter(x => x !== d);
-    }
+    this.decals = retainActiveItems(
+      this.decals,
+      new Set(deadDecals),
+      (decal) => this.releaseDecal(decal),
+    );
 
     // Update lightning arcs (redraw per frame for flicker)
     this.lightningGfx.clear();
@@ -1381,9 +1428,11 @@ export class VfxEngine {
       const alpha = progress < 0.2 ? progress / 0.2 : 1 - (progress - 0.2) / 0.8;
       this._drawLightningArc(arc, alpha * 0.9, now);
     }
-    for (const a of deadArcs) {
-      this.lightningArcs = this.lightningArcs.filter(x => x !== a);
-    }
+    this.lightningArcs = retainActiveItems(
+      this.lightningArcs,
+      new Set(deadArcs),
+      () => undefined,
+    );
 
     const deadLabels: FloatingLabel[] = [];
     for (const label of this.floatingLabels) {
@@ -1401,11 +1450,14 @@ export class VfxEngine {
       const scale = label.scaleFrom + progress * 0.08;
       label.text.scale.set(scale);
     }
-    for (const label of deadLabels) {
-      label.text.removeFromParent();
-      label.text.destroy();
-      this.floatingLabels = this.floatingLabels.filter((entry) => entry !== label);
-    }
+    this.floatingLabels = retainActiveItems(
+      this.floatingLabels,
+      new Set(deadLabels),
+      (label) => {
+        label.text.removeFromParent();
+        label.text.destroy();
+      },
+    );
   }
 
   private _drawLightningArc(arc: LightningArc, alpha: number, now: number): void {

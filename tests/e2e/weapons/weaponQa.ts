@@ -46,7 +46,6 @@ export async function openSiegeGame(page: Page, bugCount = 60) {
   await mockMetrics(page, makeBugMetrics(bugCount));
   await seedDashboardState(page, {
     gameConfig: getStaticSiegeGameConfig(),
-    showParticleCount: false,
   });
   await page.goto("./");
   await page.getByRole("button", { name: "Open interactive bug game" }).click();

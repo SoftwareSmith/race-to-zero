@@ -1,11 +1,7 @@
 export type Tone = "positive" | "negative" | "neutral";
 export type StatusBannerKind = "error" | "info";
-export type TopMenuKey = "bugs" | "codex" | "settings" | null;
-export type SettingToggleKey =
-  | "excludePublicHolidays"
-  | "excludeWeekends"
-  | "showParticleCount"
-  | "terminatorMode";
+export type TopMenuKey = "codex" | "settings" | null;
+export type SettingToggleKey = "excludePublicHolidays" | "excludeWeekends";
 export type BugVisualSettingKey = "chaosMultiplier" | "sizeMultiplier";
 export type ActiveTab = "overview" | "periods";
 export type CompareRangeKey = "7" | "30" | "90" | "all" | "custom";
@@ -131,9 +127,7 @@ export interface BugVisualSettings {
   sizeMultiplier: number;
 }
 
-export interface MenuSettingsState extends WorkdaySettings {
-  showParticleCount: boolean;
-}
+export interface MenuSettingsState extends WorkdaySettings {}
 
 export interface FireflyParticle {
   color: string;

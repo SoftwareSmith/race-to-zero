@@ -1,6 +1,5 @@
 import { useCallback, useRef, useState } from "react";
 import BackgroundField from "@game/components/BackgroundField";
-import BugSettingsMenu from "@dashboard/components/BugSettingsMenu";
 import CodexPanel from "@game/components/CodexPanel";
 import CommandCenter from "@dashboard/components/CommandCenter";
 import SettingsMenu from "@dashboard/components/SettingsMenu";
@@ -87,12 +86,6 @@ function AppContent() {
     siegeGame.exitInteractiveMode();
   }, [dashboard, siegeGame]);
 
-  const headerModeEyebrow = siegeGame.interactiveMode
-    ? "Dashboard under siege"
-    : dashboard.headerEyebrow;
-  const headerModeSubtitle = siegeGame.interactiveMode
-    ? "Panels are frozen into the battlefield. Bugs now reclaim cards, charts, and surfaces directly."
-    : dashboard.headerSubtitle;
   const backgroundChartFocus = siegeGame.interactiveMode
     ? dashboard.chartFocus
     : null;
@@ -127,7 +120,7 @@ function AppContent() {
                 siegeGame.placeStructure(type, vx, vy, cx, cy, structureId)
             : undefined
         }
-        onTerminatorHit={
+        onBugHit={
           siegeGame.interactiveMode ? siegeGame.handleInteractiveHit : undefined
         }
         onWeaponFired={
@@ -150,12 +143,8 @@ function AppContent() {
         streakMultiplier={
           siegeGame.interactiveMode ? siegeGame.streakMultiplier : 1
         }
-        showParticleCount={
-          siegeGame.interactiveMode ? false : dashboard.showParticleCount
-        }
-        showTerminatorStatusBadge={!siegeGame.interactiveMode}
         siegeZones={siegeZones}
-        terminatorMode={siegeGame.interactiveMode || dashboard.terminatorMode}
+        interactiveMode={siegeGame.interactiveMode}
         tone={dashboard.deadlineMetrics.statusTone}
         getWeaponTier={getWeaponTier}
         onWeaponEvolutionStatesChange={syncFromEngine}
@@ -194,7 +183,7 @@ function AppContent() {
       <div
         ref={dashboardRef}
         className={cn(
-          "relative z-10 mx-auto grid h-full w-full max-w-[1520px] grid-rows-[auto_auto_auto_minmax(0,1fr)] gap-3 px-3 py-3 sm:px-4 sm:py-4 lg:px-6 lg:py-5",
+          "relative z-10 mx-auto grid w-full max-w-[1480px] content-start gap-2 px-2 py-2 sm:px-3 sm:py-3 lg:px-4 lg:py-4",
           siegeGame.interactiveMode ? "pointer-events-none select-none" : "",
         )}
         style={{
@@ -211,16 +200,16 @@ function AppContent() {
               ? "blur(2px) saturate(0.72)"
               : siegeGame.siegePhase === "entering"
                 ? "blur(1px) saturate(0.82)"
-                : "none",
+                : undefined,
           transform:
-            siegeGame.siegePhase === "active" ? "scale(0.985)" : "scale(1)",
+            siegeGame.siegePhase === "active" ? "scale(0.985)" : undefined,
           transition:
             "opacity 420ms ease-out, filter 520ms ease-out, transform 520ms ease-out",
         }}
       >
         <header
           className={cn(
-            "grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3",
+            "relative z-20 grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3",
             CHROME_TRANSITION_CLASSNAME,
             chromeHidden
               ? "-translate-y-5 opacity-0 blur-sm"
@@ -229,13 +218,13 @@ function AppContent() {
         >
           <div className="min-w-0 max-w-4xl">
             <p className="text-[0.72rem] font-semibold uppercase tracking-[0.28em] text-stone-500">
-              {headerModeEyebrow}
+              {dashboard.headerEyebrow}
             </p>
             <h1 className="mt-1.5 font-display text-3xl leading-[0.92] tracking-[-0.06em] text-stone-50 sm:text-[2.65rem] xl:text-[3.25rem]">
               Race to Zero Bugs
             </h1>
             <p className="mt-2 max-w-2xl text-[0.82rem] leading-5 text-stone-400 sm:text-sm">
-              {headerModeSubtitle}
+              {dashboard.headerSubtitle}
             </p>
           </div>
 
@@ -251,10 +240,10 @@ function AppContent() {
               settings={dashboard.settings}
             />
             {!siegeGame.interactiveMode ? (
-              <Tooltip content="Arm siege mode and start clearing bugs directly off the dashboard.">
+              <Tooltip content="Launch the interactive bug game.">
                 <button
                   aria-label="Open interactive bug game"
-                  className="inline-flex min-h-10 min-w-10 items-center justify-center rounded-[15px] border border-white/10 bg-zinc-950/86 px-3 text-stone-300 shadow-[0_10px_24px_rgba(0,0,0,0.24)] transition duration-200 hover:-translate-y-0.5 hover:bg-zinc-900 hover:text-stone-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300/40"
+                  className="inline-flex min-h-12 min-w-12 items-center justify-center rounded-[16px] border border-white/10 bg-zinc-950/86 px-3 text-stone-300 shadow-[0_10px_24px_rgba(0,0,0,0.24)] transition duration-200 hover:-translate-y-0.5 hover:bg-zinc-900 hover:text-stone-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300/40"
                   onClick={handleEnterInteractiveMode}
                   type="button"
                 >
@@ -274,18 +263,6 @@ function AppContent() {
                 </button>
               </Tooltip>
             ) : null}
-            <BugSettingsMenu
-              bugVisualSettings={dashboard.bugVisualSettings}
-              containerRef={dashboard.bugSettingsMenuRef}
-              onChange={dashboard.handleBugVisualSetting}
-              onMenuToggle={() => dashboard.handleTopMenuToggle("bugs")}
-              onToggle={dashboard.handleToggleSetting}
-              open={
-                !siegeGame.interactiveMode && dashboard.openTopMenu === "bugs"
-              }
-              showParticleCount={dashboard.showParticleCount}
-              terminatorMode={dashboard.terminatorMode}
-            />
             <CodexPanel
               containerRef={dashboard.codexMenuRef}
               onMenuToggle={() => dashboard.handleTopMenuToggle("codex")}
@@ -298,14 +275,11 @@ function AppContent() {
 
         <div
           className={cn(
-            "min-h-0 rounded-[24px] border border-white/8 bg-black/18 px-3 py-2 shadow-[0_20px_48px_rgba(0,0,0,0.18)] backdrop-blur-xl",
+            "relative z-10 mt-2 rounded-[24px] px-2 py-1.5 sm:mt-3 sm:px-3 sm:py-2",
             CHROME_TRANSITION_CLASSNAME,
             chromeHidden
               ? "translate-y-[-12px] opacity-0 blur-sm"
               : "translate-y-0 opacity-100 blur-0",
-            siegeGame.interactiveMode
-              ? "border-red-500/16 before:pointer-events-none before:absolute before:inset-0 before:bg-[linear-gradient(180deg,rgba(248,113,113,0.08),transparent_34%,rgba(15,23,42,0.18))] before:content-['']"
-              : "",
           )}
           data-siege-panel="top-nav"
         >
@@ -329,6 +303,7 @@ function AppContent() {
 
         <div
           className={cn(
+            "relative z-10",
             CHROME_TRANSITION_CLASSNAME,
             chromeHidden
               ? "translate-y-[-14px] opacity-0 blur-sm"
@@ -342,8 +317,8 @@ function AppContent() {
           />
         </div>
 
-        <main className="grid min-h-0 gap-2">
-          <div className="min-h-0">
+        <main className="grid content-start gap-2 self-start">
+          <div>
             {dashboard.activeTab === "overview" ? (
               <OverviewView
                 deadlineMetrics={dashboard.deadlineMetrics}

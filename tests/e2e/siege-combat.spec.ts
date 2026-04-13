@@ -34,7 +34,6 @@ test.describe("siege combat QA", () => {
     await mockMetrics(page, singleLowBugMetrics);
     await seedDashboardState(page, {
       gameConfig: getStaticSiegeGameConfig(),
-      showParticleCount: false,
     });
 
     await page.goto("./");

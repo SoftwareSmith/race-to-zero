@@ -57,7 +57,6 @@ const ChartCard = memo(function ChartCard({
   chartKey,
   className = "",
   onHoverStateChange,
-  siegeMode = false,
 }: ChartCardProps) {
   const options = useMemo(
     () => ({
@@ -96,35 +95,24 @@ const ChartCard = memo(function ChartCard({
     <article
       data-siege-panel={chartKey}
       className={cn(
-        "group relative flex h-full min-h-0 flex-col overflow-hidden rounded-[24px] border border-white/10 bg-[linear-gradient(180deg,rgba(10,12,18,0.96),rgba(19,23,32,0.96))] p-4 text-stone-50 shadow-[0_20px_46px_rgba(0,0,0,0.32)] transition duration-200 hover:-translate-y-0.5 hover:shadow-[0_24px_56px_rgba(0,0,0,0.36)]",
-        siegeMode
-          ? "border-red-500/18 bg-[linear-gradient(180deg,rgba(25,10,14,0.96),rgba(19,23,32,0.96))]"
-          : "",
+        "group relative flex min-h-0 flex-col overflow-hidden rounded-[24px] border border-white/10 bg-[linear-gradient(180deg,rgba(10,12,18,0.96),rgba(19,23,32,0.96))] p-3.5 text-stone-50 shadow-[0_18px_38px_rgba(0,0,0,0.28)] transition duration-200 hover:-translate-y-0.5 hover:shadow-[0_22px_46px_rgba(0,0,0,0.32)]",
         className,
       )}
       onMouseLeave={() => onHoverStateChange?.(null)}
     >
-      {siegeMode ? (
-        <>
-          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(248,113,113,0.12),transparent_30%),linear-gradient(135deg,rgba(248,113,113,0.04),transparent_42%,rgba(56,189,248,0.05))]" />
-          <div className="pointer-events-none absolute left-5 top-5 rounded-full border border-red-300/20 bg-red-500/10 px-2 py-1 text-[0.54rem] font-semibold uppercase tracking-[0.22em] text-red-100/78">
-            Under siege
-          </div>
-        </>
-      ) : null}
       <div className="pointer-events-none absolute inset-0 opacity-0 transition duration-200 group-hover:opacity-100">
         <div className="absolute -left-6 top-8 h-28 w-28 rounded-full bg-sky-400/12 blur-3xl" />
         <div className="absolute bottom-4 right-4 h-24 w-24 rounded-full bg-teal-400/10 blur-3xl" />
       </div>
       <div className="absolute inset-x-0 top-0 h-24 bg-[radial-gradient(circle_at_top,rgba(56,189,248,0.14),transparent_60%)]" />
       <div className="absolute inset-x-8 top-0 h-px bg-gradient-to-r from-transparent via-white/35 to-transparent opacity-0 transition duration-200 group-hover:opacity-100" />
-      <div className="relative">
-        <div>
-          <h3 className="mt-1 font-display text-[1.8rem] leading-tight tracking-[-0.04em] text-stone-50 sm:text-[2.1rem]">
+      <div className="relative flex h-full flex-col">
+        <div className="shrink-0">
+          <h3 className="mt-0.5 font-display text-[1.55rem] leading-tight tracking-[-0.04em] text-stone-50 sm:text-[1.85rem]">
             {title}
           </h3>
           {description ? (
-            <p className="mt-2 w-full text-[0.8rem] leading-6 text-stone-300">
+            <p className="mt-1.5 w-full text-[0.76rem] leading-5 text-stone-300">
               {description}
             </p>
           ) : null}
@@ -132,8 +120,8 @@ const ChartCard = memo(function ChartCard({
 
         <div
           className={cn(
-            "h-[220px] sm:h-[240px] xl:h-[min(32vh,280px)]",
-            description ? "mt-4" : "mt-3",
+            "mt-2.5 h-[192px] shrink-0 sm:h-[208px] xl:h-[224px]",
+            description ? "sm:mt-3" : "",
           )}
         >
           {variant === "bar" ? (
@@ -144,7 +132,7 @@ const ChartCard = memo(function ChartCard({
         </div>
 
         {summary ? (
-          <p className="mt-3 max-w-2xl text-[0.76rem] leading-5 text-stone-400">
+          <p className="mt-2 shrink-0 max-w-2xl text-[0.72rem] leading-5 text-stone-400">
             {summary}
           </p>
         ) : null}

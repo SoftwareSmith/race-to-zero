@@ -5,6 +5,7 @@ interface MenuIconButtonProps {
   ariaLabel: string;
   children: ReactNode;
   onClick: () => void;
+  open?: boolean;
   tooltip: string;
 }
 
@@ -12,20 +13,25 @@ export function MenuIconButton({
   ariaLabel,
   children,
   onClick,
+  open = false,
   tooltip,
 }: MenuIconButtonProps) {
-  return (
-    <Tooltip content={tooltip}>
-      <button
-        aria-label={ariaLabel}
-        className="inline-flex min-h-12 min-w-12 items-center justify-center rounded-[16px] border border-white/10 bg-zinc-950/86 px-3 text-stone-300 shadow-[0_10px_24px_rgba(0,0,0,0.24)] transition duration-200 hover:-translate-y-0.5 hover:bg-zinc-900 hover:text-stone-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300/40"
-        onClick={onClick}
-        type="button"
-      >
-        {children}
-      </button>
-    </Tooltip>
+  const button = (
+    <button
+      aria-label={ariaLabel}
+      className="inline-flex min-h-12 min-w-12 items-center justify-center rounded-[16px] border border-white/10 bg-zinc-950/86 px-3 text-stone-300 shadow-[0_10px_24px_rgba(0,0,0,0.24)] transition duration-200 hover:-translate-y-0.5 hover:bg-zinc-900 hover:text-stone-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300/40"
+      onClick={onClick}
+      type="button"
+    >
+      {children}
+    </button>
   );
+
+  if (open) {
+    return button;
+  }
+
+  return <Tooltip content={tooltip}>{button}</Tooltip>;
 }
 
 interface MenuPanelProps {
@@ -35,7 +41,7 @@ interface MenuPanelProps {
 
 export function MenuPanel({ children, title }: MenuPanelProps) {
   return (
-    <div className="absolute right-0 top-[calc(100%+10px)] z-30 grid w-[320px] gap-3 rounded-[20px] border border-white/10 bg-zinc-950/96 p-4 text-sm text-stone-200 shadow-[0_24px_48px_rgba(0,0,0,0.34)] backdrop-blur-xl">
+    <div className="absolute right-0 top-[calc(100%+10px)] z-[260] grid w-[320px] gap-3 rounded-[20px] border border-white/10 bg-zinc-950/96 p-4 text-sm text-stone-200 shadow-[0_24px_48px_rgba(0,0,0,0.34)] backdrop-blur-xl">
       <span className="text-sm font-medium text-stone-300">{title}</span>
       {children}
     </div>

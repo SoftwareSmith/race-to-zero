@@ -37,12 +37,22 @@ export default function StructureLayer({
   const [now, setNow] = useState(() => Date.now());
 
   useEffect(() => {
-    const intervalId = window.setInterval(() => {
-      setNow(Date.now());
-    }, 100);
+    let animationFrameId = 0;
+    let lastUpdateAt = 0;
+
+    const tick = (timestamp: number) => {
+      if (timestamp - lastUpdateAt >= 100) {
+        lastUpdateAt = timestamp;
+        setNow(Date.now());
+      }
+
+      animationFrameId = window.requestAnimationFrame(tick);
+    };
+
+    animationFrameId = window.requestAnimationFrame(tick);
 
     return () => {
-      window.clearInterval(intervalId);
+      window.cancelAnimationFrame(animationFrameId);
     };
   }, []);
 

@@ -56,7 +56,7 @@ interface BackgroundFieldProps {
     canvasY: number,
     structureId?: string,
   ) => void;
-  onTerminatorHit?: (payload: BugHitPayload) => void;
+  onBugHit?: (payload: BugHitPayload) => void;
   onWeaponFired?: (id: SiegeWeaponId, firedAt: number) => void;
   placedStructures?: PlacedStructure[];
   agentCaptures?: Record<string, AgentCaptureState>;
@@ -74,10 +74,8 @@ interface BackgroundFieldProps {
   remainingBugCount?: number;
   selectedWeaponId?: SiegeWeaponId;
   streakMultiplier?: number;
-  showParticleCount: boolean;
-  showTerminatorStatusBadge?: boolean;
   siegeZones?: SiegeZoneRect[];
-  terminatorMode: boolean;
+  interactiveMode: boolean;
   tone: Tone;
   gameConfig?: GameConfig;
   /** Returns the current evolution tier for a given weapon. Defaults to T1 when not provided. */
@@ -104,7 +102,7 @@ const BackgroundField = memo(function BackgroundField({
   combatStats = null,
   interactiveSessionKey = null,
   onStructurePlace,
-  onTerminatorHit,
+  onBugHit,
   onWeaponFired,
   placedStructures,
   agentCaptures,
@@ -113,10 +111,8 @@ const BackgroundField = memo(function BackgroundField({
   remainingBugCount,
   selectedWeaponId = "hammer",
   streakMultiplier = 1,
-  showParticleCount,
-  showTerminatorStatusBadge = true,
   siegeZones = [],
-  terminatorMode,
+  interactiveMode,
   gameConfig,
   tone,
   getWeaponTier = () => 1 as import("@game/types").WeaponTier,
@@ -147,7 +143,7 @@ const BackgroundField = memo(function BackgroundField({
   );
   const gameSessionKey = interactiveSessionKey
     ? `interactive:${interactiveSessionKey}`
-    : `${terminatorMode ? "terminator" : "ambient"}:${bugCountsKey}`;
+    : `${interactiveMode ? "interactive" : "ambient"}:${bugCountsKey}`;
   const [hammerSwing, setHammerSwing] = useState(false);
   const [cursorLastFireTimes, setCursorLastFireTimes] = useState<
     Partial<Record<SiegeWeaponId, number>>
@@ -178,7 +174,7 @@ const BackgroundField = memo(function BackgroundField({
     return () => {
       window.clearTimeout(timeoutId);
     };
-  }, [gameSessionKey, terminatorMode]);
+  }, [gameSessionKey, interactiveMode]);
 
   const handleTurretFire = useCallback(
     (data: {
@@ -260,15 +256,15 @@ const BackgroundField = memo(function BackgroundField({
         };
 
   useEffect(() => {
-    document.body.classList.toggle("cursor-none", terminatorMode);
+    document.body.classList.toggle("cursor-none", interactiveMode);
 
     return () => {
       document.body.classList.remove("cursor-none");
     };
-  }, [terminatorMode]);
+  }, [interactiveMode]);
 
   useEffect(() => {
-    if (!terminatorMode) {
+    if (!interactiveMode) {
       const timeoutId = window.setTimeout(() => {
         setWeaponEffects([]);
       }, 0);
@@ -292,10 +288,10 @@ const BackgroundField = memo(function BackgroundField({
     return () => {
       window.clearInterval(intervalId);
     };
-  }, [terminatorMode, weaponEffects.length, hammerPositionRef]);
+  }, [interactiveMode, weaponEffects.length, hammerPositionRef]);
 
   useEffect(() => {
-    if (!terminatorMode) {
+    if (!interactiveMode) {
       hammerPositionRef.current = { x: 0, y: 0 };
       if (weaponCursorRef.current) {
         weaponCursorRef.current.style.transform = "translate3d(0px, 0px, 0)";
@@ -333,7 +329,7 @@ const BackgroundField = memo(function BackgroundField({
       }
       window.removeEventListener("mousemove", handlePointerMove);
     };
-  }, [terminatorMode]);
+  }, [interactiveMode]);
 
   useEffect(() => {
     if (!hammerSwing) {
@@ -378,7 +374,7 @@ const BackgroundField = memo(function BackgroundField({
   const handleBugHit = useCallback(
     (payload: BugHitPayload) => {
       setHammerSwing(true);
-      onTerminatorHit?.(payload);
+      onBugHit?.(payload);
       setGameState((currentValue) => {
         const nextState =
           currentValue.sessionKey === gameSessionKey
@@ -408,12 +404,12 @@ const BackgroundField = memo(function BackgroundField({
         };
       });
     },
-    [gameSessionKey, onTerminatorHit, totalBugCount],
+    [gameSessionKey, onBugHit, totalBugCount],
   );
 
   const handleStructureKill = useCallback(
     (x: number, y: number, variant: string) => {
-      onTerminatorHit?.({
+      onBugHit?.({
         defeated: true,
         remainingHp: 0,
         variant: variant as import("../../../../types/dashboard").BugVariant,
@@ -446,7 +442,7 @@ const BackgroundField = memo(function BackgroundField({
         };
       });
     },
-    [gameSessionKey, onTerminatorHit, totalBugCount],
+    [gameSessionKey, onBugHit, totalBugCount],
   );
 
   const handleEntityDeath = useCallback(
@@ -460,7 +456,7 @@ const BackgroundField = memo(function BackgroundField({
         return;
       }
 
-      onTerminatorHit?.({
+      onBugHit?.({
         defeated: true,
         remainingHp: 0,
         variant: variant as import("../../../../types/dashboard").BugVariant,
@@ -496,14 +492,8 @@ const BackgroundField = memo(function BackgroundField({
         };
       });
     },
-    [gameSessionKey, onTerminatorHit, totalBugCount],
+    [gameSessionKey, onBugHit, totalBugCount],
   );
-
-  const overlayLabel = terminatorMode
-    ? activeGameState.remainingTargets === 0
-      ? "Target neutralized"
-      : `${activeGameState.remainingTargets} targets left`
-    : `${totalBugCount} bugs rendered`;
 
   return (
     <div
@@ -532,18 +522,18 @@ const BackgroundField = memo(function BackgroundField({
         sceneProfile={sceneProfile}
         sessionKey={gameSessionKey}
         siegeZones={siegeZones}
-        terminatorMode={terminatorMode}
+        interactiveMode={interactiveMode}
         gameConfig={gameConfig}
         onEntityDeath={handleEntityDeath}
-        onStructureKill={terminatorMode ? handleStructureKill : undefined}
-        onAgentAbsorb={terminatorMode ? onAgentAbsorb : undefined}
-        onTurretFire={terminatorMode ? handleTurretFire : undefined}
-        onTeslaFire={terminatorMode ? handleTeslaFire : undefined}
-        placingStructureId={terminatorMode ? placingStructureId : null}
-        onStructurePlace={terminatorMode ? onStructurePlace : undefined}
+        onStructureKill={interactiveMode ? handleStructureKill : undefined}
+        onAgentAbsorb={interactiveMode ? onAgentAbsorb : undefined}
+        onTurretFire={interactiveMode ? handleTurretFire : undefined}
+        onTeslaFire={interactiveMode ? handleTeslaFire : undefined}
+        placingStructureId={interactiveMode ? placingStructureId : null}
+        onStructurePlace={interactiveMode ? onStructurePlace : undefined}
         selectedWeaponId={selectedWeaponId}
         streakMultiplier={streakMultiplier}
-        onWeaponFire={terminatorMode ? handleWeaponFire : undefined}
+        onWeaponFire={interactiveMode ? handleWeaponFire : undefined}
         hammerPositionRef={hammerPositionRef}
         getWeaponTier={getWeaponTier}
         onWeaponEvolutionStatesChange={onWeaponEvolutionStatesChange}
@@ -553,8 +543,8 @@ const BackgroundField = memo(function BackgroundField({
       {effectiveBugCount === 0 ? (
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_35%,rgba(187,247,208,0.12),transparent_28%),radial-gradient(circle_at_60%_68%,rgba(125,211,252,0.08),transparent_34%)] [animation:all-clear-breathe_6s_ease-in-out_infinite]" />
       ) : null}
-      <WeaponEffectLayer effects={terminatorMode ? weaponEffects : []} />
-      {terminatorMode && placedStructures && placedStructures.length > 0 ? (
+      <WeaponEffectLayer effects={interactiveMode ? weaponEffects : []} />
+      {interactiveMode && placedStructures && placedStructures.length > 0 ? (
         <StructureLayer
           structures={placedStructures}
           agentCaptures={agentCaptures}
@@ -562,7 +552,7 @@ const BackgroundField = memo(function BackgroundField({
           teslaLastFireTimes={teslaLastFireTimes}
         />
       ) : null}
-      {terminatorMode ? (
+      {interactiveMode ? (
         <WeaponCursor
           hideSystemCursor={
             selectedWeaponId === "hammer" || !!placingStructureId
@@ -580,11 +570,6 @@ const BackgroundField = memo(function BackgroundField({
           style={{ left: `${splat.x}px`, top: `${splat.y}px` }}
         />
       ))}
-      {showParticleCount || (terminatorMode && showTerminatorStatusBadge) ? (
-        <div className="absolute bottom-5 right-5 rounded-full border border-white/8 bg-black/35 px-3 py-1.5 text-[0.68rem] font-semibold uppercase tracking-[0.22em] text-stone-300 backdrop-blur-xl">
-          {overlayLabel}
-        </div>
-      ) : null}
     </div>
   );
 });

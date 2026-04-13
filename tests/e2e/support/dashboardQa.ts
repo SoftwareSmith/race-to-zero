@@ -42,7 +42,6 @@ interface DashboardSeedOptions {
   excludeWeekends?: boolean;
   frozenDateIso?: string;
   gameConfig?: Partial<GameConfig>;
-  showParticleCount?: boolean;
   terminatorMode?: boolean;
 }
 
@@ -157,7 +156,6 @@ export async function seedDashboardState(
     frozenDateIso = QA_TODAY_ISO,
     gameConfig,
     clearStorage = true,
-    showParticleCount = true,
     terminatorMode = false,
   } = options;
 
@@ -170,7 +168,6 @@ export async function seedDashboardState(
       excludeWeekends,
       frozenDateIso,
       gameConfig,
-      showParticleCount,
       storageKeys,
       terminatorMode,
     }) => {
@@ -220,13 +217,6 @@ export async function seedDashboardState(
         );
       }
 
-      if (!window.localStorage.getItem(storageKeys.showParticleCount)) {
-        window.localStorage.setItem(
-          storageKeys.showParticleCount,
-          String(showParticleCount),
-        );
-      }
-
       if (!window.localStorage.getItem(storageKeys.terminatorMode)) {
         window.localStorage.setItem(storageKeys.terminatorMode, String(terminatorMode));
       }
@@ -245,7 +235,6 @@ export async function seedDashboardState(
       excludeWeekends,
       frozenDateIso,
       gameConfig,
-      showParticleCount,
       storageKeys: STORAGE_KEYS,
       terminatorMode,
     },

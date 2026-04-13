@@ -33,20 +33,20 @@ export interface CardToneStyle {
 
 export const CARD_TONE_STYLES: Record<Tone, CardToneStyle> = {
   positive: {
-    card: "border-emerald-500/26 bg-emerald-950/18",
-    eyebrow: "text-emerald-300",
+    card: "border-emerald-500/30 bg-emerald-950/28",
+    eyebrow: "text-emerald-200",
     value: "text-emerald-200",
     copy: "text-emerald-100/70",
   },
   negative: {
-    card: "border-red-500/26 bg-red-950/18",
-    eyebrow: "text-red-300",
+    card: "border-red-500/30 bg-red-950/28",
+    eyebrow: "text-red-200",
     value: "text-red-200",
     copy: "text-red-100/70",
   },
   neutral: {
-    card: "border-sky-500/24 bg-sky-950/12",
-    eyebrow: "text-sky-200",
+    card: "border-sky-500/28 bg-sky-950/24",
+    eyebrow: "text-sky-100",
     value: "text-sky-100",
     copy: "text-sky-50/70",
   },

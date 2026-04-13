@@ -5,6 +5,7 @@ import {
   type CrawlRegion,
   type BugWeaponMatchups,
 } from "@config/bugVariants";
+import { createStoredJsonParser, isStoredRecord } from "@shared/utils/storage";
 
 export type {
   CrawlRegion,
@@ -40,7 +41,15 @@ export interface BugType {
   weaponMatchups: BugWeaponMatchups;
 }
 
-// ── Derive BUG_CODEX from the single config source ───────────────────────────
+function isStoredCodex(value: unknown): value is Record<string, BugType> {
+  return isStoredRecord(value);
+}
+
+const parseStoredCodex = createStoredJsonParser<Record<string, BugType>>(
+  isStoredCodex,
+);
+
+// Derive the default codex from the single config source.
 
 function variantDefToBugType(def: BugVariantDef): BugType {
   return {
@@ -73,7 +82,7 @@ export const BUG_CODEX: Record<string, BugType> = Object.fromEntries(
   ]),
 );
 
-// ── Runtime codex (user-editable, persisted to localStorage) ─────────────────
+// Runtime codex is user-editable and persisted to localStorage.
 
 function cloneWeaponMatchups(
   source: Partial<BugWeaponMatchups> | undefined,
@@ -137,9 +146,9 @@ export function loadCodexFromStorage() {
     if (typeof window === "undefined") return;
     const raw = window.localStorage.getItem("race-to-zero:bug-codex");
     if (!raw) return;
-    const parsed = JSON.parse(raw);
-    if (parsed && typeof parsed === "object") {
-      CURRENT_CODEX = cloneCodex(parsed as Record<string, BugType>);
+    const parsedCodex = parseStoredCodex(raw);
+    if (parsedCodex) {
+      CURRENT_CODEX = cloneCodex(parsedCodex);
     }
   } catch {
     // ignore

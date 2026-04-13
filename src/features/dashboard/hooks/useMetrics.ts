@@ -1,7 +1,47 @@
 import { useCallback, useEffect, useState } from "react";
 import type { MetricsSource } from "../../../types/dashboard";
+import { isStoredRecord } from "@shared/utils/storage";
 
 const METRICS_PATH = `${import.meta.env.BASE_URL}data/metrics.json`;
+
+function isMetricsSource(value: unknown): value is MetricsSource {
+  if (!isStoredRecord(value)) {
+    return false;
+  }
+
+  if (value.generatedAt !== undefined && typeof value.generatedAt !== "string") {
+    return false;
+  }
+
+  if (value.lastUpdated !== undefined && typeof value.lastUpdated !== "string") {
+    return false;
+  }
+
+  if (value.bugs === undefined) {
+    return true;
+  }
+
+  if (!Array.isArray(value.bugs)) {
+    return false;
+  }
+
+  return value.bugs.every((bug) => {
+    if (!isStoredRecord(bug)) {
+      return false;
+    }
+
+    const { completedAt, createdAt, priority, stateName, stateType, teamKey } = bug;
+
+    return (
+      typeof createdAt === "string" &&
+      (completedAt === null || completedAt === undefined || typeof completedAt === "string") &&
+      (priority === undefined || typeof priority === "number") &&
+      (stateName === null || stateName === undefined || typeof stateName === "string") &&
+      (stateType === null || stateType === undefined || typeof stateType === "string") &&
+      (teamKey === null || teamKey === undefined || typeof teamKey === "string")
+    );
+  });
+}
 
 export function useMetrics() {
   const [metrics, setMetrics] = useState<MetricsSource | null>(null);
@@ -23,7 +63,12 @@ export function useMetrics() {
           throw new Error(`Failed to load metrics (${response.status})`);
         }
 
-        const nextMetrics = (await response.json()) as MetricsSource;
+        const nextMetrics: unknown = await response.json();
+
+        if (!isMetricsSource(nextMetrics)) {
+          throw new Error("Metrics payload has an unexpected shape");
+        }
+
         setMetrics(nextMetrics);
         setError("");
         return nextMetrics;

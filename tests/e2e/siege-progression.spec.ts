@@ -34,7 +34,6 @@ test.describe("siege progression QA", () => {
     await mockMetrics(page, progressionMetrics);
     await seedDashboardState(page, {
       gameConfig: getStaticSiegeGameConfig(),
-      showParticleCount: false,
     });
 
     await page.goto("./");
@@ -100,7 +99,6 @@ test.describe("siege progression QA", () => {
     await mockMetrics(page, progressionMetrics);
     await seedDashboardState(page, {
       gameConfig: getStaticSiegeGameConfig(),
-      showParticleCount: false,
     });
 
     await page.goto("./");

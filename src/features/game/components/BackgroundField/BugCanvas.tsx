@@ -92,7 +92,7 @@ export interface BugCanvasProps {
   sceneProfile: SceneProfile;
   sessionKey: string;
   siegeZones?: SiegeZoneRect[];
-  terminatorMode: boolean;
+  interactiveMode: boolean;
   onEntityDeath?: (
     x: number,
     y: number,
@@ -150,7 +150,7 @@ const BugCanvas = memo(function BugCanvas({
   sceneProfile,
   sessionKey,
   siegeZones = [],
-  terminatorMode,
+  interactiveMode,
   onEntityDeath,
   onStructureKill,
   onAgentAbsorb,
@@ -168,7 +168,7 @@ const BugCanvas = memo(function BugCanvas({
   const motionProfileRef = useRef(motionProfile);
   const sceneProfileRef = useRef(sceneProfile);
   const chartFocusRef = useRef(chartFocus);
-  const terminatorModeRef = useRef(terminatorMode);
+  const interactiveModeRef = useRef(interactiveMode);
   const combatStatsRef = useRef<SiegeCombatStats | null>(combatStats ?? null);
   const onHitRef = useRef(onHit);
   const onEntityDeathRef = useRef(onEntityDeath);
@@ -192,19 +192,6 @@ const BugCanvas = memo(function BugCanvas({
       onWeaponEvolutionStatesChangeRef.current?.(states);
     }
   }, []);
-
-  useEffect(() => {
-    terminatorModeRef.current = terminatorMode;
-  }, [terminatorMode]);
-  useEffect(() => {
-    onWeaponEvolutionStatesChangeRef.current = onWeaponEvolutionStatesChange;
-  }, [onWeaponEvolutionStatesChange]);
-  useEffect(() => {
-    getWeaponTierRef.current = getWeaponTier;
-  }, [getWeaponTier]);
-  useEffect(() => {
-    streakMultiplierRef.current = streakMultiplier;
-  }, [streakMultiplier]);
   const selectedWeaponIdRef = useRef<SiegeWeaponId>(selectedWeaponId);
   const lastFireTimeRef = useRef<Record<string, number>>({});
   const isFiringRef = useRef(false);
@@ -237,6 +224,55 @@ const BugCanvas = memo(function BugCanvas({
     () => JSON.stringify(gameConfig ?? {}),
     [gameConfig],
   );
+
+  useEffect(() => {
+    interactiveModeRef.current = interactiveMode;
+    onWeaponEvolutionStatesChangeRef.current = onWeaponEvolutionStatesChange;
+    getWeaponTierRef.current = getWeaponTier;
+    streakMultiplierRef.current = streakMultiplier;
+    motionProfileRef.current = motionProfile;
+    sceneProfileRef.current = sceneProfile;
+    chartFocusRef.current = chartFocus;
+    onHitRef.current = onHit;
+    onEntityDeathRef.current = onEntityDeath;
+    onStructureKillRef.current = onStructureKill;
+    onAgentAbsorbRef.current = onAgentAbsorb;
+    onTurretFireRef.current = onTurretFire;
+    onTeslaFireRef.current = onTeslaFire;
+    onWeaponFireRef.current = onWeaponFire;
+    placingStructureIdRef.current = placingStructureId;
+    onStructurePlaceRef.current = onStructurePlace;
+    selectedWeaponIdRef.current = selectedWeaponId;
+    combatStatsRef.current = combatStats ?? null;
+    reseedInfoRef.current = reseedInfo;
+    siegeZonesRef.current = siegeZones;
+    targetSettingsRef.current = {
+      sizeMultiplier: bugVisualSettings?.sizeMultiplier ?? 1,
+      speedMultiplier: getSpeedMultiplier(bugVisualSettings?.chaosMultiplier),
+    };
+  }, [
+    bugVisualSettings,
+    chartFocus,
+    combatStats,
+    getWeaponTier,
+    motionProfile,
+    onAgentAbsorb,
+    onEntityDeath,
+    onHit,
+    onStructureKill,
+    onStructurePlace,
+    onTeslaFire,
+    onTurretFire,
+    onWeaponEvolutionStatesChange,
+    onWeaponFire,
+    placingStructureId,
+    reseedInfo,
+    sceneProfile,
+    selectedWeaponId,
+    siegeZones,
+    streakMultiplier,
+    interactiveMode,
+  ]);
 
   const getLocalSiegeZones = useCallback(() => {
     const canvasBounds = canvasRef.current?.getBoundingClientRect();
@@ -409,7 +445,7 @@ const BugCanvas = memo(function BugCanvas({
       }
       engine.spawnFromCounts(
         bugCounts as any,
-        terminatorMode ? getLocalSiegeZones() : [],
+        interactiveMode ? getLocalSiegeZones() : [],
       );
       stabilizeQaEngine(engine, w, h);
       swarmRef.current = engine;
@@ -454,7 +490,7 @@ const BugCanvas = memo(function BugCanvas({
       }
       swarmRef.current = null;
     };
-    // Note: terminatorMode is intentionally excluded from this dep array.
+    // Note: interactiveMode is intentionally excluded from this dep array.
     // Removing it prevents the engine from being destroyed and recreated when
     // siege mode activates, giving a seamless visual transition.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -466,77 +502,6 @@ const BugCanvas = memo(function BugCanvas({
       bugs.map((b: any, i: number) => [i, getBugVariantMaxHp(b.variant)]),
     );
   }, [sessionKey]);
-
-  useEffect(() => {
-    motionProfileRef.current = motionProfile;
-  }, [motionProfile]);
-
-  useEffect(() => {
-    sceneProfileRef.current = sceneProfile;
-  }, [sceneProfile]);
-
-  useEffect(() => {
-    chartFocusRef.current = chartFocus;
-  }, [chartFocus]);
-
-  useEffect(() => {
-    onHitRef.current = onHit;
-  }, [onHit]);
-
-  useEffect(() => {
-    onEntityDeathRef.current = onEntityDeath;
-  }, [onEntityDeath]);
-
-  useEffect(() => {
-    onStructureKillRef.current = onStructureKill;
-  }, [onStructureKill]);
-
-  useEffect(() => {
-    onAgentAbsorbRef.current = onAgentAbsorb;
-  }, [onAgentAbsorb]);
-
-  useEffect(() => {
-    onTurretFireRef.current = onTurretFire;
-  }, [onTurretFire]);
-
-  useEffect(() => {
-    onTeslaFireRef.current = onTeslaFire;
-  }, [onTeslaFire]);
-
-  useEffect(() => {
-    onWeaponFireRef.current = onWeaponFire;
-  }, [onWeaponFire]);
-
-  useEffect(() => {
-    placingStructureIdRef.current = placingStructureId;
-  }, [placingStructureId]);
-
-  useEffect(() => {
-    onStructurePlaceRef.current = onStructurePlace;
-  }, [onStructurePlace]);
-
-  useEffect(() => {
-    selectedWeaponIdRef.current = selectedWeaponId;
-  }, [selectedWeaponId]);
-
-  useEffect(() => {
-    combatStatsRef.current = combatStats ?? null;
-  }, [combatStats]);
-
-  useEffect(() => {
-    reseedInfoRef.current = reseedInfo;
-  }, [reseedInfo]);
-
-  useEffect(() => {
-    siegeZonesRef.current = siegeZones;
-  }, [siegeZones]);
-
-  useEffect(() => {
-    targetSettingsRef.current = {
-      sizeMultiplier: bugVisualSettings?.sizeMultiplier ?? 1,
-      speedMultiplier: getSpeedMultiplier(bugVisualSettings?.chaosMultiplier),
-    };
-  }, [bugVisualSettings]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -816,7 +781,7 @@ const BugCanvas = memo(function BugCanvas({
     resizeObserver.observe(canvas);
 
     const handlePointerDown = (event: MouseEvent) => {
-      if (!terminatorModeRef.current) {
+      if (!interactiveModeRef.current) {
         return;
       }
 

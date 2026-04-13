@@ -29,6 +29,7 @@ function SettingsMenu({
       <MenuIconButton
         ariaLabel="Open settings"
         onClick={onMenuToggle}
+        open={open}
         tooltip="Deadline and workday assumptions for the pace math."
       >
         <svg

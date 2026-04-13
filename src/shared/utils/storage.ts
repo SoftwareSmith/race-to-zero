@@ -2,6 +2,7 @@ import type { StorageKey } from "../../constants/storageKeys";
 
 type StorageParser<T> = (rawValue: string) => T | null;
 type StorageSerializer<T> = (value: T) => string;
+type StorageValidator<T> = (value: unknown) => value is T;
 
 function isBrowserEnvironment() {
   return typeof window !== "undefined";
@@ -39,6 +40,30 @@ export function setStorageValue<T>(
 
 export function parseStoredString(rawValue: string) {
   return rawValue;
+}
+
+export function isStoredRecord(
+  value: unknown,
+): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+export function createStoredJsonParser<T>(
+  validator?: StorageValidator<T>,
+): StorageParser<T> {
+  return (rawValue: string) => {
+    try {
+      const parsedValue: unknown = JSON.parse(rawValue);
+
+      if (validator && !validator(parsedValue)) {
+        return null;
+      }
+
+      return parsedValue as T;
+    } catch {
+      return null;
+    }
+  };
 }
 
 export function parseStoredBoolean(rawValue: string) {

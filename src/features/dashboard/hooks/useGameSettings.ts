@@ -1,19 +1,31 @@
 import { useCallback, useMemo } from "react";
 import { STORAGE_KEYS } from "../../../constants/storageKeys";
-import { DEFAULT_GAME_CONFIG } from "@game/engine/types";
+import { DEFAULT_GAME_CONFIG, type GameConfig } from "@game/engine/types";
 import { useStoredState } from "../../../hooks/useStoredState";
 import {
+  createStoredJsonParser,
+  isStoredRecord,
   parseStoredBoolean,
   parseStoredPositiveNumber,
 } from "@shared/utils/storage";
 import type { BugVisualSettingKey } from "../../../types/dashboard";
 
+function isGameConfig(value: unknown): value is GameConfig {
+  if (!isStoredRecord(value)) {
+    return false;
+  }
+
+  return Object.entries(DEFAULT_GAME_CONFIG).every(([key, defaultValue]) => {
+    const candidateValue = value[key];
+    return (
+      typeof defaultValue === "number" &&
+      typeof candidateValue === "number" &&
+      Number.isFinite(candidateValue)
+    );
+  });
+}
+
 export function useGameSettings() {
-  const [showParticleCount, setShowParticleCount] = useStoredState(
-    STORAGE_KEYS.showParticleCount,
-    true,
-    { parse: parseStoredBoolean },
-  );
   const [bugSizeMultiplier, setBugSizeMultiplier] = useStoredState(
     STORAGE_KEYS.bugSizeMultiplier,
     2.5,
@@ -28,15 +40,9 @@ export function useGameSettings() {
     STORAGE_KEYS.gameConfig,
     DEFAULT_GAME_CONFIG,
     {
-      parse: (raw: string) => {
-        try {
-          return JSON.parse(raw) as typeof DEFAULT_GAME_CONFIG;
-        } catch {
-          return null;
-        }
-      },
-      serialize: (value: typeof DEFAULT_GAME_CONFIG) => JSON.stringify(value),
-    } as never,
+      parse: createStoredJsonParser(isGameConfig),
+      serialize: JSON.stringify,
+    },
   );
 
   const bugVisualSettings = useMemo(
@@ -49,8 +55,14 @@ export function useGameSettings() {
 
   const handleBugVisualSetting = useCallback(
     (settingKey: BugVisualSettingKey, value: number) => {
-      if (settingKey === "sizeMultiplier") setBugSizeMultiplier(value);
-      if (settingKey === "chaosMultiplier") setBugChaosMultiplier(value);
+      if (settingKey === "sizeMultiplier") {
+        setBugSizeMultiplier(value);
+        return;
+      }
+
+      if (settingKey === "chaosMultiplier") {
+        setBugChaosMultiplier(value);
+      }
     },
     [setBugChaosMultiplier, setBugSizeMultiplier],
   );
@@ -61,7 +73,5 @@ export function useGameSettings() {
     handleBugVisualSetting,
     setBugChaosMultiplier,
     setBugSizeMultiplier,
-    setShowParticleCount,
-    showParticleCount,
   };
 }
