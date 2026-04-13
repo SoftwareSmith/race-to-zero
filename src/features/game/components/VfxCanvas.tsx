@@ -105,6 +105,9 @@ const VfxCanvas = forwardRef<VfxEngine | null, Props>(function VfxCanvas(
         pointerEvents: "none",
         zIndex: 65,
         overflow: "hidden",
+        contain: "layout paint",
+        isolation: "isolate",
+        transform: "translateZ(0)",
       }}
     />
   );

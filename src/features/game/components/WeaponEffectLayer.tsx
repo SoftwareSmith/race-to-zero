@@ -24,11 +24,15 @@ export default function WeaponEffectLayer({ effects }: WeaponEffectLayerProps) {
   if (effects.length === 0) return null;
 
   const layer: ReactNode = (
-    <>
+    <div
+      aria-hidden="true"
+      className="pointer-events-none fixed inset-0 z-[68] [contain:layout_paint] [isolation:isolate]"
+      style={{ transform: "translateZ(0)" }}
+    >
       {effects.map(
         (effect) => getOverlayRenderer(effect.weapon)?.(effect) ?? null,
       )}
-    </>
+    </div>
   );
 
   if (typeof document === "undefined") return layer;

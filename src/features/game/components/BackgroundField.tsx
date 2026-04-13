@@ -212,7 +212,6 @@ function getSplatClassName(variant: BugVariant) {
 
 interface BugCanvasProps {
   bugVisualSettings: BugVisualSettings;
-  bugCountsKey: string;
   chartFocus: ChartFocusState | null;
   combatStats?: SiegeCombatStats | null;
   motionProfile: MotionProfile;
@@ -291,7 +290,6 @@ interface BugCanvasProps {
 
 const BugCanvas = memo(function BugCanvas({
   bugVisualSettings,
-  bugCountsKey,
   chartFocus,
   combatStats,
   motionProfile,
@@ -335,10 +333,12 @@ const BugCanvas = memo(function BugCanvas({
   const onWeaponEvolutionStatesChangeRef = useRef(
     onWeaponEvolutionStatesChange,
   );
+  const getWeaponTierRef = useRef(getWeaponTier);
   const vfxRef = useRef<VfxEngine | null>(null);
   const blackHoleVfxIdRef = useRef<string | null>(null);
   const placingStructureIdRef = useRef(placingStructureId);
   const onStructurePlaceRef = useRef(onStructurePlace);
+  const streakMultiplierRef = useRef(streakMultiplier);
   const syncWeaponEvolutionStates = useCallback(() => {
     const states = swarmRef.current?.getWeaponEvolutionStates?.();
     if (states) {
@@ -348,16 +348,16 @@ const BugCanvas = memo(function BugCanvas({
 
   useEffect(() => {
     terminatorModeRef.current = terminatorMode;
-  }, [
-    hammerPositionRef,
-    terminatorMode,
-    getWeaponTier,
-    streakMultiplier,
-    syncWeaponEvolutionStates,
-  ]);
+  }, [terminatorMode]);
   useEffect(() => {
     onWeaponEvolutionStatesChangeRef.current = onWeaponEvolutionStatesChange;
   }, [onWeaponEvolutionStatesChange]);
+  useEffect(() => {
+    getWeaponTierRef.current = getWeaponTier;
+  }, [getWeaponTier]);
+  useEffect(() => {
+    streakMultiplierRef.current = streakMultiplier;
+  }, [streakMultiplier]);
   const selectedWeaponIdRef = useRef<SiegeWeaponId>(selectedWeaponId);
   const lastFireTimeRef = useRef<Record<string, number>>({});
   const isFiringRef = useRef(false);
@@ -407,7 +407,9 @@ const BugCanvas = memo(function BugCanvas({
   }, []);
 
   useEffect(() => {
-    // when incoming counts change, recreate swarm to match new counts
+    // Recreate the engine only when the logical session changes.
+    // In interactive play, live bug counts can change on every kill and must
+    // not rebuild the entire swarm or the canvas will visibly flicker.
     const canvas = canvasRef.current;
     const w = canvas?.clientWidth || boundsRef.current.width || 800;
     const h = canvas?.clientHeight || boundsRef.current.height || 600;
@@ -609,7 +611,7 @@ const BugCanvas = memo(function BugCanvas({
     // Removing it prevents the engine from being destroyed and recreated when
     // siege mode activates, giving a seamless visual transition.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [bugCountsKey, gameConfigKey, getLocalSiegeZones]);
+  }, [sessionKey, gameConfigKey, getLocalSiegeZones]);
 
   useEffect(() => {
     const bugs = (swarmRef.current?.getAllBugs() ?? []) as Array<any>;
@@ -1284,13 +1286,13 @@ const BugCanvas = memo(function BugCanvas({
               bounds: _b,
               now: performance.now(),
               engine: swarmRef.current as unknown as WeaponContext["engine"],
-              tier: getWeaponTier(holdWeaponId),
+              tier: getWeaponTierRef.current(holdWeaponId),
               weaponId: holdWeaponId,
             };
             const eCtx: ExecutionContext = {
               engine: swarmRef.current as unknown as ExecutionContext["engine"],
               vfx: vfxRef.current,
-              damageMultiplier: streakMultiplier,
+              damageMultiplier: streakMultiplierRef.current,
               canvas: canvasRef.current,
               bounds: _b,
               viewportX: _vx,
@@ -1495,13 +1497,13 @@ const BugCanvas = memo(function BugCanvas({
           bounds,
           now: performance.now(),
           engine: engine as unknown as WeaponContext["engine"],
-          tier: getWeaponTier(weaponId),
+          tier: getWeaponTierRef.current(weaponId),
           weaponId,
         };
         const _np_eCtx: ExecutionContext = {
           engine: engine as unknown as ExecutionContext["engine"],
           vfx: vfxRef.current,
-          damageMultiplier: streakMultiplier,
+          damageMultiplier: streakMultiplierRef.current,
           canvas: canvasRef.current,
           bounds,
           viewportX: fireX,
@@ -2366,13 +2368,7 @@ const BugCanvas = memo(function BugCanvas({
         window.cancelAnimationFrame(animationFrameId);
       }
     };
-  }, [
-    hammerPositionRef,
-    terminatorMode,
-    getWeaponTier,
-    streakMultiplier,
-    syncWeaponEvolutionStates,
-  ]);
+  }, [hammerPositionRef, syncWeaponEvolutionStates]);
 
   return (
     <>
@@ -2380,6 +2376,11 @@ const BugCanvas = memo(function BugCanvas({
         ref={canvasRef}
         className="absolute inset-0 h-full w-full opacity-96"
         aria-hidden="true"
+        style={{
+          backfaceVisibility: "hidden",
+          contain: "layout paint",
+          transform: "translateZ(0)",
+        }}
       />
       <VfxCanvas ref={vfxRef} />
       {reseedInfo ? (
@@ -2875,7 +2876,6 @@ const BackgroundField = memo(function BackgroundField({
       ) : null}
       <BugCanvas
         bugVisualSettings={bugVisualSettings}
-        bugCountsKey={bugCountsKey}
         chartFocus={chartFocus}
         combatStats={combatStats}
         motionProfile={motionProfile}
