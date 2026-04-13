@@ -4,16 +4,16 @@
  */
 export type { WeaponDef, HitPattern } from "./types";
 
-import hammer from "./hammer";
-import bugSpray from "./bugSpray";
-import freezeCone from "./freezeCone";
-import chainZap from "./chainZap";
-import flamethrower from "./flamethrower";
-import tracerBloom from "./tracerBloom";
-import staticNet from "./staticNet";
-import nullPointer from "./nullPointer";
-import forkBomb from "./forkBomb";
-import voidPulse from "./voidPulse";
+import { def as hammer }      from "./hammer/constants";
+import { def as bugSpray }    from "./bug-spray/constants";
+import { def as freezeCone }  from "./freeze-cone/constants";
+import { def as chainZap }    from "./chain-zap/constants";
+import { def as flamethrower} from "./flame/constants";
+import { def as tracerBloom } from "./tracer-bloom/constants";
+import { def as staticNet }   from "./static-net/constants";
+import { def as nullPointer } from "./null-pointer/constants";
+import { def as forkBomb }    from "./fork-bomb/constants";
+import { def as voidPulse }   from "./void-pulse/constants";
 
 export const WEAPON_REGISTRY = [
   hammer,

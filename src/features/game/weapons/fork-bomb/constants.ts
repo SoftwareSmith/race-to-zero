@@ -1,8 +1,23 @@
-import type { WeaponDef } from "./types";
+/**
+ * Fork Bomb — single source of truth.
+ */
 
-/** Fork Bomb — clustered duplicate detonations around the click point. */
-const forkBomb: WeaponDef = {
-  id: "plasma",
+import { WeaponId } from "@game/types";
+import type { WeaponDef } from "@game/weapons/types";
+
+export const ID = WeaponId.ForkBomb;
+
+export const EVOLVE_THRESHOLDS: [number, number] = [20, 60];
+
+export const CURSOR = {
+  accent: "#38bdf8",
+  aura: "0 0 26px rgba(56,189,248,0.35)",
+  size: 52,
+  showCrosshair: false,
+} as const;
+
+export const def: WeaponDef = {
+  id: ID,
   title: "Fork Bomb",
   typeLabel: "Plasma",
   typeHint: "Breaks dense bug packs with overlapping explosive bursts.",
@@ -13,9 +28,10 @@ const forkBomb: WeaponDef = {
   hitPattern: "area",
   hitRadius: 48,
   damage: 2,
-  effectColor: "#60a5fa",
+  effectColor: CURSOR.accent,
   cooldownMs: 1100,
   inputMode: "click",
+  evolveThresholds: EVOLVE_THRESHOLDS,
   hint: "Click into a dense pocket of bugs — the blast forks into 5 clustered detonations",
   tierTitles: ["Fork Bomb", "Process Storm", "Recursive Crash"],
   tierDetails: [
@@ -29,5 +45,3 @@ const forkBomb: WeaponDef = {
     "T3: Recursive cascade — expanding rings of AoE explosions",
   ],
 };
-
-export default forkBomb;

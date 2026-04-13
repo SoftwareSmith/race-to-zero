@@ -26,8 +26,13 @@ import { triggerNamedShake } from "@game/utils/screenShake";
 
 function AppContent() {
   const dashboard = useDashboardContext();
-  const { evolutionStates, onEvolution, syncFromEngine, getWeaponTier } =
-    useWeaponEvolution();
+  const {
+    evolutionStates,
+    onEvolution,
+    syncFromEngine,
+    getWeaponTier,
+    resetEvolution,
+  } = useWeaponEvolution();
   const siegeGame = useSiegeGame({
     currentBugCount: dashboard.currentBugCount,
     currentBugCounts: dashboard.currentBugCounts,
@@ -64,8 +69,9 @@ function AppContent() {
   const handleEnterInteractiveMode = useCallback(() => {
     dashboard.closeMenus();
     dashboard.setChartFocus(null);
+    resetEvolution();
     siegeGame.enterInteractiveMode();
-  }, [dashboard, siegeGame]);
+  }, [dashboard, resetEvolution, siegeGame]);
 
   const handleExitInteractiveMode = useCallback(() => {
     dashboard.closeMenus();
@@ -149,14 +155,65 @@ function AppContent() {
         <div className="pointer-events-none fixed inset-0 z-[100] [animation:siege-flash_700ms_ease-out_forwards]" />
       ) : null}
 
-      {/* Evolution toast: fires briefly when a weapon upgrades tier */}
-      {evolutionToast && siegeGame.interactiveMode ? (
-        <div
-          aria-live="polite"
-          className="pointer-events-none fixed bottom-10 left-1/2 z-[150] -translate-x-1/2 [animation:evolve-toast_3.5s_ease-out_forwards]"
-        >
-          <div className="rounded-2xl border border-amber-300/30 bg-zinc-950/90 px-5 py-2.5 text-sm font-semibold text-amber-200 shadow-[0_0_24px_rgba(251,191,36,0.2)] backdrop-blur-md">
-            ⚡ {evolutionToast}
+      {siegeGame.interactiveMode ? (
+        <div className="pointer-events-none fixed inset-x-0 top-4 z-[160] flex justify-center px-3">
+          <div className="flex w-full max-w-[34rem] flex-col items-center gap-2">
+            {evolutionToast ? (
+              <div
+                aria-live="polite"
+                className="rounded-2xl border border-amber-300/30 bg-zinc-950/92 px-5 py-2.5 text-sm font-semibold text-amber-200 shadow-[0_0_24px_rgba(251,191,36,0.2)] backdrop-blur-md"
+              >
+                {evolutionToast}
+              </div>
+            ) : null}
+
+            {(siegeGame.killStreak >= 3 || siegeGame.nextWeaponUnlock) && (
+              <div className="w-full rounded-[20px] border border-white/10 bg-zinc-950/88 px-3 py-2.5 shadow-[0_16px_32px_rgba(0,0,0,0.28)] backdrop-blur-xl">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2">
+                    {siegeGame.killStreak >= 3 ? (
+                      <div className="rounded-full border border-amber-300/24 bg-amber-400/12 px-3 py-1 text-[0.65rem] font-semibold uppercase tracking-[0.18em] text-amber-100">
+                        {`XP x${siegeGame.streakMultiplier.toFixed(1)}`}
+                      </div>
+                    ) : null}
+                    {siegeGame.killStreak >= 10 ? (
+                      <div className="rounded-full border border-amber-300/24 bg-amber-500/14 px-3 py-1 text-[0.65rem] font-black uppercase tracking-[0.22em] text-amber-100">
+                        On Fire
+                      </div>
+                    ) : null}
+                  </div>
+
+                  {siegeGame.nextWeaponUnlock ? (
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center justify-between gap-3 text-[0.62rem] font-semibold uppercase tracking-[0.16em] text-stone-400">
+                        <span className="truncate">{`Next Weapon: ${siegeGame.nextWeaponUnlock.weaponTitle}`}</span>
+                        <span>{`${siegeGame.nextWeaponUnlock.current}/${siegeGame.nextWeaponUnlock.unlockKills}`}</span>
+                      </div>
+                      <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-white/6">
+                        <div
+                          className={cn(
+                            "h-full rounded-full bg-[linear-gradient(90deg,rgba(56,189,248,0.95),rgba(251,191,36,0.92))] transition-[width] duration-300",
+                            siegeGame.nextWeaponUnlock.current /
+                              siegeGame.nextWeaponUnlock.unlockKills >=
+                              0.8
+                              ? "animate-pulse"
+                              : undefined,
+                          )}
+                          style={{
+                            width: `${Math.min(
+                              100,
+                              (siegeGame.nextWeaponUnlock.current /
+                                siegeGame.nextWeaponUnlock.unlockKills) *
+                                100,
+                            )}%`,
+                          }}
+                        />
+                      </div>
+                    </div>
+                  ) : null}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       ) : null}
@@ -200,7 +257,6 @@ function AppContent() {
                 interactiveKills={siegeGame.interactiveKills}
                 interactivePoints={siegeGame.interactivePoints}
                 interactiveRemainingBugs={siegeGame.interactiveRemainingBugs}
-                killStreak={siegeGame.killStreak}
                 onArmStructure={siegeGame.armStructure}
                 onExit={handleExitInteractiveMode}
                 onSelectWeapon={siegeGame.selectWeapon}
@@ -210,8 +266,6 @@ function AppContent() {
                 selectedWeaponId={siegeGame.selectedWeaponId}
                 lastFireTimes={siegeGame.lastFireTimes}
                 justEvolvedWeaponId={justEvolvedWeaponId}
-                nextWeaponUnlock={siegeGame.nextWeaponUnlock}
-                streakMultiplier={siegeGame.streakMultiplier}
                 unlockedStructures={siegeGame.combatStats.unlockedStructures}
                 weaponSnapshots={siegeGame.weaponSnapshots}
               />

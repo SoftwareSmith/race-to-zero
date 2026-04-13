@@ -2,14 +2,14 @@
  * Flamethrower — self-registering plugin entry point.
  */
 
-import flamethrowerDef from "../flamethrower";
+import { def } from "./constants";
 import { register } from "@game/weapons/runtime/registry";
 import type { WeaponEntry, WeaponContext, FireSession } from "@game/weapons/runtime/types";
 import { createSession } from "./behavior";
 
 const entry: WeaponEntry = {
-  weaponId: "flame",
-  config: flamethrowerDef,
+  weaponId: def.id,
+  config: def,
   createSession(_ctx: WeaponContext): FireSession {
     return createSession();
   },

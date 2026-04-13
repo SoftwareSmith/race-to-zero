@@ -1,6 +1,4 @@
-import { useCallback } from "react";
-import { useStoredState } from "../../../hooks/useStoredState";
-import { STORAGE_KEYS } from "../../../constants/storageKeys";
+import { useCallback, useState } from "react";
 import type { SiegeWeaponId, WeaponTier, WeaponEvolutionState } from "@game/types";
 import type { WeaponDef } from "@game/weapons/types";
 import { WEAPON_EVOLVE_THRESHOLDS } from "@config/gameDefaults";
@@ -12,36 +10,13 @@ const ALL_IDS: SiegeWeaponId[] = [
   "laser", "shockwave", "nullpointer", "plasma", "void",
 ];
 
-function parseEvolutionStates(raw: string): EvolutionStatesRecord | null {
-  try {
-    const parsed = JSON.parse(raw);
-    if (typeof parsed !== "object" || parsed === null) return null;
-    const result: EvolutionStatesRecord = {};
-    for (const id of ALL_IDS) {
-      const entry = parsed[id];
-      if (entry && typeof entry.tier === "number" && typeof entry.kills === "number") {
-        result[id] = { tier: entry.tier as WeaponTier, kills: entry.kills };
-      }
-    }
-    return result;
-  } catch {
-    return null;
-  }
-}
-
-function serializeEvolutionStates(value: EvolutionStatesRecord): string {
-  return JSON.stringify(value);
-}
-
 const DEFAULT_STATES: EvolutionStatesRecord = Object.fromEntries(
   ALL_IDS.map((id) => [id, { tier: 1 as WeaponTier, kills: 0 }]),
 ) as EvolutionStatesRecord;
 
 export function useWeaponEvolution() {
-  const [evolutionStates, setEvolutionStates] = useStoredState<EvolutionStatesRecord>(
-    STORAGE_KEYS.weaponEvolutionStates,
+  const [evolutionStates, setEvolutionStates] = useState<EvolutionStatesRecord>(
     DEFAULT_STATES,
-    { parse: parseEvolutionStates, serialize: serializeEvolutionStates },
   );
 
   /** Called by the Engine's onWeaponEvolution callback — syncs localStorage. */

@@ -1,4 +1,5 @@
 import type { SiegeWeaponId } from "@game/types";
+import { evolveThresholds } from "@game/weapons/handlers";
 
 /**
  * Default game-engine simulation parameters.
@@ -52,15 +53,4 @@ export const DEFAULT_GAME_CONFIG: GameConfig = {
  * Per-weapon kill thresholds for tier evolution.
  * [killsForT2, killsForT3] — tune these to adjust pacing.
  */
-export const WEAPON_EVOLVE_THRESHOLDS: Record<SiegeWeaponId, [number, number]> = {
-  hammer:       [20, 60],
-  zapper:       [25, 70],
-  freeze:       [20, 60],
-  chain:        [25, 75],
-  flame:        [25, 75],
-  laser:        [20, 60],
-  shockwave:    [15, 50],
-  nullpointer:  [20, 60],
-  plasma:       [20, 60],
-  void:         [15, 50],
-};
+export const WEAPON_EVOLVE_THRESHOLDS: Record<SiegeWeaponId, [number, number]> = evolveThresholds;

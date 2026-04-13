@@ -78,6 +78,21 @@ describe("engine death attribution", () => {
     );
   });
 
+  it("credits poison DOT kills to the weapon that applied them", () => {
+    const engine = new Engine(createCanvas(), {
+      height: 200,
+      width: 200,
+    });
+    const bug = new BugEntity({ size: 10, variant: "low", x: 100, y: 100 });
+
+    bug.hp = 1;
+    bug.applyPoison(120, 1000, "zapper");
+    engine.entities = [bug];
+    advanceUntilRemoved(engine);
+
+    expect(engine.getWeaponEvolutionStates().get("zapper")?.kills).toBe(1);
+  });
+
   it("reports delayed burn kills as uncredited so the UI can count them", () => {
     const onEntityDeath = vi.fn();
     const engine = new Engine(createCanvas(), {
@@ -114,5 +129,21 @@ describe("engine death attribution", () => {
 
     expect(nearBug.burn?.dps ?? 0).toBeGreaterThan(edgeBug.burn?.dps ?? 0);
     expect(edgeBug.burn?.dps ?? 0).toBeGreaterThan(0);
+  });
+
+  it("credits black hole kills to the void weapon", () => {
+    const engine = new Engine(createCanvas(), {
+      height: 200,
+      width: 200,
+    });
+    const bug = new BugEntity({ size: 10, variant: "high", x: 110, y: 100 });
+
+    bug.hp = 1;
+    engine.entities = [bug];
+    engine.startBlackHole(100, 100, 80, 24, 1000, 1, "void");
+    engine.tickBlackHole(16, vi.fn());
+    advanceUntilRemoved(engine);
+
+    expect(engine.getWeaponEvolutionStates().get("void")?.kills).toBe(1);
   });
 });

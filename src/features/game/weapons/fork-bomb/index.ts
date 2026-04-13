@@ -2,14 +2,14 @@
  * Fork Bomb — self-registering plugin entry point.
  */
 
-import forkBombDef from "../forkBomb";
+import { def } from "./constants";
 import { register } from "@game/weapons/runtime/registry";
 import type { WeaponEntry, WeaponContext, FireSession } from "@game/weapons/runtime/types";
 import { createSession } from "./behavior";
 
 const entry: WeaponEntry = {
-  weaponId: "plasma",
-  config: forkBombDef,
+  weaponId: def.id,
+  config: def,
   createSession(ctx: WeaponContext): FireSession {
     return createSession(ctx);
   },

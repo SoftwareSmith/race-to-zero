@@ -7,6 +7,7 @@ import type React from "react";
 import { WEAPON_DEFS } from "@config/weaponConfig";
 import type { SiegeWeaponId, StructureId } from "@game/types";
 import WeaponGlyph from "@shared/components/icons/WeaponGlyph";
+import { cursorHandlers } from "@game/weapons/handlers";
 
 interface WeaponCursorProps {
   hideSystemCursor?: boolean;
@@ -16,62 +17,8 @@ interface WeaponCursorProps {
   swinging?: boolean;
 }
 
-const CURSOR_THEME: Record<
-  SiegeWeaponId,
-  { accent: string; aura: string; ringClassName?: string; size: number }
-> = {
-  hammer: {
-    accent: "#fbbf24",
-    aura: "0 0 22px rgba(251,191,36,0.32)",
-    size: 48,
-  },
-  zapper: {
-    accent: "#fde047",
-    aura: "0 0 22px rgba(253,224,71,0.3)",
-    size: 48,
-  },
-  freeze: {
-    accent: "#bfdbfe",
-    aura: "0 0 22px rgba(191,219,254,0.32)",
-    size: 50,
-  },
-  chain: {
-    accent: "#6ee7b7",
-    aura: "0 0 24px rgba(110,231,183,0.28)",
-    ringClassName: "[animation:laser-cursor-breathe_2s_ease-in-out_infinite]",
-    size: 48,
-  },
-  flame: {
-    accent: "#f97316",
-    aura: "0 0 24px rgba(249,115,22,0.35)",
-    size: 50,
-  },
-  laser: {
-    accent: "#f87171",
-    aura: "0 0 24px rgba(248,113,113,0.28)",
-    size: 48,
-  },
-  shockwave: {
-    accent: "#a78bfa",
-    aura: "0 0 26px rgba(167,139,250,0.3)",
-    size: 54,
-  },
-  nullpointer: {
-    accent: "#fb7185",
-    aura: "0 0 26px rgba(251,113,133,0.3)",
-    size: 54,
-  },
-  plasma: {
-    accent: "#38bdf8",
-    aura: "0 0 26px rgba(56,189,248,0.35)",
-    size: 52,
-  },
-  void: {
-    accent: "#c084fc",
-    aura: "0 0 30px rgba(192,132,252,0.4)",
-    size: 56,
-  },
-};
+// Per-weapon cursor config now lives in each weapon's constants.ts.
+// cursorHandlers assembles them into a single lookup map.
 
 function CursorReticle({
   lastFiredAt,
@@ -145,7 +92,7 @@ function CursorReticle({
     );
   }
 
-  const theme = CURSOR_THEME[weaponId];
+  const theme = cursorHandlers[weaponId];
   const cooldownMs =
     WEAPON_DEFS.find((weapon) => weapon.id === weaponId)?.cooldownMs ?? 0;
   const size = theme.size;
@@ -153,7 +100,7 @@ function CursorReticle({
   const inner = Math.round(size * 0.42);
   const showOuterRing = !!theme.ringClassName;
   const showInnerRing = weaponId !== "hammer";
-  const showCrosshair = weaponId === "laser" || weaponId === "nullpointer";
+  const showCrosshair = theme.showCrosshair;
 
   return (
     <div

@@ -4,14 +4,14 @@
  */
 
 // Relative import avoids ambiguity between this folder and the legacy hammer.ts
-import hammerDef from "../hammer";
+import { def } from "./constants";
 import { register } from "@game/weapons/runtime/registry";
 import type { WeaponEntry, WeaponContext, FireSession } from "@game/weapons/runtime/types";
 import { createSession } from "./behavior";
 
 const entry: WeaponEntry = {
-  weaponId: "hammer",
-  config: hammerDef,
+  weaponId: def.id,
+  config: def,
   createSession(ctx: WeaponContext): FireSession {
     return createSession(ctx);
   },

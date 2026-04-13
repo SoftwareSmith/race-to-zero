@@ -94,7 +94,7 @@ export function executeCommands(
         }
         const bug = ctx.engine.getAllBugs()[cmd.targetIndex] as any;
         if (bug && typeof bug.applyPoison === "function") {
-          bug.applyPoison(cmd.dps, cmd.durationMs);
+          bug.applyPoison(cmd.dps, cmd.durationMs, ctx.weaponId);
           (ctx.vfx as any)?.spawnStatusApply?.(
             Math.round(bug.x + ctx.bounds.left),
             Math.round(bug.y + ctx.bounds.top),
@@ -110,7 +110,7 @@ export function executeCommands(
         }
         const bug = ctx.engine.getAllBugs()[cmd.targetIndex] as any;
         if (bug && typeof bug.applyBurn === "function") {
-          bug.applyBurn(cmd.dps, cmd.durationMs, cmd.decayPerSecond);
+          bug.applyBurn(cmd.dps, cmd.durationMs, cmd.decayPerSecond, ctx.weaponId);
           (ctx.vfx as any)?.spawnStatusApply?.(
             Math.round(bug.x + ctx.bounds.left),
             Math.round(bug.y + ctx.bounds.top),
@@ -213,6 +213,7 @@ export function executeCommands(
           cmd.coreRadius,
           cmd.durationMs,
           cmd.collapseDamage,
+          ctx.weaponId,
         );
         if (started) {
           void started;
@@ -256,7 +257,7 @@ export function executeCommands(
       case "applyLooped": {
         const bug = ctx.engine.getAllBugs()[cmd.targetIndex] as any;
         if (bug && typeof bug.applyLooped === "function") {
-          bug.applyLooped(cmd.dps, cmd.durationMs);
+          bug.applyLooped(cmd.dps, cmd.durationMs, ctx.weaponId);
         }
         break;
       }
@@ -276,7 +277,12 @@ export function executeCommands(
 
       // ── evolution-era world-state commands ──────────────────────────────
       case "propagateChargedNetwork":
-        ctx.engine.propagateChargedNetwork(cmd.sourceIndex, cmd.damage, cmd.falloff);
+        ctx.engine.propagateChargedNetwork(
+          cmd.sourceIndex,
+          cmd.damage,
+          cmd.falloff,
+          ctx.weaponId,
+        );
         break;
 
       case "applyGlobalSlow":
@@ -296,15 +302,26 @@ export function executeCommands(
         break;
 
       case "startEventHorizon":
-        ctx.engine.startEventHorizon(cmd.x, cmd.y, cmd.radius, cmd.durationMs);
+        ctx.engine.startEventHorizon(
+          cmd.x,
+          cmd.y,
+          cmd.radius,
+          cmd.durationMs,
+          ctx.weaponId,
+        );
         break;
 
       case "triggerKernelPanic":
-        ctx.engine.triggerKernelPanicExplosion(cmd.targetIndex, cmd.splashRadius, cmd.damage);
+        ctx.engine.triggerKernelPanicExplosion(
+          cmd.targetIndex,
+          cmd.splashRadius,
+          cmd.damage,
+          ctx.weaponId,
+        );
         break;
 
       case "autoScalerPulse":
-        ctx.engine.triggerAutoScalerPulse(cmd.hpThreshold);
+        ctx.engine.triggerAutoScalerPulse(cmd.hpThreshold, ctx.weaponId);
         break;
 
       // ── visual effects ────────────────────────────────────────────────────

@@ -1,7 +1,23 @@
-import type { WeaponDef } from "./types";
+/**
+ * Flamethrower — single source of truth.
+ */
 
-const flamethrower: WeaponDef = {
-  id: "flame",
+import { WeaponId } from "@game/types";
+import type { WeaponDef } from "@game/weapons/types";
+
+export const ID = WeaponId.Flame;
+
+export const EVOLVE_THRESHOLDS: [number, number] = [25, 75];
+
+export const CURSOR = {
+  accent: "#f97316",
+  aura: "0 0 24px rgba(249,115,22,0.35)",
+  size: 50,
+  showCrosshair: false,
+} as const;
+
+export const def: WeaponDef = {
+  id: ID,
   title: "Flamethrower",
   typeLabel: "Thermal",
   typeHint: "Ignites flammable bugs and turns clustered lanes into panic zones.",
@@ -17,9 +33,10 @@ const flamethrower: WeaponDef = {
   burnDps: 6,
   burnDurationMs: 1200,
   burnDecayPerSecond: 3.2,
-  effectColor: "#f97316",
+  effectColor: CURSOR.accent,
   cooldownMs: 200,
   inputMode: "hold",
+  evolveThresholds: EVOLVE_THRESHOLDS,
   hint: "Hold to spray — move to paint a flamethrower trail; ground patch burns trespassers",
   tierTitles: ["Stack Overflow", "Memory Leak", "Kernel Panic"],
   tierDetails: [
@@ -33,5 +50,3 @@ const flamethrower: WeaponDef = {
     "T3: Burning bugs detonate — chain their position toward other bugs",
   ],
 };
-
-export default flamethrower;

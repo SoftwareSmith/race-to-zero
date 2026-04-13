@@ -140,7 +140,13 @@ export class Engine {
   /** Active deadlock cluster pulls: each entry pulls bugs toward (cx,cy) until expiresAt. */
   private deadlockClusters: Array<{ cx: number; cy: number; radius: number; expiresAt: number }> = [];
   /** Active event horizons: consume unstable bugs on contact. */
-  private eventHorizons: Array<{ x: number; y: number; radius: number; expiresAt: number }> = [];
+  private eventHorizons: Array<{
+    x: number;
+    y: number;
+    radius: number;
+    expiresAt: number;
+    weaponId?: SiegeWeaponId;
+  }> = [];
 
   /**
    * Black hole state for Void Pulse.
@@ -155,6 +161,7 @@ export class Engine {
     startedAt: number;
     durationMs: number;
     active: boolean;
+    weaponId?: SiegeWeaponId;
   } | null = null;
 
   constructor(canvas: HTMLCanvasElement, opts: EngineOptions) {
@@ -735,7 +742,7 @@ export class Engine {
           const matchup = getBugWeaponMatchup(bug.variant as BugVariant, weaponId);
           if (matchup === "immune") continue;
         }
-        if (typeof bug.applyPoison === "function") bug.applyPoison(dps, durationMs);
+        if (typeof bug.applyPoison === "function") bug.applyPoison(dps, durationMs, weaponId);
       }
     }
   }
@@ -761,7 +768,7 @@ export class Engine {
       const normalized = dist / Math.max(1, radius);
       const intensity = 0.2 + 0.8 * Math.exp(-3.2 * normalized * normalized);
       if (typeof bug.applyBurn === "function") {
-        bug.applyBurn(peakDps * intensity, durationMs, decayPerSecond);
+        bug.applyBurn(peakDps * intensity, durationMs, decayPerSecond, weaponId);
       }
     }
   }
@@ -787,6 +794,7 @@ export class Engine {
     x: number, y: number,
     radius: number, coreRadius: number,
     durationMs: number, collapseDamage: number,
+    weaponId?: SiegeWeaponId,
   ): boolean {
     if (this.blackHole?.active) return false;
     this.blackHole = {
@@ -795,6 +803,7 @@ export class Engine {
       startedAt: this.elapsedMs,
       durationMs,
       active: true,
+      weaponId,
     };
     return true;
   }
@@ -807,7 +816,7 @@ export class Engine {
   tickBlackHole(dtMs: number, onCollapse: (x: number, y: number, radius: number) => void): void {
     if (!this.blackHole?.active) return;
     const age = this.elapsedMs - this.blackHole.startedAt;
-    const { x, y, radius, coreRadius, collapseDamage, durationMs } = this.blackHole;
+    const { x, y, radius, coreRadius, collapseDamage, durationMs, weaponId } = this.blackHole;
 
     // Gravity pull towards core
     for (let index = 0; index < this.entities.length; index++) {
@@ -822,14 +831,14 @@ export class Engine {
       bug.y += (dy / dist) * pull;
       // Core contact: instant kill tick
       if (dist <= coreRadius) {
-        this.handleHit(index, bug.maxHp ?? 99);
+        this.handleHit(index, bug.maxHp ?? 99, false, weaponId);
       }
     }
 
     // Collapse when time expires
     if (age >= durationMs) {
       const hits = this.radiusHitTest(x, y, radius);
-      for (const idx of hits) this.handleHit(idx, collapseDamage);
+      for (const idx of hits) this.handleHit(idx, collapseDamage, false, weaponId);
       onCollapse(x, y, radius);
       this.blackHole = null;
     }
@@ -916,7 +925,12 @@ export class Engine {
   }
 
   /** Hits all charged bugs with decaying damage (hop falloff per charged bug encountered). */
-  propagateChargedNetwork(sourceIndex: number, damage: number, falloff: number): void {
+  propagateChargedNetwork(
+    sourceIndex: number,
+    damage: number,
+    falloff: number,
+    weaponId?: SiegeWeaponId,
+  ): void {
     let currentDmg = damage;
     for (const e of this.entities) {
       const bug = e as any;
@@ -930,6 +944,7 @@ export class Engine {
           bug.vx = 0;
           bug.vy = 0;
           bug.deathCredited = false;
+          if (weaponId) bug.dotSourceWeaponId = weaponId;
         }
         currentDmg *= falloff;
       }
@@ -982,12 +997,29 @@ export class Engine {
   }
 
   /** Leave a persistent trap zone that instantly kills unstable bugs on contact. */
-  startEventHorizon(x: number, y: number, radius: number, durationMs: number): void {
-    this.eventHorizons.push({ x, y, radius, expiresAt: this.elapsedMs + durationMs });
+  startEventHorizon(
+    x: number,
+    y: number,
+    radius: number,
+    durationMs: number,
+    weaponId?: SiegeWeaponId,
+  ): void {
+    this.eventHorizons.push({
+      x,
+      y,
+      radius,
+      expiresAt: this.elapsedMs + durationMs,
+      weaponId,
+    });
   }
 
   /** AoE explosion centered on a burning bug — called by T3 Kernel Panic behavior. */
-  triggerKernelPanicExplosion(index: number, splashRadius: number, damage: number): void {
+  triggerKernelPanicExplosion(
+    index: number,
+    splashRadius: number,
+    damage: number,
+    weaponId?: SiegeWeaponId,
+  ): void {
     const src = this.entities[index] as any;
     if (!src) return;
     const { x, y } = src;
@@ -996,13 +1028,13 @@ export class Engine {
       const e = this.entities[i] as any;
       if (e.state === "dead" || e.state === "dying") continue;
       if (Math.hypot(e.x - x, e.y - y) <= splashRadius) {
-        this.handleHit(i, damage);
+        this.handleHit(i, damage, false, weaponId);
       }
     }
   }
 
   /** Kill all marked bugs below the given HP threshold globally. */
-  triggerAutoScalerPulse(hpThreshold: number): void {
+  triggerAutoScalerPulse(hpThreshold: number, weaponId?: SiegeWeaponId): void {
     for (const e of this.entities) {
       const bug = e as any;
       if (bug.state === "dead" || bug.state === "dying") continue;
@@ -1013,6 +1045,7 @@ export class Engine {
         bug.vx = 0;
         bug.vy = 0;
         bug.deathCredited = false;
+        if (weaponId) bug.dotSourceWeaponId = weaponId;
       }
     }
   }
@@ -1042,7 +1075,7 @@ export class Engine {
         if (bug.state === "dead" || bug.state === "dying") continue;
         if (bug.unstable && Math.hypot(bug.x - hz.x, bug.y - hz.y) <= hz.radius) {
           bug.unstable = null;
-          this.handleHit(i, bug.maxHp ?? 99);
+          this.handleHit(i, bug.maxHp ?? 99, false, hz.weaponId);
         }
       }
     }

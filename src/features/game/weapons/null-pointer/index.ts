@@ -2,14 +2,14 @@
  * Null Pointer — self-registering plugin entry point.
  */
 
-import nullPointerDef from "../nullPointer";
+import { def } from "./constants";
 import { register } from "@game/weapons/runtime/registry";
 import type { WeaponEntry, WeaponContext, FireSession } from "@game/weapons/runtime/types";
 import { createSession } from "./behavior";
 
 const entry: WeaponEntry = {
-  weaponId: "nullpointer",
-  config: nullPointerDef,
+  weaponId: def.id,
+  config: def,
   createSession(ctx: WeaponContext): FireSession {
     return createSession(ctx);
   },

@@ -1,8 +1,23 @@
-import type { WeaponDef } from "./types";
+/**
+ * Static Net — single source of truth.
+ */
 
-/** Static Net — replaces Shockwave. Ensnares bugs; click ensnared bugs to instakill. */
-const staticNet: WeaponDef = {
-  id: "shockwave",
+import { WeaponId } from "@game/types";
+import type { WeaponDef } from "@game/weapons/types";
+
+export const ID = WeaponId.StaticNet;
+
+export const EVOLVE_THRESHOLDS: [number, number] = [15, 50];
+
+export const CURSOR = {
+  accent: "#a78bfa",
+  aura: "0 0 26px rgba(167,139,250,0.3)",
+  size: 54,
+  showCrosshair: false,
+} as const;
+
+export const def: WeaponDef = {
+  id: ID,
   title: "Static Net",
   typeLabel: "Electric",
   typeHint: "Locks enemies in place so follow-up hits feel guaranteed.",
@@ -18,6 +33,7 @@ const staticNet: WeaponDef = {
   effectColor: "#e2e8f0",
   cooldownMs: 4000,
   inputMode: "click",
+  evolveThresholds: EVOLVE_THRESHOLDS,
   hint: "Click to cast a net — ensnared bugs are frozen; click them to instakill",
   tierTitles: ["Thread Lock", "Mutex", "Deadlock Cluster"],
   tierDetails: [
@@ -31,5 +47,3 @@ const staticNet: WeaponDef = {
     "T3: Deadlock pulls all bugs to one point instead",
   ],
 };
-
-export default staticNet;

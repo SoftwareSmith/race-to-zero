@@ -1,7 +1,25 @@
-import type { WeaponDef } from "./types";
+/**
+ * Chain Zap — single source of truth.
+ */
 
-const chainZap: WeaponDef = {
-  id: "chain",
+import { WeaponId } from "@game/types";
+import type { WeaponDef } from "@game/weapons/types";
+
+export const ID = WeaponId.ChainZap;
+
+export const EVOLVE_THRESHOLDS: [number, number] = [25, 75];
+
+export const CURSOR = {
+  accent: "#6ee7b7",
+  aura: "0 0 24px rgba(110,231,183,0.28)",
+  size: 48,
+  showCrosshair: false,
+  /** Pulsing ring animation class applied to the outer cursor ring. */
+  ringClassName: "[animation:laser-cursor-breathe_2s_ease-in-out_infinite]",
+} as const;
+
+export const def: WeaponDef = {
+  id: ID,
   title: "Chain Zap",
   typeLabel: "Electric",
   typeHint: "Jumps between clustered targets and rewards charged setups.",
@@ -13,9 +31,10 @@ const chainZap: WeaponDef = {
   hitRadius: 90,
   damage: 2,
   chainMaxBounces: 3,
-  effectColor: "#6ee7b7",
+  effectColor: CURSOR.accent,
   cooldownMs: 950,
   inputMode: "click",
+  evolveThresholds: EVOLVE_THRESHOLDS,
   hint: "Click near a bug — arc bounces 3×, targets unfrozen bugs first",
   tierTitles: ["Chain Zap", "Event Loop", "Distributed System"],
   tierDetails: [
@@ -29,5 +48,3 @@ const chainZap: WeaponDef = {
     "T3: All Charged bugs on screen get hit in a network pulse",
   ],
 };
-
-export default chainZap;

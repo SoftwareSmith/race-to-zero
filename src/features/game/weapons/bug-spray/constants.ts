@@ -1,8 +1,23 @@
-import type { WeaponDef } from "./types";
+/**
+ * Bug Spray — single source of truth.
+ */
 
-/** Bug Spray — replaces Zapper. Cone aerosol that poisons bugs + leaves a toxic cloud. */
-const bugSpray: WeaponDef = {
-  id: "zapper",
+import { WeaponId } from "@game/types";
+import type { WeaponDef } from "@game/weapons/types";
+
+export const ID = WeaponId.BugSpray;
+
+export const EVOLVE_THRESHOLDS: [number, number] = [25, 70];
+
+export const CURSOR = {
+  accent: "#fde047",
+  aura: "0 0 22px rgba(253,224,71,0.3)",
+  size: 48,
+  showCrosshair: false,
+} as const;
+
+export const def: WeaponDef = {
+  id: ID,
   title: "Bug Spray",
   typeLabel: "Toxin",
   typeHint: "Poisons swarms and rewards area denial over burst damage.",
@@ -17,9 +32,10 @@ const bugSpray: WeaponDef = {
   applyPoison: true,
   poisonDps: 0.5,
   poisonDurationMs: 4000,
-  effectColor: "#4ade80",
+  effectColor: CURSOR.accent,
   cooldownMs: 150,
   inputMode: "hold",
+  evolveThresholds: EVOLVE_THRESHOLDS,
   hint: "Hold to spray a cone — bugs are Poisoned; toxic cloud lingers 3 s",
   tierTitles: ["Patch Deployment", "Hotfix", "Rolling Deployment"],
   tierDetails: [
@@ -33,5 +49,3 @@ const bugSpray: WeaponDef = {
     "T3: Expanding ring — poison spreads across the whole field",
   ],
 };
-
-export default bugSpray;

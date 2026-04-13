@@ -1,7 +1,23 @@
-import type { WeaponDef } from "./types";
+/**
+ * Freeze Cone — single source of truth.
+ */
 
-const freezeCone: WeaponDef = {
-  id: "freeze",
+import { WeaponId } from "@game/types";
+import type { WeaponDef } from "@game/weapons/types";
+
+export const ID = WeaponId.Freeze;
+
+export const EVOLVE_THRESHOLDS: [number, number] = [20, 60];
+
+export const CURSOR = {
+  accent: "#bfdbfe",
+  aura: "0 0 22px rgba(191,219,254,0.32)",
+  size: 50,
+  showCrosshair: false,
+} as const;
+
+export const def: WeaponDef = {
+  id: ID,
   title: "Freeze Blast",
   typeLabel: "Cryo",
   typeHint: "Controls space by slowing or pinning fast threats in place.",
@@ -12,9 +28,10 @@ const freezeCone: WeaponDef = {
   hitPattern: "area",
   hitRadius: 180,
   appliesSlow: true,
-  effectColor: "#bfdbfe",
+  effectColor: CURSOR.accent,
   cooldownMs: 820,
   inputMode: "click",
+  evolveThresholds: EVOLVE_THRESHOLDS,
   hint: "Click to freeze — radial blast slows all nearby bugs; snowflakes linger",
   tierTitles: ["Deadlock", "System Fault", "Segment Fault"],
   tierDetails: [
@@ -28,5 +45,3 @@ const freezeCone: WeaponDef = {
     "T3: Global freeze — slows every active bug on the entire field",
   ],
 };
-
-export default freezeCone;

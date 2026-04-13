@@ -20,33 +20,24 @@ function weaponTooltip(
   isSelected: boolean,
 ): string {
   if (snapshot.locked) {
-    return snapshot.progressText;
+    return `${snapshot.progressText} — unlocks at ${snapshot.unlockKills} fixes`;
   }
+
   const mode = INPUT_MODE_LABEL[snapshot.inputMode] ?? snapshot.inputMode;
   const selected = isSelected ? " ✓" : "";
-  const tierLabel = snapshot.tier >= 2 ? ` [T${snapshot.tier}]` : "";
   const progress =
     snapshot.killsToNextTier != null
       ? ` · ${snapshot.killsToNextTier} kills → T${snapshot.tier + 1}`
       : " · MAX TIER";
-  return `${snapshot.title} [${mode}]${tierLabel}${selected}${progress} — ${snapshot.hint}`;
+  return `${snapshot.title} [${mode}]${selected}${progress} — ${snapshot.hint}`;
 }
 
 interface SiegeHudProps {
   className?: string;
-  killStreak?: number;
-  nextWeaponUnlock?: {
-    current: number;
-    remaining: number;
-    unlockKills: number;
-    weaponId: SiegeWeaponId;
-    weaponTitle: string;
-  } | null;
   debugMode?: boolean;
   interactiveKills: number;
   interactivePoints: number;
   interactiveRemainingBugs: number;
-  /** Weapon ID that just evolved — drives the wiggle+burst animation. */
   justEvolvedWeaponId?: SiegeWeaponId | null;
   lastFireTimes?: Partial<Record<SiegeWeaponId, number>>;
   onArmStructure?: (id: StructureId) => void;
@@ -56,90 +47,17 @@ interface SiegeHudProps {
   placedCountByType?: Partial<Record<StructureId, number>>;
   placingStructureId?: StructureId | null;
   selectedWeaponId: SiegeWeaponId;
-  streakMultiplier?: number;
   unlockedStructures?: StructureId[];
   weaponSnapshots: WeaponProgressSnapshot[];
 }
 
-const MATCHUP_DOT_CLASSES = {
-  high: "bg-red-400",
-  low: "bg-emerald-400",
-  medium: "bg-amber-400",
-  urgent: "bg-violet-400",
-} as const;
-
-function WeaponMatchupDots({ snapshot }: { snapshot: WeaponProgressSnapshot }) {
-  const featured = snapshot.matchupSummary.filter(
-    (item) => item.state === "favored" || item.state === "immune",
+function getSlotClassName(snapshot: WeaponProgressSnapshot) {
+  return cn(
+    "relative rounded-[14px] border p-1.5 text-sm text-stone-200",
+    snapshot.locked
+      ? "border-white/8 bg-black/18 opacity-80"
+      : "border-white/10 bg-zinc-900/88",
   );
-
-  if (featured.length === 0 || snapshot.locked) {
-    return null;
-  }
-
-  return (
-    <div className="mt-1 flex min-h-3 items-center justify-center gap-1.5">
-      {featured.map((item) =>
-        item.state === "immune" ? (
-          <span
-            key={`${snapshot.id}-${item.variant}`}
-            aria-label={`${item.variant} bugs are immune to ${snapshot.title}`}
-            className={cn(
-              "text-[0.45rem] font-black leading-none",
-              item.variant === "low"
-                ? "text-emerald-300"
-                : item.variant === "medium"
-                  ? "text-amber-300"
-                  : item.variant === "high"
-                    ? "text-red-300"
-                    : "text-violet-300",
-            )}
-          >
-            X
-          </span>
-        ) : (
-          <span
-            key={`${snapshot.id}-${item.variant}`}
-            aria-label={`${snapshot.title} is favored against ${item.variant} bugs`}
-            className={cn(
-              "h-1.5 w-1.5 rounded-full",
-              MATCHUP_DOT_CLASSES[item.variant],
-            )}
-          />
-        ),
-      )}
-    </div>
-  );
-}
-
-/** Outer slot wrapper — colour-coded by tier (bronze/silver/gold). */
-function getTierSlotClassName(snapshot: WeaponProgressSnapshot) {
-  const base = "relative rounded-[14px] border p-1.5 text-sm text-stone-200";
-  if (!snapshot.locked) {
-    if (snapshot.tier >= 3) {
-      // Gold  — T3
-      return cn(
-        base,
-        "border-amber-400/48 bg-[linear-gradient(135deg,rgba(180,83,9,0.24),rgba(24,24,27,0.92))] shadow-[0_0_18px_rgba(251,191,36,0.18)]",
-      );
-    }
-    if (snapshot.tier >= 2) {
-      // Silver — T2
-      return cn(
-        base,
-        "border-slate-300/48 bg-[linear-gradient(135deg,rgba(148,163,184,0.2),rgba(24,24,27,0.92))] shadow-[0_0_14px_rgba(148,163,184,0.14)]",
-      );
-    }
-
-    // Bronze — T1
-    return cn(
-      base,
-      "border-orange-400/38 bg-[linear-gradient(135deg,rgba(154,52,18,0.2),rgba(24,24,27,0.92))] shadow-[0_0_12px_rgba(249,115,22,0.12)]",
-    );
-  }
-
-  // Locked weapons stay neutral.
-  return cn(base, "border-white/8 bg-black/18");
 }
 
 function getWeaponButtonClassName(
@@ -147,21 +65,19 @@ function getWeaponButtonClassName(
   isSelected: boolean,
 ) {
   if (isSelected) {
-    return "inline-flex h-9 w-9 items-center justify-center rounded-xl border border-sky-300/40 bg-sky-400/16 text-sky-50 shadow-[0_0_20px_rgba(56,189,248,0.18)]";
+    return "inline-flex h-10 w-10 items-center justify-center rounded-xl border border-sky-300/45 bg-sky-400/14 text-sky-50 shadow-[0_0_18px_rgba(56,189,248,0.14)]";
   }
 
   if (snapshot.locked) {
-    return "inline-flex h-9 w-9 items-center justify-center rounded-xl border border-white/6 bg-white/4 text-stone-500 opacity-65";
+    return "inline-flex h-10 w-10 items-center justify-center rounded-xl border border-white/6 bg-white/4 text-stone-500 opacity-65";
   }
 
-  return "inline-flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-stone-100 transition-colors duration-150 hover:border-sky-400/30 hover:bg-sky-500/10 hover:text-sky-100";
+  return "inline-flex h-10 w-10 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-stone-100 transition-colors duration-150 hover:border-sky-400/24 hover:bg-sky-500/8 hover:text-sky-100";
 }
 
 export default function SiegeHud({
   className,
   debugMode = false,
-  killStreak = 0,
-  nextWeaponUnlock = null,
   interactiveKills,
   interactivePoints,
   interactiveRemainingBugs,
@@ -174,140 +90,148 @@ export default function SiegeHud({
   placedCountByType,
   placingStructureId,
   selectedWeaponId,
-  streakMultiplier = 1,
   unlockedStructures,
   weaponSnapshots,
 }: SiegeHudProps) {
-  const unlockProgress = nextWeaponUnlock
-    ? Math.min(1, nextWeaponUnlock.current / nextWeaponUnlock.unlockKills)
-    : 1;
+  const selectedSnapshot =
+    weaponSnapshots.find((snapshot) => snapshot.id === selectedWeaponId) ??
+    weaponSnapshots[0];
 
   return (
     <div data-no-hammer data-testid="siege-hud" className={className}>
       <div className="grid gap-2 rounded-[20px] border border-white/12 bg-zinc-950/92 p-2 shadow-[0_18px_40px_rgba(0,0,0,0.35)] backdrop-blur-xl">
-        <div className="flex items-stretch gap-2">
-          <div className="grid min-w-0 flex-1 grid-cols-4 gap-2">
-            <div className="rounded-[16px] border border-red-300/14 bg-[linear-gradient(135deg,rgba(127,29,29,0.26),rgba(24,24,27,0.92))] px-3 py-2.5">
-              <div className="text-[0.55rem] font-semibold uppercase tracking-[0.18em] text-red-200/75">
-                Bugs
-              </div>
-              <strong className="mt-1 block text-lg font-semibold leading-none text-stone-50">
-                {interactiveRemainingBugs.toLocaleString()}
-              </strong>
+        <div className="grid grid-cols-3 gap-2">
+          <div className="rounded-[16px] border border-red-300/14 bg-[linear-gradient(135deg,rgba(127,29,29,0.26),rgba(24,24,27,0.92))] px-3 py-2.5">
+            <div className="text-[0.55rem] font-semibold uppercase tracking-[0.18em] text-red-200/75">
+              Bugs
             </div>
+            <strong className="mt-1 block text-lg font-semibold leading-none text-stone-50">
+              {interactiveRemainingBugs.toLocaleString()}
+            </strong>
+          </div>
 
-            <div className="rounded-[16px] border border-white/8 bg-black/28 px-3 py-2.5">
-              <div className="text-[0.55rem] font-semibold uppercase tracking-[0.18em] text-stone-500">
-                Kills
-              </div>
-              <strong className="mt-1 block text-lg font-semibold leading-none text-stone-50">
-                {interactiveKills.toLocaleString()}
-              </strong>
+          <div className="rounded-[16px] border border-white/8 bg-black/28 px-3 py-2.5">
+            <div className="text-[0.55rem] font-semibold uppercase tracking-[0.18em] text-stone-500">
+              Kills
             </div>
+            <strong className="mt-1 block text-lg font-semibold leading-none text-stone-50">
+              {interactiveKills.toLocaleString()}
+            </strong>
+          </div>
 
-            <div className="rounded-[16px] border border-amber-300/14 bg-[linear-gradient(135deg,rgba(120,80,0,0.22),rgba(24,24,27,0.92))] px-3 py-2.5">
-              <div className="text-[0.55rem] font-semibold uppercase tracking-[0.18em] text-amber-200/75">
-                Pts
-              </div>
-              <strong className="mt-1 block text-lg font-semibold leading-none text-stone-50">
-                {interactivePoints.toLocaleString()}
-              </strong>
+          <div className="rounded-[16px] border border-amber-300/14 bg-[linear-gradient(135deg,rgba(120,80,0,0.22),rgba(24,24,27,0.92))] px-3 py-2.5">
+            <div className="text-[0.55rem] font-semibold uppercase tracking-[0.18em] text-amber-200/75">
+              Pts
             </div>
-
-            <div className="grid min-h-full grid-cols-2 gap-1">
-              <button
-                data-no-hammer
-                aria-label="Back to dashboard"
-                className="inline-flex min-h-full items-center justify-center rounded-[16px] border border-white/10 bg-zinc-900/90 px-3 text-sm font-medium text-stone-200 transition duration-200 hover:-translate-y-0.5 hover:bg-zinc-800 hover:text-stone-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300/40"
-                onClick={onExit}
-                type="button"
-              >
-                Back
-              </button>
-              <button
-                data-no-hammer
-                aria-label={
-                  debugMode
-                    ? "Disable siege debug mode"
-                    : "Enable siege debug mode"
-                }
-                aria-pressed={debugMode}
-                className={
-                  debugMode
-                    ? "inline-flex min-h-full items-center justify-center rounded-[16px] border border-cyan-300/35 bg-cyan-400/20 px-2 text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-cyan-100 transition duration-200 hover:-translate-y-0.5 hover:bg-cyan-400/26 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/40"
-                    : "inline-flex min-h-full items-center justify-center rounded-[16px] border border-white/10 bg-zinc-900/90 px-2 text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-stone-400 transition duration-200 hover:-translate-y-0.5 hover:bg-zinc-800 hover:text-stone-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300/40"
-                }
-                onClick={onToggleDebugMode}
-                type="button"
-              >
-                DBG
-              </button>
-            </div>
+            <strong className="mt-1 block text-lg font-semibold leading-none text-stone-50">
+              {interactivePoints.toLocaleString()}
+            </strong>
           </div>
         </div>
 
+        <div className="grid grid-cols-2 gap-2">
+          <button
+            data-no-hammer
+            aria-label="Back to dashboard"
+            className="inline-flex min-h-11 items-center justify-center rounded-[16px] border border-white/10 bg-zinc-900/90 px-3 text-sm font-medium text-stone-200 transition duration-200 hover:bg-zinc-800 hover:text-stone-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300/40"
+            onClick={onExit}
+            type="button"
+          >
+            Back
+          </button>
+          <button
+            data-no-hammer
+            aria-label={
+              debugMode ? "Disable siege debug mode" : "Enable siege debug mode"
+            }
+            aria-pressed={debugMode}
+            className={
+              debugMode
+                ? "inline-flex min-h-11 items-center justify-center rounded-[16px] border border-cyan-300/35 bg-cyan-400/20 px-2 text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-cyan-100 transition duration-200 hover:bg-cyan-400/26 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/40"
+                : "inline-flex min-h-11 items-center justify-center rounded-[16px] border border-white/10 bg-zinc-900/90 px-2 text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-stone-400 transition duration-200 hover:bg-zinc-800 hover:text-stone-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300/40"
+            }
+            onClick={onToggleDebugMode}
+            type="button"
+          >
+            DBG
+          </button>
+        </div>
+
         <div className="rounded-[16px] border border-white/8 bg-black/20 px-2.5 py-2.5">
-          <div className="mb-2 flex items-center justify-between gap-3 px-0.5">
+          <div className="mb-3 flex items-center justify-between gap-3 px-0.5">
             <div className="text-[0.55rem] font-semibold uppercase tracking-[0.16em] text-stone-500">
-              Weapons
+              Loadout
             </div>
-            {killStreak >= 3 ? (
-              <div className="rounded-full border border-amber-300/24 bg-amber-400/12 px-2 py-1 text-[0.55rem] font-semibold uppercase tracking-[0.18em] text-amber-100">
-                {`x${streakMultiplier.toFixed(1)} · ${killStreak} streak`}
-              </div>
-            ) : null}
+            <div className="text-[0.55rem] font-semibold uppercase tracking-[0.16em] text-stone-600">
+              Focused
+            </div>
           </div>
-          {killStreak >= 10 ? (
-            <div className="mb-3 rounded-[14px] border border-amber-300/26 bg-[linear-gradient(135deg,rgba(251,191,36,0.18),rgba(24,24,27,0.92))] px-2.5 py-1.5 text-center text-[0.66rem] font-black uppercase tracking-[0.24em] text-amber-100">
-              On Fire
+
+          {selectedSnapshot ? (
+            <div className="mb-3 rounded-[16px] border border-white/8 bg-white/[0.03] p-3">
+              <div className="flex items-start gap-3">
+                <div className="flex h-11 w-11 items-center justify-center rounded-[14px] border border-white/10 bg-black/20 text-stone-50">
+                  <WeaponGlyph className="h-5 w-5" id={selectedSnapshot.id} />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <div className="truncate text-sm font-semibold text-stone-100">
+                        {selectedSnapshot.title}
+                      </div>
+                      <div className="text-[0.6rem] uppercase tracking-[0.18em] text-stone-500">
+                        {selectedSnapshot.typeLabel} ·{" "}
+                        {INPUT_MODE_LABEL[selectedSnapshot.inputMode] ??
+                          selectedSnapshot.inputMode}
+                      </div>
+                    </div>
+                    <span className="rounded-full border border-white/10 bg-white/[0.04] px-2 py-1 text-[0.58rem] font-semibold uppercase tracking-[0.18em] text-stone-300">
+                      {`T${selectedSnapshot.tier}`}
+                    </span>
+                  </div>
+                  <p className="mt-2 text-[0.72rem] leading-5 text-stone-400">
+                    {selectedSnapshot.hint}
+                  </p>
+                </div>
+              </div>
+
+              <div className="mt-3 flex items-center justify-between gap-3 rounded-[12px] border border-white/6 bg-black/18 px-2.5 py-2">
+                <div>
+                  <div className="text-[0.58rem] font-semibold uppercase tracking-[0.16em] text-stone-500">
+                    Tier Progress
+                  </div>
+                  <div className="mt-1 text-[0.72rem] text-stone-300">
+                    {selectedSnapshot.killsToNextTier != null
+                      ? `${selectedSnapshot.weaponKills} kills · ${selectedSnapshot.killsToNextTier} to next tier`
+                      : `${selectedSnapshot.weaponKills} kills · max tier`}
+                  </div>
+                </div>
+                <div className="text-right text-[0.58rem] font-semibold uppercase tracking-[0.16em] text-stone-500">
+                  {selectedSnapshot.locked
+                    ? `Unlock @ ${selectedSnapshot.unlockKills}`
+                    : `${selectedSnapshot.cooldownMs}ms cd`}
+                </div>
+              </div>
             </div>
           ) : null}
-          {nextWeaponUnlock ? (
-            <div className="mb-3 rounded-[14px] border border-white/8 bg-white/[0.03] px-2.5 py-2">
-              <div className="flex items-center justify-between gap-3 text-[0.58rem] font-semibold uppercase tracking-[0.16em] text-stone-400">
-                <span>{`Next: ${nextWeaponUnlock.weaponTitle}`}</span>
-                <span>{`${nextWeaponUnlock.current}/${nextWeaponUnlock.unlockKills}`}</span>
-              </div>
-              <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/6">
-                <div
-                  className={cn(
-                    "h-full rounded-full bg-[linear-gradient(90deg,rgba(56,189,248,0.95),rgba(251,191,36,0.92))] transition-[width] duration-300",
-                    unlockProgress >= 0.8 ? "animate-pulse" : undefined,
-                  )}
-                  style={{ width: `${unlockProgress * 100}%` }}
-                />
-              </div>
-              <div className="mt-1 text-[0.64rem] text-stone-500">
-                {nextWeaponUnlock.remaining > 0
-                  ? `${nextWeaponUnlock.remaining} fixes remaining`
-                  : "Unlock ready"}
-              </div>
-            </div>
-          ) : null}
+
           <div
             data-no-hammer
-            className="flex flex-wrap items-center gap-2"
+            className="grid grid-cols-5 gap-2"
             role="radiogroup"
             aria-label="Select weapon"
           >
             {weaponSnapshots.map((snapshot) => {
               const isSelected = snapshot.id === selectedWeaponId;
               const isEvolving = justEvolvedWeaponId === snapshot.id;
-              const isNextUnlock = nextWeaponUnlock?.weaponId === snapshot.id;
-              const isNearlyUnlocked =
-                snapshot.locked && isNextUnlock && unlockProgress >= 0.8;
+
               return (
                 <Tooltip
                   key={snapshot.id}
                   content={weaponTooltip(snapshot, isSelected)}
                 >
                   <div
-                    className={cn(
-                      getTierSlotClassName(snapshot),
-                      isNearlyUnlocked
-                        ? "animate-pulse border-sky-400/24 shadow-[0_0_18px_rgba(56,189,248,0.14)]"
-                        : undefined,
-                    )}
+                    className={getSlotClassName(snapshot)}
                     data-current={isSelected ? "true" : "false"}
                     data-locked={snapshot.locked ? "true" : "false"}
                     data-testid={`weapon-${snapshot.id}`}
@@ -320,17 +244,9 @@ export default function SiegeHud({
                         : undefined
                     }
                   >
-                    {/* Evolution ring burst — expands outward and fades */}
-                    {isEvolving && (
-                      <div
-                        className={cn(
-                          "pointer-events-none absolute inset-[-3px] z-20 rounded-[17px] border-2 [animation:weapon-evolve-ring_650ms_ease-out_forwards]",
-                          snapshot.tier >= 3
-                            ? "border-amber-400/90"
-                            : "border-slate-300/90",
-                        )}
-                      />
-                    )}
+                    {isEvolving ? (
+                      <div className="pointer-events-none absolute inset-[-3px] z-20 rounded-[17px] border-2 border-sky-300/80 [animation:weapon-evolve-ring_650ms_ease-out_forwards]" />
+                    ) : null}
 
                     {snapshot.locked ? (
                       <div
@@ -357,52 +273,19 @@ export default function SiegeHud({
                       </button>
                     )}
 
-                    <WeaponMatchupDots snapshot={snapshot} />
+                    <div className="mt-1 text-center text-[0.55rem] font-semibold uppercase tracking-[0.16em] text-stone-500">
+                      {snapshot.locked
+                        ? `@${snapshot.unlockKills}`
+                        : `T${snapshot.tier}`}
+                    </div>
 
-                    {/* Tier pip badge — silver (T2) or gold (T3) corner medallion */}
-                    {!snapshot.locked && snapshot.tier >= 2 ? (
-                      <div className="absolute -right-1 -top-1 z-10">
-                        {snapshot.tier >= 3 ? (
-                          <span
-                            className="flex h-[18px] w-[18px] items-center justify-center rounded-full border border-amber-400/60 bg-amber-500/90 text-[0.4rem] font-black leading-none text-amber-100"
-                            style={{
-                              animation:
-                                "tier-pip-shimmer-gold 2.4s ease-in-out infinite",
-                            }}
-                            aria-label="Tier 3"
-                          >
-                            III
-                          </span>
-                        ) : (
-                          <span
-                            className="flex h-[18px] w-[18px] items-center justify-center rounded-full border border-slate-400/55 bg-slate-500/90 text-[0.4rem] font-black leading-none text-slate-100"
-                            style={{
-                              animation:
-                                "tier-pip-shimmer 2.8s ease-in-out infinite",
-                            }}
-                            aria-label="Tier 2"
-                          >
-                            II
-                          </span>
-                        )}
-                      </div>
-                    ) : null}
-
-                    {/* Reload bar: drains from full (right) to empty over cooldownMs */}
                     {!snapshot.locked &&
                     snapshot.cooldownMs > 0 &&
                     lastFireTimes?.[snapshot.id] != null ? (
                       <div className="absolute bottom-0 left-0 right-0 h-0.5 overflow-hidden rounded-b-[14px]">
                         <div
                           key={lastFireTimes[snapshot.id]}
-                          className={cn(
-                            "h-full",
-                            snapshot.tier >= 3
-                              ? "bg-amber-400/80"
-                              : snapshot.tier >= 2
-                                ? "bg-slate-300/80"
-                                : "bg-orange-300/80",
-                          )}
+                          className="h-full bg-sky-300/80"
                           style={{
                             animation: `reload-drain ${snapshot.cooldownMs}ms linear forwards`,
                           }}
@@ -416,7 +299,7 @@ export default function SiegeHud({
           </div>
         </div>
 
-        {unlockedStructures && unlockedStructures.length > 0 && (
+        {unlockedStructures && unlockedStructures.length > 0 ? (
           <div className="rounded-[16px] border border-amber-400/14 bg-black/20 px-2.5 py-2.5">
             <div className="mb-2 px-0.5 text-[0.55rem] font-semibold uppercase tracking-[0.16em] text-amber-400/70">
               Structures
@@ -428,6 +311,7 @@ export default function SiegeHud({
                 const isArming = placingStructureId === structure.id;
                 const placedCount = placedCountByType?.[structure.id] ?? 0;
                 const tooltipText = `${structure.title} — ${structure.hint} (${placedCount}/${structure.maxPlaced} placed)`;
+
                 return (
                   <Tooltip key={structure.id} content={tooltipText}>
                     <div className="relative rounded-[14px] border border-white/8 bg-black/18 p-1.5">
@@ -450,18 +334,18 @@ export default function SiegeHud({
                               : "🤖"}
                         </span>
                       </button>
-                      {placedCount > 0 && (
+                      {placedCount > 0 ? (
                         <span className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-amber-400 text-[0.5rem] font-bold text-zinc-900">
                           {placedCount}
                         </span>
-                      )}
+                      ) : null}
                     </div>
                   </Tooltip>
                 );
               })}
             </div>
           </div>
-        )}
+        ) : null}
       </div>
     </div>
   );

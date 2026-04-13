@@ -2,14 +2,14 @@
  * Void Pulse — self-registering plugin entry point.
  */
 
-import voidPulseDef from "../voidPulse";
+import { def } from "./constants";
 import { register } from "@game/weapons/runtime/registry";
 import type { WeaponEntry, WeaponContext, FireSession } from "@game/weapons/runtime/types";
 import { createSession } from "./behavior";
 
 const entry: WeaponEntry = {
-  weaponId: "void",
-  config: voidPulseDef,
+  weaponId: def.id,
+  config: def,
   createSession(ctx: WeaponContext): FireSession {
     return createSession(ctx);
   },

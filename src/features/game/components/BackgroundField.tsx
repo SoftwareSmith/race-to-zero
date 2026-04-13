@@ -2056,7 +2056,12 @@ const BugCanvas = memo(function BugCanvas({
             weaponDef.hitRadius,
           );
           for (const idx of hitIndexes) {
-            const result = engine.handleHit(idx, weaponDef.damage ?? 0, true);
+            const result = engine.handleHit(
+              idx,
+              weaponDef.damage ?? 0,
+              true,
+              weaponId,
+            );
             if (!result) continue;
 
             const bug = engine.getAllBugs()[idx];
@@ -2072,6 +2077,7 @@ const BugCanvas = memo(function BugCanvas({
                 (bug as any).applyPoison(
                   weaponDef.poisonDps ?? 0.5,
                   weaponDef.poisonDurationMs ?? 4000,
+                  weaponId,
                 );
               }
             }
@@ -2085,6 +2091,7 @@ const BugCanvas = memo(function BugCanvas({
                   (weaponDef.burnDps ?? 6) * intensity,
                   weaponDef.burnDurationMs ?? 1200,
                   weaponDef.burnDecayPerSecond ?? 3.2,
+                  weaponId,
                 );
               }
             }

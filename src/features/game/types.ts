@@ -6,17 +6,28 @@ export interface SiegeZoneRect {
   width: number;
 }
 
-export type SiegeWeaponId =
-  | "hammer"
-  | "zapper"
-  | "freeze"
-  | "chain"
-  | "flame"
-  | "laser"
-  | "shockwave"
-  | "nullpointer"
-  | "plasma"
-  | "void";
+/**
+ * Named weapon ID constants — use these instead of string literals.
+ * e.g. WeaponId.NullPointer instead of "nullpointer"
+ */
+export const WeaponId = {
+  Hammer:      "hammer",
+  BugSpray:    "zapper",
+  Freeze:      "freeze",
+  ChainZap:    "chain",
+  Flame:       "flame",
+  TracerBloom: "laser",
+  StaticNet:   "shockwave",
+  NullPointer: "nullpointer",
+  ForkBomb:    "plasma",
+  VoidPulse:   "void",
+} as const;
+
+/** Union of all valid weapon ID strings. */
+export type WeaponId = (typeof WeaponId)[keyof typeof WeaponId];
+
+/** @deprecated Use WeaponId instead. Kept as alias for backward compatibility. */
+export type SiegeWeaponId = WeaponId;
 
 export type WeaponType =
   | "blunt"
@@ -35,10 +46,20 @@ export interface WeaponMatchupSummaryItem {
   variant: "low" | "medium" | "high" | "urgent";
 }
 
-/** Current evolution tier of a weapon (1 = base, 2 = enhanced, 3 = catastrophic). */
-export type WeaponTier = 1 | 2 | 3;
+/**
+ * Named tier constants — use these instead of magic numbers.
+ * e.g. WeaponTier.Enhanced instead of 2
+ */
+export const WeaponTier = {
+  Base:        1,
+  Enhanced:    2,
+  Catastrophic: 3,
+} as const;
 
-/** Per-weapon kill count and tier, persisted across sessions. */
+/** Current evolution tier of a weapon (1 = base, 2 = enhanced, 3 = catastrophic). */
+export type WeaponTier = (typeof WeaponTier)[keyof typeof WeaponTier];
+
+/** Per-weapon kill count and tier for the current siege session. */
 export interface WeaponEvolutionState {
   tier: WeaponTier;
   /** Total kills credited to this weapon (direct + DoT). */

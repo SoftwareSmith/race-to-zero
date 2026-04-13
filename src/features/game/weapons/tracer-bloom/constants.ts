@@ -1,7 +1,23 @@
-import type { WeaponDef } from "./types";
+/**
+ * Tracer Bloom — single source of truth.
+ */
 
-const tracerBloom: WeaponDef = {
-  id: "laser",
+import { WeaponId } from "@game/types";
+import type { WeaponDef } from "@game/weapons/types";
+
+export const ID = WeaponId.TracerBloom;
+
+export const EVOLVE_THRESHOLDS: [number, number] = [20, 60];
+
+export const CURSOR = {
+  accent: "#f87171",
+  aura: "0 0 24px rgba(248,113,113,0.28)",
+  size: 48,
+  showCrosshair: true,
+} as const;
+
+export const def: WeaponDef = {
+  id: ID,
   title: "Tracer Bloom",
   typeLabel: "Precision",
   typeHint: "Picks apart priority targets and scales hardest off existing status effects.",
@@ -11,9 +27,10 @@ const tracerBloom: WeaponDef = {
     "Paints a route from the core to your click, detonating 4 pulse blooms along the way. Each bloom clips nearby bugs without using bounce-line logic.",
   hitPattern: "line",
   hitRadius: 38,
-  effectColor: "#fb7185",
+  effectColor: CURSOR.accent,
   cooldownMs: 900,
   inputMode: "click",
+  evolveThresholds: EVOLVE_THRESHOLDS,
   hint: "Click to lay a bloom route — 4 bursts detonate between the core and target",
   tierTitles: ["Debug Trace", "Deep Trace", "Full Profiling"],
   tierDetails: [
@@ -27,5 +44,3 @@ const tracerBloom: WeaponDef = {
     "T3: +3 bonus to any status-afflicted bug; full coverage",
   ],
 };
-
-export default tracerBloom;

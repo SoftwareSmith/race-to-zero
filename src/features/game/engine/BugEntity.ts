@@ -542,30 +542,45 @@ export class BugEntity extends Entity {
   }
 
   /** Apply Bug Spray poison DOT. Stacks to extend duration. */
-  applyPoison(dps: number, durationMs: number) {
+  applyPoison(dps: number, durationMs: number, sourceWeaponId?: string) {
     const now = performance.now();
     if (this.poison && now < this.poison.expiresAt) {
       this.poison.expiresAt = this.poison.expiresAt + durationMs;
+      this.poison.sourceWeaponId = sourceWeaponId ?? this.poison.sourceWeaponId;
     } else {
-      this.poison = { dps, expiresAt: now + durationMs, accumulatedDmg: 0 };
+      this.poison = {
+        dps,
+        expiresAt: now + durationMs,
+        accumulatedDmg: 0,
+        sourceWeaponId,
+      };
     }
+    if (sourceWeaponId) this.dotSourceWeaponId = sourceWeaponId;
   }
 
   /** Apply flamethrower burn. Reapplication refreshes duration and keeps the stronger flame. */
-  applyBurn(dps: number, durationMs: number, decayPerSecond = 3.2) {
+  applyBurn(
+    dps: number,
+    durationMs: number,
+    decayPerSecond = 3.2,
+    sourceWeaponId?: string,
+  ) {
     const now = performance.now();
     if (this.burn && now < this.burn.expiresAt) {
       this.burn.dps = Math.max(this.burn.dps, dps);
       this.burn.decayPerSecond = Math.max(this.burn.decayPerSecond, decayPerSecond);
       this.burn.expiresAt = Math.max(this.burn.expiresAt, now + durationMs);
+      this.burn.sourceWeaponId = sourceWeaponId ?? this.burn.sourceWeaponId;
     } else {
       this.burn = {
         dps,
         expiresAt: now + durationMs,
         accumulatedDmg: 0,
         decayPerSecond,
+        sourceWeaponId,
       };
     }
+    if (sourceWeaponId) this.dotSourceWeaponId = sourceWeaponId;
   }
 
   /** Apply Chain Zap charged status — amplifies damage taken (×1.1), enables network propagation. */
@@ -599,7 +614,7 @@ export class BugEntity extends Entity {
   }
 
   /** Apply looped echo DOT — periodic damage over time. */
-  applyLooped(dps: number, durationMs: number) {
+  applyLooped(dps: number, durationMs: number, sourceWeaponId?: string) {
     const now = performance.now();
     if (this.looped && now < this.looped.expiresAt) {
       this.looped.dps = Math.max(this.looped.dps, dps);
@@ -607,6 +622,7 @@ export class BugEntity extends Entity {
     } else {
       this.looped = { dps, expiresAt: now + durationMs, accumulatedDmg: 0 };
     }
+    if (sourceWeaponId) this.dotSourceWeaponId = sourceWeaponId;
   }
 
   /** Apply ally state — bug stops targeting the player base. */

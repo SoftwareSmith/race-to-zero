@@ -2,14 +2,14 @@
  * Freeze Cone — self-registering plugin entry point.
  */
 
-import freezeConeDef from "../freezeCone";
+import { def } from "./constants";
 import { register } from "@game/weapons/runtime/registry";
 import type { WeaponEntry, WeaponContext, FireSession } from "@game/weapons/runtime/types";
 import { createSession } from "./behavior";
 
 const entry: WeaponEntry = {
-  weaponId: "freeze",
-  config: freezeConeDef,
+  weaponId: def.id,
+  config: def,
   createSession(ctx: WeaponContext): FireSession {
     return createSession(ctx);
   },

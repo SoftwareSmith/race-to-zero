@@ -13,16 +13,17 @@ import type {
   WeaponCommand,
 } from "@game/weapons/runtime/types";
 import { canvasToViewport } from "@game/weapons/runtime/targetingHelpers";
-
-const DAMAGE = 3;
-const SPLASH_DAMAGE = 1;
-const SEEK_RADIUS = 500;
-const SPLASH_RADIUS = 60;
-const MARK_RADIUS = 80;
-// Absolute HP execute thresholds (≈ 1/3 and 1/2 of a typical 3-HP bug)
-const T1_EXECUTE_HP = 1;
-const T2_EXECUTE_HP = 2;
-const MARK_DURATION_MS = 6000;
+import {
+  ID,
+  DAMAGE,
+  SPLASH_DAMAGE,
+  SEEK_RADIUS,
+  SPLASH_RADIUS,
+  MARK_RADIUS,
+  MARK_DURATION_MS,
+  T1_EXECUTE_HP,
+  T2_EXECUTE_HP,
+} from "./constants";
 
 export function createSession(ctx: WeaponContext): ClickFireResult {
   const { engine, targetX, targetY, viewportX, viewportY, bounds } = ctx;
@@ -41,7 +42,7 @@ export function createSession(ctx: WeaponContext): ClickFireResult {
     kind: "spawnEffect",
     descriptor: {
       type: "overlayEffect",
-      weaponId: "nullpointer",
+      weaponId: ID,
       viewportX,
       viewportY,
       extras: {
@@ -60,7 +61,7 @@ export function createSession(ctx: WeaponContext): ClickFireResult {
     commands.push({ kind: "autoScalerPulse", hpThreshold: T2_EXECUTE_HP });
   }
 
-  // T2+: apply marked to bug and nearby bugs  
+  // T2+: apply marked to bug and nearby bugs
   if (tier >= 2) {
     commands.push({ kind: "applyMarked", targetIndex: targetIdx, durationMs: MARK_DURATION_MS });
     commands.push({

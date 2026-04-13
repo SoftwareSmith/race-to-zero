@@ -113,20 +113,21 @@ export interface GameEngine {
     coreRadius: number,
     durationMs: number,
     collapseDamage: number,
+    weaponId?: SiegeWeaponId,
   ): boolean;
   getBlackHole(): BlackHoleState | null;
   // ── Evolution-era additions ──────────────────────────────────────────────
   applyChargedInRadius(cx: number, cy: number, radius: number, durationMs: number): void;
   applyMarkedInRadius(cx: number, cy: number, radius: number, durationMs: number): void;
   applyUnstableInRadius(cx: number, cy: number, radius: number, durationMs: number): void;
-  propagateChargedNetwork(sourceIndex: number, damage: number, falloff: number): void;
+  propagateChargedNetwork(sourceIndex: number, damage: number, falloff: number, weaponId?: SiegeWeaponId): void;
   applyGlobalSlow(multiplier: number, durationMs: number, weaponId?: SiegeWeaponId): void;
   startDeadlockCluster(cx: number, cy: number, radius: number, pullDurationMs: number): void;
   splitBug(index: number): void;
   allyBug(index: number, durationMs: number): void;
-  startEventHorizon(x: number, y: number, radius: number, durationMs: number): void;
-  triggerKernelPanicExplosion(index: number, splashRadius: number, damage: number): void;
-  triggerAutoScalerPulse(hpThreshold: number): void;
+  startEventHorizon(x: number, y: number, radius: number, durationMs: number, weaponId?: SiegeWeaponId): void;
+  triggerKernelPanicExplosion(index: number, splashRadius: number, damage: number, weaponId?: SiegeWeaponId): void;
+  triggerAutoScalerPulse(hpThreshold: number, weaponId?: SiegeWeaponId): void;
 }
 
 // ---------------------------------------------------------------------------
