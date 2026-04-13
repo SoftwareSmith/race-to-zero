@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { STRUCTURE_DEFS } from "@config/structureConfig";
+import { getSiegeWeaponLabel } from "@game/progression/progression";
 import Tooltip from "@shared/components/Tooltip";
 import WeaponGlyph from "@shared/components/icons/WeaponGlyph";
 import { cn } from "@shared/utils/cn";
@@ -8,6 +9,13 @@ import type {
   StructureId,
   WeaponProgressSnapshot,
 } from "@game/types";
+
+const HUD_SHELL_CLASS_NAME =
+  "relative overflow-hidden rounded-[22px] border border-white/12 bg-[linear-gradient(180deg,rgba(6,10,14,0.96),rgba(9,12,16,0.88))] backdrop-blur-2xl";
+const HUD_STAT_LABEL_CLASS_NAME =
+  "text-[0.42rem] font-semibold uppercase tracking-[0.14em]";
+const HUD_STAT_VALUE_CLASS_NAME =
+  "mt-0.5 block text-[0.82rem] font-semibold leading-none text-stone-50";
 
 const INPUT_MODE_LABEL: Record<string, string> = {
   click: "Click",
@@ -40,9 +48,28 @@ interface SiegeHudProps {
   placingStructureId?: StructureId | null;
   selectedWeaponId: SiegeWeaponId;
   streakMultiplier: number;
+  upgradeToast?: string | null;
   unlockedStructures?: StructureId[];
-  weaponEvolutionToast?: string | null;
   weaponSnapshots: WeaponProgressSnapshot[];
+}
+
+function HudEventPill({
+  children,
+  className,
+}: {
+  children: ReactNode;
+  className: string;
+}) {
+  return (
+    <span
+      className={cn(
+        "inline-flex items-center rounded-full border px-2 py-1 text-[0.5rem] font-semibold uppercase tracking-[0.14em]",
+        className,
+      )}
+    >
+      {children}
+    </span>
+  );
 }
 
 function ChevronIcon({ open }: { open: boolean }) {
@@ -64,6 +91,53 @@ function ChevronIcon({ open }: { open: boolean }) {
         strokeWidth="1.5"
       />
     </svg>
+  );
+}
+
+function HudStatTile({
+  label,
+  toneClassName,
+  value,
+}: {
+  label: string;
+  toneClassName: string;
+  value: number;
+}) {
+  const [shellClassName, labelClassName] = toneClassName.split("|");
+
+  return (
+    <div
+      className={cn(
+        "rounded-[12px] border px-1.5 py-1 text-left",
+        shellClassName,
+      )}
+    >
+      <div className={cn(HUD_STAT_LABEL_CLASS_NAME, labelClassName)}>
+        {label}
+      </div>
+      <strong className={HUD_STAT_VALUE_CLASS_NAME}>
+        {value.toLocaleString()}
+      </strong>
+    </div>
+  );
+}
+
+function HudShell({
+  children,
+  className,
+  cursor = "default",
+}: {
+  children: ReactNode;
+  className?: string;
+  cursor?: "default" | "pointer";
+}) {
+  return (
+    <div
+      data-hud-cursor={cursor}
+      className={cn(HUD_SHELL_CLASS_NAME, className)}
+    >
+      {children}
+    </div>
   );
 }
 
@@ -160,19 +234,6 @@ function getTierCopy(snapshot: WeaponProgressSnapshot) {
   return `${snapshot.weaponKills} kills logged · ${snapshot.killsToNextTier} to level ${snapshot.tier + 1}`;
 }
 
-function getTierProgressSummary(snapshot: WeaponProgressSnapshot) {
-  if (snapshot.locked) {
-    return `0/${snapshot.unlockKills} to unlock`;
-  }
-
-  if (snapshot.killsToNextTier == null) {
-    return "Max level reached";
-  }
-
-  const tierGoal = snapshot.weaponKills + snapshot.killsToNextTier;
-  return `${snapshot.weaponKills}/${tierGoal} till next upgrade`;
-}
-
 function getTierProgressCompact(snapshot: WeaponProgressSnapshot) {
   if (snapshot.locked) {
     return `0/${snapshot.unlockKills}`;
@@ -184,6 +245,155 @@ function getTierProgressCompact(snapshot: WeaponProgressSnapshot) {
 
   const tierGoal = snapshot.weaponKills + snapshot.killsToNextTier;
   return `${snapshot.weaponKills}/${tierGoal}`;
+}
+
+function WeaponRailSlot({
+  isEvolving,
+  isJustUnlocked,
+  isSelected,
+  lastFiredAt,
+  onSelect,
+  snapshot,
+}: {
+  isEvolving: boolean;
+  isJustUnlocked: boolean;
+  isSelected: boolean;
+  lastFiredAt?: number;
+  onSelect: (id: SiegeWeaponId) => void;
+  snapshot: WeaponProgressSnapshot;
+}) {
+  const slotProgress = getTierProgress(snapshot);
+
+  return (
+    <Tooltip content={weaponTooltip(snapshot, isSelected)}>
+      <div
+        data-hud-cursor="pointer"
+        className={getSlotClassName(snapshot, isSelected)}
+        data-current={isSelected ? "true" : "false"}
+        data-locked={snapshot.locked ? "true" : "false"}
+        data-testid={`weapon-${snapshot.id}`}
+        style={
+          isJustUnlocked
+            ? {
+                animation:
+                  "hud-notch-arrive 420ms cubic-bezier(0.22,1,0.36,1), weapon-evolve 720ms cubic-bezier(0.34,1.56,0.64,1)",
+              }
+            : isEvolving
+              ? {
+                  animation:
+                    "weapon-evolve 720ms cubic-bezier(0.34,1.56,0.64,1) forwards",
+                }
+              : undefined
+        }
+      >
+        <div
+          className={cn(
+            "pointer-events-none absolute inset-x-0 top-0 h-5 bg-gradient-to-b opacity-70",
+            getTierAccentClassName(snapshot),
+          )}
+        />
+
+        <div className="relative flex h-full items-center justify-center">
+          {snapshot.locked ? (
+            <div
+              data-hud-cursor="pointer"
+              aria-label={`${snapshot.title} weapon (locked)`}
+              aria-checked={false}
+              role="radio"
+              className={getWeaponButtonClassName(snapshot, false)}
+            >
+              <WeaponGlyph className="h-4 w-4" id={snapshot.id} />
+            </div>
+          ) : (
+            <button
+              data-hud-cursor="pointer"
+              aria-label={`Select ${snapshot.title} weapon`}
+              aria-checked={isSelected}
+              role="radio"
+              type="button"
+              className={getWeaponButtonClassName(snapshot, isSelected)}
+              onClick={() => onSelect(snapshot.id)}
+            >
+              <WeaponGlyph className="h-4 w-4" id={snapshot.id} />
+            </button>
+          )}
+        </div>
+
+        <div className="mt-0.5 h-0.5 overflow-hidden rounded-full bg-white/8">
+          <div
+            className={cn(
+              "h-full rounded-full bg-[linear-gradient(90deg,rgba(34,197,94,0.75),rgba(56,189,248,0.95),rgba(251,191,36,0.95))] transition-[width] duration-300",
+              isSelected
+                ? "[animation:hud-weapon-breathe_1800ms_ease-in-out_infinite]"
+                : undefined,
+            )}
+            style={{ width: `${slotProgress}%` }}
+          />
+        </div>
+
+        {!snapshot.locked && snapshot.cooldownMs > 0 && lastFiredAt != null ? (
+          <div className="absolute bottom-0 left-0 right-0 h-0.5 overflow-hidden rounded-b-[12px]">
+            <div
+              key={lastFiredAt}
+              className="h-full bg-sky-300/80"
+              style={{
+                animation: `reload-drain ${snapshot.cooldownMs}ms linear forwards`,
+              }}
+            />
+          </div>
+        ) : null}
+      </div>
+    </Tooltip>
+  );
+}
+
+function StructureRailSlot({
+  isArming,
+  isJustUnlocked,
+  onArm,
+  placedCount,
+  structure,
+}: {
+  isArming: boolean;
+  isJustUnlocked: boolean;
+  onArm: (id: StructureId) => void;
+  placedCount: number;
+  structure: (typeof STRUCTURE_DEFS)[number];
+}) {
+  return (
+    <Tooltip
+      content={`${structure.title} — ${structure.hint} (${placedCount}/${structure.maxPlaced} placed)`}
+    >
+      <button
+        data-hud-cursor="pointer"
+        aria-label={`${isArming ? "Cancel" : "Arm"} ${structure.title}`}
+        aria-pressed={isArming}
+        type="button"
+        className={cn(
+          "relative inline-flex h-8 w-8 items-center justify-center rounded-[10px] border text-[0.72rem] !cursor-pointer transition duration-300 [animation:hud-notch-arrive_320ms_cubic-bezier(0.22,1,0.36,1)]",
+          isArming
+            ? "border-amber-300/50 bg-amber-400/20 text-amber-100"
+            : "border-amber-400/20 bg-amber-500/8 text-amber-100 hover:border-amber-400/40 hover:bg-amber-500/16",
+        )}
+        style={
+          isJustUnlocked
+            ? {
+                animation:
+                  "hud-notch-arrive 420ms cubic-bezier(0.22,1,0.36,1), weapon-evolve 720ms cubic-bezier(0.34,1.56,0.64,1)",
+              }
+            : undefined
+        }
+        onClick={() => onArm(structure.id)}
+      >
+        <span>{getStructureGlyph(structure.id)}</span>
+        {placedCount > 0 ? (
+          <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-amber-400 px-1 text-[0.46rem] font-bold text-zinc-900">
+            {placedCount}
+          </span>
+        ) : null}
+      </button>
+    </Tooltip>
+  );
 }
 
 function getStructureGlyph(structureId: StructureId) {
@@ -215,13 +425,17 @@ export default function SiegeHud({
   placingStructureId,
   selectedWeaponId,
   streakMultiplier,
+  upgradeToast,
   unlockedStructures,
-  weaponEvolutionToast,
   weaponSnapshots,
 }: SiegeHudProps) {
   const [detailsOpen, setDetailsOpen] = useState(false);
-  const [justUnlockedWeaponIds, setJustUnlockedWeaponIds] = useState<SiegeWeaponId[]>([]);
-  const [justUnlockedStructureIds, setJustUnlockedStructureIds] = useState<StructureId[]>([]);
+  const [justUnlockedWeaponIds, setJustUnlockedWeaponIds] = useState<
+    SiegeWeaponId[]
+  >([]);
+  const [justUnlockedStructureIds, setJustUnlockedStructureIds] = useState<
+    StructureId[]
+  >([]);
   const previousUnlockedWeaponIdsRef = useRef<Set<SiegeWeaponId>>(new Set());
   const previousUnlockedStructureIdsRef = useRef<Set<StructureId>>(new Set());
   const selectedSnapshot =
@@ -231,13 +445,25 @@ export default function SiegeHud({
     ? getTierProgress(selectedSnapshot)
     : 0;
   const unlockedWeaponIds = useMemo(
-    () => weaponSnapshots.filter((snapshot) => !snapshot.locked).map((snapshot) => snapshot.id),
+    () =>
+      weaponSnapshots
+        .filter((snapshot) => !snapshot.locked)
+        .map((snapshot) => snapshot.id),
     [weaponSnapshots],
   );
   const visibleStructureIds = useMemo(
     () => unlockedStructures ?? [],
     [unlockedStructures],
   );
+  const unlockToast = useMemo(() => {
+    if (justUnlockedWeaponIds.length === 0) {
+      return null;
+    }
+
+    return `New ${getSiegeWeaponLabel(
+      justUnlockedWeaponIds[justUnlockedWeaponIds.length - 1],
+    )} weapon unlocked`;
+  }, [justUnlockedWeaponIds]);
   const weaponCount = weaponSnapshots.length;
   const structureCount = visibleStructureIds.length;
   const weaponSlotRem = 2.35;
@@ -245,14 +471,20 @@ export default function SiegeHud({
   const railGapRem = 0.25;
   const sectionGapRem = 0.5;
   const dividerRem = structureCount > 0 ? 0.75 : 0;
-  const weaponRailWidthRem = weaponCount * weaponSlotRem + Math.max(0, weaponCount - 1) * railGapRem;
+  const weaponRailWidthRem =
+    weaponCount * weaponSlotRem + Math.max(0, weaponCount - 1) * railGapRem;
   const structureRailWidthRem =
     structureCount > 0
-      ? structureCount * structureSlotRem + Math.max(0, structureCount - 1) * railGapRem
+      ? structureCount * structureSlotRem +
+        Math.max(0, structureCount - 1) * railGapRem
       : 0;
   const toolbeltWidthRem = Math.max(
     26,
-    weaponRailWidthRem + structureRailWidthRem + dividerRem + sectionGapRem + 1.5,
+    weaponRailWidthRem +
+      structureRailWidthRem +
+      dividerRem +
+      sectionGapRem +
+      1.5,
   );
 
   useEffect(() => {
@@ -262,7 +494,10 @@ export default function SiegeHud({
       (weaponId) => !previousUnlockedWeaponIds.has(weaponId),
     );
 
-    if (previousUnlockedWeaponIds.size > 0 && newlyUnlockedWeaponIds.length > 0) {
+    if (
+      previousUnlockedWeaponIds.size > 0 &&
+      newlyUnlockedWeaponIds.length > 0
+    ) {
       setJustUnlockedWeaponIds(newlyUnlockedWeaponIds);
       window.setTimeout(() => setJustUnlockedWeaponIds([]), 1400);
     }
@@ -272,12 +507,16 @@ export default function SiegeHud({
 
   useEffect(() => {
     const currentUnlockedStructureIds = new Set(visibleStructureIds);
-    const previousUnlockedStructureIds = previousUnlockedStructureIdsRef.current;
+    const previousUnlockedStructureIds =
+      previousUnlockedStructureIdsRef.current;
     const newlyUnlockedStructureIds = visibleStructureIds.filter(
       (structureId) => !previousUnlockedStructureIds.has(structureId),
     );
 
-    if (previousUnlockedStructureIds.size > 0 && newlyUnlockedStructureIds.length > 0) {
+    if (
+      previousUnlockedStructureIds.size > 0 &&
+      newlyUnlockedStructureIds.length > 0
+    ) {
       setJustUnlockedStructureIds(newlyUnlockedStructureIds);
       window.setTimeout(() => setJustUnlockedStructureIds([]), 1400);
     }
@@ -286,42 +525,37 @@ export default function SiegeHud({
   }, [visibleStructureIds]);
 
   return (
-    <div data-hud-cursor="default" data-no-hammer className={cn("select-none", className)}>
+    <div
+      data-hud-cursor="default"
+      data-no-hammer
+      className={cn("select-none", className)}
+    >
       <div className="pointer-events-none fixed left-3 top-3 z-[220] sm:left-4 sm:top-4">
         <div
           data-testid="siege-hud"
           data-hud-cursor="default"
           className="pointer-events-auto w-full max-w-[15rem] select-none !cursor-default [animation:hud-notch-arrive_420ms_cubic-bezier(0.22,1,0.36,1)_forwards]"
         >
-          <div className="relative overflow-hidden rounded-[22px] border border-white/12 bg-[linear-gradient(180deg,rgba(6,10,14,0.96),rgba(9,12,16,0.88))] px-2 py-1.5 shadow-[0_18px_42px_rgba(0,0,0,0.34)] backdrop-blur-2xl">
+          <HudShell className="px-2 py-1.5 shadow-[0_18px_42px_rgba(0,0,0,0.34)]">
             <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(125,211,252,0.12),transparent_34%),linear-gradient(90deg,rgba(248,113,113,0.04),transparent_38%,rgba(251,191,36,0.04))]" />
 
             <div className="relative flex items-start justify-between gap-2">
               <div className="grid flex-1 grid-cols-3 gap-1">
-                <div className="rounded-[12px] border border-red-300/14 bg-red-500/[0.08] px-1.5 py-1 text-left">
-                  <div className="text-[0.42rem] font-semibold uppercase tracking-[0.14em] text-red-100/70">
-                  Bugs
-                  </div>
-                  <strong className="mt-0.5 block text-[0.82rem] font-semibold leading-none text-stone-50">
-                    {interactiveRemainingBugs.toLocaleString()}
-                  </strong>
-                </div>
-                <div className="rounded-[12px] border border-white/10 bg-white/[0.04] px-1.5 py-1 text-left">
-                  <div className="text-[0.42rem] font-semibold uppercase tracking-[0.14em] text-stone-500">
-                  Kills
-                  </div>
-                  <strong className="mt-0.5 block text-[0.82rem] font-semibold leading-none text-stone-50">
-                    {interactiveKills.toLocaleString()}
-                  </strong>
-                </div>
-                <div className="rounded-[12px] border border-amber-300/14 bg-amber-400/[0.08] px-1.5 py-1 text-left">
-                  <div className="text-[0.42rem] font-semibold uppercase tracking-[0.14em] text-amber-100/70">
-                  Pts
-                  </div>
-                  <strong className="mt-0.5 block text-[0.82rem] font-semibold leading-none text-stone-50">
-                    {interactivePoints.toLocaleString()}
-                  </strong>
-                </div>
+                <HudStatTile
+                  label="Bugs"
+                  toneClassName="border-red-300/14 bg-red-500/[0.08]|text-red-100/70"
+                  value={interactiveRemainingBugs}
+                />
+                <HudStatTile
+                  label="Kills"
+                  toneClassName="border-white/10 bg-white/[0.04]|text-stone-500"
+                  value={interactiveKills}
+                />
+                <HudStatTile
+                  label="Pts"
+                  toneClassName="border-amber-300/14 bg-amber-400/[0.08]|text-amber-100/70"
+                  value={interactivePoints}
+                />
               </div>
 
               <div className="flex shrink-0 items-center gap-1">
@@ -329,7 +563,9 @@ export default function SiegeHud({
                   data-no-hammer
                   data-hud-cursor="pointer"
                   aria-label={
-                    debugMode ? "Disable siege debug mode" : "Enable siege debug mode"
+                    debugMode
+                      ? "Disable siege debug mode"
+                      : "Enable siege debug mode"
                   }
                   aria-pressed={debugMode}
                   className={cn(
@@ -355,7 +591,7 @@ export default function SiegeHud({
                 </button>
               </div>
             </div>
-          </div>
+          </HudShell>
         </div>
       </div>
 
@@ -364,7 +600,7 @@ export default function SiegeHud({
           className="pointer-events-auto relative z-[220] max-w-[calc(100vw-1.5rem)] select-none !cursor-default transition-[width,max-width] duration-300 [animation:hud-notch-arrive_420ms_cubic-bezier(0.22,1,0.36,1)_forwards] sm:max-w-[calc(100vw-19rem)]"
           style={{ width: `${toolbeltWidthRem}rem` }}
         >
-          <div data-hud-cursor="default" className="relative overflow-hidden rounded-[22px] border border-white/12 bg-[linear-gradient(180deg,rgba(6,10,14,0.96),rgba(9,12,16,0.88))] px-2.5 py-1.5 shadow-[0_22px_54px_rgba(0,0,0,0.38)] backdrop-blur-2xl">
+          <HudShell className="px-2.5 py-1.5 shadow-[0_22px_54px_rgba(0,0,0,0.38)]">
             <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.02),transparent_48%)]" />
 
             <div className="relative">
@@ -378,90 +614,19 @@ export default function SiegeHud({
                 >
                   {weaponSnapshots.map((snapshot) => {
                     const isSelected = snapshot.id === selectedWeaponId;
-                    const isEvolving = justEvolvedWeaponId === snapshot.id;
-                    const isJustUnlocked = justUnlockedWeaponIds.includes(snapshot.id);
-                    const slotProgress = getTierProgress(snapshot);
 
                     return (
-                      <Tooltip
+                      <WeaponRailSlot
                         key={snapshot.id}
-                        content={weaponTooltip(snapshot, isSelected)}
-                      >
-                        <div
-                          data-hud-cursor="pointer"
-                          className={getSlotClassName(snapshot, isSelected)}
-                          data-current={isSelected ? "true" : "false"}
-                          data-locked={snapshot.locked ? "true" : "false"}
-                          data-testid={`weapon-${snapshot.id}`}
-                          style={
-                            isJustUnlocked
-                              ? {
-                                  animation:
-                                    "hud-notch-arrive 420ms cubic-bezier(0.22,1,0.36,1), weapon-evolve 720ms cubic-bezier(0.34,1.56,0.64,1)",
-                                }
-                              : isEvolving
-                              ? {
-                                  animation:
-                                    "weapon-evolve 720ms cubic-bezier(0.34,1.56,0.64,1) forwards",
-                                }
-                              : undefined
-                          }
-                        >
-                          <div className={cn("pointer-events-none absolute inset-x-0 top-0 h-5 bg-gradient-to-b opacity-70", getTierAccentClassName(snapshot))} />
-
-                          <div className="relative flex h-full items-center justify-center">
-                            {snapshot.locked ? (
-                              <div
-                                data-hud-cursor="pointer"
-                                aria-label={`${snapshot.title} weapon (locked)`}
-                                aria-checked={false}
-                                role="radio"
-                                className={getWeaponButtonClassName(snapshot, false)}
-                              >
-                                <WeaponGlyph className="h-4 w-4" id={snapshot.id} />
-                              </div>
-                            ) : (
-                              <button
-                                data-hud-cursor="pointer"
-                                aria-label={`Select ${snapshot.title} weapon`}
-                                aria-checked={isSelected}
-                                role="radio"
-                                type="button"
-                                className={getWeaponButtonClassName(snapshot, isSelected)}
-                                onClick={() => onSelectWeapon(snapshot.id)}
-                              >
-                                <WeaponGlyph className="h-4 w-4" id={snapshot.id} />
-                              </button>
-                            )}
-                          </div>
-
-                          <div className="mt-0.5 h-0.5 overflow-hidden rounded-full bg-white/8">
-                            <div
-                              className={cn(
-                                "h-full rounded-full bg-[linear-gradient(90deg,rgba(34,197,94,0.75),rgba(56,189,248,0.95),rgba(251,191,36,0.95))] transition-[width] duration-300",
-                                isSelected
-                                  ? "[animation:hud-weapon-breathe_1800ms_ease-in-out_infinite]"
-                                  : undefined,
-                              )}
-                              style={{ width: `${slotProgress}%` }}
-                            />
-                          </div>
-
-                          {!snapshot.locked &&
-                          snapshot.cooldownMs > 0 &&
-                          lastFireTimes?.[snapshot.id] != null ? (
-                            <div className="absolute bottom-0 left-0 right-0 h-0.5 overflow-hidden rounded-b-[12px]">
-                              <div
-                                key={lastFireTimes[snapshot.id]}
-                                className="h-full bg-sky-300/80"
-                                style={{
-                                  animation: `reload-drain ${snapshot.cooldownMs}ms linear forwards`,
-                                }}
-                              />
-                            </div>
-                          ) : null}
-                        </div>
-                      </Tooltip>
+                        isEvolving={justEvolvedWeaponId === snapshot.id}
+                        isJustUnlocked={justUnlockedWeaponIds.includes(
+                          snapshot.id,
+                        )}
+                        isSelected={isSelected}
+                        lastFiredAt={lastFireTimes?.[snapshot.id]}
+                        onSelect={onSelectWeapon}
+                        snapshot={snapshot}
+                      />
                     );
                   })}
                 </div>
@@ -474,68 +639,50 @@ export default function SiegeHud({
                       className="flex shrink-0 items-center gap-1"
                       style={{ width: `${structureRailWidthRem}rem` }}
                     >
-                      {STRUCTURE_DEFS.filter((s) => visibleStructureIds.includes(s.id)).map(
-                        (structure) => {
-                          const isArming = placingStructureId === structure.id;
-                          const isJustUnlocked = justUnlockedStructureIds.includes(structure.id);
-                          const placedCount = placedCountByType?.[structure.id] ?? 0;
+                      {STRUCTURE_DEFS.filter((s) =>
+                        visibleStructureIds.includes(s.id),
+                      ).map((structure) => {
+                        const isArming = placingStructureId === structure.id;
+                        const isJustUnlocked =
+                          justUnlockedStructureIds.includes(structure.id);
+                        const placedCount =
+                          placedCountByType?.[structure.id] ?? 0;
 
-                          return (
-                            <Tooltip
-                              key={structure.id}
-                              content={`${structure.title} — ${structure.hint} (${placedCount}/${structure.maxPlaced} placed)`}
-                            >
-                              <button
-                                data-hud-cursor="pointer"
-                                aria-label={`${isArming ? "Cancel" : "Arm"} ${structure.title}`}
-                                aria-pressed={isArming}
-                                type="button"
-                                className={cn(
-                                  "relative inline-flex h-8 w-8 items-center justify-center rounded-[10px] border text-[0.72rem] !cursor-pointer transition duration-300 [animation:hud-notch-arrive_320ms_cubic-bezier(0.22,1,0.36,1)]",
-                                  isArming
-                                    ? "border-amber-300/50 bg-amber-400/20 text-amber-100"
-                                    : "border-amber-400/20 bg-amber-500/8 text-amber-100 hover:border-amber-400/40 hover:bg-amber-500/16",
-                                )}
-                                style={
-                                  isJustUnlocked
-                                    ? {
-                                        animation:
-                                          "hud-notch-arrive 420ms cubic-bezier(0.22,1,0.36,1), weapon-evolve 720ms cubic-bezier(0.34,1.56,0.64,1)",
-                                      }
-                                    : undefined
-                                }
-                                onClick={() => onArmStructure?.(structure.id)}
-                              >
-                                <span>{getStructureGlyph(structure.id)}</span>
-                                {placedCount > 0 ? (
-                                  <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-amber-400 px-1 text-[0.46rem] font-bold text-zinc-900">
-                                    {placedCount}
-                                  </span>
-                                ) : null}
-                              </button>
-                            </Tooltip>
-                          );
-                        },
-                      )}
+                        return onArmStructure ? (
+                          <StructureRailSlot
+                            key={structure.id}
+                            isArming={isArming}
+                            isJustUnlocked={isJustUnlocked}
+                            onArm={onArmStructure}
+                            placedCount={placedCount}
+                            structure={structure}
+                          />
+                        ) : null;
+                      })}
                     </div>
                   </>
                 ) : null}
               </div>
             </div>
-          </div>
+          </HudShell>
 
-          {killStreak >= 3 || weaponEvolutionToast ? (
+          {killStreak >= 3 || unlockToast || upgradeToast ? (
             <div className="pointer-events-none mt-2 flex justify-center">
-              <div className="pointer-events-auto flex max-w-[24rem] items-center justify-center gap-2 rounded-[18px] border border-amber-300/24 bg-[linear-gradient(180deg,rgba(36,24,10,0.94),rgba(18,12,4,0.9))] px-3 py-1.5 text-center shadow-[0_16px_40px_rgba(0,0,0,0.32)] backdrop-blur-xl">
+              <div className="pointer-events-auto flex max-w-[30rem] flex-wrap items-center justify-center gap-2 px-2.5 py-2 text-center">
                 {killStreak >= 3 ? (
-                  <span className="px-0.5 text-[0.5rem] font-semibold uppercase tracking-[0.14em] text-amber-100">
+                  <HudEventPill className="border-amber-300/24 bg-amber-400/12 text-amber-100">
                     {`Streak x${streakMultiplier.toFixed(1)}`}
-                  </span>
+                  </HudEventPill>
                 ) : null}
-                {weaponEvolutionToast ? (
-                  <span className="text-[0.54rem] font-semibold uppercase tracking-[0.14em] text-amber-200 [animation:evolve-toast_2600ms_ease_forwards]">
-                    {weaponEvolutionToast}
-                  </span>
+                {unlockToast ? (
+                  <HudEventPill className="border-emerald-300/24 bg-emerald-400/10 text-emerald-100 [animation:evolve-toast_2600ms_ease_forwards]">
+                    {unlockToast}
+                  </HudEventPill>
+                ) : null}
+                {upgradeToast ? (
+                  <HudEventPill className="border-sky-300/24 bg-sky-400/10 text-sky-100 [animation:evolve-toast_2600ms_ease_forwards]">
+                    {upgradeToast}
+                  </HudEventPill>
                 ) : null}
               </div>
             </div>
@@ -548,27 +695,34 @@ export default function SiegeHud({
           <div
             data-hud-cursor="default"
             className={cn(
-              "pointer-events-auto relative overflow-hidden rounded-[20px] border border-white/10 bg-[linear-gradient(180deg,rgba(6,10,14,0.96),rgba(9,12,16,0.9))] p-2 select-none !cursor-default shadow-[0_20px_56px_rgba(0,0,0,0.34)] backdrop-blur-2xl",
+              HUD_SHELL_CLASS_NAME,
+              "pointer-events-auto rounded-[20px] border-white/10 bg-[linear-gradient(180deg,rgba(6,10,14,0.96),rgba(9,12,16,0.9))] p-2 select-none !cursor-default shadow-[0_20px_56px_rgba(0,0,0,0.34)]",
               justEvolvedWeaponId === selectedSnapshot.id
                 ? "[animation:hud-weapon-breathe_960ms_ease-out_1]"
                 : "",
             )}
           >
-            <div className={cn("pointer-events-none absolute inset-x-0 top-0 h-12 bg-gradient-to-b opacity-85", getTierAccentClassName(selectedSnapshot))} />
+            <div
+              className={cn(
+                "pointer-events-none absolute inset-x-0 top-0 h-12 bg-gradient-to-b opacity-85",
+                getTierAccentClassName(selectedSnapshot),
+              )}
+            />
 
             <button
               data-no-hammer
               data-hud-cursor="pointer"
               aria-expanded={detailsOpen}
-              aria-label={detailsOpen ? "Collapse progress details" : "Expand progress details"}
-              className="relative flex w-full items-center justify-between gap-2 rounded-[14px] bg-white/[0.04] px-2 py-1.5 text-left !cursor-pointer transition duration-150 hover:bg-white/[0.06] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300/40"
+              aria-label={
+                detailsOpen
+                  ? "Collapse progress details"
+                  : "Expand progress details"
+              }
+              className="relative flex w-full items-center justify-between gap-2 px-2 py-1.5 text-left !cursor-pointer transition duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300/40"
               onClick={() => setDetailsOpen((value) => !value)}
               type="button"
             >
               <div className="min-w-0">
-                <div className="text-[0.44rem] font-semibold uppercase tracking-[0.14em] text-stone-500">
-                  Progress
-                </div>
                 <div className="mt-0.5 truncate font-display text-[0.9rem] leading-none tracking-[-0.04em] text-stone-50">
                   {selectedSnapshot.title}
                 </div>
@@ -586,11 +740,10 @@ export default function SiegeHud({
 
             {detailsOpen ? (
               <div className="relative mt-2 space-y-2">
-                <div className="text-[0.52rem] font-medium uppercase tracking-[0.12em] text-stone-400">
-                  {getTierProgressSummary(selectedSnapshot)}
-                </div>
                 <div className="text-[0.52rem] uppercase tracking-[0.14em] text-stone-500">
-                  {selectedSnapshot.typeLabel} · {INPUT_MODE_LABEL[selectedSnapshot.inputMode] ?? selectedSnapshot.inputMode}
+                  {selectedSnapshot.typeLabel} ·{" "}
+                  {INPUT_MODE_LABEL[selectedSnapshot.inputMode] ??
+                    selectedSnapshot.inputMode}
                 </div>
 
                 <p className="text-[0.62rem] leading-4 text-stone-300">

@@ -1,4 +1,6 @@
 import { describe, expect, it } from "vitest";
+import { WEAPON_REGISTRY } from "@game/weapons";
+import { WeaponTier } from "@game/types";
 import {
   getSiegeCombatStats,
   getSiegeWeaponSnapshots,
@@ -78,5 +80,55 @@ describe("siege progression", () => {
       title: "Event Horizon",
       weaponKills: 52,
     });
+  });
+
+  it("tracks every weapon's tier progression metadata", () => {
+    const totalFixed = 999;
+
+    for (const weapon of WEAPON_REGISTRY) {
+      const [tierTwoThreshold, tierThreeThreshold] = [
+        weapon.tiers[0]?.evolveAtKills ?? 0,
+        weapon.tiers[1]?.evolveAtKills ?? Number.MAX_SAFE_INTEGER,
+      ];
+
+      const tierOneSnapshot = getSiegeWeaponSnapshots(totalFixed, weapon.id, false, {
+        [weapon.id]: { kills: 0, tier: WeaponTier.TIER_ONE },
+      }).find((snapshot) => snapshot.id === weapon.id);
+
+      expect(tierOneSnapshot).toMatchObject({
+        current: true,
+        killsToNextTier: tierTwoThreshold,
+        locked: false,
+        tier: WeaponTier.TIER_ONE,
+        title: weapon.tiers[0]?.title,
+        weaponKills: 0,
+      });
+
+      const tierTwoSnapshot = getSiegeWeaponSnapshots(totalFixed, weapon.id, false, {
+        [weapon.id]: { kills: tierTwoThreshold, tier: WeaponTier.TIER_TWO },
+      }).find((snapshot) => snapshot.id === weapon.id);
+
+      expect(tierTwoSnapshot).toMatchObject({
+        current: true,
+        killsToNextTier: Math.max(0, tierThreeThreshold - tierTwoThreshold),
+        locked: false,
+        tier: WeaponTier.TIER_TWO,
+        title: weapon.tiers[1]?.title,
+        weaponKills: tierTwoThreshold,
+      });
+
+      const tierThreeSnapshot = getSiegeWeaponSnapshots(totalFixed, weapon.id, false, {
+        [weapon.id]: { kills: tierThreeThreshold, tier: WeaponTier.TIER_THREE },
+      }).find((snapshot) => snapshot.id === weapon.id);
+
+      expect(tierThreeSnapshot).toMatchObject({
+        current: true,
+        killsToNextTier: null,
+        locked: false,
+        tier: WeaponTier.TIER_THREE,
+        title: weapon.tiers[2]?.title,
+        weaponKills: tierThreeThreshold,
+      });
+    }
   });
 });

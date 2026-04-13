@@ -12,7 +12,7 @@
  *   - Trigger hammer-swing animation for wrench
  */
 
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, type MutableRefObject } from "react";
 import type { Dispatch, SetStateAction } from "react";
 import { WeaponId } from "@game/types";
 import type { SiegeWeaponId, WeaponEffectEvent } from "@game/types";
@@ -39,7 +39,7 @@ export interface WeaponEffectsState {
     extras?: OverlayExtras,
   ) => void;
   /** Callback passed to parent to notify of weapon fire (reload bar). */
-  onWeaponFiredCallback: React.MutableRefObject<
+  onWeaponFiredCallback: MutableRefObject<
     ((weapon: SiegeWeaponId, firedAt: number) => void) | null
   >;
 }

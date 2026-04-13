@@ -342,7 +342,7 @@ export function useWeaponSession(
         clearHoldSession(weaponId);
       }
     },
-    [opts],
+    [],
   );
 
   const beginPersistent = useCallback(

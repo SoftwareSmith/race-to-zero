@@ -1,5 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { WEAPON_EVOLVE_THRESHOLDS } from "@config/gameDefaults";
+import { ALL_WEAPON_IDS, WeaponTier } from "@game/types";
 import BUG_CODEX, { cloneCodex, setCodex } from "./bugCodex";
 import { BugEntity } from "./BugEntity";
 import { Engine } from "./Engine";
@@ -145,5 +147,51 @@ describe("engine death attribution", () => {
     advanceUntilRemoved(engine);
 
     expect(engine.getWeaponEvolutionStates().get("void")?.kills).toBe(1);
+  });
+
+  it.each(ALL_WEAPON_IDS)("promotes %s through all three tiers at its kill thresholds", (weaponId) => {
+    const onWeaponEvolution = vi.fn();
+    const engine = new Engine(createCanvas(), {
+      height: 200,
+      onWeaponEvolution,
+      width: 200,
+    });
+    const [tierTwoThreshold, tierThreeThreshold] = WEAPON_EVOLVE_THRESHOLDS[weaponId];
+
+    for (let kills = 0; kills < tierTwoThreshold - 1; kills += 1) {
+      engine.recordWeaponKill(weaponId);
+    }
+
+    expect(engine.getWeaponEvolutionStates().get(weaponId)).toMatchObject({
+      kills: Math.max(0, tierTwoThreshold - 1),
+      tier: WeaponTier.TIER_ONE,
+    });
+    expect(onWeaponEvolution).not.toHaveBeenCalled();
+
+    engine.recordWeaponKill(weaponId);
+
+    expect(engine.getWeaponEvolutionStates().get(weaponId)).toMatchObject({
+      kills: tierTwoThreshold,
+      tier: WeaponTier.TIER_TWO,
+    });
+    expect(onWeaponEvolution).toHaveBeenNthCalledWith(1, weaponId, WeaponTier.TIER_TWO);
+
+    for (let kills = tierTwoThreshold; kills < tierThreeThreshold - 1; kills += 1) {
+      engine.recordWeaponKill(weaponId);
+    }
+
+    expect(engine.getWeaponEvolutionStates().get(weaponId)).toMatchObject({
+      kills: Math.max(tierTwoThreshold, tierThreeThreshold - 1),
+      tier: WeaponTier.TIER_TWO,
+    });
+    expect(onWeaponEvolution).toHaveBeenCalledTimes(1);
+
+    engine.recordWeaponKill(weaponId);
+
+    expect(engine.getWeaponEvolutionStates().get(weaponId)).toMatchObject({
+      kills: tierThreeThreshold,
+      tier: WeaponTier.TIER_THREE,
+    });
+    expect(onWeaponEvolution).toHaveBeenNthCalledWith(2, weaponId, WeaponTier.TIER_THREE);
   });
 });

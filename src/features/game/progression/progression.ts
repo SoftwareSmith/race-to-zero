@@ -30,6 +30,10 @@ const WEAPON_LABELS: Record<SiegeWeaponId, string> = {
   void: "Void Pulse",
 };
 
+export function getSiegeWeaponLabel(weaponId: SiegeWeaponId): string {
+  return WEAPON_LABELS[weaponId];
+}
+
 export function getSiegeCombatStats(
   totalFixed: number,
   debugMode = false,
@@ -42,8 +46,9 @@ export function getSiegeCombatStats(
     (s) => debugMode || totalFixed >= s.unlockKills,
   ).map((s) => s.id);
 
-  const currentToolLabel =
-    WEAPON_LABELS[unlockedWeapons[unlockedWeapons.length - 1]];
+  const currentToolLabel = getSiegeWeaponLabel(
+    unlockedWeapons[unlockedWeapons.length - 1],
+  );
 
   return { unlockedWeapons, currentToolLabel, unlockedStructures };
 }

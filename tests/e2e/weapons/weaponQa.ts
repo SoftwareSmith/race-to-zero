@@ -71,30 +71,39 @@ export async function killBugs(page: Page, killsNeeded: number) {
     const startingKills = await getHudKillCount(page);
 
     let defeated = false;
-    for (let attempt = 0; attempt < 5; attempt += 1) {
+    for (let attempt = 0; attempt < 8; attempt += 1) {
       await waitForQaBugPositions(page);
       const positions = await getQaBugPositions(page);
       if (positions.length === 0) {
         break;
       }
 
-      const bug = positions[0];
-      await canvas.click({
-        force: true,
-        position: {
-          x: bug.x - (canvasBox?.x ?? 0),
-          y: bug.y - (canvasBox?.y ?? 0),
-        },
-      });
+      const bug = [...positions].sort((left, right) => left.radius - right.radius)[0];
+      const clickPosition = {
+        x: bug.x - (canvasBox?.x ?? 0),
+        y: bug.y - (canvasBox?.y ?? 0),
+      };
 
-      try {
-        await expect
-          .poll(() => getHudKillCount(page), { interval: 100, timeout: 1200 })
-          .toBeGreaterThan(startingKills);
-        defeated = true;
+      for (let strike = 0; strike < 12; strike += 1) {
+        await canvas.click({ force: true, position: clickPosition });
+
+        const updatedKills = await getHudKillCount(page);
+        if (updatedKills > startingKills) {
+          defeated = true;
+          break;
+        }
+
+        const lastHit = await getQaLastHit(page);
+        if (lastHit?.defeated) {
+          defeated = true;
+          break;
+        }
+
+        await page.waitForTimeout(80);
+      }
+
+      if (defeated) {
         break;
-      } catch {
-        await page.waitForTimeout(150);
       }
     }
 

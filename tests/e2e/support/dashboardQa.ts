@@ -46,6 +46,12 @@ interface DashboardSeedOptions {
   terminatorMode?: boolean;
 }
 
+interface QaSiegeProgress {
+  kills: number;
+  points?: number;
+  remainingBugs?: number;
+}
+
 interface OverviewMetricOptions {
   deadlineDate?: string;
   deadlineFromDate?: string;
@@ -299,6 +305,23 @@ export async function getQaLastHit(page: Page) {
     }).__RTZ_QA__;
     return qaState?.lastHit ?? null;
   });
+}
+
+export async function setQaSiegeProgress(page: Page, progress: QaSiegeProgress) {
+  await page.evaluate((nextProgress) => {
+    const qaState = (window as Window & {
+      __RTZ_QA__?: {
+        enabled?: boolean;
+        setSiegeProgress?: (progress: QaSiegeProgress) => void;
+      };
+    }).__RTZ_QA__;
+
+    if (!qaState?.enabled || !qaState.setSiegeProgress) {
+      throw new Error("QA siege progress setter is unavailable");
+    }
+
+    qaState.setSiegeProgress(nextProgress);
+  }, progress);
 }
 
 export function getStaticSiegeGameConfig(): GameConfig {

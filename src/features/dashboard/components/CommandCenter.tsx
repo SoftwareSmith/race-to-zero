@@ -24,8 +24,7 @@ function CommandCenter({
   const paceTone = getDeltaTone(paceGap);
   const metricShellClassName =
     {
-      positive:
-        "border-emerald-400/18 bg-emerald-500/[0.05] text-emerald-100",
+      positive: "border-emerald-400/18 bg-emerald-500/[0.05] text-emerald-100",
       negative: "border-red-400/18 bg-red-500/[0.05] text-red-100",
       neutral: "border-sky-400/18 bg-sky-500/[0.05] text-sky-100",
     }[paceTone] ?? "border-sky-400/18 bg-sky-500/[0.05] text-sky-100";
@@ -72,7 +71,12 @@ function CommandCenter({
           </div>
 
           <div className="grid gap-2 md:grid-cols-3 xl:min-w-[42rem]">
-            <div className={cn("rounded-[18px] border px-3 py-2.5", metricShellClassName)}>
+            <div
+              className={cn(
+                "rounded-[18px] border px-3 py-2.5",
+                metricShellClassName,
+              )}
+            >
               <div className="text-[0.58rem] font-semibold uppercase tracking-[0.16em] text-stone-400">
                 Fix velocity
               </div>
@@ -88,7 +92,12 @@ function CommandCenter({
                 {`${formatNumber(summary.bugsPerDayRequired, 2)}/day`}
               </div>
             </div>
-            <div className={cn("rounded-[18px] border px-3 py-2.5", metricShellClassName)}>
+            <div
+              className={cn(
+                "rounded-[18px] border px-3 py-2.5",
+                metricShellClassName,
+              )}
+            >
               <div className="text-[0.58rem] font-semibold uppercase tracking-[0.16em] text-stone-400">
                 Net difference
               </div>

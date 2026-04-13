@@ -22,6 +22,15 @@ interface UseSiegeGameOptions {
   evolutionStates?: Partial<Record<SiegeWeaponId, WeaponEvolutionState>>;
 }
 
+interface SiegeQaState {
+  enabled?: boolean;
+  setSiegeProgress?: (progress: {
+    kills: number;
+    points?: number;
+    remainingBugs?: number;
+  }) => void;
+}
+
 export function useSiegeGame({
   currentBugCount,
   currentBugCounts,
@@ -221,6 +230,39 @@ export function useSiegeGame({
 
     window.localStorage.setItem("rtz-siege-debug", debugMode ? "1" : "0");
   }, [debugMode]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return undefined;
+    }
+
+    const qaState = (window as Window & { __RTZ_QA__?: SiegeQaState }).__RTZ_QA__;
+    if (!qaState?.enabled) {
+      return undefined;
+    }
+
+    qaState.setSiegeProgress = ({ kills, points, remainingBugs }) => {
+      if (!interactiveMode) {
+        return;
+      }
+
+      const normalizedKills = Math.max(0, kills);
+      setInteractiveKills(normalizedKills);
+      setInteractivePoints(points ?? normalizedKills);
+      setInteractiveRemainingBugs(
+        remainingBugs ?? Math.max(0, currentBugCount - normalizedKills),
+      );
+      setKillStreak(0);
+      setStreakMultiplier(1);
+      lastKillAtRef.current = null;
+    };
+
+    return () => {
+      if (qaState.setSiegeProgress) {
+        delete qaState.setSiegeProgress;
+      }
+    };
+  }, [currentBugCount, interactiveMode]);
 
   useEffect(() => {
     document.body.classList.toggle("interactive-mode", interactiveMode);

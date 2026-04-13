@@ -6,13 +6,14 @@ import {
   getStaticSiegeGameConfig,
   mockMetrics,
   seedDashboardState,
+  setQaSiegeProgress,
   waitForQaBugPositions,
 } from "./support/dashboardQa";
 
 test.describe.configure({ timeout: 120000 });
 
 const progressionMetrics = {
-  bugs: Array.from({ length: 68 }, (_, index) => ({
+  bugs: Array.from({ length: 90 }, (_, index) => ({
     completedAt: null,
     createdAt: `2026-04-${String((index % 9) + 1).padStart(2, "0")}`,
     priority: 4,
@@ -56,10 +57,11 @@ test.describe("siege progression QA", () => {
       "true",
     );
 
-    await killBugs(page, 12);
+    await setQaSiegeProgress(page, { kills: 12, remainingBugs: 78 });
 
-    await expect(hud.locator("strong").nth(0)).toHaveText("56");
+    await expect(hud.locator("strong").nth(0)).toHaveText("78");
     await expect(hud.locator("strong").nth(1)).toHaveText("12");
+    await expect(page.getByText("New Bug Zapper weapon unlocked")).toBeVisible();
     await expect(page.getByTestId("weapon-zapper")).toHaveAttribute(
       "data-locked",
       "false",
@@ -73,10 +75,11 @@ test.describe("siege progression QA", () => {
       "true",
     );
 
-    await killBugs(page, 68);
+    await setQaSiegeProgress(page, { kills: 68, remainingBugs: 22 });
 
-    await expect(hud.locator("strong").nth(0)).toHaveText("0");
+    await expect(hud.locator("strong").nth(0)).toHaveText("22");
     await expect(hud.locator("strong").nth(1)).toHaveText("68");
+    await expect(page.getByText("New Directional Laser weapon unlocked")).toBeVisible();
     await expect(page.getByTestId("weapon-laser")).toHaveAttribute(
       "data-locked",
       "false",
@@ -85,6 +88,40 @@ test.describe("siege progression QA", () => {
       "data-current",
       "true",
     );
+
+    await clientErrors.expectNoClientErrors();
+  });
+
+  test("hammer levels up through both upgrades in the live HUD", async ({ page }) => {
+    const clientErrors = createConsoleCollectors(page);
+
+    await page.setViewportSize({ height: 1200, width: 1440 });
+    await enableCanvasQa(page);
+    await mockMetrics(page, progressionMetrics);
+    await seedDashboardState(page, {
+      gameConfig: getStaticSiegeGameConfig(),
+      showParticleCount: false,
+    });
+
+    await page.goto("./");
+    await page.getByRole("button", { name: "Open interactive bug game" }).click();
+
+    const progressToggle = page.getByRole("button", {
+      name: /expand progress details|collapse progress details/i,
+    });
+
+    await expect(progressToggle).toContainText("Hammer");
+    await expect(progressToggle).toContainText("Level 1");
+
+    await killBugs(page, 20);
+
+    await expect(progressToggle).toContainText("Refactor Tool");
+    await expect(progressToggle).toContainText("Level 2");
+
+    await killBugs(page, 60);
+
+    await expect(progressToggle).toContainText("Rewrite Engine");
+    await expect(progressToggle).toContainText("Level 3");
 
     await clientErrors.expectNoClientErrors();
   });

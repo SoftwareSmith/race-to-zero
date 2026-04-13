@@ -655,9 +655,12 @@ export default function CodexPanel({
       // When the codex is opened, reset any previous selection so it
       // always starts on the list view. Defer to avoid synchronous
       // setState inside an effect.
-      setActiveView("bugs");
-      const t = setTimeout(() => setSelectedId(null), 0);
-      return () => clearTimeout(t);
+      const t1 = setTimeout(() => setActiveView("bugs"), 0);
+      const t2 = setTimeout(() => setSelectedId(null), 0);
+      return () => {
+        clearTimeout(t1);
+        clearTimeout(t2);
+      };
     }
     // don't reset when already open and a selection changes
   }, [open]);

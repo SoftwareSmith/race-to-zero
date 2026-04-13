@@ -1137,7 +1137,6 @@ export class VfxEngine {
   }
 
   spawnLevelUp(x: number, y: number): void {
-    this.addFloatingLabel(x, y, "TIER UP", 0xfbbf24, 1.1, 1200, 48);
     const gfx = this.acquireGfx();
     gfx.x = x;
     gfx.y = y;

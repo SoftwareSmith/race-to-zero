@@ -357,4 +357,44 @@ describe("void-pulse behavior", () => {
     if (session.mode !== "persistent") throw new Error("expected persistent");
     expect(() => session.abort()).not.toThrow();
   });
+
+  it("attributes the black hole and event horizon to void pulse", async () => {
+    vi.useFakeTimers();
+
+    try {
+      const { createSession } = await import("../void-pulse/behavior");
+      const engine = makeMockEngine();
+      const ctx = makeCtx(engine, {
+        tier: 3 as const,
+        weaponId: "void" as import("@game/types").SiegeWeaponId,
+      });
+      const session = createSession(ctx as any);
+
+      if (session.mode !== "persistent") throw new Error("expected persistent");
+
+      session.begin(ctx as any);
+
+      expect(engine.startBlackHole).toHaveBeenCalledWith(
+        100,
+        100,
+        300,
+        80,
+        2000,
+        2,
+        "void",
+      );
+
+      vi.advanceTimersByTime(2100);
+
+      expect(engine.startEventHorizon).toHaveBeenCalledWith(
+        100,
+        100,
+        200,
+        5000,
+        "void",
+      );
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });

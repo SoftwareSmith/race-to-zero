@@ -339,10 +339,22 @@ const BugCanvas = memo(function BugCanvas({
   const blackHoleVfxIdRef = useRef<string | null>(null);
   const placingStructureIdRef = useRef(placingStructureId);
   const onStructurePlaceRef = useRef(onStructurePlace);
+  const syncWeaponEvolutionStates = useCallback(() => {
+    const states = swarmRef.current?.getWeaponEvolutionStates?.();
+    if (states) {
+      onWeaponEvolutionStatesChangeRef.current?.(states);
+    }
+  }, []);
 
   useEffect(() => {
     terminatorModeRef.current = terminatorMode;
-  }, [hammerPositionRef, terminatorMode]);
+  }, [
+    hammerPositionRef,
+    terminatorMode,
+    getWeaponTier,
+    streakMultiplier,
+    syncWeaponEvolutionStates,
+  ]);
   useEffect(() => {
     onWeaponEvolutionStatesChangeRef.current = onWeaponEvolutionStatesChange;
   }, [onWeaponEvolutionStatesChange]);
@@ -352,12 +364,6 @@ const BugCanvas = memo(function BugCanvas({
   const currentMouseRef = useRef<{ x: number; y: number } | null>(null);
   const fireIntervalRef = useRef<number | null>(null);
   const lastPaintPosRef = useRef<{ x: number; y: number } | null>(null);
-  const syncWeaponEvolutionStates = useCallback(() => {
-    const states = swarmRef.current?.getWeaponEvolutionStates?.();
-    if (states) {
-      onWeaponEvolutionStatesChangeRef.current?.(states);
-    }
-  }, []);
   const reseedInfoRef = useRef<{
     ts: number;
     clustered: number;
@@ -2360,7 +2366,13 @@ const BugCanvas = memo(function BugCanvas({
         window.cancelAnimationFrame(animationFrameId);
       }
     };
-  }, [hammerPositionRef, terminatorMode]);
+  }, [
+    hammerPositionRef,
+    terminatorMode,
+    getWeaponTier,
+    streakMultiplier,
+    syncWeaponEvolutionStates,
+  ]);
 
   return (
     <>

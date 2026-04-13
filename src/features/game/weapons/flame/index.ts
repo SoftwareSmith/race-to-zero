@@ -10,7 +10,7 @@ import { createSession } from "./behavior";
 const entry: WeaponEntry = {
   weaponId: def.id,
   config: def,
-  createSession(_ctx: WeaponContext): FireSession {
+  createSession(): FireSession {
     return createSession();
   },
 };

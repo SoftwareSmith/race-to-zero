@@ -110,6 +110,7 @@ function buildTickCommands(ctx: WeaponContext): WeaponCommand[] {
 }
 
 export function createSession(_ctx?: WeaponContext): HoldFireSession {
+  void _ctx;
   return {
     mode: "hold",
     begin: buildTickCommands,

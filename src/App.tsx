@@ -43,9 +43,14 @@ function AppContent() {
     evolutionStates,
   });
   const dashboardRef = useRef<HTMLDivElement | null>(null);
-  const [evolutionToast, setEvolutionToast] = useState<string | null>(null);
+  const [upgradeToast, setUpgradeToast] = useState<string | null>(null);
   const [justEvolvedWeaponId, setJustEvolvedWeaponId] =
     useState<SiegeWeaponId | null>(null);
+
+  const showUpgradeToast = useCallback((message: string) => {
+    setUpgradeToast(message);
+    window.setTimeout(() => setUpgradeToast(null), 3500);
+  }, []);
 
   const handleEvolution = useCallback(
     (weaponId: SiegeWeaponId, newTier: WeaponTier) => {
@@ -53,15 +58,14 @@ function AppContent() {
       const def = WEAPON_DEFS.find((d) => d.id === weaponId);
       const newTitle = def ? getWeaponTierTitle(def, newTier) : weaponId;
       const weaponTitle = def?.title ?? weaponId;
-      setEvolutionToast(`${weaponTitle} upgraded to ${newTitle}`);
-      setTimeout(() => setEvolutionToast(null), 3500);
+      showUpgradeToast(`${weaponTitle} upgraded to ${newTitle}`);
       if (dashboardRef.current) {
         triggerNamedShake(dashboardRef.current, "tierup");
       }
       setJustEvolvedWeaponId(weaponId);
       setTimeout(() => setJustEvolvedWeaponId(null), 800);
     },
-    [onEvolution],
+    [onEvolution, showUpgradeToast],
   );
 
   const siegeZones = useSiegeZones({
@@ -181,8 +185,8 @@ function AppContent() {
           placingStructureId={siegeGame.placingStructureId}
           selectedWeaponId={siegeGame.selectedWeaponId}
           streakMultiplier={siegeGame.streakMultiplier}
+          upgradeToast={upgradeToast}
           unlockedStructures={siegeGame.combatStats.unlockedStructures}
-          weaponEvolutionToast={evolutionToast}
           weaponSnapshots={siegeGame.weaponSnapshots}
         />
       ) : null}
@@ -210,14 +214,17 @@ function AppContent() {
                 : "none",
           transform:
             siegeGame.siegePhase === "active" ? "scale(0.985)" : "scale(1)",
-          transition: "opacity 420ms ease-out, filter 520ms ease-out, transform 520ms ease-out",
+          transition:
+            "opacity 420ms ease-out, filter 520ms ease-out, transform 520ms ease-out",
         }}
       >
         <header
           className={cn(
             "grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3",
             CHROME_TRANSITION_CLASSNAME,
-            chromeHidden ? "-translate-y-5 opacity-0 blur-sm" : "translate-y-0 opacity-100 blur-0",
+            chromeHidden
+              ? "-translate-y-5 opacity-0 blur-sm"
+              : "translate-y-0 opacity-100 blur-0",
           )}
         >
           <div className="min-w-0 max-w-4xl">
@@ -237,7 +244,10 @@ function AppContent() {
               containerRef={dashboard.settingsMenuRef}
               onMenuToggle={() => dashboard.handleTopMenuToggle("settings")}
               onToggle={dashboard.handleToggleSetting}
-              open={!siegeGame.interactiveMode && dashboard.openTopMenu === "settings"}
+              open={
+                !siegeGame.interactiveMode &&
+                dashboard.openTopMenu === "settings"
+              }
               settings={dashboard.settings}
             />
             {!siegeGame.interactiveMode ? (
@@ -270,14 +280,18 @@ function AppContent() {
               onChange={dashboard.handleBugVisualSetting}
               onMenuToggle={() => dashboard.handleTopMenuToggle("bugs")}
               onToggle={dashboard.handleToggleSetting}
-              open={!siegeGame.interactiveMode && dashboard.openTopMenu === "bugs"}
+              open={
+                !siegeGame.interactiveMode && dashboard.openTopMenu === "bugs"
+              }
               showParticleCount={dashboard.showParticleCount}
               terminatorMode={dashboard.terminatorMode}
             />
             <CodexPanel
               containerRef={dashboard.codexMenuRef}
               onMenuToggle={() => dashboard.handleTopMenuToggle("codex")}
-              open={!siegeGame.interactiveMode && dashboard.openTopMenu === "codex"}
+              open={
+                !siegeGame.interactiveMode && dashboard.openTopMenu === "codex"
+              }
             />
           </div>
         </header>
@@ -316,7 +330,9 @@ function AppContent() {
         <div
           className={cn(
             CHROME_TRANSITION_CLASSNAME,
-            chromeHidden ? "translate-y-[-14px] opacity-0 blur-sm" : "translate-y-0 opacity-100 blur-0",
+            chromeHidden
+              ? "translate-y-[-14px] opacity-0 blur-sm"
+              : "translate-y-0 opacity-100 blur-0",
           )}
         >
           <CommandCenter

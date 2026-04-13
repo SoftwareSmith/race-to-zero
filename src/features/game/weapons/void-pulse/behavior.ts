@@ -52,7 +52,7 @@ export function createSession(ctx: WeaponContext): PersistentFireSession {
   return {
     mode: "persistent",
 
-    begin(_ctx: WeaponContext): WeaponCommand[] {
+    begin(): WeaponCommand[] {
       const started = engine.startBlackHole(
         targetX,
         targetY,
@@ -60,6 +60,7 @@ export function createSession(ctx: WeaponContext): PersistentFireSession {
         CORE_RADIUS,
         DURATION_MS,
         DAMAGE,
+        WeaponId.VoidPulse,
       );
 
       if (!started) {
@@ -79,6 +80,7 @@ export function createSession(ctx: WeaponContext): PersistentFireSession {
             targetY,
             T3_EVENT_HORIZON_RADIUS,
             T3_EVENT_HORIZON_DURATION_MS,
+            WeaponId.VoidPulse,
           );
         }
       }, DURATION_MS + 100);
