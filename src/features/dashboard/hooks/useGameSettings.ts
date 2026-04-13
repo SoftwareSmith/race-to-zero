@@ -14,11 +14,6 @@ export function useGameSettings() {
     true,
     { parse: parseStoredBoolean },
   );
-  const [terminatorMode, setTerminatorMode] = useStoredState(
-    STORAGE_KEYS.terminatorMode,
-    false,
-    { parse: parseStoredBoolean },
-  );
   const [bugSizeMultiplier, setBugSizeMultiplier] = useStoredState(
     STORAGE_KEYS.bugSizeMultiplier,
     2.5,
@@ -67,8 +62,6 @@ export function useGameSettings() {
     setBugChaosMultiplier,
     setBugSizeMultiplier,
     setShowParticleCount,
-    setTerminatorMode,
     showParticleCount,
-    terminatorMode,
   };
 }
