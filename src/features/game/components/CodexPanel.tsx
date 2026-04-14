@@ -1,4 +1,4 @@
-import type { CSSProperties, RefObject } from "react";
+import type { CSSProperties, ReactNode, RefObject } from "react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { MenuIconButton } from "@shared/components/MenuControls";
@@ -43,6 +43,7 @@ interface CodexPanelProps {
   containerRef: RefObject<HTMLDivElement | null>;
   onMenuToggle: () => void;
   open: boolean;
+  trigger?: ReactNode;
 }
 
 type CodexView = "bugs" | "weapons";
@@ -475,6 +476,7 @@ export default function CodexPanel({
   containerRef,
   onMenuToggle,
   open,
+  trigger,
 }: CodexPanelProps) {
   const codex = useMemo(() => getCodex(), []);
   const [activeView, setActiveView] = useState<CodexView>("bugs");
@@ -537,35 +539,37 @@ export default function CodexPanel({
 
   return (
     <div className="relative" ref={containerRef}>
-      <MenuIconButton
-        ariaLabel="Open bug codex"
-        onClick={handleMenuButtonClick}
-        open={open}
-        tooltip="Open the bug codex and review bug types."
-      >
-        <svg
-          aria-hidden="true"
-          className="h-4 w-4"
-          fill="none"
-          stroke="currentColor"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          strokeWidth="1.7"
-          viewBox="0 0 24 24"
+      {trigger ?? (
+        <MenuIconButton
+          ariaLabel="Open bug codex"
+          onClick={handleMenuButtonClick}
+          open={open}
+          tooltip="Open the bug codex and review bug types."
         >
-          <path d="M5.5 5.5A2.5 2.5 0 0 1 8 3h10.5v15.5A2.5 2.5 0 0 0 16 16H5.5Z" />
-          <path d="M8 3.5v12.3A2.2 2.2 0 0 0 10.2 18H18" />
-          <path d="M10.1 7.2h5.8M10.1 10.4h5.8" />
-          <path d="M11 14.6 9 13.5m4.9 1.1 2 1.1M10.4 17.1H8.4m6.2 0h2" />
-          <circle
-            cx="12.5"
-            cy="13.4"
-            r="1.2"
-            fill="currentColor"
-            stroke="none"
-          />
-        </svg>
-      </MenuIconButton>
+          <svg
+            aria-hidden="true"
+            className="h-4 w-4"
+            fill="none"
+            stroke="currentColor"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth="1.7"
+            viewBox="0 0 24 24"
+          >
+            <path d="M5.5 5.5A2.5 2.5 0 0 1 8 3h10.5v15.5A2.5 2.5 0 0 0 16 16H5.5Z" />
+            <path d="M8 3.5v12.3A2.2 2.2 0 0 0 10.2 18H18" />
+            <path d="M10.1 7.2h5.8M10.1 10.4h5.8" />
+            <path d="M11 14.6 9 13.5m4.9 1.1 2 1.1M10.4 17.1H8.4m6.2 0h2" />
+            <circle
+              cx="12.5"
+              cy="13.4"
+              r="1.2"
+              fill="currentColor"
+              stroke="none"
+            />
+          </svg>
+        </MenuIconButton>
+      )}
 
       {open && typeof document !== "undefined"
         ? createPortal(

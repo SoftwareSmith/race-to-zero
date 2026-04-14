@@ -1,6 +1,5 @@
 import { useCallback, useRef, useState } from "react";
 import BackgroundField from "@game/components/BackgroundField";
-import CodexPanel from "@game/components/CodexPanel";
 import CommandCenter from "@dashboard/components/CommandCenter";
 import SettingsMenu from "@dashboard/components/SettingsMenu";
 import TopNav from "@dashboard/components/TopNav";
@@ -19,7 +18,7 @@ import { useSiegeGame } from "@game/hooks/useSiegeGame";
 import { useSiegeZones } from "@game/hooks/useSiegeZones";
 import { useWeaponEvolution } from "@game/hooks/useWeaponEvolution";
 import { WEAPON_DEFS } from "@config/weaponConfig";
-import type { SiegeWeaponId, WeaponTier } from "@game/types";
+import { type SiegeWeaponId, type WeaponTier } from "@game/types";
 import { cn } from "@shared/utils/cn";
 import { triggerNamedShake } from "@game/utils/screenShake";
 import { getWeaponTierTitle } from "@game/weapons/progression";
@@ -158,6 +157,7 @@ function AppContent() {
       {siegeGame.interactiveMode ? (
         <SiegeHud
           className="pointer-events-none fixed inset-x-0 top-3 z-[220] px-3 sm:top-4"
+          codexMenuRef={dashboard.codexMenuRef}
           debugMode={siegeGame.debugMode}
           interactiveKills={siegeGame.interactiveKills}
           interactivePoints={siegeGame.interactivePoints}
@@ -167,7 +167,9 @@ function AppContent() {
           lastFireTimes={siegeGame.lastFireTimes}
           nextWeaponUnlock={siegeGame.nextWeaponUnlock}
           onArmStructure={siegeGame.armStructure}
+          onChangeGameMode={siegeGame.changeGameMode}
           onExit={handleExitInteractiveMode}
+          onToggleCodex={() => dashboard.handleTopMenuToggle("codex")}
           onSelectWeapon={siegeGame.selectWeapon}
           onToggleDebugMode={siegeGame.toggleDebugMode}
           placedCountByType={siegeGame.placedCountByType}
@@ -177,6 +179,8 @@ function AppContent() {
           upgradeToast={upgradeToast}
           unlockedStructures={siegeGame.combatStats.unlockedStructures}
           weaponSnapshots={siegeGame.weaponSnapshots}
+          codexOpen={dashboard.openTopMenu === "codex"}
+          gameMode={siegeGame.gameMode}
         />
       ) : null}
 
@@ -240,9 +244,9 @@ function AppContent() {
               settings={dashboard.settings}
             />
             {!siegeGame.interactiveMode ? (
-              <Tooltip content="Launch the interactive bug game.">
+              <Tooltip content="Start the interactive bug game.">
                 <button
-                  aria-label="Open interactive bug game"
+                  aria-label="Start interactive bug game"
                   className="inline-flex min-h-12 min-w-12 items-center justify-center rounded-[16px] border border-white/10 bg-zinc-950/86 px-3 text-stone-300 shadow-[0_10px_24px_rgba(0,0,0,0.24)] transition duration-200 hover:-translate-y-0.5 hover:bg-zinc-900 hover:text-stone-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300/40"
                   onClick={handleEnterInteractiveMode}
                   type="button"
@@ -263,13 +267,6 @@ function AppContent() {
                 </button>
               </Tooltip>
             ) : null}
-            <CodexPanel
-              containerRef={dashboard.codexMenuRef}
-              onMenuToggle={() => dashboard.handleTopMenuToggle("codex")}
-              open={
-                !siegeGame.interactiveMode && dashboard.openTopMenu === "codex"
-              }
-            />
           </div>
         </header>
 

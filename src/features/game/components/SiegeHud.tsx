@@ -1,14 +1,24 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+  type RefObject,
+} from "react";
+import CodexPanel from "@game/components/CodexPanel";
 import { STRUCTURE_DEFS } from "@config/structureConfig";
 import { getSiegeWeaponLabel } from "@game/progression/progression";
 import Tooltip from "@shared/components/Tooltip";
 import WeaponGlyph from "@shared/components/icons/WeaponGlyph";
 import { cn } from "@shared/utils/cn";
 import type {
+  SiegeGameMode,
   SiegeWeaponId,
   StructureId,
   WeaponProgressSnapshot,
 } from "@game/types";
+import { SIEGE_GAME_MODE_META } from "@game/types";
 import {
   getSlotClassName,
   getStructureGlyph,
@@ -24,13 +34,16 @@ import {
 const HUD_SHELL_CLASS_NAME =
   "relative overflow-hidden rounded-[22px] border border-white/12 bg-[linear-gradient(180deg,rgba(6,10,14,0.96),rgba(9,12,16,0.88))] backdrop-blur-2xl";
 const HUD_STAT_LABEL_CLASS_NAME =
-  "text-[0.42rem] font-semibold uppercase tracking-[0.14em]";
+  "text-[0.47rem] font-semibold uppercase tracking-[0.16em]";
 const HUD_STAT_VALUE_CLASS_NAME =
-  "mt-0.5 block text-[0.82rem] font-semibold leading-none text-stone-50";
+  "mt-1 block font-display text-[1rem] leading-none tracking-[-0.03em] text-stone-50";
 
 interface SiegeHudProps {
   className?: string;
+  codexMenuRef?: RefObject<HTMLDivElement | null>;
+  codexOpen?: boolean;
   debugMode?: boolean;
+  gameMode: SiegeGameMode;
   interactiveKills: number;
   interactivePoints: number;
   interactiveRemainingBugs: number;
@@ -45,7 +58,9 @@ interface SiegeHudProps {
     weaponTitle: string;
   } | null;
   onArmStructure?: (id: StructureId) => void;
+  onChangeGameMode?: (mode: SiegeGameMode) => void;
   onExit: () => void;
+  onToggleCodex?: () => void;
   onSelectWeapon: (id: SiegeWeaponId) => void;
   onToggleDebugMode?: () => void;
   placedCountByType?: Partial<Record<StructureId, number>>;
@@ -112,7 +127,7 @@ function HudStatTile({
   return (
     <div
       className={cn(
-        "rounded-[12px] border px-1.5 py-1 text-left",
+        "min-h-[4.35rem] rounded-[16px] border px-2.5 py-2 text-left shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]",
         shellClassName,
       )}
     >
@@ -123,6 +138,48 @@ function HudStatTile({
         {value.toLocaleString()}
       </strong>
     </div>
+  );
+}
+
+function HudActionButton({
+  active = false,
+  children,
+  label,
+  onClick,
+  tone = "default",
+}: {
+  active?: boolean;
+  children: ReactNode;
+  label: string;
+  onClick: () => void;
+  tone?: "default" | "danger" | "info";
+}) {
+  const toneClassName = {
+    danger: active
+      ? "border-red-300/40 bg-red-400/18 text-red-50"
+      : "border-red-300/16 bg-red-500/[0.08] text-red-100/85 hover:border-red-300/28 hover:bg-red-500/[0.14]",
+    info: active
+      ? "border-cyan-300/40 bg-cyan-400/18 text-cyan-50"
+      : "border-cyan-300/16 bg-cyan-500/[0.08] text-cyan-100/85 hover:border-cyan-300/28 hover:bg-cyan-500/[0.14]",
+    default: active
+      ? "border-sky-300/40 bg-sky-400/18 text-sky-50"
+      : "border-white/10 bg-white/[0.04] text-stone-200 hover:border-white/18 hover:bg-white/[0.08] hover:text-stone-50",
+  }[tone];
+
+  return (
+    <button
+      data-no-hammer
+      data-hud-cursor="pointer"
+      className={cn(
+        "inline-flex h-9 items-center justify-center gap-1.5 rounded-[14px] border px-3 text-[0.54rem] font-semibold uppercase tracking-[0.16em] !cursor-pointer transition duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300/40",
+        toneClassName,
+      )}
+      onClick={onClick}
+      type="button"
+    >
+      <span className="shrink-0">{children}</span>
+      <span>{label}</span>
+    </button>
   );
 }
 
@@ -296,7 +353,10 @@ function StructureRailSlot({
 
 export default function SiegeHud({
   className,
+  codexMenuRef,
+  codexOpen = false,
   debugMode = false,
+  gameMode,
   interactiveKills,
   interactivePoints,
   interactiveRemainingBugs,
@@ -304,7 +364,9 @@ export default function SiegeHud({
   killStreak,
   lastFireTimes,
   onArmStructure,
+  onChangeGameMode,
   onExit,
+  onToggleCodex,
   onSelectWeapon,
   onToggleDebugMode,
   placedCountByType,
@@ -316,6 +378,9 @@ export default function SiegeHud({
   weaponSnapshots,
 }: SiegeHudProps) {
   const [detailsOpen, setDetailsOpen] = useState(false);
+  const [modeMenuOpen, setModeMenuOpen] = useState(false);
+  const modeMenuRef = useRef<HTMLDivElement | null>(null);
+  const gameModeMeta = SIEGE_GAME_MODE_META[gameMode];
   const [justUnlockedWeaponIds, setJustUnlockedWeaponIds] = useState<
     SiegeWeaponId[]
   >([]);
@@ -352,6 +417,8 @@ export default function SiegeHud({
   }, [justUnlockedWeaponIds]);
   const weaponCount = weaponSnapshots.length;
   const structureCount = visibleStructureIds.length;
+  const actionCount =
+    (codexMenuRef && onToggleCodex ? 1 : 0) + (onToggleDebugMode ? 1 : 0) + 1;
   const weaponSlotRem = 2.35;
   const structureSlotRem = 2;
   const railGapRem = 0.25;
@@ -372,6 +439,34 @@ export default function SiegeHud({
       sectionGapRem +
       1.5,
   );
+
+  useEffect(() => {
+    if (!modeMenuOpen) {
+      return undefined;
+    }
+
+    const handlePointerDown = (
+      event: globalThis.MouseEvent | globalThis.TouchEvent,
+    ) => {
+      const targetNode = event.target;
+
+      if (!(targetNode instanceof Node)) {
+        return;
+      }
+
+      if (modeMenuRef.current && !modeMenuRef.current.contains(targetNode)) {
+        setModeMenuOpen(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handlePointerDown);
+    document.addEventListener("touchstart", handlePointerDown);
+
+    return () => {
+      document.removeEventListener("mousedown", handlePointerDown);
+      document.removeEventListener("touchstart", handlePointerDown);
+    };
+  }, [modeMenuOpen]);
 
   useEffect(() => {
     const currentUnlockedWeaponIds = new Set(unlockedWeaponIds);
@@ -420,13 +515,109 @@ export default function SiegeHud({
         <div
           data-testid="siege-hud"
           data-hud-cursor="default"
-          className="pointer-events-auto w-full max-w-[15rem] select-none !cursor-default [animation:hud-notch-arrive_420ms_cubic-bezier(0.22,1,0.36,1)_forwards]"
+          className="pointer-events-auto w-full max-w-[19rem] select-none !cursor-default [animation:hud-notch-arrive_420ms_cubic-bezier(0.22,1,0.36,1)_forwards]"
         >
-          <HudShell className="px-2 py-1.5 shadow-[0_18px_42px_rgba(0,0,0,0.34)]">
+          <HudShell className="px-2.5 py-2.5 shadow-[0_18px_42px_rgba(0,0,0,0.34)]">
             <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(125,211,252,0.12),transparent_34%),linear-gradient(90deg,rgba(248,113,113,0.04),transparent_38%,rgba(251,191,36,0.04))]" />
 
-            <div className="relative flex items-start justify-between gap-2">
-              <div className="grid flex-1 grid-cols-3 gap-1">
+            <div className="relative space-y-2.5">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <div className="text-[0.5rem] font-semibold uppercase tracking-[0.22em] text-stone-500">
+                    {gameModeMeta.label}
+                  </div>
+                  <div className="mt-1 font-display text-[0.92rem] tracking-[-0.03em] text-stone-100">
+                    {gameModeMeta.shortLabel}
+                  </div>
+                </div>
+                <span className="inline-flex items-center rounded-full border border-emerald-300/18 bg-emerald-400/[0.08] px-2 py-1 text-[0.48rem] font-semibold uppercase tracking-[0.16em] text-emerald-100">
+                  Active
+                </span>
+              </div>
+
+              <div className="grid grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)] gap-1.5">
+                <div className="relative" ref={modeMenuRef}>
+                  <Tooltip content="Switch between Purge and Outbreak. For now this sets the active game mode UI and upcoming ruleset context.">
+                    <button
+                      aria-expanded={modeMenuOpen}
+                      aria-haspopup="menu"
+                      className="flex min-h-[3.6rem] w-full items-center justify-between rounded-[16px] border border-white/10 bg-white/[0.04] px-3 py-2 text-left transition duration-150 hover:border-white/16 hover:bg-white/[0.06] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300/40"
+                      onClick={() => setModeMenuOpen((value) => !value)}
+                      type="button"
+                    >
+                      <div>
+                        <div className="text-[0.48rem] font-semibold uppercase tracking-[0.16em] text-stone-500">
+                          Game Mode
+                        </div>
+                        <div className="mt-1 text-[0.76rem] font-semibold text-stone-100">
+                          {gameModeMeta.label}
+                        </div>
+                      </div>
+                      <ChevronIcon open={modeMenuOpen} />
+                    </button>
+                  </Tooltip>
+
+                  {modeMenuOpen ? (
+                    <div className="absolute left-0 right-0 top-[calc(100%+8px)] z-[280] grid gap-1.5 rounded-[18px] border border-white/10 bg-zinc-950/96 p-2 shadow-[0_20px_40px_rgba(0,0,0,0.36)] backdrop-blur-xl">
+                      {(["purge", "outbreak"] as const).map((mode) => {
+                        const meta = SIEGE_GAME_MODE_META[mode];
+                        const selected = mode === gameMode;
+
+                        return (
+                          <button
+                            key={mode}
+                            className={cn(
+                              "grid gap-1 rounded-[14px] border px-3 py-2 text-left transition duration-150",
+                              selected
+                                ? "border-sky-300/28 bg-sky-400/[0.08]"
+                                : "border-white/8 bg-white/[0.03] hover:border-white/14 hover:bg-white/[0.05]",
+                            )}
+                            onClick={() => {
+                              onChangeGameMode?.(mode);
+                              setModeMenuOpen(false);
+                            }}
+                            type="button"
+                          >
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="text-[0.72rem] font-semibold text-stone-100">
+                                {meta.label}
+                              </span>
+                              <span className="rounded-full border border-white/10 bg-white/[0.04] px-2 py-0.5 text-[0.52rem] font-semibold uppercase tracking-[0.14em] text-stone-300">
+                                {meta.shortLabel}
+                              </span>
+                            </div>
+                            <span className="text-[0.66rem] leading-4 text-stone-400">
+                              {meta.description}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  ) : null}
+                </div>
+
+                <Tooltip
+                  content={
+                    gameMode === "purge"
+                      ? "Placeholder for the Purge clear-time clock."
+                      : "Placeholder for the Outbreak survival timer."
+                  }
+                >
+                  <div className="min-h-[3.6rem] rounded-[16px] border border-white/10 bg-white/[0.04] px-3 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
+                    <div className="text-[0.48rem] font-semibold uppercase tracking-[0.16em] text-stone-500">
+                      {gameMode === "purge" ? "Purge Timer" : "Survival Timer"}
+                    </div>
+                    <div className="mt-1 font-display text-[1rem] leading-none tracking-[-0.04em] text-stone-100">
+                      00:00
+                    </div>
+                    <div className="mt-1 text-[0.58rem] uppercase tracking-[0.14em] text-stone-500">
+                      Placeholder
+                    </div>
+                  </div>
+                </Tooltip>
+              </div>
+
+              <div className="grid grid-cols-3 gap-1.5">
                 <HudStatTile
                   label="Bugs"
                   toneClassName="border-red-300/14 bg-red-500/[0.08]|text-red-100/70"
@@ -444,37 +635,80 @@ export default function SiegeHud({
                 />
               </div>
 
-              <div className="flex shrink-0 items-center gap-1">
-                <button
-                  data-no-hammer
-                  data-hud-cursor="pointer"
-                  aria-label={
-                    debugMode
-                      ? "Disable siege debug mode"
-                      : "Enable siege debug mode"
-                  }
-                  aria-pressed={debugMode}
-                  className={cn(
-                    "inline-flex h-6 items-center justify-center rounded-full border px-1.5 text-[0.48rem] font-semibold uppercase tracking-[0.14em] !cursor-pointer transition duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/40",
-                    debugMode
-                      ? "border-cyan-300/40 bg-cyan-400/18 text-cyan-100 hover:bg-cyan-400/24"
-                      : "border-white/10 bg-white/[0.04] text-stone-400 hover:border-white/16 hover:bg-white/[0.08] hover:text-stone-100",
-                  )}
-                  onClick={onToggleDebugMode}
-                  type="button"
-                >
-                  DBG
-                </button>
-                <button
-                  data-no-hammer
-                  data-hud-cursor="pointer"
-                  aria-label="Back to dashboard"
-                  className="inline-flex h-6 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] px-1.5 text-[0.48rem] font-semibold uppercase tracking-[0.14em] text-stone-200 !cursor-pointer transition duration-150 hover:border-white/16 hover:bg-white/[0.08] hover:text-stone-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300/40"
-                  onClick={onExit}
-                  type="button"
-                >
-                  Exit
-                </button>
+              <div
+                className={cn(
+                  "grid gap-1.5",
+                  actionCount >= 3 ? "grid-cols-3" : "grid-cols-2",
+                )}
+              >
+                {codexMenuRef && onToggleCodex ? (
+                  <CodexPanel
+                    containerRef={codexMenuRef}
+                    onMenuToggle={onToggleCodex}
+                    open={codexOpen}
+                    trigger={
+                      <HudActionButton
+                        active={codexOpen}
+                        label="Codex"
+                        onClick={onToggleCodex}
+                      >
+                        <svg
+                          aria-hidden="true"
+                          className="h-3.5 w-3.5"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth="1.7"
+                          viewBox="0 0 24 24"
+                        >
+                          <path d="M5.5 5.5A2.5 2.5 0 0 1 8 3h10.5v15.5A2.5 2.5 0 0 0 16 16H5.5Z" />
+                          <path d="M8 3.5v12.3A2.2 2.2 0 0 0 10.2 18H18" />
+                          <path d="M10.1 7.2h5.8M10.1 10.4h5.8" />
+                        </svg>
+                      </HudActionButton>
+                    }
+                  />
+                ) : null}
+                {onToggleDebugMode ? (
+                  <HudActionButton
+                    active={debugMode}
+                    label="Debug"
+                    onClick={onToggleDebugMode}
+                    tone="info"
+                  >
+                    <svg
+                      aria-hidden="true"
+                      className="h-3.5 w-3.5"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth="1.8"
+                      viewBox="0 0 24 24"
+                    >
+                      <path d="M9 18h6" />
+                      <path d="M10 22h4" />
+                      <rect x="6" y="7" width="12" height="11" rx="2" />
+                      <path d="M9 7V5a3 3 0 0 1 6 0v2M4 11h2m12 0h2" />
+                    </svg>
+                  </HudActionButton>
+                ) : null}
+                <HudActionButton label="Exit" onClick={onExit} tone="danger">
+                  <svg
+                    aria-hidden="true"
+                    className="h-3.5 w-3.5"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth="1.8"
+                    viewBox="0 0 24 24"
+                  >
+                    <path d="M15 18 9 12l6-6" />
+                    <path d="M9 12h10" />
+                  </svg>
+                </HudActionButton>
               </div>
             </div>
           </HudShell>

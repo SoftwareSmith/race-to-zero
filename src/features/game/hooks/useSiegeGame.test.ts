@@ -27,6 +27,7 @@ describe("useSiegeGame", () => {
       result.current.enterInteractiveMode();
     });
 
+    expect(result.current.gameMode).toBe("purge");
     expect(result.current.selectedWeaponId).toBe("hammer");
 
     act(() => {
@@ -37,5 +38,21 @@ describe("useSiegeGame", () => {
 
     expect(result.current.combatStats.unlockedWeapons).toContain("zapper");
     expect(result.current.selectedWeaponId).toBe("hammer");
+  });
+
+  it("starts the selected game mode", () => {
+    const { result } = renderHook(() =>
+      useSiegeGame({
+        currentBugCount: 20,
+        currentBugCounts: { high: 0, low: 20, medium: 0, urgent: 0 },
+        evolutionStates: {},
+      }),
+    );
+
+    act(() => {
+      result.current.enterInteractiveMode("outbreak");
+    });
+
+    expect(result.current.gameMode).toBe("outbreak");
   });
 });

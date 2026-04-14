@@ -10,6 +10,7 @@ import { STRUCTURE_DEFS } from "@config/structureConfig";
 import type {
   AgentCaptureState,
   PlacedStructure,
+  SiegeGameMode,
   SiegePhase,
   SiegeWeaponId,
   StructureId,
@@ -49,6 +50,7 @@ export function useSiegeGame({
     return window.localStorage.getItem("rtz-siege-debug") === "1";
   });
   const [siegePhase, setSiegePhase] = useState<SiegePhase>("idle");
+  const [gameMode, setGameMode] = useState<SiegeGameMode>("purge");
   const [interactiveInitialBugCounts, setInteractiveInitialBugCounts] =
     useState<BugCounts>(currentBugCounts);
   const [interactiveKills, setInteractiveKills] = useState(0);
@@ -70,10 +72,11 @@ export function useSiegeGame({
 
   const interactiveMode = siegePhase !== "idle";
 
-  const enterInteractiveMode = useCallback(() => {
+  const enterInteractiveMode = useCallback((nextMode: SiegeGameMode = gameMode) => {
     if (phaseTimerRef.current != null) {
       window.clearTimeout(phaseTimerRef.current);
     }
+    setGameMode(nextMode);
     setInteractiveKills(0);
     setInteractivePoints(0);
     setInteractiveInitialBugCounts(currentBugCounts);
@@ -92,7 +95,7 @@ export function useSiegeGame({
       phaseTimerRef.current = null;
       setSiegePhase("active");
     }, 700);
-  }, [currentBugCount, currentBugCounts]);
+  }, [currentBugCount, currentBugCounts, gameMode]);
 
   const exitInteractiveMode = useCallback(() => {
     if (phaseTimerRef.current != null) {
@@ -358,6 +361,10 @@ export function useSiegeGame({
     setDebugMode((value) => !value);
   }, []);
 
+  const changeGameMode = useCallback((nextMode: SiegeGameMode) => {
+    setGameMode(nextMode);
+  }, []);
+
   // Placed count per structure type for HUD display
   const placedCountByType = useMemo(() => {
     const counts: Partial<Record<StructureId, number>> = {};
@@ -376,10 +383,12 @@ export function useSiegeGame({
     armStructure,
     cancelStructurePlacement,
     combatStats,
+    changeGameMode,
     displayedBugCounts,
     debugMode,
     enterInteractiveMode,
     exitInteractiveMode,
+    gameMode,
     handleAgentAbsorb,
     handleInteractiveHit,
     handleWeaponFired,

@@ -103,6 +103,28 @@ export interface WeaponEvolutionState {
 
 export type SiegePhase = "idle" | "entering" | "active" | "exiting";
 
+export type SiegeGameMode = "purge" | "outbreak";
+
+export const SIEGE_GAME_MODE_META: Record<
+  SiegeGameMode,
+  {
+    description: string;
+    label: string;
+    shortLabel: string;
+  }
+> = {
+  purge: {
+    description: "Fastest time to clear the current bug loadout.",
+    label: "Purge Mode",
+    shortLabel: "Time Attack",
+  },
+  outbreak: {
+    description: "Survive a shifting outbreak with bugs spawning and changing over time.",
+    label: "Outbreak",
+    shortLabel: "Survival",
+  },
+};
+
 export interface WeaponEffectEvent {
   id: string;
   weapon: SiegeWeaponId;
