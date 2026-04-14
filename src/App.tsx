@@ -159,6 +159,7 @@ function AppContent() {
           className="pointer-events-none fixed inset-x-0 top-3 z-[220] px-3 sm:top-4"
           codexMenuRef={dashboard.codexMenuRef}
           debugMode={siegeGame.debugMode}
+          elapsedMs={siegeGame.interactiveElapsedMs}
           interactiveKills={siegeGame.interactiveKills}
           interactivePoints={siegeGame.interactivePoints}
           interactiveRemainingBugs={siegeGame.interactiveRemainingBugs}

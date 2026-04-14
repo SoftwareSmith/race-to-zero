@@ -31,13 +31,15 @@ export function getSlotClassName(
   isSelected: boolean,
 ) {
   return cn(
-    "relative h-10 min-w-[2.35rem] overflow-hidden rounded-[10px] border px-0.5 py-1 text-sm text-stone-200 transition duration-200",
+    "relative h-10 min-w-[2.35rem] overflow-hidden rounded-[12px] border px-0.5 py-1 text-sm text-stone-200 transition duration-200",
     isSelected
-      ? "border-sky-300/40 bg-[linear-gradient(180deg,rgba(56,189,248,0.18),rgba(5,10,14,0.92))] shadow-[0_0_18px_rgba(56,189,248,0.16)]"
+      ? "border-white/18 bg-[linear-gradient(180deg,rgba(255,255,255,0.18),rgba(25,26,30,0.94))] shadow-[0_0_18px_rgba(255,255,255,0.08)]"
       : "",
     snapshot.locked
-      ? "border-white/8 bg-black/18 opacity-80"
-      : "border-white/10 bg-zinc-900/88 hover:border-white/16 hover:bg-zinc-900/96",
+      ? "border-white/6 bg-black/16 opacity-70"
+      : isSelected
+        ? ""
+        : "border-white/8 bg-white/[0.045] hover:border-white/12 hover:bg-white/[0.075]",
   );
 }
 
@@ -46,14 +48,30 @@ export function getWeaponButtonClassName(
   isSelected: boolean,
 ) {
   if (isSelected) {
-    return "inline-flex h-7 w-7 items-center justify-center rounded-[8px] border border-sky-300/45 bg-sky-400/14 text-sky-50 !cursor-pointer shadow-[0_0_14px_rgba(56,189,248,0.14)]";
+    return "inline-flex h-7 w-7 items-center justify-center rounded-[9px] border border-white/30 bg-white/12 text-stone-50 !cursor-pointer shadow-[0_0_14px_rgba(255,255,255,0.08)]";
   }
 
   if (snapshot.locked) {
     return "inline-flex h-7 w-7 items-center justify-center rounded-[8px] border border-white/6 bg-white/4 text-stone-500 opacity-65 !cursor-pointer";
   }
 
-  return "inline-flex h-7 w-7 items-center justify-center rounded-[8px] border border-white/10 bg-white/5 text-stone-100 !cursor-pointer transition duration-150 hover:border-sky-400/24 hover:bg-sky-500/8 hover:text-sky-100";
+  return "inline-flex h-7 w-7 items-center justify-center rounded-[9px] border border-white/10 bg-black/20 text-stone-200 !cursor-pointer transition duration-150 hover:border-white/16 hover:bg-white/[0.08] hover:text-stone-50";
+}
+
+export function getTierBarClassName(snapshot: WeaponProgressSnapshot) {
+  if (snapshot.locked) {
+    return "bg-white/16";
+  }
+
+  if (snapshot.tier >= 3 || snapshot.killsToNextTier == null) {
+    return "bg-[linear-gradient(90deg,rgba(245,158,11,0.78),rgba(251,191,36,0.96),rgba(253,224,71,0.88))]";
+  }
+
+  if (snapshot.tier === 2) {
+    return "bg-[linear-gradient(90deg,rgba(148,163,184,0.72),rgba(226,232,240,0.94),rgba(203,213,225,0.82))]";
+  }
+
+  return "bg-[linear-gradient(90deg,rgba(180,83,9,0.78),rgba(217,119,6,0.95),rgba(251,191,36,0.72))]";
 }
 
 export function getTierAccentClassName(snapshot: WeaponProgressSnapshot) {

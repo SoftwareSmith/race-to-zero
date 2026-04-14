@@ -22,8 +22,7 @@ import { SIEGE_GAME_MODE_META } from "@game/types";
 import {
   getSlotClassName,
   getStructureGlyph,
-  getTierAccentClassName,
-  getTierCopy,
+  getTierBarClassName,
   getTierProgress,
   getTierProgressCompact,
   getWeaponButtonClassName,
@@ -33,16 +32,13 @@ import {
 
 const HUD_SHELL_CLASS_NAME =
   "relative overflow-hidden rounded-[22px] border border-white/12 bg-[linear-gradient(180deg,rgba(6,10,14,0.96),rgba(9,12,16,0.88))] backdrop-blur-2xl";
-const HUD_STAT_LABEL_CLASS_NAME =
-  "text-[0.47rem] font-semibold uppercase tracking-[0.16em]";
-const HUD_STAT_VALUE_CLASS_NAME =
-  "mt-1 block font-display text-[1rem] leading-none tracking-[-0.03em] text-stone-50";
 
 interface SiegeHudProps {
   className?: string;
   codexMenuRef?: RefObject<HTMLDivElement | null>;
   codexOpen?: boolean;
   debugMode?: boolean;
+  elapsedMs?: number;
   gameMode: SiegeGameMode;
   interactiveKills: number;
   interactivePoints: number;
@@ -72,6 +68,14 @@ interface SiegeHudProps {
   weaponSnapshots: WeaponProgressSnapshot[];
 }
 
+function formatElapsedTime(elapsedMs: number) {
+  const totalSeconds = Math.max(0, Math.floor(elapsedMs / 1000));
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+
+  return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+}
+
 function HudEventPill({
   children,
   className,
@@ -91,79 +95,27 @@ function HudEventPill({
   );
 }
 
-function ChevronIcon({ open }: { open: boolean }) {
-  return (
-    <svg
-      aria-hidden="true"
-      className={cn(
-        "h-3.5 w-3.5 text-stone-400 transition-transform duration-200",
-        open ? "rotate-180" : "rotate-0",
-      )}
-      viewBox="0 0 16 16"
-      fill="none"
-    >
-      <path
-        d="M3.5 6 8 10.5 12.5 6"
-        stroke="currentColor"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth="1.5"
-      />
-    </svg>
-  );
-}
-
-function HudStatTile({
-  label,
-  toneClassName,
-  value,
-}: {
-  label: string;
-  toneClassName: string;
-  value: number;
-}) {
-  const [shellClassName, labelClassName] = toneClassName.split("|");
-
-  return (
-    <div
-      className={cn(
-        "min-h-[4.35rem] rounded-[16px] border px-2.5 py-2 text-left shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]",
-        shellClassName,
-      )}
-    >
-      <div className={cn(HUD_STAT_LABEL_CLASS_NAME, labelClassName)}>
-        {label}
-      </div>
-      <strong className={HUD_STAT_VALUE_CLASS_NAME}>
-        {value.toLocaleString()}
-      </strong>
-    </div>
-  );
-}
-
 function HudActionButton({
   active = false,
   children,
-  label,
   onClick,
   tone = "default",
 }: {
   active?: boolean;
   children: ReactNode;
-  label: string;
   onClick: () => void;
   tone?: "default" | "danger" | "info";
 }) {
   const toneClassName = {
     danger: active
-      ? "border-red-300/40 bg-red-400/18 text-red-50"
-      : "border-red-300/16 bg-red-500/[0.08] text-red-100/85 hover:border-red-300/28 hover:bg-red-500/[0.14]",
+      ? "border-red-300/34 bg-red-400/16 text-red-50"
+      : "border-red-300/16 bg-black/28 text-red-100/88 hover:border-red-300/28 hover:bg-red-500/[0.12]",
     info: active
-      ? "border-cyan-300/40 bg-cyan-400/18 text-cyan-50"
-      : "border-cyan-300/16 bg-cyan-500/[0.08] text-cyan-100/85 hover:border-cyan-300/28 hover:bg-cyan-500/[0.14]",
+      ? "border-cyan-300/34 bg-cyan-400/16 text-cyan-50"
+      : "border-cyan-300/16 bg-black/28 text-cyan-100/88 hover:border-cyan-300/28 hover:bg-cyan-500/[0.12]",
     default: active
-      ? "border-sky-300/40 bg-sky-400/18 text-sky-50"
-      : "border-white/10 bg-white/[0.04] text-stone-200 hover:border-white/18 hover:bg-white/[0.08] hover:text-stone-50",
+      ? "border-sky-300/34 bg-sky-400/16 text-sky-50"
+      : "border-white/10 bg-black/28 text-stone-200 hover:border-white/18 hover:bg-white/[0.08] hover:text-stone-50",
   }[tone];
 
   return (
@@ -171,14 +123,13 @@ function HudActionButton({
       data-no-hammer
       data-hud-cursor="pointer"
       className={cn(
-        "inline-flex h-9 items-center justify-center gap-1.5 rounded-[14px] border px-3 text-[0.54rem] font-semibold uppercase tracking-[0.16em] !cursor-pointer transition duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300/40",
+        "inline-flex h-9 w-9 items-center justify-center rounded-full border text-stone-200 !cursor-pointer transition duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300/40",
         toneClassName,
       )}
       onClick={onClick}
       type="button"
     >
       <span className="shrink-0">{children}</span>
-      <span>{label}</span>
     </button>
   );
 }
@@ -218,6 +169,7 @@ function WeaponRailSlot({
   snapshot: WeaponProgressSnapshot;
 }) {
   const slotProgress = getTierProgress(snapshot);
+  const tierBarClassName = getTierBarClassName(snapshot);
 
   return (
     <Tooltip content={weaponTooltip(snapshot, isSelected)}>
@@ -241,13 +193,6 @@ function WeaponRailSlot({
               : undefined
         }
       >
-        <div
-          className={cn(
-            "pointer-events-none absolute inset-x-0 top-0 h-5 bg-gradient-to-b opacity-70",
-            getTierAccentClassName(snapshot),
-          )}
-        />
-
         <div className="relative flex h-full items-center justify-center">
           {snapshot.locked ? (
             <div
@@ -274,13 +219,19 @@ function WeaponRailSlot({
           )}
         </div>
 
-        <div className="mt-0.5 h-0.5 overflow-hidden rounded-full bg-white/8">
+        <div
+          className={cn(
+            "mt-0.5 h-0.5 overflow-hidden rounded-full transition duration-200",
+            isSelected ? "bg-white/14" : "bg-white/8",
+          )}
+        >
           <div
             className={cn(
-              "h-full rounded-full bg-[linear-gradient(90deg,rgba(34,197,94,0.75),rgba(56,189,248,0.95),rgba(251,191,36,0.95))] transition-[width] duration-300",
+              "h-full rounded-full transition-[width] duration-300",
+              tierBarClassName,
               isSelected
                 ? "[animation:hud-weapon-breathe_1800ms_ease-in-out_infinite]"
-                : undefined,
+                : "opacity-72",
             )}
             style={{ width: `${slotProgress}%` }}
           />
@@ -356,6 +307,7 @@ export default function SiegeHud({
   codexMenuRef,
   codexOpen = false,
   debugMode = false,
+  elapsedMs = 0,
   gameMode,
   interactiveKills,
   interactivePoints,
@@ -377,10 +329,6 @@ export default function SiegeHud({
   unlockedStructures,
   weaponSnapshots,
 }: SiegeHudProps) {
-  const [detailsOpen, setDetailsOpen] = useState(false);
-  const [modeMenuOpen, setModeMenuOpen] = useState(false);
-  const modeMenuRef = useRef<HTMLDivElement | null>(null);
-  const gameModeMeta = SIEGE_GAME_MODE_META[gameMode];
   const [justUnlockedWeaponIds, setJustUnlockedWeaponIds] = useState<
     SiegeWeaponId[]
   >([]);
@@ -417,8 +365,6 @@ export default function SiegeHud({
   }, [justUnlockedWeaponIds]);
   const weaponCount = weaponSnapshots.length;
   const structureCount = visibleStructureIds.length;
-  const actionCount =
-    (codexMenuRef && onToggleCodex ? 1 : 0) + (onToggleDebugMode ? 1 : 0) + 1;
   const weaponSlotRem = 2.35;
   const structureSlotRem = 2;
   const railGapRem = 0.25;
@@ -439,34 +385,8 @@ export default function SiegeHud({
       sectionGapRem +
       1.5,
   );
-
-  useEffect(() => {
-    if (!modeMenuOpen) {
-      return undefined;
-    }
-
-    const handlePointerDown = (
-      event: globalThis.MouseEvent | globalThis.TouchEvent,
-    ) => {
-      const targetNode = event.target;
-
-      if (!(targetNode instanceof Node)) {
-        return;
-      }
-
-      if (modeMenuRef.current && !modeMenuRef.current.contains(targetNode)) {
-        setModeMenuOpen(false);
-      }
-    };
-
-    document.addEventListener("mousedown", handlePointerDown);
-    document.addEventListener("touchstart", handlePointerDown);
-
-    return () => {
-      document.removeEventListener("mousedown", handlePointerDown);
-      document.removeEventListener("touchstart", handlePointerDown);
-    };
-  }, [modeMenuOpen]);
+  const timerValue = formatElapsedTime(elapsedMs);
+  const bugsLabel = gameMode === "outbreak" ? "Infection" : "Bugs";
 
   useEffect(() => {
     const currentUnlockedWeaponIds = new Set(unlockedWeaponIds);
@@ -513,143 +433,51 @@ export default function SiegeHud({
     >
       <div className="pointer-events-none fixed left-3 top-3 z-[220] sm:left-4 sm:top-4">
         <div
-          data-testid="siege-hud"
+          data-testid="siege-hud-controls"
           data-hud-cursor="default"
-          className="pointer-events-auto w-full max-w-[19rem] select-none !cursor-default [animation:hud-notch-arrive_420ms_cubic-bezier(0.22,1,0.36,1)_forwards]"
+          className="pointer-events-auto w-full max-w-[26rem] select-none !cursor-default [animation:hud-notch-arrive_420ms_cubic-bezier(0.22,1,0.36,1)_forwards]"
         >
-          <HudShell className="px-2.5 py-2.5 shadow-[0_18px_42px_rgba(0,0,0,0.34)]">
-            <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(125,211,252,0.12),transparent_34%),linear-gradient(90deg,rgba(248,113,113,0.04),transparent_38%,rgba(251,191,36,0.04))]" />
+          <div className="flex flex-wrap items-center gap-2">
+            <div
+              aria-label="Siege mode"
+              className="inline-flex rounded-full border border-white/8 bg-black/28 p-0.5 shadow-[0_12px_28px_rgba(0,0,0,0.24)] backdrop-blur-xl"
+              role="tablist"
+            >
+              {(["purge", "outbreak"] as const).map((mode) => {
+                const meta = SIEGE_GAME_MODE_META[mode];
+                const selected = mode === gameMode;
 
-            <div className="relative space-y-2.5">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <div className="text-[0.5rem] font-semibold uppercase tracking-[0.22em] text-stone-500">
-                    {gameModeMeta.label}
-                  </div>
-                  <div className="mt-1 font-display text-[0.92rem] tracking-[-0.03em] text-stone-100">
-                    {gameModeMeta.shortLabel}
-                  </div>
-                </div>
-                <span className="inline-flex items-center rounded-full border border-emerald-300/18 bg-emerald-400/[0.08] px-2 py-1 text-[0.48rem] font-semibold uppercase tracking-[0.16em] text-emerald-100">
-                  Active
-                </span>
-              </div>
-
-              <div className="grid grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)] gap-1.5">
-                <div className="relative" ref={modeMenuRef}>
-                  <Tooltip content="Switch between Purge and Outbreak. For now this sets the active game mode UI and upcoming ruleset context.">
+                return (
+                  <Tooltip key={mode} content={meta.description}>
                     <button
-                      aria-expanded={modeMenuOpen}
-                      aria-haspopup="menu"
-                      className="flex min-h-[3.6rem] w-full items-center justify-between rounded-[16px] border border-white/10 bg-white/[0.04] px-3 py-2 text-left transition duration-150 hover:border-white/16 hover:bg-white/[0.06] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300/40"
-                      onClick={() => setModeMenuOpen((value) => !value)}
+                      aria-selected={selected}
+                      className={cn(
+                        "rounded-full px-3 py-1.5 text-[0.74rem] font-semibold transition duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300/40",
+                        selected
+                          ? "bg-sky-400/8 text-sky-100 shadow-[inset_0_0_0_1px_rgba(56,189,248,0.14)]"
+                          : "text-stone-400 hover:bg-white/4 hover:text-stone-100",
+                      )}
+                      onClick={() => onChangeGameMode?.(mode)}
+                      role="tab"
                       type="button"
                     >
-                      <div>
-                        <div className="text-[0.48rem] font-semibold uppercase tracking-[0.16em] text-stone-500">
-                          Game Mode
-                        </div>
-                        <div className="mt-1 text-[0.76rem] font-semibold text-stone-100">
-                          {gameModeMeta.label}
-                        </div>
-                      </div>
-                      <ChevronIcon open={modeMenuOpen} />
+                      {meta.shortLabel}
                     </button>
                   </Tooltip>
+                );
+              })}
+            </div>
 
-                  {modeMenuOpen ? (
-                    <div className="absolute left-0 right-0 top-[calc(100%+8px)] z-[280] grid gap-1.5 rounded-[18px] border border-white/10 bg-zinc-950/96 p-2 shadow-[0_20px_40px_rgba(0,0,0,0.36)] backdrop-blur-xl">
-                      {(["purge", "outbreak"] as const).map((mode) => {
-                        const meta = SIEGE_GAME_MODE_META[mode];
-                        const selected = mode === gameMode;
-
-                        return (
-                          <button
-                            key={mode}
-                            className={cn(
-                              "grid gap-1 rounded-[14px] border px-3 py-2 text-left transition duration-150",
-                              selected
-                                ? "border-sky-300/28 bg-sky-400/[0.08]"
-                                : "border-white/8 bg-white/[0.03] hover:border-white/14 hover:bg-white/[0.05]",
-                            )}
-                            onClick={() => {
-                              onChangeGameMode?.(mode);
-                              setModeMenuOpen(false);
-                            }}
-                            type="button"
-                          >
-                            <div className="flex items-center justify-between gap-2">
-                              <span className="text-[0.72rem] font-semibold text-stone-100">
-                                {meta.label}
-                              </span>
-                              <span className="rounded-full border border-white/10 bg-white/[0.04] px-2 py-0.5 text-[0.52rem] font-semibold uppercase tracking-[0.14em] text-stone-300">
-                                {meta.shortLabel}
-                              </span>
-                            </div>
-                            <span className="text-[0.66rem] leading-4 text-stone-400">
-                              {meta.description}
-                            </span>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  ) : null}
-                </div>
-
-                <Tooltip
-                  content={
-                    gameMode === "purge"
-                      ? "Placeholder for the Purge clear-time clock."
-                      : "Placeholder for the Outbreak survival timer."
-                  }
-                >
-                  <div className="min-h-[3.6rem] rounded-[16px] border border-white/10 bg-white/[0.04] px-3 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
-                    <div className="text-[0.48rem] font-semibold uppercase tracking-[0.16em] text-stone-500">
-                      {gameMode === "purge" ? "Purge Timer" : "Survival Timer"}
-                    </div>
-                    <div className="mt-1 font-display text-[1rem] leading-none tracking-[-0.04em] text-stone-100">
-                      00:00
-                    </div>
-                    <div className="mt-1 text-[0.58rem] uppercase tracking-[0.14em] text-stone-500">
-                      Placeholder
-                    </div>
-                  </div>
-                </Tooltip>
-              </div>
-
-              <div className="grid grid-cols-3 gap-1.5">
-                <HudStatTile
-                  label="Bugs"
-                  toneClassName="border-red-300/14 bg-red-500/[0.08]|text-red-100/70"
-                  value={interactiveRemainingBugs}
-                />
-                <HudStatTile
-                  label="Kills"
-                  toneClassName="border-white/10 bg-white/[0.04]|text-stone-500"
-                  value={interactiveKills}
-                />
-                <HudStatTile
-                  label="Pts"
-                  toneClassName="border-amber-300/14 bg-amber-400/[0.08]|text-amber-100/70"
-                  value={interactivePoints}
-                />
-              </div>
-
-              <div
-                className={cn(
-                  "grid gap-1.5",
-                  actionCount >= 3 ? "grid-cols-3" : "grid-cols-2",
-                )}
-              >
-                {codexMenuRef && onToggleCodex ? (
-                  <CodexPanel
-                    containerRef={codexMenuRef}
-                    onMenuToggle={onToggleCodex}
-                    open={codexOpen}
-                    trigger={
+            <div className="flex items-center gap-1.5">
+              {codexMenuRef && onToggleCodex ? (
+                <CodexPanel
+                  containerRef={codexMenuRef}
+                  onMenuToggle={onToggleCodex}
+                  open={codexOpen}
+                  trigger={
+                    <Tooltip content="Open codex">
                       <HudActionButton
                         active={codexOpen}
-                        label="Codex"
                         onClick={onToggleCodex}
                       >
                         <svg
@@ -667,13 +495,15 @@ export default function SiegeHud({
                           <path d="M10.1 7.2h5.8M10.1 10.4h5.8" />
                         </svg>
                       </HudActionButton>
-                    }
-                  />
-                ) : null}
-                {onToggleDebugMode ? (
+                    </Tooltip>
+                  }
+                />
+              ) : null}
+
+              {onToggleDebugMode ? (
+                <Tooltip content="Toggle debug overlay">
                   <HudActionButton
                     active={debugMode}
-                    label="Debug"
                     onClick={onToggleDebugMode}
                     tone="info"
                   >
@@ -693,8 +523,11 @@ export default function SiegeHud({
                       <path d="M9 7V5a3 3 0 0 1 6 0v2M4 11h2m12 0h2" />
                     </svg>
                   </HudActionButton>
-                ) : null}
-                <HudActionButton label="Exit" onClick={onExit} tone="danger">
+                </Tooltip>
+              ) : null}
+
+              <Tooltip content="Exit siege">
+                <HudActionButton onClick={onExit} tone="danger">
                   <svg
                     aria-hidden="true"
                     className="h-3.5 w-3.5"
@@ -709,21 +542,131 @@ export default function SiegeHud({
                     <path d="M9 12h10" />
                   </svg>
                 </HudActionButton>
+              </Tooltip>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="pointer-events-none fixed inset-x-0 top-[4.65rem] z-[220] flex justify-center px-3 sm:top-4">
+        <div className="pointer-events-auto w-full max-w-[28rem] select-none !cursor-default [animation:hud-notch-arrive_420ms_cubic-bezier(0.22,1,0.36,1)_forwards]">
+          <HudShell className="px-2 py-1.5 shadow-[0_18px_42px_rgba(0,0,0,0.34)]">
+            <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(125,211,252,0.11),transparent_30%),linear-gradient(90deg,rgba(248,113,113,0.05),transparent_34%,rgba(251,191,36,0.05))]" />
+
+            <div className="relative space-y-1.5">
+              <div className="flex items-stretch rounded-full border border-white/8 bg-black/18 px-1.5 py-1 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
+                <div className="grid min-w-0 flex-1 grid-cols-4 gap-1">
+                  <div className="flex min-w-0 items-center gap-2 rounded-full px-2 py-1.5">
+                    <span className="text-[0.43rem] font-semibold uppercase tracking-[0.14em] text-red-100/65">
+                      {bugsLabel}
+                    </span>
+                    <strong className="truncate font-display text-[0.9rem] leading-none tracking-[-0.04em] text-stone-50">
+                      {interactiveRemainingBugs.toLocaleString()}
+                    </strong>
+                  </div>
+                  <div className="flex min-w-0 items-center gap-2 rounded-full border-l border-white/6 px-2 py-1.5">
+                    <span className="text-[0.43rem] font-semibold uppercase tracking-[0.14em] text-stone-500">
+                      Kills
+                    </span>
+                    <strong className="truncate font-display text-[0.9rem] leading-none tracking-[-0.04em] text-stone-50">
+                      {interactiveKills.toLocaleString()}
+                    </strong>
+                  </div>
+                  <div className="flex min-w-0 items-center gap-2 rounded-full border-l border-white/6 px-2 py-1.5">
+                    <span className="text-[0.43rem] font-semibold uppercase tracking-[0.14em] text-amber-100/65">
+                      Points
+                    </span>
+                    <strong className="truncate font-display text-[0.9rem] leading-none tracking-[-0.04em] text-stone-50">
+                      {interactivePoints.toLocaleString()}
+                    </strong>
+                  </div>
+                  <Tooltip
+                    content={
+                      gameMode === "purge"
+                        ? "Elapsed clear time."
+                        : "Elapsed survival time."
+                    }
+                  >
+                    <div className="flex min-w-0 items-center justify-center gap-2 rounded-full border border-cyan-300/12 bg-cyan-500/[0.08] px-2 py-1.5 text-center">
+                      <span className="text-[0.43rem] font-semibold uppercase tracking-[0.14em] text-cyan-100/65">
+                        Time
+                      </span>
+                      <strong className="font-display text-[0.94rem] leading-none tracking-[-0.05em] text-stone-50">
+                        {timerValue}
+                      </strong>
+                    </div>
+                  </Tooltip>
+                </div>
               </div>
+
+              {killStreak >= 3 || unlockToast || upgradeToast ? (
+                <div className="flex flex-wrap items-center justify-center gap-1 pt-0.5 text-center">
+                  {killStreak >= 3 ? (
+                    <HudEventPill className="border-amber-300/24 bg-amber-400/10 text-amber-100">
+                      {`Streak x${streakMultiplier.toFixed(1)}`}
+                    </HudEventPill>
+                  ) : null}
+                  {unlockToast ? (
+                    <HudEventPill className="border-emerald-300/24 bg-emerald-400/10 text-emerald-100 [animation:evolve-toast_2600ms_ease_forwards]">
+                      {unlockToast}
+                    </HudEventPill>
+                  ) : null}
+                  {upgradeToast ? (
+                    <HudEventPill className="border-sky-300/24 bg-sky-400/10 text-sky-100 [animation:evolve-toast_2600ms_ease_forwards]">
+                      {upgradeToast}
+                    </HudEventPill>
+                  ) : null}
+                </div>
+              ) : null}
             </div>
           </HudShell>
         </div>
       </div>
 
-      <div className="pointer-events-none mx-auto flex w-full max-w-[1120px] justify-center">
+      <div className="pointer-events-none fixed inset-x-0 bottom-3 z-[220] flex justify-center px-3 sm:bottom-4">
         <div
-          className="pointer-events-auto relative z-[220] max-w-[calc(100vw-1.5rem)] select-none !cursor-default transition-[width,max-width] duration-300 [animation:hud-notch-arrive_420ms_cubic-bezier(0.22,1,0.36,1)_forwards] sm:max-w-[calc(100vw-19rem)]"
+          className="pointer-events-auto relative z-[220] max-w-[calc(100vw-1.5rem)] select-none !cursor-default transition-[width,max-width] duration-300 [animation:hud-notch-arrive_420ms_cubic-bezier(0.22,1,0.36,1)_forwards]"
           style={{ width: `${toolbeltWidthRem}rem` }}
         >
-          <HudShell className="px-2.5 py-1.5 shadow-[0_22px_54px_rgba(0,0,0,0.38)]">
+          <HudShell className="px-2.5 py-2 shadow-[0_22px_54px_rgba(0,0,0,0.38)]">
             <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.02),transparent_48%)]" />
 
-            <div className="relative">
+            <div className="relative space-y-2">
+              {selectedSnapshot ? (
+                <div className="flex items-start justify-between gap-3 rounded-[14px] border border-white/10 bg-white/[0.05] px-3 py-2">
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate font-display text-[0.96rem] leading-none tracking-[-0.04em] text-stone-50">
+                      {selectedSnapshot.title}
+                    </div>
+                    <div className="mt-1 text-[0.52rem] uppercase tracking-[0.14em] text-stone-500">
+                      {selectedSnapshot.typeLabel} ·{" "}
+                      {INPUT_MODE_LABEL[selectedSnapshot.inputMode] ??
+                        selectedSnapshot.inputMode}
+                    </div>
+                    <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-white/8">
+                      <div
+                        className={cn(
+                          "relative h-full rounded-full transition-[width] duration-500",
+                          getTierBarClassName(selectedSnapshot),
+                        )}
+                        style={{ width: `${selectedProgress}%` }}
+                      >
+                        <div className="absolute inset-y-0 left-0 w-8 bg-white/30 [animation:hud-progress-scan_1400ms_linear_infinite]" />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex shrink-0 items-center gap-1">
+                    <span className="rounded-full border border-white/10 bg-black/22 px-1.5 py-0.5 text-[0.48rem] font-semibold uppercase tracking-[0.12em] text-stone-200">
+                      {`Level ${selectedSnapshot.tier}`}
+                    </span>
+                    <span className="rounded-full border border-white/10 bg-white/[0.06] px-1.5 py-0.5 text-[0.48rem] font-semibold uppercase tracking-[0.12em] text-stone-100">
+                      {getTierProgressCompact(selectedSnapshot)}
+                    </span>
+                  </div>
+                </div>
+              ) : null}
+
               <div className="flex items-center gap-2">
                 <div
                   data-no-hammer
@@ -759,8 +702,8 @@ export default function SiegeHud({
                       className="flex shrink-0 items-center gap-1"
                       style={{ width: `${structureRailWidthRem}rem` }}
                     >
-                      {STRUCTURE_DEFS.filter((s) =>
-                        visibleStructureIds.includes(s.id),
+                      {STRUCTURE_DEFS.filter((structure) =>
+                        visibleStructureIds.includes(structure.id),
                       ).map((structure) => {
                         const isArming = placingStructureId === structure.id;
                         const isJustUnlocked =
@@ -785,117 +728,8 @@ export default function SiegeHud({
               </div>
             </div>
           </HudShell>
-
-          {killStreak >= 3 || unlockToast || upgradeToast ? (
-            <div className="pointer-events-none mt-2 flex justify-center">
-              <div className="pointer-events-auto flex max-w-[30rem] flex-wrap items-center justify-center gap-2 px-2.5 py-2 text-center">
-                {killStreak >= 3 ? (
-                  <HudEventPill className="border-amber-300/24 bg-amber-400/12 text-amber-100">
-                    {`Streak x${streakMultiplier.toFixed(1)}`}
-                  </HudEventPill>
-                ) : null}
-                {unlockToast ? (
-                  <HudEventPill className="border-emerald-300/24 bg-emerald-400/10 text-emerald-100 [animation:evolve-toast_2600ms_ease_forwards]">
-                    {unlockToast}
-                  </HudEventPill>
-                ) : null}
-                {upgradeToast ? (
-                  <HudEventPill className="border-sky-300/24 bg-sky-400/10 text-sky-100 [animation:evolve-toast_2600ms_ease_forwards]">
-                    {upgradeToast}
-                  </HudEventPill>
-                ) : null}
-              </div>
-            </div>
-          ) : null}
         </div>
       </div>
-
-      {selectedSnapshot ? (
-        <div className="pointer-events-none fixed right-3 top-3 z-[220] w-[min(16.5rem,calc(100vw-1.5rem))] sm:right-4 sm:top-4">
-          <div
-            data-hud-cursor="default"
-            className={cn(
-              HUD_SHELL_CLASS_NAME,
-              "pointer-events-auto rounded-[20px] border-white/10 bg-[linear-gradient(180deg,rgba(6,10,14,0.96),rgba(9,12,16,0.9))] p-2 select-none !cursor-default shadow-[0_20px_56px_rgba(0,0,0,0.34)]",
-              justEvolvedWeaponId === selectedSnapshot.id
-                ? "[animation:hud-weapon-breathe_960ms_ease-out_1]"
-                : "",
-            )}
-          >
-            <div
-              className={cn(
-                "pointer-events-none absolute inset-x-0 top-0 h-12 bg-gradient-to-b opacity-85",
-                getTierAccentClassName(selectedSnapshot),
-              )}
-            />
-
-            <button
-              data-no-hammer
-              data-hud-cursor="pointer"
-              aria-expanded={detailsOpen}
-              aria-label={
-                detailsOpen
-                  ? "Collapse progress details"
-                  : "Expand progress details"
-              }
-              className="relative flex w-full items-center justify-between gap-2 px-2 py-1.5 text-left !cursor-pointer transition duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300/40"
-              onClick={() => setDetailsOpen((value) => !value)}
-              type="button"
-            >
-              <div className="min-w-0">
-                <div className="mt-0.5 truncate font-display text-[0.9rem] leading-none tracking-[-0.04em] text-stone-50">
-                  {selectedSnapshot.title}
-                </div>
-              </div>
-              <div className="flex shrink-0 items-center gap-1">
-                <span className="rounded-full border border-white/10 bg-white/[0.05] px-1.5 py-0.5 text-[0.48rem] font-semibold uppercase tracking-[0.12em] text-stone-200">
-                  {`Level ${selectedSnapshot.tier}`}
-                </span>
-                <span className="rounded-full border border-sky-300/18 bg-sky-400/[0.08] px-1.5 py-0.5 text-[0.48rem] font-semibold uppercase tracking-[0.12em] text-sky-100">
-                  {getTierProgressCompact(selectedSnapshot)}
-                </span>
-                <ChevronIcon open={detailsOpen} />
-              </div>
-            </button>
-
-            {detailsOpen ? (
-              <div className="relative mt-2 space-y-2">
-                <div className="text-[0.52rem] uppercase tracking-[0.14em] text-stone-500">
-                  {selectedSnapshot.typeLabel} ·{" "}
-                  {INPUT_MODE_LABEL[selectedSnapshot.inputMode] ??
-                    selectedSnapshot.inputMode}
-                </div>
-
-                <p className="text-[0.62rem] leading-4 text-stone-300">
-                  {selectedSnapshot.hint}
-                </p>
-
-                <div className="rounded-[14px] border border-white/8 bg-black/22 p-2">
-                  <div className="flex items-center justify-between gap-3 text-[0.5rem] font-semibold uppercase tracking-[0.14em] text-stone-500">
-                    <span>Upgrade Progress</span>
-                    <span>
-                      {selectedSnapshot.killsToNextTier == null
-                        ? "Max"
-                        : `${selectedSnapshot.killsToNextTier} to next upgrade`}
-                    </span>
-                  </div>
-                  <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-white/8">
-                    <div
-                      className="relative h-full rounded-full bg-[linear-gradient(90deg,rgba(34,197,94,0.8),rgba(56,189,248,0.95),rgba(251,191,36,0.92))] transition-[width] duration-500"
-                      style={{ width: `${selectedProgress}%` }}
-                    >
-                      <div className="absolute inset-y-0 left-0 w-8 bg-white/30 [animation:hud-progress-scan_1400ms_linear_infinite]" />
-                    </div>
-                  </div>
-                  <div className="mt-1.5 text-[0.6rem] text-stone-300">
-                    {getTierCopy(selectedSnapshot)}
-                  </div>
-                </div>
-              </div>
-            ) : null}
-          </div>
-        </div>
-      ) : null}
     </div>
   );
 }

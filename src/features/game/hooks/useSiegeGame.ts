@@ -56,6 +56,8 @@ export function useSiegeGame({
   const [interactiveKills, setInteractiveKills] = useState(0);
   const [interactivePoints, setInteractivePoints] = useState(0);
   const [interactiveRemainingBugs, setInteractiveRemainingBugs] = useState(0);
+  const [interactiveStartedAt, setInteractiveStartedAt] = useState<number | null>(null);
+  const [interactiveElapsedMs, setInteractiveElapsedMs] = useState(0);
   const [interactiveSessionKey, setInteractiveSessionKey] = useState<
     string | null
   >(null);
@@ -73,6 +75,7 @@ export function useSiegeGame({
   const interactiveMode = siegePhase !== "idle";
 
   const enterInteractiveMode = useCallback((nextMode: SiegeGameMode = gameMode) => {
+    const startedAt = Date.now();
     if (phaseTimerRef.current != null) {
       window.clearTimeout(phaseTimerRef.current);
     }
@@ -81,6 +84,8 @@ export function useSiegeGame({
     setInteractivePoints(0);
     setInteractiveInitialBugCounts(currentBugCounts);
     setInteractiveRemainingBugs(currentBugCount);
+    setInteractiveStartedAt(startedAt);
+    setInteractiveElapsedMs(0);
     setInteractiveSessionKey(`${Date.now()}`);
     setKillStreak(0);
     setStreakMultiplier(1);
@@ -225,6 +230,27 @@ export function useSiegeGame({
     },
     [],
   );
+
+  useEffect(() => {
+    if (!interactiveMode || interactiveStartedAt == null) {
+      if (!interactiveMode) {
+        setInteractiveElapsedMs(0);
+        setInteractiveStartedAt(null);
+      }
+      return undefined;
+    }
+
+    const syncElapsedMs = () => {
+      setInteractiveElapsedMs(Math.max(0, Date.now() - interactiveStartedAt));
+    };
+
+    syncElapsedMs();
+    const intervalId = window.setInterval(syncElapsedMs, 250);
+
+    return () => {
+      window.clearInterval(intervalId);
+    };
+  }, [interactiveMode, interactiveStartedAt]);
 
   useEffect(() => {
     if (typeof window === "undefined") {
@@ -393,10 +419,12 @@ export function useSiegeGame({
     handleInteractiveHit,
     handleWeaponFired,
     interactiveInitialBugCounts,
+    interactiveElapsedMs,
     interactiveKills,
     interactiveMode,
     interactivePoints,
     interactiveRemainingBugs,
+    interactiveStartedAt,
     interactiveSessionKey,
     killStreak,
     lastFireTimes,
