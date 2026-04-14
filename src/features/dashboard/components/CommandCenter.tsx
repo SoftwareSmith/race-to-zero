@@ -7,20 +7,37 @@ import {
   getDeltaTone,
   getStatusTagText,
 } from "../utils/dashboard";
-import type { DeadlineMetrics, SummaryMetrics } from "../../../types/dashboard";
+import type {
+  DeadlineMetrics,
+  SummaryMetrics,
+  ActiveTab,
+  ComparisonMetrics,
+} from "../../../types/dashboard";
 
 interface CommandCenterProps {
+  activeTab: ActiveTab;
+  comparisonMetrics?: ComparisonMetrics | null;
   deadlineMetrics: DeadlineMetrics;
   siegeMode?: boolean;
   summary: SummaryMetrics;
 }
 
 function CommandCenter({
+  activeTab,
+  comparisonMetrics = null,
   deadlineMetrics,
   siegeMode = false,
   summary,
 }: CommandCenterProps) {
-  const paceGap = summary.currentFixRate - summary.bugsPerDayRequired;
+  const isPeriods = activeTab === "periods" && comparisonMetrics;
+
+  // choose period or overview values
+  const periodWindow = isPeriods ? comparisonMetrics!.currentWindow : null;
+
+  const paceGap = isPeriods
+    ? periodWindow!.fixRate - periodWindow!.addRate
+    : summary.currentFixRate - summary.bugsPerDayRequired;
+
   const paceTone = getDeltaTone(paceGap);
   const metricShellClassName =
     {
@@ -29,6 +46,9 @@ function CommandCenter({
       neutral: "border-sky-400/18 bg-sky-500/[0.05] text-sky-100",
     }[paceTone] ?? "border-sky-400/18 bg-sky-500/[0.05] text-sky-100";
 
+  const statusTone = isPeriods
+    ? comparisonMetrics!.tone
+    : deadlineMetrics.statusTone;
   const statusGlowClassName =
     {
       positive:
@@ -37,8 +57,10 @@ function CommandCenter({
         "before:bg-[radial-gradient(circle_at_top_left,rgba(239,68,68,0.14),transparent_42%)] after:bg-[radial-gradient(circle_at_bottom_right,rgba(56,189,248,0.08),transparent_38%)]",
       neutral:
         "before:bg-[radial-gradient(circle_at_top_left,rgba(56,189,248,0.14),transparent_42%)] after:bg-[radial-gradient(circle_at_bottom_right,rgba(20,184,166,0.08),transparent_38%)]",
-    }[deadlineMetrics.statusTone] ??
+    }[statusTone] ??
     "before:bg-[radial-gradient(circle_at_top_left,rgba(56,189,248,0.14),transparent_42%)] after:bg-[radial-gradient(circle_at_bottom_right,rgba(20,184,166,0.08),transparent_38%)]";
+
+  const title = isPeriods ? "Period Outlook" : "Delivery outlook";
 
   return (
     <Surface
@@ -54,10 +76,10 @@ function CommandCenter({
           <div className="w-full">
             <div className="flex flex-wrap items-center gap-3">
               <p className="text-[0.62rem] font-semibold uppercase tracking-[0.28em] text-stone-500">
-                Delivery outlook
+                {title}
               </p>
-              <StatusTag tone={deadlineMetrics.statusTone}>
-                {getStatusTagText(deadlineMetrics.statusTone)}
+              <StatusTag tone={statusTone}>
+                {getStatusTagText(statusTone)}
               </StatusTag>
             </div>
           </div>
@@ -73,7 +95,9 @@ function CommandCenter({
                 Fix velocity
               </div>
               <div className="mt-1 font-display text-[1.45rem] leading-none tracking-[-0.04em]">
-                {`${formatNumber(summary.currentFixRate, 2)}/day`}
+                {isPeriods
+                  ? `${formatNumber(periodWindow!.fixRate, 2)}/day`
+                  : `${formatNumber(summary.currentFixRate, 2)}/day`}
               </div>
             </div>
             <div className="rounded-[18px] border border-white/10 bg-white/[0.03] px-3 py-2.5 text-stone-100">
@@ -81,7 +105,9 @@ function CommandCenter({
                 Required pace
               </div>
               <div className="mt-1 font-display text-[1.45rem] leading-none tracking-[-0.04em]">
-                {`${formatNumber(summary.bugsPerDayRequired, 2)}/day`}
+                {isPeriods
+                  ? `${formatNumber(periodWindow!.addRate, 2)}/day`
+                  : `${formatNumber(summary.bugsPerDayRequired, 2)}/day`}
               </div>
             </div>
             <div
@@ -94,7 +120,9 @@ function CommandCenter({
                 Net difference
               </div>
               <div className="mt-1 font-display text-[1.45rem] leading-none tracking-[-0.04em]">
-                {`${formatSignedNumber(paceGap, 2)}/day`}
+                {isPeriods
+                  ? `${formatSignedNumber(periodWindow!.netBurnRate, 2)}/day`
+                  : `${formatSignedNumber(paceGap, 2)}/day`}
               </div>
             </div>
           </div>

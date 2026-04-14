@@ -311,6 +311,8 @@ function AppContent() {
           )}
         >
           <CommandCenter
+            activeTab={dashboard.activeTab}
+            comparisonMetrics={dashboard.comparisonMetrics}
             deadlineMetrics={dashboard.deadlineMetrics}
             siegeMode={siegeGame.interactiveMode}
             summary={dashboard.summary}
