@@ -152,10 +152,10 @@ const BackgroundField = memo(function BackgroundField({
     : `${interactiveMode ? "interactive" : "ambient"}:${bugCountsKey}`;
   const { hammerPositionRef, hammerSwing, triggerHammerSwing } =
     useWeaponCursorState(interactiveMode);
-  const {
-    cursorLastFireTimes,
-    recordCursorFire,
-  } = useWeaponFireTimes(gameSessionKey, interactiveMode);
+  const { cursorLastFireTimes, recordCursorFire } = useWeaponFireTimes(
+    gameSessionKey,
+    interactiveMode,
+  );
   const [weaponEffects, setWeaponEffects] = useState<WeaponEffectEvent[]>([]);
   const onWeaponFiredRef = useRef(onWeaponFired);
 

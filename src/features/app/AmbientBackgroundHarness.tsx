@@ -19,7 +19,8 @@ const AmbientBackgroundHarness = memo(function AmbientBackgroundHarness({
     [metrics.currentBugCounts],
   );
   const visibilityKey = useMemo(
-    () => `${fullDensity ? "full" : "ambient"}:${Object.values(bugCounts).join(":")}`,
+    () =>
+      `${fullDensity ? "full" : "ambient"}:${Object.values(bugCounts).join(":")}`,
     [bugCounts, fullDensity],
   );
   const [revealedKey, setRevealedKey] = useState(

@@ -43,8 +43,7 @@ function CompletionActionCard({
       "border-white/12 bg-white/6 hover:border-white/20 hover:bg-white/10",
     emerald:
       "border-emerald-300/24 bg-emerald-300/10 hover:border-emerald-200/40 hover:bg-emerald-300/16",
-    sky:
-      "border-sky-300/24 bg-sky-300/10 hover:border-sky-200/40 hover:bg-sky-300/16",
+    sky: "border-sky-300/24 bg-sky-300/10 hover:border-sky-200/40 hover:bg-sky-300/16",
   }[tone];
   const labelClassName = {
     default: "text-stone-400",
@@ -58,7 +57,9 @@ function CompletionActionCard({
       onClick={onClick}
       type="button"
     >
-      <div className={`text-[0.72rem] uppercase tracking-[0.18em] ${labelClassName}`}>
+      <div
+        className={`text-[0.72rem] uppercase tracking-[0.18em] ${labelClassName}`}
+      >
         {label}
       </div>
       <div className="mt-2 text-lg font-semibold text-white">{title}</div>
@@ -74,7 +75,8 @@ const SiegeRunCompleteOverlay = memo(function SiegeRunCompleteOverlay({
   onExit,
   onSwitchMode,
 }: SiegeRunCompleteOverlayProps) {
-  const alternateMode = completionSummary.mode === "purge" ? "outbreak" : "purge";
+  const alternateMode =
+    completionSummary.mode === "purge" ? "outbreak" : "purge";
   const alternateModeMeta = SIEGE_GAME_MODE_META[alternateMode];
   const modeMeta = SIEGE_GAME_MODE_META[completionSummary.mode];
   const actionCards: CompletionActionCardProps[] = [
@@ -129,7 +131,9 @@ const SiegeRunCompleteOverlay = memo(function SiegeRunCompleteOverlay({
           <div className="grid gap-6 lg:grid-cols-[1.3fr_0.9fr]">
             <div className="space-y-5">
               <div className="inline-flex items-center gap-2 rounded-full border border-emerald-400/24 bg-emerald-300/10 px-3 py-1 text-[0.72rem] font-semibold uppercase tracking-[0.22em] text-emerald-100">
-                {completionSummary.isNewBest ? "New local best" : `Leaderboard rank ${completionSummary.rank}`}
+                {completionSummary.isNewBest
+                  ? "New local best"
+                  : `Leaderboard rank ${completionSummary.rank}`}
               </div>
 
               <div className="space-y-2">
@@ -140,25 +144,33 @@ const SiegeRunCompleteOverlay = memo(function SiegeRunCompleteOverlay({
                   Swarm cleared. The lane is stable.
                 </h2>
                 <p className="max-w-2xl text-sm leading-6 text-stone-300 sm:text-[0.95rem]">
-                  {completionSummary.bugCount.toLocaleString()} bugs cleared in {formatElapsedTime(completionSummary.elapsedMs)} with {completionSummary.topWeaponLabel} leading the run.
+                  {completionSummary.bugCount.toLocaleString()} bugs cleared in{" "}
+                  {formatElapsedTime(completionSummary.elapsedMs)} with{" "}
+                  {completionSummary.topWeaponLabel} leading the run.
                 </p>
               </div>
 
               <div className="grid gap-3 sm:grid-cols-3">
                 <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-                  <div className="text-[0.7rem] uppercase tracking-[0.2em] text-stone-400">Bug count</div>
+                  <div className="text-[0.7rem] uppercase tracking-[0.2em] text-stone-400">
+                    Bug count
+                  </div>
                   <div className="mt-2 text-3xl font-semibold tracking-[-0.04em] text-white">
                     {completionSummary.bugCount.toLocaleString()}
                   </div>
                 </div>
                 <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-                  <div className="text-[0.7rem] uppercase tracking-[0.2em] text-stone-400">Final time</div>
+                  <div className="text-[0.7rem] uppercase tracking-[0.2em] text-stone-400">
+                    Final time
+                  </div>
                   <div className="mt-2 text-3xl font-semibold tracking-[-0.04em] text-white">
                     {formatElapsedTime(completionSummary.elapsedMs)}
                   </div>
                 </div>
                 <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-                  <div className="text-[0.7rem] uppercase tracking-[0.2em] text-stone-400">Bugs per second</div>
+                  <div className="text-[0.7rem] uppercase tracking-[0.2em] text-stone-400">
+                    Bugs per second
+                  </div>
                   <div className="mt-2 text-3xl font-semibold tracking-[-0.04em] text-white">
                     {completionSummary.bugsPerSecond.toFixed(2)}
                   </div>
@@ -179,7 +191,8 @@ const SiegeRunCompleteOverlay = memo(function SiegeRunCompleteOverlay({
                     Local leaderboard
                   </p>
                   <p className="mt-1 text-sm text-stone-300">
-                    Best clears are ranked by bug count first, then by fastest finish.
+                    Best clears are ranked by bug count first, then by fastest
+                    finish.
                   </p>
                 </div>
                 <div className="rounded-full border border-white/10 bg-white/6 px-2.5 py-1 text-[0.68rem] font-semibold uppercase tracking-[0.18em] text-stone-300">
@@ -198,10 +211,13 @@ const SiegeRunCompleteOverlay = memo(function SiegeRunCompleteOverlay({
                     </div>
                     <div>
                       <div className="text-sm font-semibold text-white">
-                        {entry.bugCount.toLocaleString()} bugs • {formatElapsedTime(entry.elapsedMs)}
+                        {entry.bugCount.toLocaleString()} bugs •{" "}
+                        {formatElapsedTime(entry.elapsedMs)}
                       </div>
                       <div className="mt-1 text-xs uppercase tracking-[0.16em] text-stone-400">
-                        {SIEGE_GAME_MODE_META[entry.mode].shortLabel} • {entry.topWeaponLabel} • {entry.bugsPerSecond.toFixed(2)} bugs/s
+                        {SIEGE_GAME_MODE_META[entry.mode].shortLabel} •{" "}
+                        {entry.topWeaponLabel} •{" "}
+                        {entry.bugsPerSecond.toFixed(2)} bugs/s
                       </div>
                     </div>
                     <div className="text-right text-[0.68rem] uppercase tracking-[0.14em] text-stone-500">
