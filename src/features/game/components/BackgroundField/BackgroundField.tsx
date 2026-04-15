@@ -26,20 +26,11 @@ import WeaponCursor from "@game/components/WeaponCursor";
 import WeaponEffectLayer from "@game/components/WeaponEffectLayer";
 import StructureLayer from "@game/components/StructureLayer";
 import { createEffectEvent, isEffectAlive } from "@game/utils/weaponEffects";
+import { getWeaponHeatProfile } from "@game/utils/weaponHeat";
 import type { GameConfig } from "@game/engine/types";
 import BugCanvas from "./BugCanvas";
 import type { BugHitPayload, GameState } from "./types";
 import { getSplatClassName } from "./splat";
-
-// Weapons that use the legacy overlay effect layer (WeaponEffectLayer).
-// All others rely exclusively on Pixi VFX rendered by the executor/adapter.
-const OVERLAY_EFFECT_WEAPONS = new Set<SiegeWeaponId>([
-  WeaponId.Freeze,
-  WeaponId.ChainZap,
-  WeaponId.TracerBloom,
-  WeaponId.NullPointer,
-  WeaponId.VoidPulse,
-]);
 
 interface BackgroundFieldProps {
   bugCounts: BugCounts;
@@ -212,20 +203,24 @@ const BackgroundField = memo(function BackgroundField({
         targetX?: number;
         targetY?: number;
         color?: string;
+        segments?: Array<{ x1: number; y1: number; x2: number; y2: number }>;
       },
     ) => {
-      let startedAt = performance.now();
+      const tier = getWeaponTier(weapon);
+      const heat = getWeaponHeatProfile(tier);
+      const event = createEffectEvent(weapon, x, y, {
+        ...extras,
+        heatColor: heat.accent,
+        heatCore: heat.core,
+        heatScale: heat.burstScale,
+        heatStage: heat.stage,
+      });
+      const startedAt = event.startedAt;
 
-      // Weapons that already have upgraded Pixi VFX should not also render the
-      // legacy overlay effect, otherwise both old and new visuals stack.
-      if (OVERLAY_EFFECT_WEAPONS.has(weapon)) {
-        const event = createEffectEvent(weapon, x, y, extras);
-        startedAt = event.startedAt;
-        setWeaponEffects((prev) => {
-          const now = performance.now();
-          return [...prev.filter((e) => isEffectAlive(e, now)), event];
-        });
-      }
+      setWeaponEffects((prev) => {
+        const now = performance.now();
+        return [...prev.filter((e) => isEffectAlive(e, now)), event];
+      });
 
       setCursorLastFireTimes((prev) => ({
         ...prev,
@@ -238,7 +233,7 @@ const BackgroundField = memo(function BackgroundField({
       // Notify parent so it can update reload bar state
       onWeaponFiredRef.current?.(weapon, startedAt);
     },
-    [],
+    [getWeaponTier],
   );
 
   const [gameState, setGameState] = useState<GameState>(() => ({
@@ -559,6 +554,7 @@ const BackgroundField = memo(function BackgroundField({
           }
           lastFiredAt={cursorLastFireTimes[selectedWeaponId]}
           structureId={placingStructureId ?? undefined}
+          weaponTier={getWeaponTier(selectedWeaponId)}
           weaponId={selectedWeaponId}
           swinging={hammerSwing}
         />

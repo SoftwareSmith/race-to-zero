@@ -1,5 +1,6 @@
 import { cn } from "@shared/utils/cn";
 import type { StructureId, WeaponProgressSnapshot } from "@game/types";
+import { getWeaponHeatProfile } from "@game/utils/weaponHeat";
 
 export const INPUT_MODE_LABEL: Record<string, string> = {
   click: "Click",
@@ -31,15 +32,18 @@ export function getSlotClassName(
   isSelected: boolean,
 ) {
   return cn(
-    "relative h-10 min-w-[2.35rem] overflow-hidden rounded-[12px] border px-0.5 py-1 text-sm text-stone-200 transition duration-200",
+    "relative h-10 min-w-[2.35rem] overflow-hidden rounded-[12px] border px-0.5 py-1 text-sm text-stone-200",
     isSelected
-      ? "border-white/18 bg-[linear-gradient(180deg,rgba(255,255,255,0.18),rgba(25,26,30,0.94))] shadow-[0_0_18px_rgba(255,255,255,0.08)]"
+      ? getTierSelectedFrameClassName(snapshot)
       : "",
     snapshot.locked
       ? "border-white/6 bg-black/16 opacity-70"
       : isSelected
         ? ""
-        : "border-white/8 bg-white/[0.045] hover:border-white/12 hover:bg-white/[0.075]",
+        : cn(
+            "bg-white/[0.045] hover:bg-white/[0.075]",
+            getTierIdleFrameClassName(snapshot),
+          ),
   );
 }
 
@@ -47,15 +51,33 @@ export function getWeaponButtonClassName(
   snapshot: WeaponProgressSnapshot,
   isSelected: boolean,
 ) {
+  const heat = getWeaponHeatProfile(snapshot.tier, snapshot.killsToNextTier == null);
+
   if (isSelected) {
-    return "inline-flex h-7 w-7 items-center justify-center rounded-[9px] border border-white/30 bg-white/12 text-stone-50 !cursor-pointer shadow-[0_0_14px_rgba(255,255,255,0.08)]";
+    if (heat.stage === "overdrive") {
+      return "relative inline-flex h-7 w-7 items-center justify-center overflow-visible rounded-[9px] border border-orange-100/76 bg-[linear-gradient(180deg,rgba(255,247,237,0.46),rgba(253,186,116,0.24)_20%,rgba(249,115,22,0.42)_44%,rgba(153,27,27,0.84))] text-white !cursor-pointer";
+    }
+
+    if (heat.stage === "hot") {
+      return "relative inline-flex h-7 w-7 items-center justify-center overflow-visible rounded-[9px] border border-orange-200/40 bg-[linear-gradient(180deg,rgba(254,215,170,0.16),rgba(249,115,22,0.2)_36%,rgba(120,53,15,0.6))] text-orange-100 !cursor-pointer";
+    }
+
+    return "relative inline-flex h-7 w-7 items-center justify-center overflow-visible rounded-[9px] border border-slate-200/42 bg-[linear-gradient(180deg,rgba(255,255,255,0.18),rgba(148,163,184,0.12)_34%,rgba(24,28,34,0.56))] text-slate-100 !cursor-pointer";
   }
 
   if (snapshot.locked) {
     return "inline-flex h-7 w-7 items-center justify-center rounded-[8px] border border-white/6 bg-white/4 text-stone-500 opacity-65 !cursor-pointer";
   }
 
-  return "inline-flex h-7 w-7 items-center justify-center rounded-[9px] border border-white/10 bg-black/20 text-stone-200 !cursor-pointer transition duration-150 hover:border-white/16 hover:bg-white/[0.08] hover:text-stone-50";
+  if (heat.stage === "overdrive") {
+    return "relative inline-flex h-7 w-7 items-center justify-center overflow-visible rounded-[9px] border border-orange-100/72 bg-[linear-gradient(180deg,rgba(255,247,237,0.28),rgba(253,186,116,0.18)_24%,rgba(249,115,22,0.34)_42%,rgba(153,27,27,0.72))] text-orange-50 !cursor-pointer hover:border-white/90 hover:bg-[linear-gradient(180deg,rgba(255,247,237,0.32),rgba(253,186,116,0.22)_24%,rgba(249,115,22,0.4)_42%,rgba(127,29,29,0.78))] hover:text-white";
+  }
+
+  if (heat.stage === "hot") {
+    return "relative inline-flex h-7 w-7 items-center justify-center overflow-visible rounded-[9px] border border-orange-300/36 bg-[linear-gradient(180deg,rgba(251,146,60,0.12),rgba(120,53,15,0.42))] text-orange-100 !cursor-pointer hover:border-orange-200/46 hover:bg-[linear-gradient(180deg,rgba(253,186,116,0.16),rgba(120,53,15,0.52))] hover:text-orange-50";
+  }
+
+  return "relative inline-flex h-7 w-7 items-center justify-center overflow-visible rounded-[9px] border border-slate-300/24 bg-[linear-gradient(180deg,rgba(255,255,255,0.14),rgba(71,85,105,0.18)_34%,rgba(15,23,42,0.36))] text-slate-200 !cursor-pointer hover:border-slate-200/38 hover:bg-[linear-gradient(180deg,rgba(255,255,255,0.18),rgba(100,116,139,0.24)_34%,rgba(30,41,59,0.42))] hover:text-slate-50";
 }
 
 export function getTierBarClassName(snapshot: WeaponProgressSnapshot) {
@@ -64,14 +86,90 @@ export function getTierBarClassName(snapshot: WeaponProgressSnapshot) {
   }
 
   if (snapshot.tier >= 3 || snapshot.killsToNextTier == null) {
-    return "bg-[linear-gradient(90deg,rgba(245,158,11,0.78),rgba(251,191,36,0.96),rgba(253,224,71,0.88))]";
+    return "bg-[linear-gradient(90deg,#7f1d1d_0%,#dc2626_16%,#f97316_34%,#fff7ed_50%,#fb923c_64%,#ef4444_80%,#7f1d1d_100%)] bg-[length:220%_100%] shadow-[0_0_16px_rgba(239,68,68,0.34)] [animation:heat-bar-flow_1500ms_linear_infinite,heat-tier-flicker_2000ms_ease-in-out_infinite]";
   }
 
   if (snapshot.tier === 2) {
-    return "bg-[linear-gradient(90deg,rgba(148,163,184,0.72),rgba(226,232,240,0.94),rgba(203,213,225,0.82))]";
+    return "bg-[linear-gradient(90deg,#78350f_0%,#c2410c_26%,#f59e0b_62%,#7c2d12_100%)] bg-[length:180%_100%] shadow-[0_0_10px_rgba(249,115,22,0.16)] [animation:heat-bar-flow_2400ms_linear_infinite]";
   }
 
-  return "bg-[linear-gradient(90deg,rgba(180,83,9,0.78),rgba(217,119,6,0.95),rgba(251,191,36,0.72))]";
+  return "bg-[linear-gradient(90deg,#7c2d12_0%,#c2410c_32%,#fb923c_70%,#fdba74_100%)] shadow-[0_0_8px_rgba(249,115,22,0.16)]";
+}
+
+export function getTierBadgeClassName(snapshot: WeaponProgressSnapshot) {
+  if (snapshot.locked) {
+    return "border-white/10 bg-white/[0.06] text-stone-300";
+  }
+
+  if (snapshot.tier >= 3 || snapshot.killsToNextTier == null) {
+    return "border-orange-100/50 bg-[linear-gradient(180deg,rgba(255,247,237,0.24),rgba(249,115,22,0.22)_32%,rgba(153,27,27,0.34))] text-orange-50 shadow-[0_0_20px_rgba(239,68,68,0.24)]";
+  }
+
+  if (snapshot.tier === 2) {
+    return "border-orange-300/26 bg-[linear-gradient(180deg,rgba(251,146,60,0.16),rgba(120,53,15,0.3))] text-orange-100 shadow-[0_0_14px_rgba(249,115,22,0.14)]";
+  }
+
+  return "border-slate-300/24 bg-[linear-gradient(180deg,rgba(255,255,255,0.16),rgba(71,85,105,0.22))] text-slate-100 shadow-[0_0_12px_rgba(148,163,184,0.1)]";
+}
+
+export function getTierLabel(snapshot: WeaponProgressSnapshot) {
+  if (snapshot.locked) {
+    return "Locked";
+  }
+
+  if (snapshot.tier >= 3 || snapshot.killsToNextTier == null) {
+    return "Overdrive";
+  }
+
+  return `Level ${snapshot.tier}`;
+}
+
+export function getTierIdleFrameClassName(snapshot: WeaponProgressSnapshot) {
+  if (snapshot.locked) {
+    return "border-white/6";
+  }
+
+  if (snapshot.tier >= 3 || snapshot.killsToNextTier == null) {
+    return "border-red-200/54 hover:border-white/78";
+  }
+
+  if (snapshot.tier === 2) {
+    return "border-orange-300/30 hover:border-orange-200/42";
+  }
+
+  return "border-slate-300/22 hover:border-slate-200/34";
+}
+
+export function getTierSelectedFrameClassName(snapshot: WeaponProgressSnapshot) {
+  if (snapshot.locked) {
+    return "border-white/18 bg-[linear-gradient(180deg,rgba(255,255,255,0.18),rgba(25,26,30,0.94))] shadow-[0_0_18px_rgba(255,255,255,0.08)]";
+  }
+
+  if (snapshot.tier >= 3 || snapshot.killsToNextTier == null) {
+    return "border-orange-100/56 bg-[linear-gradient(180deg,rgba(255,247,237,0.18),rgba(249,115,22,0.18)_22%,rgba(153,27,27,0.56)_58%,rgba(69,10,10,0.96))] shadow-[0_0_24px_rgba(239,68,68,0.34)]";
+  }
+
+  if (snapshot.tier === 2) {
+    return "border-orange-200/44 bg-[linear-gradient(180deg,rgba(253,186,116,0.18),rgba(120,53,15,0.94))] shadow-[0_0_18px_rgba(249,115,22,0.2)]";
+  }
+
+  return "border-slate-200/34 bg-[linear-gradient(180deg,rgba(255,255,255,0.14),rgba(30,41,59,0.94))] shadow-[0_0_16px_rgba(148,163,184,0.16)]";
+}
+
+export function getTierSheenClassName(snapshot: WeaponProgressSnapshot) {
+  if (snapshot.locked) {
+    return "from-white/6 via-white/0 to-transparent";
+  }
+
+  if (snapshot.tier >= 3 || snapshot.killsToNextTier == null) {
+    return "from-orange-100/52 via-orange-400/18 to-transparent";
+  }
+
+  if (snapshot.tier === 2) {
+    return "from-amber-100/28 via-orange-200/12 to-transparent";
+  }
+
+  return "from-white/18 via-slate-200/10 to-transparent";
 }
 
 export function getTierAccentClassName(snapshot: WeaponProgressSnapshot) {
@@ -79,15 +177,31 @@ export function getTierAccentClassName(snapshot: WeaponProgressSnapshot) {
     return "from-white/14 via-white/6 to-transparent";
   }
 
-  if (snapshot.tier === 3) {
-    return "from-amber-300/60 via-amber-200/18 to-transparent";
+  if (snapshot.tier >= 3 || snapshot.killsToNextTier == null) {
+    return "from-orange-100/80 via-red-300/24 to-transparent";
   }
 
   if (snapshot.tier === 2) {
-    return "from-cyan-200/55 via-sky-300/16 to-transparent";
+    return "from-amber-200/64 via-orange-300/18 to-transparent";
   }
 
-  return "from-sky-300/50 via-sky-300/14 to-transparent";
+  return "from-slate-100/44 via-slate-200/14 to-transparent";
+}
+
+export function getTierBarCoreClassName(snapshot: WeaponProgressSnapshot) {
+  if (snapshot.locked) {
+    return "hidden";
+  }
+
+  if (snapshot.tier >= 3 || snapshot.killsToNextTier == null) {
+    return "bg-[linear-gradient(90deg,rgba(255,247,237,0.0),rgba(255,247,237,0.92),rgba(255,247,237,0.0))] opacity-100 [animation:heat-core-pulse_1100ms_ease-in-out_infinite]";
+  }
+
+  if (snapshot.tier === 2) {
+    return "bg-[linear-gradient(90deg,rgba(254,215,170,0.0),rgba(254,215,170,0.52),rgba(254,215,170,0.0))] opacity-78";
+  }
+
+  return "bg-[linear-gradient(90deg,rgba(254,215,170,0.0),rgba(254,215,170,0.34),rgba(254,215,170,0.0))] opacity-70";
 }
 
 export function getTierProgress(snapshot: WeaponProgressSnapshot) {

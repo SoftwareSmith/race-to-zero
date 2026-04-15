@@ -148,6 +148,14 @@ export interface WeaponEffectEvent {
   segments?: Array<{ x1: number; y1: number; x2: number; y2: number }>;
   /** Optional color tint override for effect rendering (e.g. turret pointer in cyan). */
   color?: string;
+  /** Optional shared heat-system stage for tier feedback. */
+  heatStage?: "warm" | "hot" | "overdrive";
+  /** Optional shared heat accent for tier feedback bursts. */
+  heatColor?: string;
+  /** Optional bright shared heat core for tier feedback bursts. */
+  heatCore?: string;
+  /** Optional shared scale multiplier for tier feedback bursts. */
+  heatScale?: number;
 }
 
 export interface WeaponProgressSnapshot {

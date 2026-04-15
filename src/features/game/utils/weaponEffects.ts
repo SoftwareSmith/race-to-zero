@@ -29,6 +29,10 @@ export function createEffectEvent(
     targetX?: number;
     targetY?: number;
     color?: string;
+    heatColor?: string;
+    heatCore?: string;
+    heatScale?: number;
+    heatStage?: "warm" | "hot" | "overdrive";
     segments?: Array<{ x1: number; y1: number; x2: number; y2: number }>;
   },
 ): WeaponEffectEvent {

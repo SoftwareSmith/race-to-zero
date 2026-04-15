@@ -10,8 +10,8 @@ import { OVERLAY_EFFECT_DURATION_MS } from "./vfx";
 export const ID = WeaponId.Hammer;
 
 export const CURSOR = {
-  accent: "#fbbf24",
-  aura: "0 0 22px rgba(251,191,36,0.32)",
+  accent: "#f8fafc",
+  aura: "0 0 22px rgba(248,250,252,0.28)",
   size: 48,
   showCrosshair: false,
 } as const;

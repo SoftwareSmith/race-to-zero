@@ -21,6 +21,7 @@ interface UseSiegeGameOptions {
   currentBugCount: number;
   currentBugCounts: BugCounts;
   evolutionStates?: Partial<Record<SiegeWeaponId, WeaponEvolutionState>>;
+  pauseTimer?: boolean;
 }
 
 interface SiegeQaState {
@@ -36,6 +37,7 @@ export function useSiegeGame({
   currentBugCount,
   currentBugCounts,
   evolutionStates,
+  pauseTimer = false,
 }: UseSiegeGameOptions) {
   const [debugMode, setDebugMode] = useState(() => {
     if (typeof window === "undefined") {
@@ -57,6 +59,9 @@ export function useSiegeGame({
   const [interactivePoints, setInteractivePoints] = useState(0);
   const [interactiveRemainingBugs, setInteractiveRemainingBugs] = useState(0);
   const [interactiveStartedAt, setInteractiveStartedAt] = useState<number | null>(null);
+  const [interactiveRunningSince, setInteractiveRunningSince] =
+    useState<number | null>(null);
+  const [interactiveBaseElapsedMs, setInteractiveBaseElapsedMs] = useState(0);
   const [interactiveElapsedMs, setInteractiveElapsedMs] = useState(0);
   const [interactiveSessionKey, setInteractiveSessionKey] = useState<
     string | null
@@ -85,6 +90,8 @@ export function useSiegeGame({
     setInteractiveInitialBugCounts(currentBugCounts);
     setInteractiveRemainingBugs(currentBugCount);
     setInteractiveStartedAt(startedAt);
+    setInteractiveRunningSince(startedAt);
+    setInteractiveBaseElapsedMs(0);
     setInteractiveElapsedMs(0);
     setInteractiveSessionKey(`${Date.now()}`);
     setKillStreak(0);
@@ -235,13 +242,34 @@ export function useSiegeGame({
     if (!interactiveMode || interactiveStartedAt == null) {
       if (!interactiveMode) {
         setInteractiveElapsedMs(0);
+        setInteractiveBaseElapsedMs(0);
+        setInteractiveRunningSince(null);
         setInteractiveStartedAt(null);
       }
       return undefined;
     }
 
+    if (pauseTimer) {
+      if (interactiveRunningSince != null) {
+        const frozenElapsedMs =
+          interactiveBaseElapsedMs + Math.max(0, Date.now() - interactiveRunningSince);
+        setInteractiveBaseElapsedMs(frozenElapsedMs);
+        setInteractiveElapsedMs(frozenElapsedMs);
+        setInteractiveRunningSince(null);
+      }
+
+      return undefined;
+    }
+
+    if (interactiveRunningSince == null) {
+      setInteractiveRunningSince(Date.now());
+      return undefined;
+    }
+
     const syncElapsedMs = () => {
-      setInteractiveElapsedMs(Math.max(0, Date.now() - interactiveStartedAt));
+      setInteractiveElapsedMs(
+        interactiveBaseElapsedMs + Math.max(0, Date.now() - interactiveRunningSince),
+      );
     };
 
     syncElapsedMs();
@@ -250,7 +278,13 @@ export function useSiegeGame({
     return () => {
       window.clearInterval(intervalId);
     };
-  }, [interactiveMode, interactiveStartedAt]);
+  }, [
+    interactiveBaseElapsedMs,
+    interactiveMode,
+    interactiveRunningSince,
+    interactiveStartedAt,
+    pauseTimer,
+  ]);
 
   useEffect(() => {
     if (typeof window === "undefined") {

@@ -39,6 +39,7 @@ function AppContent() {
     currentBugCount: dashboard.currentBugCount,
     currentBugCounts: dashboard.currentBugCounts,
     evolutionStates,
+    pauseTimer: dashboard.openTopMenu === "codex",
   });
   const dashboardRef = useRef<HTMLDivElement | null>(null);
   const [upgradeToast, setUpgradeToast] = useState<string | null>(null);

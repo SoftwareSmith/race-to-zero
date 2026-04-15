@@ -22,9 +22,12 @@ import { SIEGE_GAME_MODE_META } from "@game/types";
 import {
   getSlotClassName,
   getStructureGlyph,
+  getTierBadgeClassName,
   getTierBarClassName,
+  getTierBarCoreClassName,
+  getTierLabel,
   getTierProgress,
-  getTierProgressCompact,
+  getTierSheenClassName,
   getWeaponButtonClassName,
   INPUT_MODE_LABEL,
   weaponTooltip,
@@ -170,6 +173,20 @@ function WeaponRailSlot({
 }) {
   const slotProgress = getTierProgress(snapshot);
   const tierBarClassName = getTierBarClassName(snapshot);
+  const tierBarCoreClassName = getTierBarCoreClassName(snapshot);
+  const tierSheenClassName = getTierSheenClassName(snapshot);
+  const upgradeActive = isJustUnlocked || isEvolving;
+  const isOverdrive = snapshot.tier >= 3 || snapshot.killsToNextTier == null;
+  const overdriveDecoration =
+    isOverdrive && !snapshot.locked ? (
+      <>
+        <div className="pointer-events-none absolute inset-[-3px] rounded-[11px] border border-white/18 opacity-90 [box-shadow:0_0_0_1px_rgba(255,247,237,0.18),0_0_18px_rgba(239,68,68,0.24)] [animation:overdrive-border-pulse_1300ms_ease-in-out_infinite]" />
+        <div className="pointer-events-none absolute inset-[-5px] rounded-[13px] border border-orange-300/30 [animation:overdrive-border-bloom_1500ms_ease-out_infinite]" />
+        <div className="pointer-events-none absolute -top-3 left-1.5 h-5 w-2 rounded-[999px_999px_999px_999px/100%_100%_40%_40%] bg-[linear-gradient(180deg,rgba(255,251,235,0.98),rgba(253,186,116,0.92)_18%,rgba(249,115,22,0.84)_44%,rgba(220,38,38,0.0))] opacity-90 blur-[0.5px] [animation:overdrive-border-flame-left_760ms_ease-in-out_infinite]" />
+        <div className="pointer-events-none absolute -top-4 left-1/2 h-6 w-3 -translate-x-1/2 rounded-[999px_999px_999px_999px/100%_100%_40%_40%] bg-[linear-gradient(180deg,rgba(255,251,235,1),rgba(255,247,237,0.96)_14%,rgba(253,186,116,0.92)_28%,rgba(249,115,22,0.76)_52%,rgba(220,38,38,0.0))] opacity-100 [animation:overdrive-border-flame-top_620ms_ease-in-out_infinite]" />
+        <div className="pointer-events-none absolute -right-0.5 -top-3 h-5 w-2 rounded-[999px_999px_999px_999px/100%_100%_40%_40%] bg-[linear-gradient(180deg,rgba(255,237,213,0.96),rgba(251,146,60,0.86)_28%,rgba(220,38,38,0.0))] opacity-90 blur-[0.5px] [animation:overdrive-border-flame-right_820ms_ease-in-out_infinite]" />
+      </>
+    ) : null;
 
   return (
     <Tooltip content={weaponTooltip(snapshot, isSelected)}>
@@ -193,6 +210,22 @@ function WeaponRailSlot({
               : undefined
         }
       >
+        {upgradeActive ? (
+          <>
+            <div className="pointer-events-none absolute inset-0 rounded-[12px] bg-[radial-gradient(circle_at_center,rgba(255,247,237,0.4),rgba(255,247,237,0.0)_58%)] [animation:heat-tier-up-flash_420ms_ease-out_forwards]" />
+            <div className="pointer-events-none absolute inset-[-3px] rounded-[14px] border border-orange-100/70 [animation:heat-tier-up-ripple_460ms_ease-out_forwards]" />
+          </>
+        ) : null}
+
+        {!snapshot.locked ? (
+          <div
+            className={cn(
+              "pointer-events-none absolute inset-x-1 top-0 h-3 rounded-b-full bg-gradient-to-b opacity-90",
+              tierSheenClassName,
+            )}
+          />
+        ) : null}
+
         <div className="relative flex h-full items-center justify-center">
           {snapshot.locked ? (
             <div
@@ -202,7 +235,16 @@ function WeaponRailSlot({
               role="radio"
               className={getWeaponButtonClassName(snapshot, false)}
             >
-              <WeaponGlyph className="h-4 w-4" id={snapshot.id} />
+              {overdriveDecoration}
+              <WeaponGlyph
+                className={cn(
+                  "relative z-[1] h-4 w-4",
+                  isOverdrive
+                    ? "drop-shadow-[0_0_10px_rgba(255,247,237,0.62)]"
+                    : undefined,
+                )}
+                id={snapshot.id}
+              />
             </div>
           ) : (
             <button
@@ -214,7 +256,16 @@ function WeaponRailSlot({
               className={getWeaponButtonClassName(snapshot, isSelected)}
               onClick={() => onSelect(snapshot.id)}
             >
-              <WeaponGlyph className="h-4 w-4" id={snapshot.id} />
+              {overdriveDecoration}
+              <WeaponGlyph
+                className={cn(
+                  "relative z-[1] h-4 w-4",
+                  isOverdrive
+                    ? "drop-shadow-[0_0_10px_rgba(255,247,237,0.62)]"
+                    : undefined,
+                )}
+                id={snapshot.id}
+              />
             </button>
           )}
         </div>
@@ -227,14 +278,21 @@ function WeaponRailSlot({
         >
           <div
             className={cn(
-              "h-full rounded-full transition-[width] duration-300",
+              "relative h-full rounded-full transition-[width] duration-300",
               tierBarClassName,
               isSelected
                 ? "[animation:hud-weapon-breathe_1800ms_ease-in-out_infinite]"
                 : "opacity-72",
             )}
             style={{ width: `${slotProgress}%` }}
-          />
+          >
+            <div
+              className={cn(
+                "absolute inset-y-0 left-0 right-0 rounded-full",
+                tierBarCoreClassName,
+              )}
+            />
+          </div>
         </div>
 
         {!snapshot.locked && snapshot.cooldownMs > 0 && lastFiredAt != null ? (
@@ -387,6 +445,26 @@ export default function SiegeHud({
   );
   const timerValue = formatElapsedTime(elapsedMs);
   const bugsLabel = gameMode === "outbreak" ? "Infection" : "Bugs";
+  const selectedTierBadgeClassName = selectedSnapshot
+    ? getTierBadgeClassName(selectedSnapshot)
+    : "border-white/10 bg-white/[0.06] text-stone-100";
+  const selectedTierLabel = selectedSnapshot
+    ? getTierLabel(selectedSnapshot)
+    : "Tier";
+
+  useEffect(() => {
+    return () => {
+      document.body.classList.remove("hud-system-cursor-active");
+    };
+  }, []);
+
+  const showSystemCursor = () => {
+    document.body.classList.add("hud-system-cursor-active");
+  };
+
+  const hideSystemCursor = () => {
+    document.body.classList.remove("hud-system-cursor-active");
+  };
 
   useEffect(() => {
     const currentUnlockedWeaponIds = new Set(unlockedWeaponIds);
@@ -468,7 +546,11 @@ export default function SiegeHud({
               })}
             </div>
 
-            <div className="flex items-center gap-1.5">
+            <div
+              className="flex items-center gap-1.5"
+              onPointerEnter={showSystemCursor}
+              onPointerLeave={hideSystemCursor}
+            >
               {codexMenuRef && onToggleCodex ? (
                 <CodexPanel
                   containerRef={codexMenuRef}
@@ -553,9 +635,9 @@ export default function SiegeHud({
           <HudShell className="px-2 py-1.5 shadow-[0_18px_42px_rgba(0,0,0,0.34)]">
             <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(125,211,252,0.11),transparent_30%),linear-gradient(90deg,rgba(248,113,113,0.05),transparent_34%,rgba(251,191,36,0.05))]" />
 
-            <div className="relative space-y-1.5">
+            <div className="relative">
               <div className="flex items-stretch rounded-full border border-white/8 bg-black/18 px-1.5 py-1 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
-                <div className="grid min-w-0 flex-1 grid-cols-4 gap-1">
+                <div className="grid min-w-0 flex-1 grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_7.6rem] gap-1">
                   <div className="flex min-w-0 items-center gap-2 rounded-full px-2 py-1.5">
                     <span className="text-[0.43rem] font-semibold uppercase tracking-[0.14em] text-red-100/65">
                       {bugsLabel}
@@ -587,39 +669,39 @@ export default function SiegeHud({
                         : "Elapsed survival time."
                     }
                   >
-                    <div className="flex min-w-0 items-center justify-center gap-2 rounded-full border border-cyan-300/12 bg-cyan-500/[0.08] px-2 py-1.5 text-center">
+                    <div className="flex h-full w-[7.6rem] shrink-0 items-center justify-between rounded-full border border-cyan-300/12 bg-cyan-500/[0.08] px-2.5 py-1.5 text-center">
                       <span className="text-[0.43rem] font-semibold uppercase tracking-[0.14em] text-cyan-100/65">
                         Time
                       </span>
-                      <strong className="font-display text-[0.94rem] leading-none tracking-[-0.05em] text-stone-50">
+                      <strong className="font-display text-[0.94rem] leading-none tracking-[-0.05em] tabular-nums text-stone-50">
                         {timerValue}
                       </strong>
                     </div>
                   </Tooltip>
                 </div>
               </div>
-
-              {killStreak >= 3 || unlockToast || upgradeToast ? (
-                <div className="flex flex-wrap items-center justify-center gap-1 pt-0.5 text-center">
-                  {killStreak >= 3 ? (
-                    <HudEventPill className="border-amber-300/24 bg-amber-400/10 text-amber-100">
-                      {`Streak x${streakMultiplier.toFixed(1)}`}
-                    </HudEventPill>
-                  ) : null}
-                  {unlockToast ? (
-                    <HudEventPill className="border-emerald-300/24 bg-emerald-400/10 text-emerald-100 [animation:evolve-toast_2600ms_ease_forwards]">
-                      {unlockToast}
-                    </HudEventPill>
-                  ) : null}
-                  {upgradeToast ? (
-                    <HudEventPill className="border-sky-300/24 bg-sky-400/10 text-sky-100 [animation:evolve-toast_2600ms_ease_forwards]">
-                      {upgradeToast}
-                    </HudEventPill>
-                  ) : null}
-                </div>
-              ) : null}
             </div>
           </HudShell>
+
+          {killStreak >= 3 || unlockToast || upgradeToast ? (
+            <div className="pointer-events-none mt-1.5 flex flex-wrap items-center justify-center gap-1 text-center">
+              {killStreak >= 3 ? (
+                <HudEventPill className="border-amber-300/24 bg-amber-400/10 text-amber-100">
+                  {`Streak x${streakMultiplier.toFixed(1)}`}
+                </HudEventPill>
+              ) : null}
+              {unlockToast ? (
+                <HudEventPill className="border-emerald-300/24 bg-emerald-400/10 text-emerald-100 [animation:evolve-toast_2600ms_ease_forwards]">
+                  {unlockToast}
+                </HudEventPill>
+              ) : null}
+              {upgradeToast ? (
+                <HudEventPill className="border-orange-300/24 bg-red-500/10 text-orange-100 [animation:evolve-toast_2600ms_ease_forwards]">
+                  {upgradeToast}
+                </HudEventPill>
+              ) : null}
+            </div>
+          ) : null}
         </div>
       </div>
 
@@ -633,8 +715,23 @@ export default function SiegeHud({
 
             <div className="relative space-y-2">
               {selectedSnapshot ? (
-                <div className="flex items-start justify-between gap-3 rounded-[14px] border border-white/10 bg-white/[0.05] px-3 py-2">
-                  <div className="min-w-0 flex-1">
+                <div className="relative rounded-[14px] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.08),rgba(255,255,255,0.04))] px-3 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]">
+                  <div className="absolute right-3 top-2 flex shrink-0 items-center gap-1">
+                    <span
+                      className={cn(
+                        "rounded-full border px-1.5 py-0.5 text-[0.48rem] font-semibold uppercase tracking-[0.12em]",
+                        selectedTierBadgeClassName,
+                        selectedSnapshot.tier >= 3 ||
+                          selectedSnapshot.killsToNextTier == null
+                          ? "[animation:heat-tier-flicker_2200ms_ease-in-out_infinite] shadow-[0_0_20px_rgba(239,68,68,0.24)]"
+                          : undefined,
+                      )}
+                    >
+                      {selectedTierLabel}
+                    </span>
+                  </div>
+
+                  <div>
                     <div className="truncate font-display text-[0.96rem] leading-none tracking-[-0.04em] text-stone-50">
                       {selectedSnapshot.title}
                     </div>
@@ -651,18 +748,14 @@ export default function SiegeHud({
                         )}
                         style={{ width: `${selectedProgress}%` }}
                       >
-                        <div className="absolute inset-y-0 left-0 w-8 bg-white/30 [animation:hud-progress-scan_1400ms_linear_infinite]" />
+                        <div
+                          className={cn(
+                            "absolute inset-y-0 left-0 right-0 rounded-full",
+                            getTierBarCoreClassName(selectedSnapshot),
+                          )}
+                        />
                       </div>
                     </div>
-                  </div>
-
-                  <div className="flex shrink-0 items-center gap-1">
-                    <span className="rounded-full border border-white/10 bg-black/22 px-1.5 py-0.5 text-[0.48rem] font-semibold uppercase tracking-[0.12em] text-stone-200">
-                      {`Level ${selectedSnapshot.tier}`}
-                    </span>
-                    <span className="rounded-full border border-white/10 bg-white/[0.06] px-1.5 py-0.5 text-[0.48rem] font-semibold uppercase tracking-[0.12em] text-stone-100">
-                      {getTierProgressCompact(selectedSnapshot)}
-                    </span>
                   </div>
                 </div>
               ) : null}

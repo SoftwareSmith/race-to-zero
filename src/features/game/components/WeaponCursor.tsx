@@ -7,12 +7,15 @@ import type React from "react";
 import { WEAPON_DEFS } from "@config/weaponConfig";
 import { WeaponId } from "@game/types";
 import type { SiegeWeaponId, StructureId } from "@game/types";
+import { cn } from "@shared/utils/cn";
 import WeaponGlyph from "@shared/components/icons/WeaponGlyph";
+import { getWeaponHeatProfile } from "@game/utils/weaponHeat";
 
 interface WeaponCursorProps {
   hideSystemCursor?: boolean;
   lastFiredAt?: number;
   structureId?: StructureId;
+  weaponTier?: number;
   weaponId: SiegeWeaponId;
   swinging?: boolean;
 }
@@ -20,10 +23,12 @@ interface WeaponCursorProps {
 function CursorReticle({
   lastFiredAt,
   structureId,
+  weaponTier = 1,
   weaponId,
 }: {
   lastFiredAt?: number;
   structureId?: StructureId;
+  weaponTier?: number;
   weaponId: SiegeWeaponId;
 }) {
   if (structureId) {
@@ -92,6 +97,7 @@ function CursorReticle({
   const weaponDef = WEAPON_DEFS.find((weapon) => weapon.id === weaponId);
   if (!weaponDef) return null;
   const theme = weaponDef.cursor;
+  const heat = getWeaponHeatProfile(weaponTier);
   const cooldownMs = weaponDef.cooldownMs;
   const size = theme.size;
   const guide = Math.round(size * 0.22);
@@ -99,6 +105,7 @@ function CursorReticle({
   const showOuterRing = !!theme.ringClassName;
   const showInnerRing = weaponId !== WeaponId.Hammer;
   const showCrosshair = theme.showCrosshair;
+  const showCenterDot = weaponId !== WeaponId.Hammer;
 
   return (
     <div
@@ -106,7 +113,7 @@ function CursorReticle({
       style={{
         width: size,
         height: size,
-        filter: `drop-shadow(${theme.aura})`,
+        filter: `drop-shadow(${theme.aura}) drop-shadow(0 0 14px ${heat.glow})`,
         transform: "translate(-50%, -50%)",
       }}
     >
@@ -176,18 +183,31 @@ function CursorReticle({
           />
         </>
       ) : null}
-      <div
-        className="absolute left-1/2 top-1/2 rounded-full"
-        style={{
-          width: 3,
-          height: 3,
-          background: theme.accent,
-          boxShadow: `0 0 6px ${theme.accent}`,
-          transform: "translate(-50%, -50%)",
-        }}
-      />
+      {showCenterDot ? (
+        <div
+          className="absolute left-1/2 top-1/2 rounded-full"
+          style={{
+            width: 3,
+            height: 3,
+            background: theme.accent,
+            boxShadow: `0 0 6px ${theme.accent}`,
+            transform: "translate(-50%, -50%)",
+          }}
+        />
+      ) : null}
       <WeaponGlyph
-        className="absolute left-1/2 top-1/2 h-6 w-6 -translate-x-1/2 -translate-y-1/2"
+        className={cn(
+          "absolute left-1/2 top-1/2 h-6 w-6 -translate-x-1/2 -translate-y-1/2",
+          weaponId === WeaponId.Hammer
+            ? "text-slate-50 drop-shadow-[0_0_10px_rgba(248,250,252,0.5)]"
+            : undefined,
+          heat.stage === "hot"
+            ? "drop-shadow-[0_0_10px_rgba(239,68,68,0.22)]"
+            : undefined,
+          heat.stage === "overdrive"
+            ? "drop-shadow-[0_0_12px_rgba(255,247,237,0.28)] [animation:heat-tier-flicker_2200ms_ease-in-out_infinite]"
+            : undefined,
+        )}
         id={weaponId}
       />
       {cooldownMs > 0 && lastFiredAt != null ? (
@@ -213,6 +233,7 @@ export default function WeaponCursor({
   hideSystemCursor = false,
   lastFiredAt,
   structureId,
+  weaponTier = 1,
   weaponId,
   swinging = false,
 }: WeaponCursorProps) {
@@ -255,7 +276,7 @@ export default function WeaponCursor({
     <div
       ref={containerRef}
       aria-hidden="true"
-      className="pointer-events-none fixed left-0 top-0 z-[110]"
+      className="weapon-cursor-layer pointer-events-none fixed left-0 top-0 z-[110] transition-opacity duration-100"
       style={{ transform: "translate3d(-200px, -200px, 0)" }}
     >
       <div
@@ -280,6 +301,7 @@ export default function WeaponCursor({
           <CursorReticle
             lastFiredAt={lastFiredAt}
             structureId={structureId}
+            weaponTier={weaponTier}
             weaponId={weaponId}
           />
         </div>

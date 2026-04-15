@@ -517,7 +517,7 @@ export class VfxEngine {
         cy += Math.sin(angle) * stepLen;
         gfx.lineTo(cx, cy);
       }
-      gfx.stroke({ color: 0xfbbf24, width: 1.6, alpha: 0.85 });
+      gfx.stroke({ color: 0xf8fafc, width: 1.6, alpha: 0.9 });
 
       // Sub-crack from midpoint of main arm
       const midX = cx * 0.5;
@@ -529,7 +529,7 @@ export class VfxEngine {
         midX + Math.cos(subAngle) * subLen,
         midY + Math.sin(subAngle) * subLen,
       );
-      gfx.stroke({ color: 0xfde68a, width: 0.9, alpha: 0.6 });
+      gfx.stroke({ color: 0xe2e8f0, width: 0.9, alpha: 0.68 });
 
       // Micro-crack from sub-crack midpoint
       const mcX = midX + Math.cos(subAngle) * subLen * 0.5;
@@ -540,11 +540,11 @@ export class VfxEngine {
         mcX + Math.cos(mcAngle) * subLen * 0.35,
         mcY + Math.sin(mcAngle) * subLen * 0.35,
       );
-      gfx.stroke({ color: 0xfef3c7, width: 0.6, alpha: 0.4 });
+      gfx.stroke({ color: 0xffffff, width: 0.6, alpha: 0.46 });
     }
-    // Impact center dot
-    gfx.circle(0, 0, 3.5);
-    gfx.fill({ color: 0xfbbf24, alpha: 0.7 });
+    // Keep the impact center subtle and cold so the crack doesn't flash yellow.
+    gfx.circle(0, 0, 2.75);
+    gfx.fill({ color: 0xf8fafc, alpha: 0.5 });
   }
 
   /**
@@ -1182,19 +1182,9 @@ export class VfxEngine {
   }
 
   spawnLevelUp(x: number, y: number): void {
-    const gfx = this.acquireGfx();
-    gfx.x = x;
-    gfx.y = y;
-    gfx.circle(0, 0, 18);
-    gfx.stroke({ color: 0xfbbf24, width: 3, alpha: 0.95 });
-    this.decalContainer.addChild(gfx);
-    this.decals.push({
-      gfx,
-      createdAt: performance.now(),
-      lifetime: 650,
-      initialAlpha: 1,
-      container: this.decalContainer,
-    });
+    // Legacy evolution ring removed; HUD evolution feedback now owns this moment.
+    void x;
+    void y;
   }
 
   private addFloatingLabel(
