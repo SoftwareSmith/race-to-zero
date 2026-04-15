@@ -9,11 +9,6 @@ import {
   useState,
 } from "react";
 import { getBugCountsKey, getBugTotal } from "../../../../constants/bugs";
-import {
-  getEffectPalette,
-  getMotionProfile,
-  getSceneProfile,
-} from "@game/utils/backgroundScene";
 import { cn } from "@shared/utils/cn";
 import type {
   AgentCaptureState,
@@ -24,7 +19,6 @@ import type {
   StructureId,
   WeaponEffectEvent,
 } from "@game/types";
-import { WeaponId } from "@game/types";
 import type {
   BugCounts,
   BugVisualSettings,
@@ -38,6 +32,9 @@ import type { GameConfig } from "@game/engine/types";
 import BugCanvas from "./BugCanvas";
 import type { BugHitPayload, GameState } from "./types";
 import { getSplatClassName } from "./splat";
+import { getBackgroundSceneConfig } from "./sceneConfig";
+import { useWeaponCursorState } from "./useWeaponCursorState";
+import { useWeaponFireTimes } from "./useWeaponFireTimes";
 
 const WeaponEffectLayer = lazy(
   () => import("@game/components/WeaponEffectLayer"),
@@ -134,14 +131,10 @@ const BackgroundField = memo(function BackgroundField({
     0,
     Math.floor(remainingBugCount ?? totalBugCount),
   );
-  const visualTone = effectiveBugCount === 0 ? "all-clear" : tone;
-  const colors = useMemo(() => getEffectPalette(visualTone), [visualTone]);
-  // particles are produced and managed by BugCanvas's internal entity engine
-  const motionProfile = useMemo(
-    () => getMotionProfile(visualTone),
-    [visualTone],
+  const { colors, motionProfile, sceneProfile } = useMemo(
+    () => getBackgroundSceneConfig(tone, effectiveBugCount),
+    [effectiveBugCount, tone],
   );
-  const sceneProfile = useMemo(() => getSceneProfile(visualTone), [visualTone]);
   const bugCountsKey = useMemo(
     () => getBugCountsKey(normalizedBugCounts),
     [normalizedBugCounts],
@@ -149,37 +142,22 @@ const BackgroundField = memo(function BackgroundField({
   const gameSessionKey = interactiveSessionKey
     ? `interactive:${interactiveSessionKey}`
     : `${interactiveMode ? "interactive" : "ambient"}:${bugCountsKey}`;
-  const [hammerSwing, setHammerSwing] = useState(false);
-  const [cursorLastFireTimes, setCursorLastFireTimes] = useState<
-    Partial<Record<SiegeWeaponId, number>>
-  >({});
-  const [turretLastFireTimes, setTurretLastFireTimes] = useState<
-    Record<string, number>
-  >({});
-  const [teslaLastFireTimes, setTeslaLastFireTimes] = useState<
-    Record<string, number>
-  >({});
-  const hammerPositionRef = useRef({ x: 0, y: 0 });
-  const weaponCursorRef = useRef<HTMLDivElement | null>(null);
-  const hammerMoveFrameRef = useRef<number | null>(null);
+  const { hammerPositionRef, hammerSwing, triggerHammerSwing } =
+    useWeaponCursorState(interactiveMode);
+  const {
+    cursorLastFireTimes,
+    recordCursorFire,
+    recordTeslaFire,
+    recordTurretFire,
+    teslaLastFireTimes,
+    turretLastFireTimes,
+  } = useWeaponFireTimes(gameSessionKey, interactiveMode);
   const [weaponEffects, setWeaponEffects] = useState<WeaponEffectEvent[]>([]);
   const onWeaponFiredRef = useRef(onWeaponFired);
 
   useEffect(() => {
     onWeaponFiredRef.current = onWeaponFired;
   }, [onWeaponFired]);
-
-  useEffect(() => {
-    const timeoutId = window.setTimeout(() => {
-      setCursorLastFireTimes({});
-      setTurretLastFireTimes({});
-      setTeslaLastFireTimes({});
-    }, 0);
-
-    return () => {
-      window.clearTimeout(timeoutId);
-    };
-  }, [gameSessionKey, interactiveMode]);
 
   const handleTurretFire = useCallback(
     (data: {
@@ -190,20 +168,14 @@ const BackgroundField = memo(function BackgroundField({
       targetY: number;
       angle: number;
     }) => {
-      setTurretLastFireTimes((prev) => ({
-        ...prev,
-        [data.structureId]: performance.now(),
-      }));
+      recordTurretFire(data.structureId);
     },
-    [],
+    [recordTurretFire],
   );
 
   const handleTeslaFire = useCallback((data: { structureId: string }) => {
-    setTeslaLastFireTimes((prev) => ({
-      ...prev,
-      [data.structureId]: performance.now(),
-    }));
-  }, []);
+    recordTeslaFire(data.structureId);
+  }, [recordTeslaFire]);
 
   const handleWeaponFire = useCallback(
     (
@@ -236,18 +208,15 @@ const BackgroundField = memo(function BackgroundField({
         return [...prev.filter((e) => isEffectAlive(e, now)), event];
       });
 
-      setCursorLastFireTimes((prev) => ({
-        ...prev,
-        [weapon]: startedAt,
-      }));
+      recordCursorFire(weapon, startedAt);
       // Always swing hammer cursor on any hammer fire (hit or miss)
       if (weapon === "hammer") {
-        setHammerSwing(true);
+        triggerHammerSwing();
       }
       // Notify parent so it can update reload bar state
       onWeaponFiredRef.current?.(weapon, startedAt);
     },
-    [getWeaponTier],
+    [getWeaponTier, recordCursorFire, triggerHammerSwing],
   );
 
   const [gameState, setGameState] = useState<GameState>(() => ({
@@ -263,14 +232,6 @@ const BackgroundField = memo(function BackgroundField({
           sessionKey: gameSessionKey,
           splats: [],
         };
-
-  useEffect(() => {
-    document.body.classList.toggle("cursor-none", interactiveMode);
-
-    return () => {
-      document.body.classList.remove("cursor-none");
-    };
-  }, [interactiveMode]);
 
   useEffect(() => {
     if (!interactiveMode) {
@@ -297,62 +258,7 @@ const BackgroundField = memo(function BackgroundField({
     return () => {
       window.clearInterval(intervalId);
     };
-  }, [interactiveMode, weaponEffects.length, hammerPositionRef]);
-
-  useEffect(() => {
-    if (!interactiveMode) {
-      hammerPositionRef.current = { x: 0, y: 0 };
-      if (weaponCursorRef.current) {
-        weaponCursorRef.current.style.transform = "translate3d(0px, 0px, 0)";
-      }
-      return undefined;
-    }
-
-    const handlePointerMove = (event: globalThis.MouseEvent) => {
-      hammerPositionRef.current = {
-        x: event.clientX,
-        y: event.clientY,
-      };
-
-      if (hammerMoveFrameRef.current != null) {
-        return;
-      }
-
-      hammerMoveFrameRef.current = window.requestAnimationFrame(() => {
-        hammerMoveFrameRef.current = null;
-        const cursor = weaponCursorRef.current;
-        if (!cursor) {
-          return;
-        }
-
-        const { x, y } = hammerPositionRef.current;
-        cursor.style.transform = `translate3d(${x}px, ${y}px, 0)`;
-      });
-    };
-
-    window.addEventListener("mousemove", handlePointerMove);
-    return () => {
-      if (hammerMoveFrameRef.current != null) {
-        window.cancelAnimationFrame(hammerMoveFrameRef.current);
-        hammerMoveFrameRef.current = null;
-      }
-      window.removeEventListener("mousemove", handlePointerMove);
-    };
-  }, [interactiveMode]);
-
-  useEffect(() => {
-    if (!hammerSwing) {
-      return undefined;
-    }
-
-    const timeoutId = window.setTimeout(() => {
-      setHammerSwing(false);
-    }, 180);
-
-    return () => {
-      window.clearTimeout(timeoutId);
-    };
-  }, [hammerSwing]);
+  }, [interactiveMode, weaponEffects.length]);
 
   useEffect(() => {
     if (activeGameState.splats.length === 0) {
@@ -382,7 +288,7 @@ const BackgroundField = memo(function BackgroundField({
 
   const handleBugHit = useCallback(
     (payload: BugHitPayload) => {
-      setHammerSwing(true);
+      triggerHammerSwing();
       onBugHit?.(payload);
       setGameState((currentValue) => {
         const nextState =
@@ -413,7 +319,7 @@ const BackgroundField = memo(function BackgroundField({
         };
       });
     },
-    [gameSessionKey, onBugHit, totalBugCount],
+    [gameSessionKey, onBugHit, totalBugCount, triggerHammerSwing],
   );
 
   const handleStructureKill = useCallback(

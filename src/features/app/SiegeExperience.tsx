@@ -206,7 +206,7 @@ const SiegeExperience = memo(function SiegeExperience({
         tone={metrics.deadlineMetrics.statusTone}
       />
       {siegeGame.siegePhase === "entering" ? (
-        <div className="pointer-events-none fixed inset-0 z-[100] [animation:siege-flash_700ms_ease-out_forwards]" />
+        <div className="pointer-events-none fixed inset-0 z-[100] [animation:siege-flash_520ms_ease-out_forwards]" />
       ) : null}
 
       {siegeGame.interactiveMode ? (

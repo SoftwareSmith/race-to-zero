@@ -1,10 +1,8 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getBugVariantMaxHp } from "../../../../constants/bugs";
 import Engine from "@game/engine/Engine";
-import { getCodex } from "@game/engine/bugCodex";
 import type { GameConfig } from "@game/engine/types";
 import { DEFAULT_GAME_CONFIG } from "@game/engine/types";
-import { drawBugSprite } from "@game/utils/bugSprite";
 import type {
   PlacedStructure,
   SiegeCombatStats,
@@ -21,7 +19,6 @@ import type {
   SceneProfile,
 } from "../../../../types/dashboard";
 import { WEAPON_DEFS } from "@config/weaponConfig";
-import { drawHealthBar, HEALTHBAR_SHOW_DURATION } from "@game/utils/healthbar";
 import VfxCanvas from "@game/components/VfxCanvas";
 import type { VfxEngine } from "@game/engine/VfxEngine";
 import type {
@@ -38,11 +35,18 @@ import {
   updateQaLastHit,
   stabilizeQaEngine,
 } from "./qa";
+import { drawBugFramePass } from "./bugFramePass";
+import {
+  measureCanvasBounds,
+  reseedClusteredBugs,
+  updateLiveCanvasBounds,
+  type CanvasBounds,
+  type ReseedInfo,
+} from "./canvasState";
 
 const AMBIENT_TARGET_FRAME_MS = 1000 / 24;
 const INTERACTIVE_TARGET_FRAME_MS = 1000 / 45;
 const TRANSITION_EASING = 0.08;
-const BUG_CODEX = getCodex();
 
 function interpolate(
   currentValue: number,
@@ -208,13 +212,14 @@ const BugCanvas = memo(function BugCanvas({
   const currentMouseRef = useRef<{ x: number; y: number } | null>(null);
   const fireIntervalRef = useRef<number | null>(null);
   const lastPaintPosRef = useRef<{ x: number; y: number } | null>(null);
-  const reseedInfoRef = useRef<{
-    ts: number;
-    clustered: number;
-    total: number;
-  } | null>(null);
+  const reseedInfoRef = useRef<ReseedInfo | null>(null);
   const siegeZonesRef = useRef<SiegeZoneRect[]>(siegeZones);
-  const boundsRef = useRef({ height: 0, left: 0, top: 0, width: 0 });
+  const boundsRef = useRef<CanvasBounds>({
+    height: 0,
+    left: 0,
+    top: 0,
+    width: 0,
+  });
   const latestBugPositionsRef = useRef<RenderedBugPosition[]>([]);
   const hitPointsRef = useRef<Map<number, number>>(new Map());
   const targetSettingsRef = useRef({
@@ -225,11 +230,7 @@ const BugCanvas = memo(function BugCanvas({
     sizeMultiplier: bugVisualSettings?.sizeMultiplier ?? 1,
     speedMultiplier: getSpeedMultiplier(bugVisualSettings?.chaosMultiplier),
   });
-  const [reseedInfo, setReseedInfo] = useState<{
-    ts: number;
-    clustered: number;
-    total: number;
-  } | null>(null);
+  const [reseedInfo, setReseedInfo] = useState<ReseedInfo | null>(null);
   const gameConfigKey = useMemo(
     () => JSON.stringify(gameConfig ?? {}),
     [gameConfig],
@@ -462,26 +463,21 @@ const BugCanvas = memo(function BugCanvas({
       swarmRef.current = engine;
       syncQaBugPositionsFromEngine(engine, boundsRef.current);
     }
-    // if many bugs were seeded at (0,0) (canvas not measured yet), reseed
     const maybeBugs = swarmRef.current.getAllBugs() as Array<any>;
-    const clustered = maybeBugs.filter((b: any) => b.x <= 1 && b.y <= 1).length;
-    if (clustered > 0 && clustered / Math.max(1, maybeBugs.length) > 0.25) {
-      for (const b of maybeBugs) {
-        b.x = Math.random() * w;
-        b.y = Math.random() * h;
-        const base =
+    const nextReseedInfo = reseedClusteredBugs(
+      maybeBugs,
+      w,
+      h,
+      targetSettingsRef.current.speedMultiplier,
+      {
+        baseSpeed:
           (swarmRef.current as any)?.__baseSpeedOriginal ??
-          DEFAULT_GAME_CONFIG.baseSpeed;
-        const speed =
-          base *
-          targetSettingsRef.current.speedMultiplier *
-          (0.75 + Math.random() * 0.35);
-        const angle = Math.random() * Math.PI * 2;
-        b.vx = Math.cos(angle) * speed;
-        b.vy = Math.sin(angle) * speed;
-        b.heading = angle;
-      }
-      setReseedInfo({ ts: Date.now(), clustered, total: maybeBugs.length });
+          DEFAULT_GAME_CONFIG.baseSpeed,
+        thresholdRatio: 0.25,
+      },
+    );
+    if (nextReseedInfo) {
+      setReseedInfo(nextReseedInfo);
     }
     const bugs = swarmRef.current.getAllBugs() as Array<any>;
     hitPointsRef.current = new Map(
@@ -532,60 +528,52 @@ const BugCanvas = memo(function BugCanvas({
     let isActive = !document.hidden && document.hasFocus();
 
     const resizeCanvas = () => {
-      const nextWidth = canvas.clientWidth;
-      const nextHeight = canvas.clientHeight;
-      const devicePixelRatio = window.devicePixelRatio || 1;
-
-      if (!nextWidth || !nextHeight) {
+      const measurement = measureCanvasBounds(canvas);
+      if (!measurement) {
         return;
       }
 
-      width = nextWidth;
-      height = nextHeight;
-      boundsRef.current = {
-        height: nextHeight,
-        left: canvas.getBoundingClientRect().left,
-        top: canvas.getBoundingClientRect().top,
-        width: nextWidth,
-      };
-      canvas.width = Math.floor(nextWidth * devicePixelRatio);
-      canvas.height = Math.floor(nextHeight * devicePixelRatio);
-      context.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
+      width = measurement.width;
+      height = measurement.height;
+      boundsRef.current = measurement.bounds;
+      canvas.width = Math.floor(width * measurement.devicePixelRatio);
+      canvas.height = Math.floor(height * measurement.devicePixelRatio);
+      context.setTransform(
+        measurement.devicePixelRatio,
+        0,
+        0,
+        measurement.devicePixelRatio,
+        0,
+        0,
+      );
       context.clearRect(0, 0, width, height);
 
       // update swarm size to current canvas and reseed if many bugs clustered at 0,0
       if (swarmRef.current) {
-        swarmRef.current.width = nextWidth;
-        swarmRef.current.height = nextHeight;
-        stabilizeQaEngine(swarmRef.current, nextWidth, nextHeight);
+        swarmRef.current.width = width;
+        swarmRef.current.height = height;
+        stabilizeQaEngine(swarmRef.current, width, height);
         syncQaBugPositionsFromEngine(swarmRef.current, boundsRef.current);
         const bugs = swarmRef.current.getAllBugs() as Array<any>;
-        const clustered = bugs.filter((b: any) => b.x <= 1 && b.y <= 1).length;
-        if (clustered > 0 && clustered / Math.max(1, bugs.length) > 0.2) {
-          // reseed positions and velocities
-          for (const b of bugs) {
-            b.x = Math.random() * nextWidth;
-            b.y = Math.random() * nextHeight;
-            const speed =
-              DEFAULT_GAME_CONFIG.baseSpeed *
-              targetSettingsRef.current.speedMultiplier *
-              (0.75 + Math.random() * 0.35);
-            const angle = Math.random() * Math.PI * 2;
-            b.vx = Math.cos(angle) * speed;
-            b.vy = Math.sin(angle) * speed;
-            b.heading = angle;
-          }
+        const nextReseedInfo = reseedClusteredBugs(
+          bugs,
+          width,
+          height,
+          targetSettingsRef.current.speedMultiplier,
+          {
+            baseSpeed:
+              (swarmRef.current as any)?.__baseSpeedOriginal ??
+              DEFAULT_GAME_CONFIG.baseSpeed,
+            thresholdRatio: 0.2,
+          },
+        );
+        if (nextReseedInfo) {
           console.debug("Engine reseeded on resize", {
-            nextWidth,
-            nextHeight,
-            clustered,
-            total: bugs.length,
+            nextHeight: height,
+            nextWidth: width,
+            clustered: nextReseedInfo.clustered,
+            total: nextReseedInfo.total,
           });
-          const nextReseedInfo = {
-            ts: Date.now(),
-            clustered,
-            total: bugs.length,
-          };
           reseedInfoRef.current = nextReseedInfo;
           setReseedInfo(nextReseedInfo);
         }
@@ -668,66 +656,17 @@ const BugCanvas = memo(function BugCanvas({
         : [];
       const activeMotionProfile = motionProfileRef.current;
       const activeChartFocus = chartFocusRef.current;
-      const focusX = activeChartFocus?.relativeIndex ?? 0.5;
-      const nextBugPositions: RenderedBugPosition[] = [];
       const frameNow = performance.now();
-
-      for (let index = 0; index < activeParticles.length; index += 1) {
-        const particle = activeParticles[index];
-        const bugCodex = BUG_CODEX[particle.variant as BugVariant];
-        const normalizedX = particle.x / width;
-        const focusDistance = Math.abs(normalizedX - focusX);
-        const focusFalloff = activeChartFocus
-          ? Math.max(0, 1 - focusDistance * 3.1)
-          : 0;
-        const x = particle.x;
-        const y = particle.y;
-        const opacity = clampNumber(
-          (particle.opacity ?? 1) * activeMotionProfile.opacityMultiplier,
-          0.06,
-          1,
-        );
-        const size =
-          particle.size *
-          activeMotionProfile.scale *
-          sizeMultiplier *
-          (bugCodex?.size ?? 1) *
-          (activeChartFocus ? 0.92 + focusFalloff * 0.26 : 1);
-        const velX = particle.vx ?? particle.driftX ?? 1;
-        const velY = particle.vy ?? particle.driftY ?? 0;
-        const rotation =
-          typeof particle.heading === "number"
-            ? particle.heading
-            : Math.atan2(velY, velX);
-
-        nextBugPositions.push({
-          index,
-          radius: Math.max(size * 0.7, 12),
-          x,
-          y,
-        });
-
-        drawBugSprite(context, {
-          color: bugCodex?.color,
-          opacity,
-          rotation,
-          size,
-          variant: particle.variant,
-          x,
-          y,
-        });
-
-        // Health bar: shown after a hit on multi-HP bugs until HEALTHBAR_SHOW_DURATION elapses
-        const lastHitTime: number = (particle as any).lastHitTime ?? 0;
-        const bugMaxHp: number = (particle as any).maxHp ?? 1;
-        const bugHp: number = (particle as any).hp ?? 1;
-        if (lastHitTime > 0 && bugMaxHp > 1 && bugHp < bugMaxHp) {
-          const elapsed = frameNow - lastHitTime;
-          if (elapsed < HEALTHBAR_SHOW_DURATION) {
-            drawHealthBar(context, x, y, bugHp, bugMaxHp, size, elapsed);
-          }
-        }
-      }
+      const nextBugPositions = drawBugFramePass({
+        chartFocus: activeChartFocus,
+        context,
+        frameNow,
+        height,
+        motionProfile: activeMotionProfile,
+        particles: activeParticles,
+        sizeMultiplier,
+        width,
+      });
 
       latestBugPositionsRef.current = nextBugPositions;
       updateQaBugPositions(nextBugPositions, boundsRef.current);
@@ -761,28 +700,19 @@ const BugCanvas = memo(function BugCanvas({
       // one-time safety reseed: if many bugs still sit at 0,0, reseed and surface badge
       if (!reseedInfoRef.current && swarmRef.current) {
         const bugs = swarmRef.current.getAllBugs() as Array<any>;
-        const clustered = bugs.filter((b: any) => b.x <= 1 && b.y <= 1).length;
-        if (clustered > 0 && clustered / Math.max(1, bugs.length) > 0.2) {
-          for (const b of bugs) {
-            b.x = Math.random() * width;
-            b.y = Math.random() * height;
-            const base =
+        const nextReseedInfo = reseedClusteredBugs(
+          bugs,
+          width,
+          height,
+          targetSettingsRef.current.speedMultiplier,
+          {
+            baseSpeed:
               (swarmRef.current as any)?.__baseSpeedOriginal ??
-              DEFAULT_GAME_CONFIG.baseSpeed;
-            const speed =
-              base *
-              targetSettingsRef.current.speedMultiplier *
-              (0.75 + Math.random() * 0.35);
-            const angle = Math.random() * Math.PI * 2;
-            b.vx = Math.cos(angle) * speed;
-            b.vy = Math.sin(angle) * speed;
-            b.heading = angle;
-          }
-          const nextReseedInfo = {
-            ts: Date.now(),
-            clustered,
-            total: bugs.length,
-          };
+              DEFAULT_GAME_CONFIG.baseSpeed,
+            thresholdRatio: 0.2,
+          },
+        );
+        if (nextReseedInfo) {
           reseedInfoRef.current = nextReseedInfo;
           setReseedInfo(nextReseedInfo);
         }
@@ -804,15 +734,7 @@ const BugCanvas = memo(function BugCanvas({
       }
 
       // Keep bounds fresh on scroll; stale viewport offsets break click→canvas mapping.
-      const liveBounds = canvas.getBoundingClientRect();
-      if (liveBounds.width && liveBounds.height) {
-        boundsRef.current = {
-          height: liveBounds.height,
-          left: liveBounds.left,
-          top: liveBounds.top,
-          width: liveBounds.width,
-        };
-      }
+      boundsRef.current = updateLiveCanvasBounds(canvas, boundsRef.current);
 
       const targetElement =
         event.target instanceof Element ? event.target : null;

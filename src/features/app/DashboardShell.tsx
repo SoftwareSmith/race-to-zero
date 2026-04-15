@@ -22,7 +22,7 @@ import Tooltip from "@shared/components/Tooltip";
 import { cn } from "@shared/utils/cn";
 
 const CHROME_TRANSITION_CLASSNAME =
-  "transition-[opacity,transform,filter] duration-700 ease-[cubic-bezier(0.22,1,0.36,1)]";
+  "transition-[opacity,transform,filter] duration-450 ease-[cubic-bezier(0.22,1,0.36,1)]";
 
 interface DashboardShellProps {
   dashboardRef: RefObject<HTMLDivElement | null>;
@@ -101,7 +101,7 @@ const DashboardShell = memo(function DashboardShell({
               : undefined,
         transform: siegePhase === "active" ? "scale(0.985)" : undefined,
         transition:
-          "opacity 420ms ease-out, filter 520ms ease-out, transform 520ms ease-out",
+          "opacity 260ms ease-out, filter 340ms ease-out, transform 340ms ease-out",
       }}
     >
       <header

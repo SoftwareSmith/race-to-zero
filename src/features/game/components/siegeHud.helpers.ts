@@ -405,9 +405,7 @@ export function getTierProgressCompact(snapshot: WeaponProgressSnapshot) {
   }
 
   const tierGoal = snapshot.nextTierGoalKills ?? snapshot.weaponKills;
-  const tierWindow = Math.max(1, tierGoal - snapshot.currentTierStartKills);
-  const progressedKills = Math.max(0, snapshot.weaponKills - snapshot.currentTierStartKills);
-  return `${progressedKills}/${tierWindow}`;
+  return `${snapshot.weaponKills}/${tierGoal}`;
 }
 
 export function getStructureGlyph(structureId: StructureId) {

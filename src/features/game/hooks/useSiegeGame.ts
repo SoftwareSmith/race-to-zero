@@ -21,6 +21,66 @@ import { WeaponTier as Tier } from "@game/types";
 
 const LANTERN_SUPPORT_XP_INTERVAL_MS = 4500;
 const STRUCTURE_KILL_XP = 2;
+const SIEGE_ENTER_DURATION_MS = 520;
+const SIEGE_EXIT_DURATION_MS = 220;
+
+function scheduleTimeout(callback: () => void, delay: number): number {
+  if (typeof window !== "undefined") {
+    return window.setTimeout(callback, delay);
+  }
+
+  return globalThis.setTimeout(callback, delay) as unknown as number;
+}
+
+function cancelTimeout(timeoutId: number | null): void {
+  if (timeoutId == null) {
+    return;
+  }
+
+  globalThis.clearTimeout(timeoutId);
+}
+
+function scheduleInterval(callback: () => void, delay: number): number {
+  if (typeof window !== "undefined") {
+    return window.setInterval(callback, delay);
+  }
+
+  return globalThis.setInterval(callback, delay) as unknown as number;
+}
+
+function cancelInterval(intervalId: number): void {
+  globalThis.clearInterval(intervalId);
+}
+
+function scheduleAnimationFrame(callback: FrameRequestCallback): number {
+  if (
+    typeof window !== "undefined" &&
+    typeof window.requestAnimationFrame === "function"
+  ) {
+    return window.requestAnimationFrame(callback);
+  }
+
+  return globalThis.setTimeout(
+    () => callback(globalThis.performance.now()),
+    16,
+  ) as unknown as number;
+}
+
+function cancelScheduledAnimationFrame(frameId: number | null): void {
+  if (frameId == null) {
+    return;
+  }
+
+  if (
+    typeof window !== "undefined" &&
+    typeof window.cancelAnimationFrame === "function"
+  ) {
+    window.cancelAnimationFrame(frameId);
+    return;
+  }
+
+  globalThis.clearTimeout(frameId);
+}
 
 function getNextStructureTierXp(
   structureType: StructureId,
@@ -189,10 +249,8 @@ export function useSiegeGame({
     };
 
     if (force) {
-      if (snapshotFrameRef.current != null) {
-        window.cancelAnimationFrame(snapshotFrameRef.current);
-        snapshotFrameRef.current = null;
-      }
+      cancelScheduledAnimationFrame(snapshotFrameRef.current);
+      snapshotFrameRef.current = null;
       applySnapshot();
       return;
     }
@@ -201,7 +259,7 @@ export function useSiegeGame({
       return;
     }
 
-    snapshotFrameRef.current = window.requestAnimationFrame(() => {
+    snapshotFrameRef.current = scheduleAnimationFrame(() => {
       snapshotFrameRef.current = null;
       applySnapshot();
     });
@@ -230,9 +288,7 @@ export function useSiegeGame({
 
   const enterInteractiveMode = useCallback((nextMode: SiegeGameMode = gameMode) => {
     const startedAt = Date.now();
-    if (phaseTimerRef.current != null) {
-      window.clearTimeout(phaseTimerRef.current);
-    }
+    cancelTimeout(phaseTimerRef.current);
     setGameMode(nextMode);
     setInteractiveInitialBugCounts(currentBugCounts);
     setInteractiveStartedAt(startedAt);
@@ -247,21 +303,19 @@ export function useSiegeGame({
     setPlacingStructureId(null);
     setAgentCaptures({});
     setSiegePhase("entering");
-    phaseTimerRef.current = window.setTimeout(() => {
+    phaseTimerRef.current = scheduleTimeout(() => {
       phaseTimerRef.current = null;
       setSiegePhase("active");
-    }, 700);
+    }, SIEGE_ENTER_DURATION_MS);
   }, [currentBugCount, currentBugCounts, flushRuntimeSnapshot, gameMode]);
 
   const exitInteractiveMode = useCallback(() => {
-    if (phaseTimerRef.current != null) {
-      window.clearTimeout(phaseTimerRef.current);
-    }
+    cancelTimeout(phaseTimerRef.current);
     setSiegePhase("exiting");
-    phaseTimerRef.current = window.setTimeout(() => {
+    phaseTimerRef.current = scheduleTimeout(() => {
       phaseTimerRef.current = null;
       setSiegePhase("idle");
-    }, 400);
+    }, SIEGE_EXIT_DURATION_MS);
   }, []);
 
   const selectWeapon = useCallback(
@@ -379,7 +433,7 @@ export function useSiegeGame({
         }));
       }
       if (phase === "done" || phase === "failed") {
-        window.setTimeout(() => {
+        scheduleTimeout(() => {
           setAgentCaptures((prev) => {
             const next = { ...prev };
             delete next[data.structureId];
@@ -424,7 +478,7 @@ export function useSiegeGame({
       return undefined;
     }
 
-    const intervalId = window.setInterval(() => {
+    const intervalId = scheduleInterval(() => {
       setPlacedStructures((prev) =>
         prev.map((structure) =>
           structure.structureType === "lantern"
@@ -435,7 +489,7 @@ export function useSiegeGame({
     }, LANTERN_SUPPORT_XP_INTERVAL_MS);
 
     return () => {
-      window.clearInterval(intervalId);
+      cancelInterval(intervalId);
     };
   }, [interactiveMode]);
 
@@ -482,10 +536,10 @@ export function useSiegeGame({
     };
 
     syncElapsedMs();
-    const intervalId = window.setInterval(syncElapsedMs, 250);
+    const intervalId = scheduleInterval(syncElapsedMs, 250);
 
     return () => {
-      window.clearInterval(intervalId);
+      cancelInterval(intervalId);
     };
   }, [
     flushRuntimeSnapshot,
@@ -599,12 +653,8 @@ export function useSiegeGame({
 
   useEffect(() => {
     return () => {
-      if (phaseTimerRef.current != null) {
-        window.clearTimeout(phaseTimerRef.current);
-      }
-      if (snapshotFrameRef.current != null) {
-        window.cancelAnimationFrame(snapshotFrameRef.current);
-      }
+      cancelTimeout(phaseTimerRef.current);
+      cancelScheduledAnimationFrame(snapshotFrameRef.current);
     };
   }, []);
 
@@ -613,7 +663,7 @@ export function useSiegeGame({
       return undefined;
     }
 
-    const timeoutId = window.setTimeout(() => {
+    const timeoutId = scheduleTimeout(() => {
       if (
         lastKillAtRef.current != null &&
         performance.now() - lastKillAtRef.current >= 1200
@@ -627,7 +677,7 @@ export function useSiegeGame({
     }, 1250);
 
     return () => {
-      window.clearTimeout(timeoutId);
+      cancelTimeout(timeoutId);
     };
   }, [interactiveMode, killStreak, updateRuntimeSnapshot]);
 
