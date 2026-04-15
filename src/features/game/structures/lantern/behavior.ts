@@ -22,6 +22,10 @@ export const lanternBehavior: StructureBehavior = {
   config: STRUCTURE_DEFS.find((s) => s.id === "lantern")!,
 
   tick(entry: StructureEntry, ctx: StructureTickContext): void {
+    const tier = entry.tier ?? 1;
+    const attractRadius = ATTRACT_RADIUS + (tier - 1) * 35;
+    const orbitSpeed = ORBIT_SPEED * (1 + (tier - 1) * 0.15);
+    const pullStrength = PULL_PX * (1 + (tier - 1) * 0.2);
     const bugs = ctx.engine.getEntities();
     for (let i = 0; i < bugs.length; i++) {
       const e = bugs[i] as any;
@@ -29,13 +33,13 @@ export const lanternBehavior: StructureBehavior = {
       const dx = entry.x - e.x;
       const dy = entry.y - e.y;
       const dist = Math.hypot(dx, dy);
-      if (dist > ATTRACT_RADIUS || dist < 1) continue;
+      if (dist > attractRadius || dist < 1) continue;
 
       // Tangential component (left-turn orbit)
-      const tx = (-dy / dist) * ORBIT_SPEED;
-      const ty = (dx / dist) * ORBIT_SPEED;
+      const tx = (-dy / dist) * orbitSpeed;
+      const ty = (dx / dist) * orbitSpeed;
       // Inward radial component (diminishing toward edge)
-      const inwardFactor = (1 - dist / ATTRACT_RADIUS) * PULL_PX;
+      const inwardFactor = (1 - dist / attractRadius) * pullStrength;
       const rx = (dx / dist) * inwardFactor;
       const ry = (dy / dist) * inwardFactor;
 

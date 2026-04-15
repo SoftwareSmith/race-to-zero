@@ -48,6 +48,7 @@ interface BackgroundFieldProps {
     structureId?: string,
   ) => void;
   onBugHit?: (payload: BugHitPayload) => void;
+  onStructureKill?: (structureId: string) => void;
   onWeaponFired?: (id: SiegeWeaponId, firedAt: number) => void;
   placedStructures?: PlacedStructure[];
   agentCaptures?: Record<string, AgentCaptureState>;
@@ -94,6 +95,7 @@ const BackgroundField = memo(function BackgroundField({
   interactiveSessionKey = null,
   onStructurePlace,
   onBugHit,
+  onStructureKill,
   onWeaponFired,
   placedStructures,
   agentCaptures,
@@ -403,7 +405,7 @@ const BackgroundField = memo(function BackgroundField({
   );
 
   const handleStructureKill = useCallback(
-    (x: number, y: number, variant: string) => {
+    (structureId: string, x: number, y: number, variant: string) => {
       onBugHit?.({
         defeated: true,
         remainingHp: 0,
@@ -436,8 +438,9 @@ const BackgroundField = memo(function BackgroundField({
           ],
         };
       });
+      onStructureKill?.(structureId);
     },
-    [gameSessionKey, onBugHit, totalBugCount],
+    [gameSessionKey, onBugHit, onStructureKill, totalBugCount],
   );
 
   const handleEntityDeath = useCallback(
@@ -521,6 +524,7 @@ const BackgroundField = memo(function BackgroundField({
         gameConfig={gameConfig}
         onEntityDeath={handleEntityDeath}
         onStructureKill={interactiveMode ? handleStructureKill : undefined}
+        placedStructures={placedStructures}
         onAgentAbsorb={interactiveMode ? onAgentAbsorb : undefined}
         onTurretFire={interactiveMode ? handleTurretFire : undefined}
         onTeslaFire={interactiveMode ? handleTeslaFire : undefined}

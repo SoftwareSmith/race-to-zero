@@ -31,6 +31,8 @@ export interface StructureDef {
   effectType: "attract" | "capture" | "shoot";
   /** CSS hex colour used by the StructureLayer renderer. */
   accentColor: string;
+  /** XP thresholds for T2 and T3 structure upgrades. */
+  tierThresholds: readonly [number, number];
 }
 
 export const STRUCTURE_DEFS: StructureDef[] = [
@@ -45,6 +47,7 @@ export const STRUCTURE_DEFS: StructureDef[] = [
     effectRadius: 280,
     effectType: "attract",
     accentColor: "#fbbf24",
+    tierThresholds: [3, 7],
   },
   {
     id: "agent",
@@ -57,6 +60,7 @@ export const STRUCTURE_DEFS: StructureDef[] = [
     effectRadius: 80,
     effectType: "capture",
     accentColor: "#34d399",
+    tierThresholds: [2, 5],
   },
   {
     id: "turret",
@@ -69,6 +73,7 @@ export const STRUCTURE_DEFS: StructureDef[] = [
     effectRadius: 150,
     effectType: "shoot",
     accentColor: "#22d3ee",
+    tierThresholds: [2, 5],
   },
   {
     id: "tesla",
@@ -81,6 +86,7 @@ export const STRUCTURE_DEFS: StructureDef[] = [
     effectRadius: 120,
     effectType: "shoot",
     accentColor: "#c084fc",
+    tierThresholds: [2, 5],
   },
   {
     id: "firewall",
@@ -93,6 +99,7 @@ export const STRUCTURE_DEFS: StructureDef[] = [
     effectRadius: 20,
     effectType: "capture",
     accentColor: "#f97316",
+    tierThresholds: [2, 5],
   },
 ];
 
@@ -101,3 +108,8 @@ export const STRUCTURE_UNLOCK_THRESHOLDS: Record<StructureId, number> =
     StructureId,
     number
   >;
+
+export const STRUCTURE_TIER_THRESHOLDS: Record<StructureId, readonly [number, number]> =
+  Object.fromEntries(
+    STRUCTURE_DEFS.map((structure) => [structure.id, structure.tierThresholds]),
+  ) as Record<StructureId, readonly [number, number]>;

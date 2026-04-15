@@ -22,14 +22,16 @@ import { SIEGE_GAME_MODE_META } from "@game/types";
 import {
   getSlotClassName,
   getStructureGlyph,
-  getTierBadgeClassName,
-  getTierBarClassName,
   getTierBarCoreClassName,
-  getTierLabel,
-  getTierProgress,
+  getTierNodeClassName,
+  getTierNodeFillClassName,
+  getTierNodeFillWidth,
+  getTierNodeOffsetClassName,
+  getTierProgressCompact,
   getTierSheenClassName,
   getWeaponButtonClassName,
-  INPUT_MODE_LABEL,
+  isMaxTierSnapshot,
+  WEAPON_TIER_NODE_COUNT,
   weaponTooltip,
 } from "./siegeHud.helpers";
 
@@ -171,12 +173,9 @@ function WeaponRailSlot({
   onSelect: (id: SiegeWeaponId) => void;
   snapshot: WeaponProgressSnapshot;
 }) {
-  const slotProgress = getTierProgress(snapshot);
-  const tierBarClassName = getTierBarClassName(snapshot);
-  const tierBarCoreClassName = getTierBarCoreClassName(snapshot);
   const tierSheenClassName = getTierSheenClassName(snapshot);
   const upgradeActive = isJustUnlocked || isEvolving;
-  const isOverdrive = snapshot.tier >= 3 || snapshot.killsToNextTier == null;
+  const isOverdrive = isMaxTierSnapshot(snapshot);
   const overdriveDecoration =
     isOverdrive && !snapshot.locked ? (
       <>
@@ -270,41 +269,44 @@ function WeaponRailSlot({
           )}
         </div>
 
-        <div
-          className={cn(
-            "mt-0.5 h-0.5 overflow-hidden rounded-full transition duration-200",
-            isSelected ? "bg-white/14" : "bg-white/8",
-          )}
-        >
-          <div
-            className={cn(
-              "relative h-full rounded-full transition-[width] duration-300",
-              tierBarClassName,
-              isSelected
-                ? "[animation:hud-weapon-breathe_1800ms_ease-in-out_infinite]"
-                : "opacity-72",
-            )}
-            style={{ width: `${slotProgress}%` }}
-          >
-            <div
-              className={cn(
-                "absolute inset-y-0 left-0 right-0 rounded-full",
-                tierBarCoreClassName,
-              )}
-            />
+        <div className="mt-0.5 px-1">
+          <div className="grid grid-cols-3 items-center">
+            {Array.from({ length: WEAPON_TIER_NODE_COUNT }, (_, index) => (
+              <span
+                key={`${snapshot.id}-tier-node-${index + 1}`}
+                className={cn(
+                  getTierNodeOffsetClassName(snapshot, index + 1),
+                  getTierNodeClassName(snapshot, index + 1),
+                )}
+              >
+                <span
+                  className={cn(
+                    "absolute inset-y-0 left-0 rounded-full transition-[width] duration-300",
+                    getTierNodeFillClassName(snapshot),
+                    isSelected ||
+                      (index + 1 === snapshot.tier && !snapshot.locked)
+                      ? undefined
+                      : "opacity-84",
+                  )}
+                  style={{ width: getTierNodeFillWidth(snapshot, index + 1) }}
+                >
+                  <span
+                    className={cn(
+                      "absolute inset-y-0 left-0 right-0 rounded-full",
+                      getTierBarCoreClassName(snapshot),
+                    )}
+                  />
+                </span>
+              </span>
+            ))}
           </div>
         </div>
 
         {!snapshot.locked && snapshot.cooldownMs > 0 && lastFiredAt != null ? (
-          <div className="absolute bottom-0 left-0 right-0 h-0.5 overflow-hidden rounded-b-[12px]">
-            <div
-              key={lastFiredAt}
-              className="h-full bg-sky-300/80"
-              style={{
-                animation: `reload-drain ${snapshot.cooldownMs}ms linear forwards`,
-              }}
-            />
-          </div>
+          <div
+            key={lastFiredAt}
+            className="pointer-events-none absolute inset-[3px] rounded-[10px] border border-sky-200/22 [animation:heat-tier-up-ripple_520ms_ease-out_forwards]"
+          />
         ) : null}
       </div>
     </Tooltip>
@@ -398,9 +400,6 @@ export default function SiegeHud({
   const selectedSnapshot =
     weaponSnapshots.find((snapshot) => snapshot.id === selectedWeaponId) ??
     weaponSnapshots[0];
-  const selectedProgress = selectedSnapshot
-    ? getTierProgress(selectedSnapshot)
-    : 0;
   const unlockedWeaponIds = useMemo(
     () =>
       weaponSnapshots
@@ -445,12 +444,6 @@ export default function SiegeHud({
   );
   const timerValue = formatElapsedTime(elapsedMs);
   const bugsLabel = gameMode === "outbreak" ? "Infection" : "Bugs";
-  const selectedTierBadgeClassName = selectedSnapshot
-    ? getTierBadgeClassName(selectedSnapshot)
-    : "border-white/10 bg-white/[0.06] text-stone-100";
-  const selectedTierLabel = selectedSnapshot
-    ? getTierLabel(selectedSnapshot)
-    : "Tier";
 
   useEffect(() => {
     return () => {
@@ -716,45 +709,57 @@ export default function SiegeHud({
             <div className="relative space-y-2">
               {selectedSnapshot ? (
                 <div className="relative rounded-[14px] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.08),rgba(255,255,255,0.04))] px-3 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]">
-                  <div className="absolute right-3 top-2 flex shrink-0 items-center gap-1">
-                    <span
-                      className={cn(
-                        "rounded-full border px-1.5 py-0.5 text-[0.48rem] font-semibold uppercase tracking-[0.12em]",
-                        selectedTierBadgeClassName,
-                        selectedSnapshot.tier >= 3 ||
-                          selectedSnapshot.killsToNextTier == null
-                          ? "[animation:heat-tier-flicker_2200ms_ease-in-out_infinite] shadow-[0_0_20px_rgba(239,68,68,0.24)]"
-                          : undefined,
-                      )}
-                    >
-                      {selectedTierLabel}
-                    </span>
-                  </div>
-
-                  <div>
-                    <div className="truncate font-display text-[0.96rem] leading-none tracking-[-0.04em] text-stone-50">
-                      {selectedSnapshot.title}
-                    </div>
-                    <div className="mt-1 text-[0.52rem] uppercase tracking-[0.14em] text-stone-500">
-                      {selectedSnapshot.typeLabel} ·{" "}
-                      {INPUT_MODE_LABEL[selectedSnapshot.inputMode] ??
-                        selectedSnapshot.inputMode}
-                    </div>
-                    <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-white/8">
-                      <div
-                        className={cn(
-                          "relative h-full rounded-full transition-[width] duration-500",
-                          getTierBarClassName(selectedSnapshot),
-                        )}
-                        style={{ width: `${selectedProgress}%` }}
-                      >
-                        <div
-                          className={cn(
-                            "absolute inset-y-0 left-0 right-0 rounded-full",
-                            getTierBarCoreClassName(selectedSnapshot),
-                          )}
-                        />
+                  <div className="flex items-center gap-2.5">
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate font-display text-[0.92rem] leading-none tracking-[-0.04em] text-stone-50">
+                        {selectedSnapshot.title}
                       </div>
+                    </div>
+                    <div className="flex shrink-0 items-center gap-2">
+                      <div className="grid shrink-0 grid-cols-2 items-center gap-1">
+                        {Array.from(
+                          { length: WEAPON_TIER_NODE_COUNT },
+                          (_, index) => (
+                            <span
+                              key={`selected-tier-node-${index + 1}`}
+                              className={cn(
+                                getTierNodeOffsetClassName(
+                                  selectedSnapshot,
+                                  index + 1,
+                                ),
+                                getTierNodeClassName(
+                                  selectedSnapshot,
+                                  index + 1,
+                                  "panel",
+                                ),
+                              )}
+                            >
+                              <span
+                                className={cn(
+                                  "absolute inset-y-0 left-0 rounded-full transition-[width] duration-500",
+                                  getTierNodeFillClassName(selectedSnapshot),
+                                )}
+                                style={{
+                                  width: getTierNodeFillWidth(
+                                    selectedSnapshot,
+                                    index + 1,
+                                  ),
+                                }}
+                              >
+                                <span
+                                  className={cn(
+                                    "absolute inset-y-0 left-0 right-0 rounded-full",
+                                    getTierBarCoreClassName(selectedSnapshot),
+                                  )}
+                                />
+                              </span>
+                            </span>
+                          ),
+                        )}
+                      </div>
+                      <span className="rounded-full border border-white/10 bg-black/24 px-2 py-1 text-[0.54rem] font-semibold uppercase tracking-[0.12em] text-stone-200">
+                        {getTierProgressCompact(selectedSnapshot)}
+                      </span>
                     </div>
                   </div>
                 </div>

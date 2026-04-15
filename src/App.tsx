@@ -17,8 +17,13 @@ import SiegeHud from "@game/components/SiegeHud";
 import { useSiegeGame } from "@game/hooks/useSiegeGame";
 import { useSiegeZones } from "@game/hooks/useSiegeZones";
 import { useWeaponEvolution } from "@game/hooks/useWeaponEvolution";
+import { STRUCTURE_DEFS } from "@config/structureConfig";
 import { WEAPON_DEFS } from "@config/weaponConfig";
-import { type SiegeWeaponId, type WeaponTier } from "@game/types";
+import {
+  type SiegeWeaponId,
+  type StructureId,
+  type WeaponTier,
+} from "@game/types";
 import { cn } from "@shared/utils/cn";
 import { triggerNamedShake } from "@game/utils/screenShake";
 import { getWeaponTierTitle } from "@game/weapons/progression";
@@ -35,12 +40,6 @@ function AppContent() {
     getWeaponTier,
     resetEvolution,
   } = useWeaponEvolution();
-  const siegeGame = useSiegeGame({
-    currentBugCount: dashboard.currentBugCount,
-    currentBugCounts: dashboard.currentBugCounts,
-    evolutionStates,
-    pauseTimer: dashboard.openTopMenu === "codex",
-  });
   const dashboardRef = useRef<HTMLDivElement | null>(null);
   const [upgradeToast, setUpgradeToast] = useState<string | null>(null);
   const [justEvolvedWeaponId, setJustEvolvedWeaponId] =
@@ -50,6 +49,40 @@ function AppContent() {
     setUpgradeToast(message);
     window.setTimeout(() => setUpgradeToast(null), 3500);
   }, []);
+
+  const getProgressionLabel = useCallback((tier: WeaponTier) => {
+    return tier === 3 ? "Overdrive" : `Tier ${tier}`;
+  }, []);
+
+  const handleStructureTierUp = useCallback(
+    ({
+      structureType,
+      tier,
+    }: {
+      structureId: string;
+      structureType: StructureId;
+      tier: WeaponTier;
+    }) => {
+      const structureTitle =
+        STRUCTURE_DEFS.find((structure) => structure.id === structureType)
+          ?.title ?? structureType;
+      showUpgradeToast(
+        `${structureTitle} upgraded to ${getProgressionLabel(tier)}`,
+      );
+      if (dashboardRef.current) {
+        triggerNamedShake(dashboardRef.current, "tierup");
+      }
+    },
+    [getProgressionLabel, showUpgradeToast],
+  );
+
+  const siegeGame = useSiegeGame({
+    currentBugCount: dashboard.currentBugCount,
+    currentBugCounts: dashboard.currentBugCounts,
+    evolutionStates,
+    onStructureTierUp: handleStructureTierUp,
+    pauseTimer: dashboard.openTopMenu === "codex",
+  });
 
   const handleEvolution = useCallback(
     (weaponId: SiegeWeaponId, newTier: WeaponTier) => {
@@ -122,6 +155,9 @@ function AppContent() {
         }
         onBugHit={
           siegeGame.interactiveMode ? siegeGame.handleInteractiveHit : undefined
+        }
+        onStructureKill={
+          siegeGame.interactiveMode ? siegeGame.handleStructureKill : undefined
         }
         onWeaponFired={
           siegeGame.interactiveMode ? siegeGame.handleWeaponFired : undefined

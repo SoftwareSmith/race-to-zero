@@ -161,12 +161,14 @@ export interface WeaponEffectEvent {
 export interface WeaponProgressSnapshot {
   current: boolean;
   cooldownMs: number;
+  currentTierStartKills: number;
   detail: string;
   hint: string;
   id: SiegeWeaponId;
   inputMode: "click" | "directional" | "seeking" | "hold";
   locked: boolean;
   matchupSummary: WeaponMatchupSummaryItem[];
+  nextTierGoalKills: number | null;
   progressText: string;
   title: string;
   typeHint: string;
@@ -195,6 +197,10 @@ export type StructureId = "lantern" | "agent" | "turret" | "tesla" | "firewall";
 export interface PlacedStructure {
   id: string;
   structureType: StructureId;
+  tier: WeaponTier;
+  xp: number;
+  nextTierXp: number | null;
+  kills: number;
   /** Viewport x coordinate */
   x: number;
   /** Viewport y coordinate */

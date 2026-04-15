@@ -25,13 +25,17 @@ export const turretBehavior: StructureBehavior = {
 
   tick(entry: StructureEntry, ctx: StructureTickContext): void {
     const { now, engine, callbacks } = ctx;
+    const tier = entry.tier ?? 1;
+    const shootRadius = SHOOT_RADIUS + (tier - 1) * 18;
+    const shotDamage = tier >= 3 ? 2 : 1;
+    const intervalMs = Math.max(1200, SHOOT_INTERVAL_MS - (tier - 1) * 350);
 
     // ── Resolve active aim phase ─────────────────────────────────────────
     if (entry.aimPhase) {
       if (now >= entry.aimPhase.firesAt) {
         const ap = entry.aimPhase;
         entry.aimPhase = null;
-        entry.nextCaptureAt = now + SHOOT_INTERVAL_MS;
+        entry.nextCaptureAt = now + intervalMs;
 
         // Find the bug currently closest to the locked aim position
         const bugs = engine.getEntities();
@@ -51,10 +55,10 @@ export const turretBehavior: StructureBehavior = {
           const fireTarget = bugs[bestIdx] as any;
           const angle = Math.atan2(fireTarget.y - entry.y, fireTarget.x - entry.x);
           entry.lastFireAngle = angle;
-          const result = engine.handleHit(bestIdx, 1, true);
+          const result = engine.handleHit(bestIdx, shotDamage, true);
           if (result?.defeated) {
             try {
-              callbacks.onStructureKill?.(fireTarget.x, fireTarget.y, fireTarget.variant);
+              callbacks.onStructureKill?.(entry.id, fireTarget.x, fireTarget.y, fireTarget.variant);
             } catch { void 0; }
           }
           try {
@@ -83,7 +87,7 @@ export const turretBehavior: StructureBehavior = {
       const e = bugs[i] as any;
       if (isTerminalEntityState(e.state)) continue;
       const dist = Math.hypot(e.x - entry.x, e.y - entry.y);
-      if (dist <= SHOOT_RADIUS && dist < bestDist) {
+      if (dist <= shootRadius && dist < bestDist) {
         bestDist = dist;
         bestIdx = i;
       }

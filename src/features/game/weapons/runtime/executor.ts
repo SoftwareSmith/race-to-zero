@@ -76,6 +76,9 @@ export function executeCommands(
               Math.max(0, cmd.amount),
               getMatchupFeedbackTone(result.matchup),
             );
+            for (const comboEvent of result.comboEvents ?? []) {
+              (ctx.vfx as any)?.spawnComboBurst?.(vx, vy, comboEvent);
+            }
           }
           ctx.updateQaLastHit({
             defeated: result.defeated,
@@ -100,6 +103,11 @@ export function executeCommands(
             Math.round(bug.x + ctx.bounds.left),
             Math.round(bug.y + ctx.bounds.top),
             "poison",
+          );
+          (ctx.vfx as any)?.spawnPoisonBurst?.(
+            Math.round(bug.x + ctx.bounds.left),
+            Math.round(bug.y + ctx.bounds.top),
+            22,
           );
         }
         break;
@@ -141,6 +149,11 @@ export function executeCommands(
         const bug = ctx.engine.getAllBugs()[cmd.targetIndex] as any;
         if (bug && typeof bug.applyEnsnare === "function") {
           bug.applyEnsnare(cmd.durationMs);
+          (ctx.vfx as any)?.spawnStatusApply?.(
+            Math.round(bug.x + ctx.bounds.left),
+            Math.round(bug.y + ctx.bounds.top),
+            "ensnare",
+          );
         }
         break;
       }
@@ -162,6 +175,11 @@ export function executeCommands(
           cmd.dps,
           cmd.durationMs,
           ctx.weaponId,
+        );
+        (ctx.vfx as any)?.spawnPoisonBurst?.(
+          Math.round(cmd.cx + ctx.bounds.left),
+          Math.round(cmd.cy + ctx.bounds.top),
+          Math.max(28, cmd.radius * 0.4),
         );
         break;
 
@@ -197,9 +215,22 @@ export function executeCommands(
           cmd.durationMs,
           ctx.weaponId,
         );
+        (ctx.vfx as any)?.spawnPoisonBurst?.(
+          Math.round(cmd.cx + ctx.bounds.left),
+          Math.round(cmd.cy + ctx.bounds.top),
+          Math.max(30, cmd.radius * 0.42),
+        );
         const engine = ctx.engine;
+        const vfx = ctx.vfx as any;
+        const viewportCx = Math.round(cmd.cx + ctx.bounds.left);
+        const viewportCy = Math.round(cmd.cy + ctx.bounds.top);
         const intId = window.setInterval(() => {
           engine.applyPoisonInRadius(cmd.cx, cmd.cy, cmd.radius, cmd.dps, cmd.durationMs, ctx.weaponId);
+          vfx?.spawnPoisonBurst?.(
+            viewportCx,
+            viewportCy,
+            Math.max(26, cmd.radius * 0.34),
+          );
         }, cmd.intervalMs);
         window.setTimeout(() => window.clearInterval(intId), cmd.totalMs + 50);
         break;
@@ -243,6 +274,11 @@ export function executeCommands(
         const bug = ctx.engine.getAllBugs()[cmd.targetIndex] as any;
         if (bug && typeof bug.applyMarked === "function") {
           bug.applyMarked(cmd.durationMs);
+          (ctx.vfx as any)?.spawnStatusApply?.(
+            Math.round(bug.x + ctx.bounds.left),
+            Math.round(bug.y + ctx.bounds.top),
+            "marked",
+          );
         }
         break;
       }
@@ -251,6 +287,11 @@ export function executeCommands(
         const bug = ctx.engine.getAllBugs()[cmd.targetIndex] as any;
         if (bug && typeof bug.applyUnstable === "function") {
           bug.applyUnstable(cmd.durationMs);
+          (ctx.vfx as any)?.spawnStatusApply?.(
+            Math.round(bug.x + ctx.bounds.left),
+            Math.round(bug.y + ctx.bounds.top),
+            "unstable",
+          );
         }
         break;
       }
@@ -259,6 +300,11 @@ export function executeCommands(
         const bug = ctx.engine.getAllBugs()[cmd.targetIndex] as any;
         if (bug && typeof bug.applyLooped === "function") {
           bug.applyLooped(cmd.dps, cmd.durationMs, ctx.weaponId);
+          (ctx.vfx as any)?.spawnStatusApply?.(
+            Math.round(bug.x + ctx.bounds.left),
+            Math.round(bug.y + ctx.bounds.top),
+            "looped",
+          );
         }
         break;
       }
@@ -300,6 +346,16 @@ export function executeCommands(
 
       case "allyBug":
         ctx.engine.allyBug(cmd.targetIndex, cmd.durationMs);
+        {
+          const bug = ctx.engine.getAllBugs()[cmd.targetIndex] as any;
+          if (bug) {
+            (ctx.vfx as any)?.spawnStatusApply?.(
+              Math.round(bug.x + ctx.bounds.left),
+              Math.round(bug.y + ctx.bounds.top),
+              "ally",
+            );
+          }
+        }
         break;
 
       case "startEventHorizon":

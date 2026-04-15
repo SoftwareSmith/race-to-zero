@@ -6,6 +6,7 @@ import type { GameConfig } from "@game/engine/types";
 import { DEFAULT_GAME_CONFIG } from "@game/engine/types";
 import { drawBugSprite } from "@game/utils/bugSprite";
 import type {
+  PlacedStructure,
   SiegeCombatStats,
   SiegeWeaponId,
   SiegeZoneRect,
@@ -99,7 +100,13 @@ export interface BugCanvasProps {
     variant: string,
     meta: { credited: boolean; frozen: boolean; pointValue: number },
   ) => void;
-  onStructureKill?: (x: number, y: number, variant: string) => void;
+  onStructureKill?: (
+    structureId: string,
+    x: number,
+    y: number,
+    variant: string,
+  ) => void;
+  placedStructures?: PlacedStructure[];
   onAgentAbsorb?: (data: {
     structureId: string;
     phase: "absorbing" | "pulling" | "done" | "failed";
@@ -153,6 +160,7 @@ const BugCanvas = memo(function BugCanvas({
   interactiveMode,
   onEntityDeath,
   onStructureKill,
+  placedStructures,
   onAgentAbsorb,
   onTurretFire,
   onTeslaFire,
@@ -326,9 +334,10 @@ const BugCanvas = memo(function BugCanvas({
             void 0;
           }
         },
-        onStructureKill: (x, y, variant) => {
+        onStructureKill: (structureId, x, y, variant) => {
           try {
             onStructureKillRef.current?.(
+              structureId,
               Math.round(x + (boundsRef.current.left || 0)),
               Math.round(y + (boundsRef.current.top || 0)),
               variant,
@@ -1057,6 +1066,24 @@ const BugCanvas = memo(function BugCanvas({
       }
     };
   }, [hammerPositionRef, syncWeaponEvolutionStates]);
+
+  useEffect(() => {
+    const engine = swarmRef.current as
+      | (Engine & {
+          updateStructureTier?: (
+            id: string,
+            tier: import("@game/types").WeaponTier,
+          ) => void;
+        })
+      | null;
+    if (!engine || !placedStructures) {
+      return;
+    }
+
+    for (const structure of placedStructures) {
+      engine.updateStructureTier?.(structure.id, structure.tier);
+    }
+  }, [placedStructures]);
 
   return (
     <>

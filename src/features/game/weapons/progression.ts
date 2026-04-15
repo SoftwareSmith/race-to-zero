@@ -27,12 +27,41 @@ export function getWeaponTierDefinition(
   return tiers[getTierIndex(tier)] ?? tiers[tiers.length - 1];
 }
 
+export function getWeaponMaxTier(def: WeaponDef): WeaponTier {
+  const tiers = getWeaponTiers(def);
+  return (tiers[tiers.length - 1]?.tier ?? WeaponTier.TIER_ONE) as WeaponTier;
+}
+
 export function getNextWeaponTierDefinition(
   def: WeaponDef,
   tier: WeaponTier,
 ): WeaponTierDefinition | null {
   const tiers = getWeaponTiers(def);
   return tiers[getTierIndex(tier) + 1] ?? null;
+}
+
+export function getCurrentWeaponTierStartKills(
+  def: WeaponDef,
+  tier: WeaponTier,
+): number {
+  const tiers = getWeaponTiers(def);
+  return tiers[getTierIndex(tier) - 1]?.evolveAtKills ?? 0;
+}
+
+export function getCurrentWeaponTierGoalKills(
+  def: WeaponDef,
+  tier: WeaponTier,
+): number | null {
+  return getWeaponTierDefinition(def, tier).evolveAtKills ?? null;
+}
+
+export function isWeaponEvolutionMaxed(
+  def: WeaponDef,
+  state: WeaponEvolutionState | undefined,
+): boolean {
+  return (
+    getNextWeaponTierDefinition(def, state?.tier ?? WeaponTier.TIER_ONE) == null
+  );
 }
 
 export function getWeaponTierTitle(def: WeaponDef, tier: WeaponTier): string {

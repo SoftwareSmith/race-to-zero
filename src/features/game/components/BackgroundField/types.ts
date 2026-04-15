@@ -8,6 +8,7 @@ export interface BugHitPayload {
   y: number;
   pointValue?: number;
   frozen?: boolean;
+  comboEvents?: Array<"detonate" | "quench">;
 }
 
 export interface RenderedBugPosition {

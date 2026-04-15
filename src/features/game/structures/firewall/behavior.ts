@@ -23,19 +23,23 @@ export const firewallBehavior: StructureBehavior = {
 
   tick(entry: StructureEntry, ctx: StructureTickContext): void {
     const { now, engine, callbacks } = ctx;
+    const tier = entry.tier ?? 1;
+    const wallHalfWidth = WALL_HALF_WIDTH + (tier - 1) * 8;
+    const tickDamage = tier >= 3 ? 2 : 1;
+    const damageIntervalMs = Math.max(350, DAMAGE_INTERVAL_MS - (tier - 1) * 180);
 
     if (now < (entry.firewallNextDamageAt ?? 0)) return;
-    entry.firewallNextDamageAt = now + DAMAGE_INTERVAL_MS;
+    entry.firewallNextDamageAt = now + damageIntervalMs;
 
     const bugs = engine.getEntities();
     for (let i = 0; i < bugs.length; i++) {
       const e = bugs[i] as any;
       if (isTerminalEntityState(e.state)) continue;
-      if (Math.abs(e.x - entry.x) <= WALL_HALF_WIDTH) {
-        const result = engine.handleHit(i, 1, true);
+      if (Math.abs(e.x - entry.x) <= wallHalfWidth) {
+        const result = engine.handleHit(i, tickDamage, true);
         if (result?.defeated) {
           try {
-            callbacks.onStructureKill?.(e.x, e.y, e.variant);
+            callbacks.onStructureKill?.(entry.id, e.x, e.y, e.variant);
           } catch { void 0; }
         }
       }

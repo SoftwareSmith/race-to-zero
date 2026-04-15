@@ -11,6 +11,8 @@ import { STRUCTURE_DEFS } from "@config/structureConfig";
 import type { StructureId } from "@game/types";
 import { getWeaponMatchupSummary } from "@game/combat/weaponMatchups";
 import {
+  getCurrentWeaponTierGoalKills,
+  getCurrentWeaponTierStartKills,
   getKillsToNextTier,
   getWeaponTierDetail,
   getWeaponTierHint,
@@ -88,11 +90,14 @@ export function getSiegeWeaponSnapshots(
     const tier: WeaponTier = evo?.tier ?? WeaponTierEnum.TIER_ONE;
     const weaponKills = evo?.kills ?? 0;
     const killsToNextTier = getKillsToNextTier(weapon, evo);
+    const currentTierStartKills = getCurrentWeaponTierStartKills(weapon, tier);
+    const nextTierGoalKills = getCurrentWeaponTierGoalKills(weapon, tier);
 
     return {
       id: weapon.id,
       title: getWeaponTierTitle(weapon, tier),
       hint: getWeaponTierHint(weapon, tier),
+      currentTierStartKills,
       typeLabel: weapon.typeLabel,
       typeHint: weapon.typeHint,
       inputMode: weapon.inputMode,
@@ -100,6 +105,7 @@ export function getSiegeWeaponSnapshots(
       locked: !unlocked,
       current: weapon.id === selectedId,
       detail: getWeaponTierDetail(weapon, tier),
+      nextTierGoalKills,
       unlockKills: weapon.unlockKills,
       matchupSummary: getWeaponMatchupSummary(weapon.id),
       tier,

@@ -12,14 +12,14 @@ export interface BugSpriteOptions {
   rotation?: number;
   size: number;
   statusFlags?: {
-    ally?: boolean;
-    burn?: boolean;
-    charged?: boolean;
-    ensnare?: boolean;
-    freeze?: boolean;
-    marked?: boolean;
-    poison?: boolean;
-    unstable?: boolean;
+    ally?: boolean | number;
+    burn?: boolean | number;
+    charged?: boolean | number;
+    ensnare?: boolean | number;
+    freeze?: boolean | number;
+    marked?: boolean | number;
+    poison?: boolean | number;
+    unstable?: boolean | number;
   };
   timeMs?: number;
   variant?: BugVariant;
@@ -46,6 +46,93 @@ const BUG_RAW_SVGS: Record<BugVariant, string> = {
 };
 
 const SPRITE_FORWARD_ROTATION_OFFSET = Math.PI / 2 + Math.PI / 18;
+
+function getStatusStrength(value: boolean | number | undefined) {
+  if (typeof value === "number") {
+    return Math.max(0, Math.min(1, value));
+  }
+
+  return value ? 1 : 0;
+}
+
+function drawStatusAura(
+  ctx: CanvasRenderingContext2D,
+  size: number,
+  timeMs: number,
+  statusFlags: NonNullable<BugSpriteOptions["statusFlags"]>,
+) {
+  const radius = size * 0.56;
+  const poisonStrength = getStatusStrength(statusFlags.poison);
+  const markedStrength = getStatusStrength(statusFlags.marked);
+  const ensnareStrength = getStatusStrength(statusFlags.ensnare);
+  const chargedStrength = getStatusStrength(statusFlags.charged);
+
+  if (poisonStrength > 0) {
+    const pulse = 0.82 + Math.sin(timeMs * 0.01) * 0.12;
+    ctx.save();
+    ctx.globalCompositeOperation = "lighter";
+    ctx.strokeStyle = `rgba(120, 255, 110, ${(0.16 + poisonStrength * 0.28) + Math.sin(timeMs * 0.008) * 0.04})`;
+    ctx.lineWidth = Math.max(1, size * (0.03 + poisonStrength * 0.02));
+    ctx.beginPath();
+    ctx.arc(0, 0, radius * (pulse * (0.88 + poisonStrength * 0.18)), 0, Math.PI * 2);
+    ctx.stroke();
+
+    for (let index = 0; index < 3; index += 1) {
+      const angle = timeMs * 0.0028 + index * ((Math.PI * 2) / 3);
+      const dropletRadius = radius * (0.68 + index * 0.08);
+      const dropletX = Math.cos(angle) * dropletRadius;
+      const dropletY = Math.sin(angle * 1.2) * dropletRadius * 0.65;
+      ctx.fillStyle = `rgba(166, 255, 128, ${0.08 + poisonStrength * 0.16 + index * 0.04})`;
+      ctx.beginPath();
+      ctx.arc(
+        dropletX,
+        dropletY,
+        Math.max(1.2, size * (0.035 + poisonStrength * 0.025) - index * 0.12),
+        0,
+        Math.PI * 2,
+      );
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  if (markedStrength > 0) {
+    ctx.save();
+    ctx.strokeStyle = `rgba(244, 114, 182, ${0.14 + markedStrength * 0.26})`;
+    ctx.lineWidth = Math.max(1, size * (0.025 + markedStrength * 0.015));
+    ctx.beginPath();
+    ctx.arc(0, 0, radius * 0.92, Math.PI * 0.12, Math.PI * 1.88);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  if (ensnareStrength > 0) {
+    ctx.save();
+    ctx.strokeStyle = `rgba(250, 204, 21, ${0.12 + ensnareStrength * 0.22})`;
+    ctx.lineWidth = Math.max(1, size * (0.02 + ensnareStrength * 0.015));
+    for (let index = 0; index < 3; index += 1) {
+      const offset = ((timeMs * 0.003 + index * 0.33) % 1) * radius * 1.6 - radius * 0.8;
+      ctx.beginPath();
+      ctx.moveTo(-radius * 0.85, offset);
+      ctx.lineTo(radius * 0.85, offset - radius * 0.22);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  if (chargedStrength > 0) {
+    ctx.save();
+    ctx.strokeStyle = `rgba(103, 232, 249, ${0.12 + chargedStrength * 0.22})`;
+    ctx.lineWidth = Math.max(1, size * (0.025 + chargedStrength * 0.012));
+    ctx.beginPath();
+    ctx.moveTo(-radius * 0.5, -radius * 0.2);
+    ctx.lineTo(-radius * 0.08, -radius * 0.5);
+    ctx.lineTo(radius * 0.1, -radius * 0.05);
+    ctx.lineTo(radius * 0.45, -radius * 0.34);
+    ctx.stroke();
+    ctx.restore();
+  }
+}
 
 /* ---------------------------------- */
 /* Utilities */
@@ -210,15 +297,21 @@ export function drawBugSprite(
     );
 
     if (statusFlags) {
+      drawStatusAura(ctx, finalSize, timeMs, statusFlags);
+    }
+
+    if (statusFlags) {
       for (const [key, tint] of Object.entries(STATUS_TINTS) as Array<
         [keyof typeof STATUS_TINTS, string]
       >) {
-        if (!statusFlags[key]) {
+        const strength = getStatusStrength(statusFlags[key]);
+        if (strength <= 0) {
           continue;
         }
 
         ctx.save();
         ctx.globalCompositeOperation = "source-atop";
+        ctx.globalAlpha = Math.max(0.14, strength);
         ctx.fillStyle = tint;
         ctx.fillRect(-finalSize / 2, -finalSize / 2, finalSize, finalSize);
         ctx.restore();
@@ -241,12 +334,18 @@ export function drawBugSprite(
     drawFallbackBug(ctx);
 
     if (statusFlags) {
+      drawStatusAura(ctx, finalSize, timeMs, statusFlags);
+    }
+
+    if (statusFlags) {
       for (const [key, tint] of Object.entries(STATUS_TINTS) as Array<
         [keyof typeof STATUS_TINTS, string]
       >) {
-        if (!statusFlags[key]) {
+        const strength = getStatusStrength(statusFlags[key]);
+        if (strength <= 0) {
           continue;
         }
+        ctx.globalAlpha = Math.max(0.14, strength);
         ctx.globalCompositeOperation = "source-atop";
         ctx.fillStyle = tint;
         ctx.fillRect(-12, -12, 24, 24);

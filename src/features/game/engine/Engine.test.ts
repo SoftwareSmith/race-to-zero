@@ -193,5 +193,13 @@ describe("engine death attribution", () => {
       tier: WeaponTier.TIER_THREE,
     });
     expect(onWeaponEvolution).toHaveBeenNthCalledWith(2, weaponId, WeaponTier.TIER_THREE);
+
+    engine.recordWeaponKill(weaponId);
+
+    expect(engine.getWeaponEvolutionStates().get(weaponId)).toMatchObject({
+      kills: tierThreeThreshold + 1,
+      tier: WeaponTier.TIER_THREE,
+    });
+    expect(onWeaponEvolution).toHaveBeenCalledTimes(2);
   });
 });

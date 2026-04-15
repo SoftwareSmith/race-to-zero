@@ -493,8 +493,8 @@ export class BugEntity extends Entity {
     this.state = "flee";
     this.fleeTimer = 0.9 + Math.random() * 0.5;
     this.syncTypeSpec();
-    this.handleStatusInteractions();
-    return { defeated: false, remainingHp: this.hp, pointValue: 0, frozen, poisoned, burning, ensnared };
+    const comboEvents = this.handleStatusInteractions();
+    return { defeated: false, remainingHp: this.hp, pointValue: 0, frozen, poisoned, burning, ensnared, comboEvents };
   }
 
   /** Handle status combo interactions after a hit. */
@@ -503,11 +503,13 @@ export class BugEntity extends Entity {
     const isCharged = this.charged !== null && now < this.charged.expiresAt;
     const isBurning = this.burn !== null && now < this.burn.expiresAt;
     const isFrozen = this.slow !== null && now < this.slow.expiresAt;
+    const comboEvents: Array<"detonate" | "quench"> = [];
 
     // burning + charged → detonation: extra damage burst, clears charged
     if (isBurning && isCharged) {
       this.hp = Math.max(0, this.hp - 3);
       this.charged = null;
+      comboEvents.push("detonate");
       if (this.hp === 0 && !isTerminalEntityState(this.state)) {
         this.state = EntityState.Dying;
         this.deathProgress = 0;
@@ -521,6 +523,7 @@ export class BugEntity extends Entity {
     if (isFrozen && isBurning) {
       this.burn = null;
       this.hp = Math.max(0, this.hp - 2);
+      comboEvents.push("quench");
       if (this.hp === 0 && !isTerminalEntityState(this.state)) {
         this.state = EntityState.Dying;
         this.deathProgress = 0;
@@ -529,6 +532,8 @@ export class BugEntity extends Entity {
         this.deathCredited = false;
       }
     }
+
+    return comboEvents;
   }
 
   /** Apply a Freeze Cone slow. Stacks to extend duration. */
@@ -693,6 +698,14 @@ export class BugEntity extends Entity {
     const color = typeSpec?.color;
     const sizeMultiplier = typeSpec?.size ?? 1;
     const now = performance.now();
+    const statusStrength = (expiresAt: number | undefined, fullMs: number) => {
+      if (!expiresAt || now >= expiresAt) {
+        return 0;
+      }
+
+      return Math.max(0.18, Math.min(1, (expiresAt - now) / fullMs));
+    };
+
     drawBugSprite(ctx2d, {
       x: renderX,
       y: renderY,
@@ -703,14 +716,14 @@ export class BugEntity extends Entity {
       color: color ?? undefined,
       timeMs: now,
       statusFlags: {
-        ally: this.ally !== null && now < this.ally.expiresAt,
-        burn: this.burn !== null && now < this.burn.expiresAt,
-        charged: this.charged !== null && now < this.charged.expiresAt,
-        ensnare: this.ensnare !== null && now < this.ensnare.expiresAt,
-        freeze: this.slow !== null && now < this.slow.expiresAt,
-        marked: this.marked !== null && now < this.marked.expiresAt,
-        poison: this.poison !== null && now < this.poison.expiresAt,
-        unstable: this.unstable !== null && now < this.unstable.expiresAt,
+        ally: statusStrength(this.ally?.expiresAt, 7000),
+        burn: statusStrength(this.burn?.expiresAt, 2800),
+        charged: statusStrength(this.charged?.expiresAt, 2400),
+        ensnare: statusStrength(this.ensnare?.expiresAt, 2200),
+        freeze: statusStrength(this.slow?.expiresAt, 2200),
+        marked: statusStrength(this.marked?.expiresAt, 2600),
+        poison: statusStrength(this.poison?.expiresAt, 3200),
+        unstable: statusStrength(this.unstable?.expiresAt, 2600),
       },
     });
   }

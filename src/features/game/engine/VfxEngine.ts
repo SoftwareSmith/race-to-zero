@@ -82,16 +82,37 @@ interface FloatingLabel {
   scaleFrom: number;
 }
 
-type StatusLabel = "burn" | "freeze" | "poison" | "charged";
+type StatusLabel =
+  | "ally"
+  | "burn"
+  | "charged"
+  | "ensnare"
+  | "freeze"
+  | "looped"
+  | "marked"
+  | "poison"
+  | "unstable";
+
+type ComboLabel = "detonate" | "quench";
 
 const STATUS_APPLY_SPECS: Record<
   StatusLabel,
   { color: number; text: string }
 > = {
+  ally: { color: 0x34d399, text: "ALLY" },
   burn: { color: 0xf97316, text: "FIRE" },
   charged: { color: 0x22d3ee, text: "CHARGED" },
+  ensnare: { color: 0xfacc15, text: "SNARED" },
   freeze: { color: 0x93c5fd, text: "SLOW" },
+  looped: { color: 0xc084fc, text: "LOOPED" },
+  marked: { color: 0xe879f9, text: "MARKED" },
   poison: { color: 0x4ade80, text: "POISON" },
+  unstable: { color: 0xa855f7, text: "UNSTABLE" },
+};
+
+const COMBO_SPECS: Record<ComboLabel, { color: number; text: string }> = {
+  detonate: { color: 0xfb7185, text: "DETONATE" },
+  quench: { color: 0x93c5fd, text: "QUENCH" },
 };
 
 // ── Noise helper ──────────────────────────────────────────────────────────────
@@ -1179,6 +1200,70 @@ export class VfxEngine {
   spawnStatusApply(x: number, y: number, status: StatusLabel): void {
     const spec = STATUS_APPLY_SPECS[status];
     this.addFloatingLabel(x, y, spec.text, spec.color, 0.78, 780, 24);
+  }
+
+  spawnPoisonBurst(x: number, y: number, radius = 26): void {
+    const particleCount = Math.max(6, Math.floor(radius * 0.22));
+
+    for (let index = 0; index < particleCount; index += 1) {
+      const angle = (index / particleCount) * Math.PI * 2 + Math.random() * 0.34;
+      const speed = 22 + Math.random() * (radius * 1.2);
+      this.spawnParticle({
+        x,
+        y,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed - 10,
+        ay: -8,
+        life: 420 + Math.random() * 260,
+        size: 5 + Math.random() * 7,
+        type: PType.MIST,
+        r: 132,
+        g: 255,
+        b: 138,
+        additive: true,
+      });
+    }
+
+    for (let index = 0; index < Math.max(4, Math.floor(radius * 0.12)); index += 1) {
+      const angle = Math.random() * Math.PI * 2;
+      const speed = 10 + Math.random() * (radius * 0.44);
+      this.spawnParticle({
+        x,
+        y,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed - 16,
+        ay: -4,
+        life: 620 + Math.random() * 320,
+        size: 9 + Math.random() * 11,
+        type: PType.SMOKE,
+        r: 62,
+        g: 110,
+        b: 58,
+        additive: false,
+      });
+    }
+  }
+
+  spawnComboBurst(x: number, y: number, combo: ComboLabel): void {
+    const spec = COMBO_SPECS[combo];
+    this.addFloatingLabel(x, y - 6, spec.text, spec.color, 1.05, 980, 34);
+    for (let index = 0; index < 10; index += 1) {
+      const angle = (index / 10) * Math.PI * 2 + Math.random() * 0.2;
+      const speed = 78 + Math.random() * 60;
+      this.spawnParticle({
+        x,
+        y,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed,
+        life: 260 + Math.random() * 120,
+        size: 2 + Math.random() * 3,
+        type: PType.SPARK,
+        r: (spec.color >> 16) & 0xff,
+        g: (spec.color >> 8) & 0xff,
+        b: spec.color & 0xff,
+        additive: true,
+      });
+    }
   }
 
   spawnLevelUp(x: number, y: number): void {

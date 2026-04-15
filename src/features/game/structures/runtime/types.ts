@@ -6,7 +6,7 @@
  */
 
 import type { StructureDef } from "@config/structureConfig";
-import type { StructureId } from "@game/types";
+import type { StructureId, WeaponTier } from "@game/types";
 
 // Re-exports for convenience
 export type { StructureId, StructureDef };
@@ -38,6 +38,7 @@ export interface AimPhase {
 export interface StructureEntry {
   id: string;
   type: StructureId;
+  tier: WeaponTier;
   x: number;
   y: number;
   nextCaptureAt: number;
@@ -113,7 +114,7 @@ export interface TeslaFireData {
 }
 
 export interface StructureCallbacks {
-  onStructureKill?(x: number, y: number, variant: string): void;
+  onStructureKill?(structureId: string, x: number, y: number, variant: string): void;
   onAgentAbsorb?(data: AgentAbsorbData): void;
   onTurretFire?(data: TurretFireData): void;
   onTeslaFire?(data: TeslaFireData): void;

@@ -6,7 +6,7 @@ import {
   getSiegeWeaponSnapshots,
 } from "@game/progression/progression";
 import { WEAPON_DEFS } from "@config/weaponConfig";
-import { STRUCTURE_DEFS } from "@config/structureConfig";
+import { STRUCTURE_DEFS, STRUCTURE_TIER_THRESHOLDS } from "@config/structureConfig";
 import type {
   AgentCaptureState,
   PlacedStructure,
@@ -14,13 +14,71 @@ import type {
   SiegePhase,
   SiegeWeaponId,
   StructureId,
+  WeaponTier,
   WeaponEvolutionState,
 } from "@game/types";
+import { WeaponTier as Tier } from "@game/types";
+
+const LANTERN_SUPPORT_XP_INTERVAL_MS = 4500;
+const STRUCTURE_KILL_XP = 2;
+
+function getNextStructureTierXp(
+  structureType: StructureId,
+  tier: WeaponTier,
+): number | null {
+  const thresholds = STRUCTURE_TIER_THRESHOLDS[structureType];
+  if (tier === Tier.TIER_ONE) {
+    return thresholds[0];
+  }
+
+  if (tier === Tier.TIER_TWO) {
+    return thresholds[1];
+  }
+
+  return null;
+}
+
+function getStructureTierForXp(
+  structureType: StructureId,
+  xp: number,
+): WeaponTier {
+  const [tierTwoThreshold, tierThreeThreshold] = STRUCTURE_TIER_THRESHOLDS[structureType];
+  if (xp >= tierThreeThreshold) {
+    return Tier.TIER_THREE;
+  }
+
+  if (xp >= tierTwoThreshold) {
+    return Tier.TIER_TWO;
+  }
+
+  return Tier.TIER_ONE;
+}
+
+function applyStructureXp(
+  structure: PlacedStructure,
+  xpGain: number,
+  killGain = 0,
+): PlacedStructure {
+  const xp = structure.xp + xpGain;
+  const tier = getStructureTierForXp(structure.structureType, xp);
+  return {
+    ...structure,
+    xp,
+    kills: structure.kills + killGain,
+    tier,
+    nextTierXp: getNextStructureTierXp(structure.structureType, tier),
+  };
+}
 
 interface UseSiegeGameOptions {
   currentBugCount: number;
   currentBugCounts: BugCounts;
   evolutionStates?: Partial<Record<SiegeWeaponId, WeaponEvolutionState>>;
+  onStructureTierUp?: (payload: {
+    structureId: string;
+    structureType: StructureId;
+    tier: WeaponTier;
+  }) => void;
   pauseTimer?: boolean;
 }
 
@@ -37,6 +95,7 @@ export function useSiegeGame({
   currentBugCount,
   currentBugCounts,
   evolutionStates,
+  onStructureTierUp,
   pauseTimer = false,
 }: UseSiegeGameOptions) {
   const [debugMode, setDebugMode] = useState(() => {
@@ -76,6 +135,7 @@ export function useSiegeGame({
   const [lastFireTimes, setLastFireTimes] = useState<Record<SiegeWeaponId, number>>({} as Record<SiegeWeaponId, number>);
   const phaseTimerRef = useRef<number | null>(null);
   const lastKillAtRef = useRef<number | null>(null);
+  const previousStructureTiersRef = useRef<Record<string, WeaponTier>>({});
 
   const interactiveMode = siegePhase !== "idle";
 
@@ -161,6 +221,10 @@ export function useSiegeGame({
               structureId ??
               `${structureType}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
             structureType,
+            tier: Tier.TIER_ONE,
+            xp: 0,
+            nextTierXp: getNextStructureTierXp(structureType, Tier.TIER_ONE),
+            kills: 0,
             x: viewportX,
             y: viewportY,
             canvasX,
@@ -237,6 +301,54 @@ export function useSiegeGame({
     },
     [],
   );
+
+  const handleStructureKill = useCallback((structureId: string) => {
+    setPlacedStructures((prev) =>
+      prev.map((structure) =>
+        structure.id === structureId
+          ? applyStructureXp(structure, STRUCTURE_KILL_XP, 1)
+          : structure,
+      ),
+    );
+  }, []);
+
+  useEffect(() => {
+    const nextTiers: Record<string, WeaponTier> = {};
+
+    for (const structure of placedStructures) {
+      nextTiers[structure.id] = structure.tier;
+      const previousTier = previousStructureTiersRef.current[structure.id];
+      if (previousTier != null && structure.tier > previousTier) {
+        onStructureTierUp?.({
+          structureId: structure.id,
+          structureType: structure.structureType,
+          tier: structure.tier,
+        });
+      }
+    }
+
+    previousStructureTiersRef.current = nextTiers;
+  }, [onStructureTierUp, placedStructures]);
+
+  useEffect(() => {
+    if (!interactiveMode) {
+      return undefined;
+    }
+
+    const intervalId = window.setInterval(() => {
+      setPlacedStructures((prev) =>
+        prev.map((structure) =>
+          structure.structureType === "lantern"
+            ? applyStructureXp(structure, 1)
+            : structure,
+        ),
+      );
+    }, LANTERN_SUPPORT_XP_INTERVAL_MS);
+
+    return () => {
+      window.clearInterval(intervalId);
+    };
+  }, [interactiveMode]);
 
   useEffect(() => {
     if (!interactiveMode || interactiveStartedAt == null) {
@@ -451,6 +563,7 @@ export function useSiegeGame({
     gameMode,
     handleAgentAbsorb,
     handleInteractiveHit,
+    handleStructureKill,
     handleWeaponFired,
     interactiveInitialBugCounts,
     interactiveElapsedMs,

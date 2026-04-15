@@ -16,6 +16,7 @@ import "@game/structures/index";
 interface StructureEntry {
   id: string;
   type: StructureId;
+  tier: WeaponTier;
   x: number;
   y: number;
   /** engine ticks until next agent capture or turret shot */
@@ -60,7 +61,7 @@ export interface EngineOptions {
     meta: { credited: boolean; frozen: boolean; pointValue: number },
   ) => void;
   /** Called when a structure (lantern/agent/turret) kills a bug — counts toward the player kill tally */
-  onStructureKill?: (x: number, y: number, variant: string) => void;
+  onStructureKill?: (structureId: string, x: number, y: number, variant: string) => void;
   /** Called when the agent starts/finishes/fails absorbing a bug */
   onAgentAbsorb?: (data: {
     structureId: string;
@@ -109,7 +110,7 @@ export class Engine {
     variant: string,
     meta: { credited: boolean; frozen: boolean; pointValue: number },
   ) => void;
-  onStructureKill?: (x: number, y: number, variant: string) => void;
+  onStructureKill?: (structureId: string, x: number, y: number, variant: string) => void;
   onAgentAbsorb?: (data: {
     structureId: string;
     phase: "absorbing" | "pulling" | "done" | "failed";
@@ -191,8 +192,13 @@ export class Engine {
   recordWeaponKill(weaponId: SiegeWeaponId | undefined | null): void {
     if (!weaponId) return;
     const state = this.weaponEvolutionStates.get(weaponId);
-    if (!state || state.tier >= WeaponTier.TIER_THREE) return;
+    if (!state) return;
     state.kills++;
+
+    if (state.tier >= WeaponTier.TIER_THREE) {
+      return;
+    }
+
     this.checkEvolution(weaponId);
   }
 
@@ -669,7 +675,7 @@ export class Engine {
     const initialDelay = type === "turret" || type === "tesla" ? 1000 : 2000;
     const placedAt = this.elapsedMs;
     this.structures.push({
-      id, type, x, y,
+      id, type, tier: WeaponTier.TIER_ONE, x, y,
       nextCaptureAt: this.elapsedMs + initialDelay,
       absorbing: null,
       placedAt,
@@ -678,12 +684,19 @@ export class Engine {
     return id;
   }
 
+  updateStructureTier(id: string, tier: WeaponTier): void {
+    const structure = this.structures.find((entry) => entry.id === id);
+    if (structure) {
+      structure.tier = tier;
+    }
+  }
+
   removeStructure(id: string): void {
     this.structures = this.structures.filter((s) => s.id !== id);
   }
 
-  getStructures(): Array<{ id: string; type: StructureId; x: number; y: number }> {
-    return this.structures.map(({ id, type, x, y }) => ({ id, type, x, y }));
+  getStructures(): Array<{ id: string; type: StructureId; tier: WeaponTier; x: number; y: number }> {
+    return this.structures.map(({ id, type, tier, x, y }) => ({ id, type, tier, x, y }));
   }
 
   /** Build the StructureTickContext passed to each plugin's tick() method. */

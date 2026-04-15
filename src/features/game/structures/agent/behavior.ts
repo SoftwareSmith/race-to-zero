@@ -27,6 +27,9 @@ export const agentBehavior: StructureBehavior = {
 
   tick(entry: StructureEntry, ctx: StructureTickContext): void {
     const { now, engine, callbacks } = ctx;
+    const tier = entry.tier ?? 1;
+    const captureRadius = CAPTURE_RADIUS + (tier - 1) * 10;
+    const respawnDelayMs = Math.max(1200, RESPAWN_DELAY_MS - (tier - 1) * 350);
 
     // ── Phase 2: processing an already-captured bug ─────────────────────
     if (entry.absorbing) {
@@ -56,7 +59,7 @@ export const agentBehavior: StructureBehavior = {
         const fail = Math.random() < entry.absorbing.failChance;
         if (!fail) {
           try {
-            callbacks.onStructureKill?.(entry.x, entry.y, entry.absorbing.variant);
+            callbacks.onStructureKill?.(entry.id, entry.x, entry.y, entry.absorbing.variant);
           } catch { void 0; }
         }
         try {
@@ -77,7 +80,7 @@ export const agentBehavior: StructureBehavior = {
     }
 
     if (now < entry.nextCaptureAt) return;
-
+        entry.nextCaptureAt = now + respawnDelayMs;
     // ── Phase 1: find and immediately capture nearest bug in range ───────
     const bugs = engine.getEntities();
     let bestDist = Infinity;
@@ -86,7 +89,7 @@ export const agentBehavior: StructureBehavior = {
       const e = bugs[i] as any;
       if (isTerminalEntityState(e.state)) continue;
       const dist = Math.hypot(e.x - entry.x, e.y - entry.y);
-      if (dist <= CAPTURE_RADIUS && dist < bestDist) {
+      if (dist <= captureRadius && dist < bestDist) {
         bestDist = dist;
         bestIdx = i;
       }
@@ -96,7 +99,7 @@ export const agentBehavior: StructureBehavior = {
 
     const captured = bugs[bestIdx] as any;
     const size = captured.size ?? 12;
-    const processingMs = Math.round(800 + size * 80);
+    const processingMs = Math.round((800 + size * 80) * Math.max(0.7, 1 - (tier - 1) * 0.12));
     entry.absorbing = {
       variant: captured.variant,
       bugX: captured.x,
@@ -106,7 +109,7 @@ export const agentBehavior: StructureBehavior = {
       pullStartedAt: now,
       size,
       completesAt: now + PULL_DURATION_MS + processingMs,
-      failChance: 0.2,
+      failChance: Math.max(0.05, 0.2 - (tier - 1) * 0.06),
     };
 
     // Remove bug from simulation immediately — the pull is purely visual

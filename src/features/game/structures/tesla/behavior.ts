@@ -23,6 +23,11 @@ export const teslaBehavior: StructureBehavior = {
 
   tick(entry: StructureEntry, ctx: StructureTickContext): void {
     const { now, engine, callbacks } = ctx;
+    const tier = entry.tier ?? 1;
+    const shootRadius = SHOOT_RADIUS + (tier - 1) * 18;
+    const maxHops = MAX_HOPS + (tier - 1);
+    const zapDamage = tier >= 3 ? 2 : 1;
+    const intervalMs = Math.max(1200, SHOOT_INTERVAL_MS - (tier - 1) * 300);
 
     if (now < entry.nextCaptureAt) return;
 
@@ -33,25 +38,25 @@ export const teslaBehavior: StructureBehavior = {
       const e = bugs[i] as any;
       if (isTerminalEntityState(e.state)) continue;
       const dist = Math.hypot(e.x - entry.x, e.y - entry.y);
-      if (dist <= SHOOT_RADIUS) candidates.push({ idx: i, dist });
+      if (dist <= shootRadius) candidates.push({ idx: i, dist });
     }
 
     if (candidates.length === 0) return;
 
     candidates.sort((a, b) => a.dist - b.dist);
-    const targets = candidates.slice(0, MAX_HOPS);
+    const targets = candidates.slice(0, maxHops);
 
-    entry.nextCaptureAt = now + SHOOT_INTERVAL_MS;
+    entry.nextCaptureAt = now + intervalMs;
 
     // Build chain nodes: coil origin → each bug
     const nodes: Array<{ x: number; y: number }> = [{ x: entry.x, y: entry.y }];
     for (const { idx } of targets) {
       const e = bugs[idx] as any;
       nodes.push({ x: e.x, y: e.y });
-      const result = engine.handleHit(idx, 1, true);
+      const result = engine.handleHit(idx, zapDamage, true);
       if (result?.defeated) {
         try {
-          callbacks.onStructureKill?.(e.x, e.y, e.variant);
+          callbacks.onStructureKill?.(entry.id, e.x, e.y, e.variant);
         } catch { void 0; }
       }
     }

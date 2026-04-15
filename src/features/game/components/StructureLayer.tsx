@@ -63,11 +63,13 @@ export default function StructureLayer({
       {structures.map((s) => {
         const def = STRUCTURE_DEFS.find((d) => d.id === s.structureType);
         const color = def?.accentColor ?? "#fbbf24";
+        const tier = s.tier ?? 1;
+        const tierScale = 1 + (tier - 1) * 0.12;
         const isLantern = s.structureType === "lantern";
         const isTurret = s.structureType === "turret";
         const isTesla = s.structureType === "tesla";
         const isFirewall = s.structureType === "firewall";
-        const effectR = def?.effectRadius ?? 80;
+        const effectR = (def?.effectRadius ?? 80) * tierScale;
         const capture = agentCaptures?.[s.id];
         const isAbsorbing = capture?.phase === "absorbing";
         const isDone = capture?.phase === "done";
@@ -99,6 +101,17 @@ export default function StructureLayer({
               height: 0,
             }}
           >
+            <div
+              className="absolute -right-4 -top-5 flex min-w-8 items-center justify-center rounded-full border px-1.5 py-0.5 text-[0.45rem] font-semibold uppercase tracking-[0.12em] text-white"
+              style={{
+                borderColor: `${color}88`,
+                background: `linear-gradient(180deg, ${color}55, rgba(3,7,18,0.92))`,
+                boxShadow: `0 0 12px ${color}30`,
+              }}
+            >
+              {tier === 3 ? "T3" : `T${tier}`}
+            </div>
+
             {/* ── Lantern: large radial warm glow field ── */}
             {isLantern ? (
               <>
@@ -110,8 +123,8 @@ export default function StructureLayer({
                     height: effectR * 2,
                     left: -effectR,
                     top: -effectR,
-                    background: `radial-gradient(circle, ${color}55 0%, ${color}22 35%, ${color}08 65%, transparent 80%)`,
-                    boxShadow: `0 0 60px 20px ${color}18`,
+                    background: `radial-gradient(circle, ${color}${tier >= 3 ? "77" : tier === 2 ? "66" : "55"} 0%, ${color}22 35%, ${color}08 65%, transparent 80%)`,
+                    boxShadow: `0 0 ${60 + tier * 10}px ${20 + tier * 4}px ${color}18`,
                   }}
                 />
                 {/* Subtle pulsing ring edge */}
@@ -132,8 +145,9 @@ export default function StructureLayer({
                     left: -20,
                     top: -20,
                     borderColor: `${color}70`,
-                    background: `${color}30`,
-                    boxShadow: `0 0 28px ${color}70`,
+                    background: `${color}${tier >= 3 ? "48" : "30"}`,
+                    boxShadow: `0 0 ${28 + tier * 6}px ${color}70`,
+                    transform: `scale(${1 + (tier - 1) * 0.06})`,
                   }}
                 >
                   <span className="text-xl leading-none">🔦</span>
@@ -159,7 +173,7 @@ export default function StructureLayer({
                     height: 58,
                     left: -29,
                     top: -29,
-                    boxShadow: `0 0 20px ${color}18`,
+                    boxShadow: `0 0 ${20 + tier * 6}px ${color}18`,
                   }}
                 />
                 <div
@@ -169,7 +183,8 @@ export default function StructureLayer({
                     top: -22,
                     borderColor: `${color}70`,
                     background: `radial-gradient(circle at 40% 38%, ${color}30 0%, ${color}18 45%, rgba(3,7,18,0.88) 100%)`,
-                    boxShadow: `0 0 18px ${color}55`,
+                    boxShadow: `0 0 ${18 + tier * 4}px ${color}55`,
+                    transform: `scale(${1 + (tier - 1) * 0.05})`,
                   }}
                 >
                   <div className="absolute inset-[5px] rounded-full border border-cyan-200/18 [animation:laser-cursor-breathe_1.8s_ease-in-out_infinite]" />
@@ -244,7 +259,7 @@ export default function StructureLayer({
                     left: -32,
                     top: -32,
                     borderColor: `${color}60`,
-                    boxShadow: `0 0 22px ${color}30`,
+                    boxShadow: `0 0 ${22 + tier * 6}px ${color}30`,
                   }}
                 />
                 {/* Inner plasma rotating ring */}
@@ -257,7 +272,7 @@ export default function StructureLayer({
                     top: -23,
                     borderColor: `${color}90`,
                     animation: "agent-ring-spin 1.8s linear infinite",
-                    boxShadow: `0 0 14px ${color}50, inset 0 0 10px ${color}20`,
+                    boxShadow: `0 0 ${14 + tier * 4}px ${color}50, inset 0 0 10px ${color}20`,
                   }}
                 />
                 {/* Core */}
@@ -268,7 +283,8 @@ export default function StructureLayer({
                     top: -20,
                     borderColor: `${color}80`,
                     background: `radial-gradient(circle at 38% 36%, ${color}40 0%, ${color}18 50%, rgba(3,7,18,0.9) 100%)`,
-                    boxShadow: `0 0 22px ${color}70`,
+                    boxShadow: `0 0 ${22 + tier * 5}px ${color}70`,
+                    transform: `scale(${1 + (tier - 1) * 0.05})`,
                   }}
                 >
                   <span className="text-lg leading-none">⚡</span>

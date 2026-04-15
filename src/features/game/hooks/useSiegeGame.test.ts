@@ -55,4 +55,36 @@ describe("useSiegeGame", () => {
 
     expect(result.current.gameMode).toBe("outbreak");
   });
+
+  it("levels placed structures from attributed kills", () => {
+    const { result } = renderHook(() =>
+      useSiegeGame({
+        currentBugCount: 20,
+        currentBugCounts: { high: 0, low: 20, medium: 0, urgent: 0 },
+        evolutionStates: {},
+      }),
+    );
+
+    act(() => {
+      result.current.enterInteractiveMode();
+      result.current.placeStructure(
+        "turret",
+        100,
+        120,
+        80,
+        90,
+        "turret-alpha",
+      );
+    });
+
+    expect(result.current.placedStructures[0]?.tier).toBe(1);
+
+    act(() => {
+      result.current.handleStructureKill("turret-alpha");
+      result.current.handleStructureKill("turret-alpha");
+    });
+
+    expect(result.current.placedStructures[0]?.kills).toBe(2);
+    expect(result.current.placedStructures[0]?.tier).toBe(2);
+  });
 });
