@@ -1,4 +1,24 @@
 import { expect, test } from "@playwright/test";
+import {
+  enableCanvasQa,
+  getStaticSiegeGameConfig,
+  mockMetrics,
+  seedDashboardState,
+  setQaSiegeProgress,
+} from "./support/dashboardQa";
+
+const completionMetrics = {
+  bugs: Array.from({ length: 36 }, (_, index) => ({
+    completedAt: null,
+    createdAt: `2026-04-${String((index % 9) + 1).padStart(2, "0")}`,
+    priority: 4,
+    stateName: "Backlog",
+    stateType: "backlog",
+    teamKey: "QA",
+  })),
+  generatedAt: "2026-04-09T12:00:00.000Z",
+  lastUpdated: "2026-04-09T12:00:00.000Z",
+};
 
 test("arms siege mode from the dashboard", async ({ page }) => {
   await page.goto("./");
@@ -12,6 +32,7 @@ test("arms siege mode from the dashboard", async ({ page }) => {
   await expect(statsHud.getByText("Bugs")).toBeVisible();
   await expect(statsHud.getByText("Kills")).toBeVisible();
   await expect(statsHud.getByText("Active tool")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Kill all bugs" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Open interactive bug game" })).toHaveCount(0);
 
   const box = await statsHud.boundingBox();
@@ -44,4 +65,49 @@ test("esc exits siege mode", async ({ page }) => {
 
   await expect(page.getByRole("button", { name: "Open interactive bug game" })).toBeVisible();
   await expect(page.getByTestId("siege-hud")).toBeHidden();
+});
+
+test("shows the completion overlay and allows a doubled rerun", async ({ page }) => {
+  await page.setViewportSize({ height: 1200, width: 1440 });
+  await enableCanvasQa(page);
+  await mockMetrics(page, completionMetrics);
+  await seedDashboardState(page, {
+    gameConfig: getStaticSiegeGameConfig(),
+  });
+
+  await page.goto("./");
+  await page.getByRole("button", { name: "Open interactive bug game" }).click();
+  await expect(page.getByTestId("siege-hud")).toBeVisible();
+
+  await setQaSiegeProgress(page, { kills: 36, remainingBugs: 0 });
+
+  const overlay = page.getByTestId("siege-complete-overlay");
+  await expect(overlay).toBeVisible();
+  await expect(overlay.getByText("Swarm cleared. The lane is stable.")).toBeVisible();
+  await expect(overlay.getByText(/36 bugs cleared in 00:00/i)).toBeVisible();
+
+  await overlay.getByRole("button", { name: "Double bug count" }).click();
+  await expect(overlay).toBeHidden();
+  await expect(page.getByTestId("siege-hud").locator("strong").nth(0)).toHaveText("72");
+  await expect(page.getByTestId("siege-hud").locator("strong").nth(1)).toHaveText("0");
+});
+
+test("debug mode can kill all bugs to force the completion overlay", async ({ page }) => {
+  await page.setViewportSize({ height: 1200, width: 1440 });
+  await enableCanvasQa(page);
+  await mockMetrics(page, completionMetrics);
+  await seedDashboardState(page, {
+    gameConfig: getStaticSiegeGameConfig(),
+  });
+
+  await page.goto("./?siegeDebug=1");
+  await page.getByRole("button", { name: "Open interactive bug game" }).click();
+
+  const killAllButton = page.getByRole("button", { name: "Kill all bugs" });
+  await expect(killAllButton).toBeVisible();
+  await killAllButton.click();
+
+  const overlay = page.getByTestId("siege-complete-overlay");
+  await expect(overlay).toBeVisible();
+  await expect(overlay.getByText(/36 bugs cleared in 00:00/i)).toBeVisible();
 });

@@ -66,8 +66,6 @@ function makeEntry(
     y: 200,
     nextCaptureAt: 0,
     absorbing: null,
-    placedAt: 0,
-    firewallNextDamageAt: 0,
     ...overrides,
   };
 }
@@ -84,8 +82,6 @@ function makeCtx(
     callbacks: {
       onStructureKill: vi.fn(),
       onAgentAbsorb: vi.fn(),
-      onTurretFire: vi.fn(),
-      onTeslaFire: vi.fn(),
       ...callbacks,
     },
   };
@@ -192,160 +188,5 @@ describe("agent behavior", () => {
       expect.objectContaining({ phase: "done" }),
     );
     expect(entry.absorbing).toBeNull();
-  });
-});
-
-// ---------------------------------------------------------------------------
-// Turret
-// ---------------------------------------------------------------------------
-
-describe("turret behavior", () => {
-  it("does nothing when cooldown has not elapsed", async () => {
-    const { turretBehavior } = await import("../turret/behavior");
-    const engine = makeMockEngine([makeBug({ x: 210, y: 200 })]);
-    const entry = makeEntry("turret", { nextCaptureAt: 5000 });
-    const ctx = makeCtx(engine, 1000);
-
-    turretBehavior.tick(entry, ctx);
-
-    expect(ctx.callbacks.onTurretFire).not.toHaveBeenCalled();
-  });
-
-  it("starts aim phase when a bug is in range", async () => {
-    const { turretBehavior } = await import("../turret/behavior");
-    const bug = makeBug({ x: 250, y: 200 }); // 50px from turret at 200,200
-    const engine = makeMockEngine([bug]);
-    const entry = makeEntry("turret", { nextCaptureAt: 0 });
-    const ctx = makeCtx(engine, 1000);
-
-    turretBehavior.tick(entry, ctx);
-
-    expect(entry.aimPhase).not.toBeNull();
-    expect(ctx.callbacks.onTurretFire).toHaveBeenCalledWith(
-      expect.objectContaining({ phase: "aim" }),
-    );
-  });
-
-  it("fires when aim phase completes", async () => {
-    const { turretBehavior } = await import("../turret/behavior");
-    const bug = makeBug({ x: 250, y: 200 });
-    const engine = makeMockEngine([bug]);
-    const entry = makeEntry("turret", {
-      nextCaptureAt: 0,
-      aimPhase: { targetX: 250, targetY: 200, angle: 0, firesAt: 500 },
-    });
-    const ctx = makeCtx(engine, 1000); // now > firesAt
-
-    turretBehavior.tick(entry, ctx);
-
-    expect(engine.handleHit).toHaveBeenCalled();
-    expect(ctx.callbacks.onTurretFire).toHaveBeenCalledWith(
-      expect.objectContaining({ phase: "fire" }),
-    );
-    expect(entry.aimPhase).toBeNull();
-  });
-});
-
-// ---------------------------------------------------------------------------
-// Tesla
-// ---------------------------------------------------------------------------
-
-describe("tesla behavior", () => {
-  it("does nothing when cooldown has not elapsed", async () => {
-    const { teslaBehavior } = await import("../tesla/behavior");
-    const engine = makeMockEngine([makeBug({ x: 210, y: 200 })]);
-    const entry = makeEntry("tesla", { nextCaptureAt: 5000 });
-    const ctx = makeCtx(engine, 1000);
-
-    teslaBehavior.tick(entry, ctx);
-
-    expect(ctx.callbacks.onTeslaFire).not.toHaveBeenCalled();
-  });
-
-  it("zaps up to 3 bugs and fires onTeslaFire with nodes", async () => {
-    const { teslaBehavior } = await import("../tesla/behavior");
-    const bugs = [
-      makeBug({ x: 210, y: 200 }),
-      makeBug({ x: 220, y: 200 }),
-      makeBug({ x: 230, y: 200 }),
-      makeBug({ x: 240, y: 200 }), // 4th bug — should be excluded
-    ];
-    const engine = makeMockEngine(bugs);
-    const entry = makeEntry("tesla", { nextCaptureAt: 0 });
-    const ctx = makeCtx(engine, 1000);
-
-    teslaBehavior.tick(entry, ctx);
-
-    expect(engine.handleHit).toHaveBeenCalledTimes(3);
-    expect(ctx.callbacks.onTeslaFire).toHaveBeenCalledWith(
-      expect.objectContaining({
-        nodes: expect.arrayContaining([{ x: 200, y: 200 }]),
-      }),
-    );
-  });
-
-  it("fires onStructureKill for each lethal hit", async () => {
-    const { teslaBehavior } = await import("../tesla/behavior");
-    const engine = makeMockEngine([makeBug({ x: 210, y: 200 })]);
-    const entry = makeEntry("tesla", { nextCaptureAt: 0 });
-    const ctx = makeCtx(engine, 1000);
-
-    teslaBehavior.tick(entry, ctx);
-
-    expect(ctx.callbacks.onStructureKill).toHaveBeenCalledTimes(1);
-  });
-});
-
-// ---------------------------------------------------------------------------
-// Firewall
-// ---------------------------------------------------------------------------
-
-describe("firewall behavior", () => {
-  it("does nothing when damage interval has not elapsed", async () => {
-    const { firewallBehavior } = await import("../firewall/behavior");
-    const engine = makeMockEngine([makeBug({ x: 200, y: 200 })]);
-    const entry = makeEntry("firewall", { firewallNextDamageAt: 5000 });
-    const ctx = makeCtx(engine, 1000);
-
-    firewallBehavior.tick(entry, ctx);
-
-    expect(engine.handleHit).not.toHaveBeenCalled();
-  });
-
-  it("damages bugs within the horizontal strip", async () => {
-    const { firewallBehavior } = await import("../firewall/behavior");
-    const bugs = [
-      makeBug({ x: 205, y: 150 }), // within ±20px of wall x=200
-      makeBug({ x: 350, y: 150 }), // outside
-    ];
-    const engine = makeMockEngine(bugs);
-    const entry = makeEntry("firewall", { firewallNextDamageAt: 0 });
-    const ctx = makeCtx(engine, 1000);
-
-    firewallBehavior.tick(entry, ctx);
-
-    expect(engine.handleHit).toHaveBeenCalledTimes(1);
-    expect(engine.handleHit).toHaveBeenCalledWith(0, 1, true);
-  });
-
-  it("fires onStructureKill for lethal hits", async () => {
-    const { firewallBehavior } = await import("../firewall/behavior");
-    const engine = makeMockEngine([makeBug({ x: 205, y: 200 })]);
-    const entry = makeEntry("firewall", { firewallNextDamageAt: 0 });
-    const ctx = makeCtx(engine, 1000);
-
-    firewallBehavior.tick(entry, ctx);
-
-    expect(ctx.callbacks.onStructureKill).toHaveBeenCalledTimes(1);
-  });
-
-  it("advances the next damage timestamp after firing", async () => {
-    const { firewallBehavior } = await import("../firewall/behavior");
-    const engine = makeMockEngine([]);
-    const entry = makeEntry("firewall", { firewallNextDamageAt: 0 });
-
-    firewallBehavior.tick(entry, makeCtx(engine, 1000));
-
-    expect(entry.firewallNextDamageAt).toBeGreaterThan(1000);
   });
 });

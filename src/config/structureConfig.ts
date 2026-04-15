@@ -22,13 +22,8 @@ export interface StructureDef {
    * Agent: capture sweep radius.
    */
   effectRadius: number;
-  /**
-   * Inner kill radius — bugs that enter this zone are instantly destroyed.
-   * Only relevant for the Lantern.
-   */
-  killRadius?: number;
   /** How the structure interacts with bugs. */
-  effectType: "attract" | "capture" | "shoot";
+  effectType: "attract" | "capture";
   /** CSS hex colour used by the StructureLayer renderer. */
   accentColor: string;
   /** XP thresholds for T2 and T3 structure upgrades. */
@@ -39,67 +34,28 @@ export const STRUCTURE_DEFS: StructureDef[] = [
   {
     id: "lantern",
     title: "Bug Lantern",
-    unlockKills: 45,
+    unlockKills: 48,
     detail:
-      "Emits an irresistible glow that pulls bugs into a mesmerising orbit. Bugs spiral in and circle the flame — pick them off while they're circling.",
-    hint: "Click to arm, then click the field to place (max 3)",
-    maxPlaced: 3,
-    effectRadius: 280,
+      "Projects a rich amber trap field that drags nearby bugs into a tighter orbit and bunches lanes for cleanup.",
+    hint: "Click to arm, then click the field to place (max 2)",
+    maxPlaced: 2,
+    effectRadius: 320,
     effectType: "attract",
     accentColor: "#fbbf24",
-    tierThresholds: [3, 7],
+    tierThresholds: [2, 5],
   },
   {
     id: "agent",
     title: "Bug Agent",
-    unlockKills: 60,
+    unlockKills: 92,
     detail:
-      "A silent code sentinel. Every 2 seconds it extends a capture arm and eliminates the nearest bug within reach.",
-    hint: "Click to arm, then click the field to place (max 3)",
-    maxPlaced: 3,
-    effectRadius: 80,
+      "Deploys a covert cleanup specialist that hooks a priority bug, reels it in, and processes it off-screen before the swarm can react.",
+    hint: "Click to arm, then click the field to place (max 2)",
+    maxPlaced: 2,
+    effectRadius: 110,
     effectType: "capture",
     accentColor: "#34d399",
-    tierThresholds: [2, 5],
-  },
-  {
-    id: "turret",
-    title: "Debug Turret",
-    unlockKills: 75,
-    detail:
-      "Auto-firing sentry gun. Locks onto the nearest bug within 150px and fires every 2 seconds. Deals 1 damage per shot.",
-    hint: "Click to arm, then click the field to place (max 2)",
-    maxPlaced: 2,
-    effectRadius: 150,
-    effectType: "shoot",
-    accentColor: "#22d3ee",
-    tierThresholds: [2, 5],
-  },
-  {
-    id: "tesla",
-    title: "Tesla Coil",
-    unlockKills: 95,
-    detail:
-      "Auto-firing chain lightning coil. Every 3 seconds it unleashes a plasma arc that bounces between 2 nearby bugs within 120px. Deals 1 damage per hop.",
-    hint: "Click to arm, then click the field to place (max 2)",
-    maxPlaced: 2,
-    effectRadius: 120,
-    effectType: "shoot",
-    accentColor: "#c084fc",
-    tierThresholds: [2, 5],
-  },
-  {
-    id: "firewall",
-    title: "Firewall",
-    unlockKills: 120,
-    detail:
-      "Places a 200px horizontal burn zone. Any bug that crosses it takes 1 damage per tick for 10 seconds. Fire renders continuously with VFX.",
-    hint: "Click to arm, then click the field to place (max 2)",
-    maxPlaced: 2,
-    effectRadius: 20,
-    effectType: "capture",
-    accentColor: "#f97316",
-    tierThresholds: [2, 5],
+    tierThresholds: [2, 4],
   },
 ];
 

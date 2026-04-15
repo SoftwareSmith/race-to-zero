@@ -15,6 +15,7 @@ import { STRUCTURE_DEFS } from "@config/structureConfig";
 import { WEAPON_DEFS } from "@config/weaponConfig";
 import BackgroundField from "@game/components/BackgroundField";
 import SiegeHud from "@game/components/SiegeHud";
+import SiegeRunCompleteOverlay from "@game/components/SiegeRunCompleteOverlay";
 import { useSiegeGame } from "@game/hooks/useSiegeGame";
 import { useSiegeZones } from "@game/hooks/useSiegeZones";
 import { useWeaponEvolution } from "@game/hooks/useWeaponEvolution";
@@ -145,6 +146,26 @@ const SiegeExperience = memo(function SiegeExperience({
     siegeGame.exitInteractiveMode();
   }, [siegeGame, ui]);
 
+  const handleDoubleBugCount = useCallback(() => {
+    ui.closeMenus();
+    ui.setChartFocus(null);
+    resetEvolution();
+    siegeGame.enterInteractiveMode(siegeGame.gameMode, {
+      baseBugCounts: siegeGame.interactiveInitialBugCounts,
+      bugMultiplier: 2,
+    });
+  }, [resetEvolution, siegeGame, ui]);
+
+  const handleSwitchMode = useCallback(() => {
+    ui.closeMenus();
+    ui.setChartFocus(null);
+    resetEvolution();
+    siegeGame.enterInteractiveMode(
+      siegeGame.gameMode === "purge" ? "outbreak" : "purge",
+      { baseBugCounts: siegeGame.interactiveInitialBugCounts },
+    );
+  }, [resetEvolution, siegeGame, ui]);
+
   const backgroundChartFocus = siegeGame.interactiveMode ? ui.chartFocus : null;
 
   return (
@@ -227,6 +248,7 @@ const SiegeExperience = memo(function SiegeExperience({
           onArmStructure={siegeGame.armStructure}
           onChangeGameMode={siegeGame.changeGameMode}
           onExit={handleExitInteractiveMode}
+          onKillAllBugs={siegeGame.killAllBugs}
           onSelectWeapon={siegeGame.selectWeapon}
           onToggleCodex={() => ui.handleTopMenuToggle("codex")}
           onToggleDebugMode={siegeGame.toggleDebugMode}
@@ -237,6 +259,16 @@ const SiegeExperience = memo(function SiegeExperience({
           unlockedStructures={siegeGame.combatStats.unlockedStructures}
           upgradeToast={upgradeToast}
           weaponSnapshots={siegeGame.weaponSnapshots}
+        />
+      ) : null}
+
+      {siegeGame.interactiveMode && siegeGame.completionSummary ? (
+        <SiegeRunCompleteOverlay
+          completionSummary={siegeGame.completionSummary}
+          leaderboard={siegeGame.leaderboard}
+          onDoubleBugCount={handleDoubleBugCount}
+          onExit={handleExitInteractiveMode}
+          onSwitchMode={handleSwitchMode}
         />
       ) : null}
     </>

@@ -1,7 +1,7 @@
 /**
  * Structure plugin registry integrity test.
  * Imports the barrel to trigger all self-registrations, then verifies
- * all 5 structures are registered with valid configs.
+ * all registered structures are available with valid configs.
  */
 
 import { describe, it, expect } from "vitest";
@@ -13,14 +13,11 @@ import "../index";
 const EXPECTED_STRUCTURE_IDS = [
   "lantern",
   "agent",
-  "turret",
-  "tesla",
-  "firewall",
 ] as const;
 
 describe("structure plugin registry — integrity", () => {
-  it("registers exactly 5 structures", () => {
-    expect(registeredIds().length).toBe(5);
+  it("registers exactly 2 structures", () => {
+    expect(registeredIds().length).toBe(2);
   });
 
   it("registers no duplicate IDs", () => {

@@ -761,6 +761,34 @@ body.hud-system-cursor-active .weapon-cursor-layer {
   100% { opacity: 0; }
 }
 
+@keyframes siege-complete-pop {
+  0% {
+    opacity: 0;
+    transform: translateY(26px) scale(0.96);
+  }
+
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes siege-confetti-fall {
+  0% {
+    opacity: 0;
+    transform: translate3d(0, -8%, 0) rotate(0deg);
+  }
+
+  10% {
+    opacity: 1;
+  }
+
+  100% {
+    opacity: 0;
+    transform: translate3d(40px, 118vh, 0) rotate(540deg);
+  }
+}
+
 @keyframes ember-rise {
   0% {
     opacity: 0;

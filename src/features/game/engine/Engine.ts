@@ -5,6 +5,7 @@ import { Entity } from "./Entity";
 import { getBugVariantMaxHp } from "../../../constants/bugs";
 import { ALL_WEAPON_IDS, EntityState, WeaponMatchup, WeaponTier, isTerminalEntityState } from "../types";
 import type { StructureId, SiegeWeaponId, WeaponEvolutionState } from "../types";
+import { STRUCTURE_DEFS } from "@config/structureConfig";
 import { hasEntry, getEntry } from "@game/structures/runtime/registry";
 import type { StructureTickContext, StructureGameEngine } from "@game/structures/runtime/types";
 import { WEAPON_EVOLVE_THRESHOLDS } from "@config/gameDefaults";
@@ -19,7 +20,7 @@ interface StructureEntry {
   tier: WeaponTier;
   x: number;
   y: number;
-  /** engine ticks until next agent capture or turret shot */
+  /** engine ticks until next agent capture */
   nextCaptureAt: number;
   /** When the agent is processing a captured bug, holds capture state */
   absorbing: {
@@ -35,19 +36,6 @@ interface StructureEntry {
     completesAt: number;
     failChance: number;
   } | null;
-  /** Last fire angle in radians for turret visual rotation */
-  lastFireAngle?: number;
-  /** Turret aim phase: locks target while waiting to fire */
-  aimPhase?: {
-    targetX: number;
-    targetY: number;
-    angle: number;
-    firesAt: number;
-  } | null;
-  /** Elapsed-ms timestamp when this structure was placed (for firewall expiry) */
-  placedAt?: number;
-  /** Elapsed-ms timestamp of next firewall damage tick */
-  firewallNextDamageAt?: number;
 }
 
 type SpatialCell = Entity[];
@@ -62,7 +50,7 @@ export interface EngineOptions {
     variant: string,
     meta: { credited: boolean; frozen: boolean; pointValue: number },
   ) => void;
-  /** Called when a structure (lantern/agent/turret) kills a bug — counts toward the player kill tally */
+  /** Called when a structure kills a bug — counts toward the player kill tally */
   onStructureKill?: (structureId: string, x: number, y: number, variant: string) => void;
   /** Called when the agent starts/finishes/fails absorbing a bug */
   onAgentAbsorb?: (data: {
@@ -75,22 +63,6 @@ export interface EngineOptions {
     srcX?: number;
     srcY?: number;
     processingMs?: number;
-  }) => void;
-  /** Called when the turret fires at a bug (canvas-local coords) */
-  onTurretFire?: (data: {
-    structureId: string;
-    srcX: number;
-    srcY: number;
-    targetX: number;
-    targetY: number;
-    angle: number;
-    /** "aim" = locking on (tracer shown), "fire" = damage dealt */
-    phase: "aim" | "fire";
-  }) => void;
-  /** Called when the tesla coil chain-zaps bugs (canvas-local coords) */
-  onTeslaFire?: (data: {
-    structureId: string;
-    nodes: Array<{ x: number; y: number }>;
   }) => void;
   /** Called whenever a weapon evolves to a new tier */
   onWeaponEvolution?: (weaponId: SiegeWeaponId, newTier: WeaponTier) => void;
@@ -122,19 +94,6 @@ export class Engine {
     srcX?: number;
     srcY?: number;
     processingMs?: number;
-  }) => void;
-  onTurretFire?: (data: {
-    structureId: string;
-    srcX: number;
-    srcY: number;
-    targetX: number;
-    targetY: number;
-    angle: number;
-    phase: "aim" | "fire";
-  }) => void;
-  onTeslaFire?: (data: {
-    structureId: string;
-    nodes: Array<{ x: number; y: number }>;
   }) => void;
   private structures: StructureEntry[] = [];
   private elapsedMs = 0;
@@ -182,8 +141,6 @@ export class Engine {
     this.onEntityDeath = opts.onEntityDeath;
     this.onStructureKill = opts.onStructureKill;
     this.onAgentAbsorb = opts.onAgentAbsorb;
-    this.onTurretFire = opts.onTurretFire;
-    this.onTeslaFire = opts.onTeslaFire;
     this.onWeaponEvolution = opts.onWeaponEvolution;
     this.weaponEvolutionStates = new Map(
       ALL_WEAPON_IDS.map((id) => [
@@ -720,23 +677,20 @@ export class Engine {
     type: StructureId,
     forcedId?: string,
   ): string {
-    const MAX = 3;
+    const def = STRUCTURE_DEFS.find((entry) => entry.id === type);
+    const maxPlaced = def?.maxPlaced ?? 2;
     const existing = this.structures.filter((s) => s.type === type);
-    if (existing.length >= MAX) {
+    if (existing.length >= maxPlaced) {
       const oldest = existing[0];
       this.structures = this.structures.filter((s) => s.id !== oldest.id);
     }
     const id =
       forcedId ??
       `${type}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
-    const initialDelay = type === "turret" || type === "tesla" ? 1000 : 2000;
-    const placedAt = this.elapsedMs;
     this.structures.push({
       id, type, tier: WeaponTier.TIER_ONE, x, y,
-      nextCaptureAt: this.elapsedMs + initialDelay,
+      nextCaptureAt: this.elapsedMs + 1400,
       absorbing: null,
-      placedAt,
-      firewallNextDamageAt: this.elapsedMs + 1000,
     });
     return id;
   }
@@ -780,18 +734,12 @@ export class Engine {
       callbacks: {
         onStructureKill: this.onStructureKill?.bind(this),
         onAgentAbsorb: this.onAgentAbsorb?.bind(this),
-        onTurretFire: this.onTurretFire?.bind(this),
-        onTeslaFire: this.onTeslaFire?.bind(this),
       },
     };
   }
 
   private tickStructures(dtMs: number): void {
     this.elapsedMs += dtMs;
-    // Expire firewall structures after 8 seconds
-    this.structures = this.structures.filter(
-      (s) => s.type !== "firewall" || (s.placedAt != null && this.elapsedMs - s.placedAt < 8000),
-    );
     const ctx = this._buildStructureCtx(dtMs);
     for (const s of this.structures) {
       const behavior = hasEntry(s.type) ? getEntry(s.type) : undefined;
@@ -1104,7 +1052,8 @@ export class Engine {
   }
 
   /** Must be called each update tick to process event horizon kills. */
-  private tickEvolutionEffects(dtMs: number): void {
+  private tickEvolutionEffects(_dtMs: number): void {
+    void _dtMs;
     // Event horizon unstable-bug consumption
     this.eventHorizons = this.eventHorizons.filter(h => h.expiresAt > this.elapsedMs);
     for (const hz of this.eventHorizons) {

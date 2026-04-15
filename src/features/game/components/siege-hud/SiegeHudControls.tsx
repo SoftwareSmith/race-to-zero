@@ -14,10 +14,21 @@ interface SiegeHudControlsProps {
   gameMode: SiegeGameMode;
   onChangeGameMode?: (mode: SiegeGameMode) => void;
   onExit: () => void;
+  onKillAllBugs?: () => void;
   onToggleCodex?: () => void;
   onToggleDebugMode?: () => void;
   onPointerEnterHud: () => void;
   onPointerLeaveHud: () => void;
+}
+
+interface HudControlAction {
+  active?: boolean;
+  ariaLabel: string;
+  icon: JSX.Element;
+  key: string;
+  onClick: () => void;
+  tone: "default" | "danger" | "info";
+  tooltip: string;
 }
 
 const SiegeHudControls = memo(function SiegeHudControls({
@@ -27,6 +38,7 @@ const SiegeHudControls = memo(function SiegeHudControls({
   gameMode,
   onChangeGameMode,
   onExit,
+  onKillAllBugs,
   onToggleCodex,
   onToggleDebugMode,
   onPointerEnterHud,
@@ -52,6 +64,87 @@ const SiegeHudControls = memo(function SiegeHudControls({
       </HudActionButton>
     </Tooltip>
   ) : null;
+  const controlActions: HudControlAction[] = [
+    ...(onToggleDebugMode
+      ? [
+          {
+            active: debugMode,
+            ariaLabel: "Toggle debug overlay",
+            icon: (
+              <svg
+                aria-hidden="true"
+                className="h-3.5 w-3.5"
+                fill="none"
+                stroke="currentColor"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth="1.8"
+                viewBox="0 0 24 24"
+              >
+                <path d="M9 18h6" />
+                <path d="M10 22h4" />
+                <rect x="6" y="7" width="12" height="11" rx="2" />
+                <path d="M9 7V5a3 3 0 0 1 6 0v2M4 11h2m12 0h2" />
+              </svg>
+            ),
+            key: "debug",
+            onClick: onToggleDebugMode,
+            tone: "info",
+            tooltip: "Toggle debug overlay",
+          },
+        ]
+      : []),
+    ...(debugMode && onKillAllBugs
+      ? [
+          {
+            ariaLabel: "Kill all bugs",
+            icon: (
+              <svg
+                aria-hidden="true"
+                className="h-3.5 w-3.5"
+                fill="none"
+                stroke="currentColor"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth="1.8"
+                viewBox="0 0 24 24"
+              >
+                <path d="M6 6l12 12" />
+                <path d="M18 6 6 18" />
+                <path d="M12 3v3" />
+                <path d="M3 12h3m12 0h3" />
+              </svg>
+            ),
+            key: "kill-all",
+            onClick: onKillAllBugs,
+            tone: "danger",
+            tooltip: "Clear the current swarm and trigger completion state",
+          },
+        ]
+      : []),
+    {
+      ariaLabel: "Back to dashboard",
+      icon: (
+        <svg
+          aria-hidden="true"
+          className="h-3.5 w-3.5"
+          fill="none"
+          stroke="currentColor"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth="1.8"
+          viewBox="0 0 24 24"
+        >
+          <path d="M15 18 9 12l6-6" />
+          <path d="M9 12h10" />
+        </svg>
+      ),
+      key: "exit",
+      onClick: onExit,
+      tone: "danger",
+      tooltip: "Exit siege",
+    },
+  ];
 
   return (
     <div className="pointer-events-none fixed left-3 top-3 z-[220] sm:left-4 sm:top-4">
@@ -107,54 +200,18 @@ const SiegeHudControls = memo(function SiegeHudControls({
               </Suspense>
             ) : null}
 
-            {onToggleDebugMode ? (
-              <Tooltip content="Toggle debug overlay">
+            {controlActions.map((action) => (
+              <Tooltip key={action.key} content={action.tooltip}>
                 <HudActionButton
-                  active={debugMode}
-                  ariaLabel="Toggle debug overlay"
-                  onClick={onToggleDebugMode}
-                  tone="info"
+                  active={action.active}
+                  ariaLabel={action.ariaLabel}
+                  onClick={action.onClick}
+                  tone={action.tone}
                 >
-                  <svg
-                    aria-hidden="true"
-                    className="h-3.5 w-3.5"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth="1.8"
-                    viewBox="0 0 24 24"
-                  >
-                    <path d="M9 18h6" />
-                    <path d="M10 22h4" />
-                    <rect x="6" y="7" width="12" height="11" rx="2" />
-                    <path d="M9 7V5a3 3 0 0 1 6 0v2M4 11h2m12 0h2" />
-                  </svg>
+                  {action.icon}
                 </HudActionButton>
               </Tooltip>
-            ) : null}
-
-            <Tooltip content="Exit siege">
-              <HudActionButton
-                ariaLabel="Back to dashboard"
-                onClick={onExit}
-                tone="danger"
-              >
-                <svg
-                  aria-hidden="true"
-                  className="h-3.5 w-3.5"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth="1.8"
-                  viewBox="0 0 24 24"
-                >
-                  <path d="M15 18 9 12l6-6" />
-                  <path d="M9 12h10" />
-                </svg>
-              </HudActionButton>
-            </Tooltip>
+            ))}
           </div>
         </div>
       </div>

@@ -11,7 +11,7 @@ export const tierOneTier: WeaponTierDefinition = {
   effectColor: "#fde047",
   evolveAtKills: 70,
   config: {
-    poisonDps: 0.5,
+    poisonDps: 0.75,
   },
   vfx: BUG_SPRAY_TIER_VFX.tierOne,
   behavior: {

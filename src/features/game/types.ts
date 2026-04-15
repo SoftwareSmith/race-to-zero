@@ -184,7 +184,7 @@ export interface SiegeCombatStats {
 
 // ── Structure types ──────────────────────────────────────────────
 
-export type StructureId = "lantern" | "agent" | "turret" | "tesla" | "firewall";
+export type StructureId = "lantern" | "agent";
 
 export interface PlacedStructure {
   id: string;

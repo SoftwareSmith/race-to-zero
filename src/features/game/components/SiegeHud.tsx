@@ -10,7 +10,8 @@ import type {
 import SiegeHudControls from "./siege-hud/SiegeHudControls";
 import SiegeHudLoadout from "./siege-hud/SiegeHudLoadout";
 import SiegeHudStats from "./siege-hud/SiegeHudStats";
-import { formatElapsedTime, HudEventPill } from "./siege-hud/shared";
+import { HudEventPill } from "./siege-hud/shared";
+import { formatElapsedTime } from "./siege-hud/formatElapsedTime";
 
 interface SiegeHudProps {
   className?: string;
@@ -35,6 +36,7 @@ interface SiegeHudProps {
   onArmStructure?: (id: StructureId) => void;
   onChangeGameMode?: (mode: SiegeGameMode) => void;
   onExit: () => void;
+  onKillAllBugs?: () => void;
   onToggleCodex?: () => void;
   onSelectWeapon: (id: SiegeWeaponId) => void;
   onToggleDebugMode?: () => void;
@@ -63,6 +65,7 @@ export default function SiegeHud({
   onArmStructure,
   onChangeGameMode,
   onExit,
+  onKillAllBugs,
   onToggleCodex,
   onSelectWeapon,
   onToggleDebugMode,
@@ -120,7 +123,7 @@ export default function SiegeHud({
       ? structureCount * structureSlotRem +
         Math.max(0, structureCount - 1) * railGapRem
       : 0;
-  const toolbeltWidthRem = Math.max(
+  const _toolbeltWidthRem = Math.max(
     26,
     weaponRailWidthRem +
       structureRailWidthRem +
@@ -195,6 +198,7 @@ export default function SiegeHud({
         gameMode={gameMode}
         onChangeGameMode={onChangeGameMode}
         onExit={onExit}
+        onKillAllBugs={onKillAllBugs}
         onToggleCodex={onToggleCodex}
         onToggleDebugMode={onToggleDebugMode}
         onPointerEnterHud={showSystemCursor}

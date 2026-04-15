@@ -18,19 +18,34 @@ const AmbientBackgroundHarness = memo(function AmbientBackgroundHarness({
     () => metrics.currentBugCounts,
     [metrics.currentBugCounts],
   );
-  const [isVisible, setIsVisible] = useState(fullDensity);
+  const visibilityKey = useMemo(
+    () => `${fullDensity ? "full" : "ambient"}:${Object.values(bugCounts).join(":")}`,
+    [bugCounts, fullDensity],
+  );
+  const [revealedKey, setRevealedKey] = useState(
+    fullDensity ? visibilityKey : "",
+  );
+  const isVisible = fullDensity || revealedKey === visibilityKey;
 
   useEffect(() => {
+    let firstFrame = 0;
+    let secondFrame = 0;
+
     if (fullDensity) {
-      setIsVisible(true);
-      return;
+      firstFrame = window.requestAnimationFrame(() => {
+        setRevealedKey(visibilityKey);
+      });
+
+      return () => {
+        if (firstFrame) {
+          window.cancelAnimationFrame(firstFrame);
+        }
+      };
     }
 
-    setIsVisible(false);
-    let secondFrame = 0;
-    const firstFrame = window.requestAnimationFrame(() => {
+    firstFrame = window.requestAnimationFrame(() => {
       secondFrame = window.requestAnimationFrame(() => {
-        setIsVisible(true);
+        setRevealedKey(visibilityKey);
       });
     });
 
@@ -40,7 +55,7 @@ const AmbientBackgroundHarness = memo(function AmbientBackgroundHarness({
         window.cancelAnimationFrame(secondFrame);
       }
     };
-  }, [bugCounts, fullDensity]);
+  }, [fullDensity, visibilityKey]);
 
   return (
     <BackgroundField

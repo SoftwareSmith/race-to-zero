@@ -11,6 +11,3 @@ export type { StructureDef } from "@config/structureConfig";
 // Side-effect imports: each calls register() at module load time.
 import "./lantern/index";
 import "./agent/index";
-import "./turret/index";
-import "./tesla/index";
-import "./firewall/index";

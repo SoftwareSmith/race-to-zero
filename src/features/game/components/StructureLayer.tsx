@@ -1,6 +1,6 @@
 /**
- * StructureLayer — renders placed structures (Lantern, Bug Agent, Turret) as an
- * absolute-positioned layer inside BackgroundField, aligned with canvas-local coords.
+ * StructureLayer — renders placed structures as an absolute-positioned layer
+ * inside BackgroundField, aligned with canvas-local coords.
  */
 
 import { useEffect, useState } from "react";
@@ -10,8 +10,6 @@ import { STRUCTURE_DEFS } from "@config/structureConfig";
 interface StructureLayerProps {
   structures: PlacedStructure[];
   agentCaptures?: Record<string, AgentCaptureState>;
-  turretLastFireTimes?: Record<string, number>;
-  teslaLastFireTimes?: Record<string, number>;
 }
 
 /** Agent commentary lines based on absorb progress */
@@ -31,8 +29,6 @@ function getAgentText(
 export default function StructureLayer({
   structures,
   agentCaptures,
-  turretLastFireTimes,
-  teslaLastFireTimes,
 }: StructureLayerProps) {
   const [now, setNow] = useState(() => Date.now());
 
@@ -66,9 +62,6 @@ export default function StructureLayer({
         const tier = s.tier ?? 1;
         const tierScale = 1 + (tier - 1) * 0.12;
         const isLantern = s.structureType === "lantern";
-        const isTurret = s.structureType === "turret";
-        const isTesla = s.structureType === "tesla";
-        const isFirewall = s.structureType === "firewall";
         const effectR = (def?.effectRadius ?? 80) * tierScale;
         const capture = agentCaptures?.[s.id];
         const isAbsorbing = capture?.phase === "absorbing";
@@ -80,14 +73,9 @@ export default function StructureLayer({
             : isDone
               ? 1
               : 0;
-        const agentLabel =
-          !isLantern && !isTurret
-            ? getAgentText(capture?.phase ?? "idle", progress)
-            : null;
-        const turretLastFiredAt = turretLastFireTimes?.[s.id];
-        const turretCooldownMs = 2000;
-        const teslaLastFiredAt = teslaLastFireTimes?.[s.id];
-        const teslaCooldownMs = 2500;
+        const agentLabel = isLantern
+          ? null
+          : getAgentText(capture?.phase ?? "idle", progress);
 
         return (
           <div
@@ -151,219 +139,6 @@ export default function StructureLayer({
                   }}
                 >
                   <span className="text-xl leading-none">🔦</span>
-                </div>
-              </>
-            ) : isTurret ? (
-              /* ── Turret: debug-pointer core with reload bar ── */
-              <>
-                <div
-                  className="pointer-events-none absolute rounded-full border border-dashed [animation:turret-scan_2s_ease-in-out_infinite]"
-                  style={{
-                    width: effectR * 2,
-                    height: effectR * 2,
-                    left: -effectR,
-                    top: -effectR,
-                    borderColor: `${color}45`,
-                  }}
-                />
-                <div
-                  className="pointer-events-none absolute rounded-full border border-cyan-200/12"
-                  style={{
-                    width: 58,
-                    height: 58,
-                    left: -29,
-                    top: -29,
-                    boxShadow: `0 0 ${20 + tier * 6}px ${color}18`,
-                  }}
-                />
-                <div
-                  className="absolute flex h-11 w-11 items-center justify-center rounded-full border"
-                  style={{
-                    left: -22,
-                    top: -22,
-                    borderColor: `${color}70`,
-                    background: `radial-gradient(circle at 40% 38%, ${color}30 0%, ${color}18 45%, rgba(3,7,18,0.88) 100%)`,
-                    boxShadow: `0 0 ${18 + tier * 4}px ${color}55`,
-                    transform: `scale(${1 + (tier - 1) * 0.05})`,
-                  }}
-                >
-                  <div className="absolute inset-[5px] rounded-full border border-cyan-200/18 [animation:laser-cursor-breathe_1.8s_ease-in-out_infinite]" />
-                  <div className="text-cyan-100 [animation:laser-cursor-breathe_1.2s_ease-in-out_infinite]">
-                    {/* Crosshair icon — distinct from weapon HUD glyph */}
-                    <svg
-                      viewBox="0 0 20 20"
-                      width="20"
-                      height="20"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="1.5"
-                      strokeLinecap="round"
-                    >
-                      <circle cx="10" cy="10" r="4.5" />
-                      <circle cx="10" cy="10" r="7.5" opacity="0.5" />
-                      <line x1="10" y1="1" x2="10" y2="4" />
-                      <line x1="10" y1="16" x2="10" y2="19" />
-                      <line x1="1" y1="10" x2="4" y2="10" />
-                      <line x1="16" y1="10" x2="19" y2="10" />
-                    </svg>
-                  </div>
-                  <div
-                    className="absolute left-1/2 top-1/2 h-1.5 w-1.5 rounded-full bg-cyan-100"
-                    style={{
-                      transform: "translate(-50%, -50%)",
-                      boxShadow: "0 0 8px rgba(165,243,252,0.7)",
-                    }}
-                  />
-                </div>
-                <div
-                  className="absolute h-1.5 w-12 overflow-hidden rounded-full border border-cyan-200/20 bg-slate-950/80"
-                  style={{
-                    top: 26,
-                    left: -24,
-                    boxShadow: `0 0 10px ${color}18`,
-                  }}
-                >
-                  <div
-                    key={turretLastFiredAt}
-                    className="h-full rounded-full bg-cyan-300/85"
-                    style={
-                      turretLastFiredAt != null
-                        ? {
-                            animation: `reload-drain ${turretCooldownMs}ms linear forwards`,
-                          }
-                        : { width: "100%" }
-                    }
-                  />
-                </div>
-              </>
-            ) : isTesla ? (
-              /* ── Tesla Coil: rotating plasma ring + coil core ── */
-              <>
-                {/* Field radius indicator */}
-                <div
-                  className="pointer-events-none absolute rounded-full border border-dashed [animation:turret-scan_1.4s_ease-in-out_infinite]"
-                  style={{
-                    width: effectR * 2,
-                    height: effectR * 2,
-                    left: -effectR,
-                    top: -effectR,
-                    borderColor: `${color}40`,
-                  }}
-                />
-                {/* Outer ambient ring */}
-                <div
-                  className="pointer-events-none absolute rounded-full border [animation:structure-pulse_2s_ease-in-out_infinite]"
-                  style={{
-                    width: 64,
-                    height: 64,
-                    left: -32,
-                    top: -32,
-                    borderColor: `${color}60`,
-                    boxShadow: `0 0 ${22 + tier * 6}px ${color}30`,
-                  }}
-                />
-                {/* Inner plasma rotating ring */}
-                <div
-                  className="pointer-events-none absolute rounded-full border-2 border-dashed"
-                  style={{
-                    width: 46,
-                    height: 46,
-                    left: -23,
-                    top: -23,
-                    borderColor: `${color}90`,
-                    animation: "agent-ring-spin 1.8s linear infinite",
-                    boxShadow: `0 0 ${14 + tier * 4}px ${color}50, inset 0 0 10px ${color}20`,
-                  }}
-                />
-                {/* Core */}
-                <div
-                  className="absolute flex h-10 w-10 items-center justify-center rounded-full border-2"
-                  style={{
-                    left: -20,
-                    top: -20,
-                    borderColor: `${color}80`,
-                    background: `radial-gradient(circle at 38% 36%, ${color}40 0%, ${color}18 50%, rgba(3,7,18,0.9) 100%)`,
-                    boxShadow: `0 0 ${22 + tier * 5}px ${color}70`,
-                    transform: `scale(${1 + (tier - 1) * 0.05})`,
-                  }}
-                >
-                  <span className="text-lg leading-none">⚡</span>
-                </div>
-                {/* Reload bar */}
-                <div
-                  className="absolute h-1.5 w-12 overflow-hidden rounded-full border border-yellow-400/20 bg-slate-950/80"
-                  style={{
-                    top: 26,
-                    left: -24,
-                    boxShadow: `0 0 10px ${color}18`,
-                  }}
-                >
-                  <div
-                    key={teslaLastFiredAt}
-                    className="h-full rounded-full"
-                    style={{
-                      background: `linear-gradient(90deg, ${color}, ${color}cc)`,
-                      ...(teslaLastFiredAt != null
-                        ? {
-                            animation: `reload-drain ${teslaCooldownMs}ms linear forwards`,
-                          }
-                        : { width: "100%" }),
-                    }}
-                  />
-                </div>
-              </>
-            ) : isFirewall ? (
-              /* ── Firewall: arc-slash energy blades rotating each tick ── */
-              <>
-                {(() => {
-                  const slashPhase = Math.floor(now / 380);
-                  const angles = [0, 1, 2].map(
-                    (i) => (slashPhase * 137 + i * 127) % 360,
-                  );
-                  return angles.map((angle, i) => (
-                    <div
-                      key={i}
-                      className="pointer-events-none absolute"
-                      style={{
-                        width: 6,
-                        height: 160,
-                        left: -3,
-                        top: -80,
-                        background: `linear-gradient(to bottom, transparent 0%, ${color}00 5%, ${color}88 35%, ${color}cc 50%, ${color}88 65%, ${color}00 95%, transparent 100%)`,
-                        borderRadius: "50%",
-                        filter: "blur(2px)",
-                        transform: `rotate(${angle}deg)`,
-                        boxShadow: `0 0 12px 2px ${color}44`,
-                        opacity: 0.9,
-                      }}
-                    />
-                  ));
-                })()}
-                {/* Core icon */}
-                <div
-                  className="absolute flex h-10 w-10 items-center justify-center rounded-full border-2"
-                  style={{
-                    left: -20,
-                    top: -20,
-                    borderColor: `${color}80`,
-                    background: `radial-gradient(circle, ${color}30 0%, rgba(3,7,18,0.9) 100%)`,
-                    boxShadow: `0 0 24px ${color}70`,
-                  }}
-                >
-                  <span className="text-xl leading-none">🔥</span>
-                </div>
-                {/* Lifetime indicator bar */}
-                <div
-                  className="absolute h-1.5 w-12 overflow-hidden rounded-full border border-orange-400/25 bg-slate-950/80"
-                  style={{ top: 26, left: -24 }}
-                >
-                  <div
-                    className="h-full rounded-full"
-                    style={{
-                      background: `linear-gradient(90deg, ${color}, ${color}bb)`,
-                      animation: `reload-drain 8000ms linear forwards`,
-                    }}
-                  />
                 </div>
               </>
             ) : (

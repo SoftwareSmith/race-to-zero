@@ -8,18 +8,10 @@ export function useWeaponFireTimes(
   const [cursorLastFireTimes, setCursorLastFireTimes] = useState<
     Partial<Record<SiegeWeaponId, number>>
   >({});
-  const [turretLastFireTimes, setTurretLastFireTimes] = useState<
-    Record<string, number>
-  >({});
-  const [teslaLastFireTimes, setTeslaLastFireTimes] = useState<
-    Record<string, number>
-  >({});
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
       setCursorLastFireTimes({});
-      setTurretLastFireTimes({});
-      setTeslaLastFireTimes({});
     }, 0);
 
     return () => {
@@ -37,26 +29,8 @@ export function useWeaponFireTimes(
     [],
   );
 
-  const recordTurretFire = useCallback((structureId: string) => {
-    setTurretLastFireTimes((previous) => ({
-      ...previous,
-      [structureId]: performance.now(),
-    }));
-  }, []);
-
-  const recordTeslaFire = useCallback((structureId: string) => {
-    setTeslaLastFireTimes((previous) => ({
-      ...previous,
-      [structureId]: performance.now(),
-    }));
-  }, []);
-
   return {
     cursorLastFireTimes,
     recordCursorFire,
-    recordTeslaFire,
-    recordTurretFire,
-    teslaLastFireTimes,
-    turretLastFireTimes,
   };
 }

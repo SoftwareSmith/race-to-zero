@@ -4,7 +4,7 @@ import { CHAIN_ZAP_TIER_VFX } from "../vfx";
 
 export const baseTier: WeaponTierDefinition = {
   tier: WeaponTier.TIER_ONE,
-  title: "Chain Zap",
+  title: "Lightning",
   detail:
     "Starts a short lightning chain that prioritises unfrozen bugs and rewards tight cluster targeting.",
   hint: "Click near a bug — arc bounces 3x, targets unfrozen bugs first",

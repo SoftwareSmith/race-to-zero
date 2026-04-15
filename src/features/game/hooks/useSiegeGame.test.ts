@@ -1,6 +1,7 @@
-import { act, renderHook } from "@testing-library/react";
+import { act, renderHook, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { STORAGE_KEYS } from "../../../constants/storageKeys";
 import { useSiegeGame } from "./useSiegeGame";
 
 describe("useSiegeGame", () => {
@@ -31,12 +32,12 @@ describe("useSiegeGame", () => {
     expect(result.current.selectedWeaponId).toBe("hammer");
 
     act(() => {
-      for (let i = 0; i < 12; i += 1) {
+      for (let i = 0; i < 18; i += 1) {
         result.current.handleInteractiveHit({ defeated: true, pointValue: 1 });
       }
     });
 
-    expect(result.current.combatStats.unlockedWeapons).toContain("zapper");
+    expect(result.current.combatStats.unlockedWeapons).toContain("nullpointer");
     expect(result.current.selectedWeaponId).toBe("hammer");
   });
 
@@ -68,23 +69,85 @@ describe("useSiegeGame", () => {
     act(() => {
       result.current.enterInteractiveMode();
       result.current.placeStructure(
-        "turret",
+        "agent",
         100,
         120,
         80,
         90,
-        "turret-alpha",
+        "agent-alpha",
       );
     });
 
     expect(result.current.placedStructures[0]?.tier).toBe(1);
 
     act(() => {
-      result.current.handleStructureKill("turret-alpha");
-      result.current.handleStructureKill("turret-alpha");
+      result.current.handleStructureKill("agent-alpha");
+      result.current.handleStructureKill("agent-alpha");
     });
 
     expect(result.current.placedStructures[0]?.kills).toBe(2);
-    expect(result.current.placedStructures[0]?.tier).toBe(2);
+    expect(result.current.placedStructures[0]?.tier).toBe(3);
+  });
+
+  it("freezes the run and stores a leaderboard entry when bugs run out", async () => {
+    const { result } = renderHook(() =>
+      useSiegeGame({
+        currentBugCount: 1,
+        currentBugCounts: { high: 0, low: 1, medium: 0, urgent: 0 },
+        evolutionStates: {
+          hammer: { kills: 1, tier: 1 },
+        },
+      }),
+    );
+
+    act(() => {
+      result.current.enterInteractiveMode();
+      result.current.handleInteractiveHit({ defeated: true, pointValue: 1 });
+    });
+
+    await waitFor(() => {
+      expect(result.current.completionSummary).not.toBeNull();
+    });
+
+    expect(result.current.interactiveRemainingBugs).toBe(0);
+    expect(result.current.leaderboard).toHaveLength(1);
+    expect(result.current.completionSummary?.topWeaponLabel).toBe("Hammer");
+    expect(window.localStorage.setItem).toHaveBeenCalledWith(
+      STORAGE_KEYS.siegeRunLeaderboard,
+      expect.any(String),
+    );
+  });
+
+  it("can force-clear the remaining bugs for debug completion checks", async () => {
+    const { result } = renderHook(() =>
+      useSiegeGame({
+        currentBugCount: 5,
+        currentBugCounts: { high: 0, low: 5, medium: 0, urgent: 0 },
+        evolutionStates: {
+          hammer: { kills: 2, tier: 1 },
+        },
+      }),
+    );
+
+    act(() => {
+      result.current.enterInteractiveMode();
+    });
+
+    await waitFor(() => {
+      expect(result.current.siegePhase).toBe("active");
+    });
+
+    act(() => {
+      result.current.killAllBugs();
+    });
+
+    await waitFor(() => {
+      expect(result.current.completionSummary).not.toBeNull();
+    });
+
+    expect(result.current.interactiveKills).toBe(5);
+    expect(result.current.interactivePoints).toBe(5);
+    expect(result.current.interactiveRemainingBugs).toBe(0);
+    expect(result.current.completionSummary?.bugCount).toBe(5);
   });
 });

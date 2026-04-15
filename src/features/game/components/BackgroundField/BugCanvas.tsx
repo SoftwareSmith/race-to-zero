@@ -136,16 +136,6 @@ export interface BugCanvasProps {
     srcY?: number;
     processingMs?: number;
   }) => void;
-  onTurretFire?: (data: {
-    structureId: string;
-    srcX: number;
-    srcY: number;
-    targetX: number;
-    targetY: number;
-    angle: number;
-    phase: "aim" | "fire";
-  }) => void;
-  onTeslaFire?: (data: { structureId: string }) => void;
   gameConfig?: GameConfig;
   hammerPositionRef?: { current: { x: number; y: number } };
   getWeaponTier?: (id: SiegeWeaponId) => import("@game/types").WeaponTier;
@@ -181,8 +171,6 @@ const BugCanvas = memo(function BugCanvas({
   onStructureKill,
   placedStructures,
   onAgentAbsorb,
-  onTurretFire,
-  onTeslaFire,
   gameConfig,
   hammerPositionRef,
   getWeaponTier = () => 1 as import("@game/types").WeaponTier,
@@ -201,8 +189,6 @@ const BugCanvas = memo(function BugCanvas({
   const onEntityDeathRef = useRef(onEntityDeath);
   const onStructureKillRef = useRef(onStructureKill);
   const onAgentAbsorbRef = useRef(onAgentAbsorb);
-  const onTurretFireRef = useRef(onTurretFire);
-  const onTeslaFireRef = useRef(onTeslaFire);
   const onWeaponFireRef = useRef(onWeaponFire);
   const onWeaponEvolutionStatesChangeRef = useRef(
     onWeaponEvolutionStatesChange,
@@ -242,25 +228,10 @@ const BugCanvas = memo(function BugCanvas({
     speedMultiplier: getSpeedMultiplier(bugVisualSettings?.chaosMultiplier),
   });
   const [reseedInfo, setReseedInfo] = useState<ReseedInfo | null>(null);
-  const [vfxActivated, setVfxActivated] = useState(false);
   const gameConfigKey = useMemo(
     () => JSON.stringify(gameConfig ?? {}),
     [gameConfig],
   );
-
-  useEffect(() => {
-    setVfxActivated(false);
-  }, [sessionKey]);
-
-  useEffect(() => {
-    if (!interactiveMode) {
-      return;
-    }
-
-    if (selectedWeaponId !== "hammer" || (placedStructures?.length ?? 0) > 0) {
-      setVfxActivated(true);
-    }
-  }, [interactiveMode, placedStructures?.length, selectedWeaponId]);
 
   useEffect(() => {
     interactiveModeRef.current = interactiveMode;
@@ -274,8 +245,6 @@ const BugCanvas = memo(function BugCanvas({
     onEntityDeathRef.current = onEntityDeath;
     onStructureKillRef.current = onStructureKill;
     onAgentAbsorbRef.current = onAgentAbsorb;
-    onTurretFireRef.current = onTurretFire;
-    onTeslaFireRef.current = onTeslaFire;
     onWeaponFireRef.current = onWeaponFire;
     placingStructureIdRef.current = placingStructureId;
     onStructurePlaceRef.current = onStructurePlace;
@@ -298,8 +267,6 @@ const BugCanvas = memo(function BugCanvas({
     onHit,
     onStructureKill,
     onStructurePlace,
-    onTeslaFire,
-    onTurretFire,
     onWeaponEvolutionStatesChange,
     onWeaponFire,
     placingStructureId,
@@ -401,70 +368,6 @@ const BugCanvas = memo(function BugCanvas({
             void 0;
           }
         },
-        onTurretFire: (data) => {
-          try {
-            const vx = Math.round(data.srcX + (boundsRef.current.left || 0));
-            const vy = Math.round(data.srcY + (boundsRef.current.top || 0));
-            const vtx = Math.round(
-              data.targetX + (boundsRef.current.left || 0),
-            );
-            const vty = Math.round(data.targetY + (boundsRef.current.top || 0));
-            if (data.phase === "aim") {
-              // Tracer line from turret to target during aim phase
-              vfxRef.current?.addTracerLine(
-                data.srcX,
-                data.srcY,
-                data.targetX,
-                data.targetY,
-                550,
-              );
-              onWeaponFireRef.current?.("nullpointer", vx, vy, {
-                targetX: vtx,
-                targetY: vty,
-                color: "#22d3ee",
-              });
-            } else {
-              // Fire phase: spark crown + small burst at target
-              vfxRef.current?.spawnSparkCrown(
-                data.targetX,
-                data.targetY,
-                0x22d3ee,
-              );
-              vfxRef.current?.spawnExplosion(
-                data.targetX,
-                data.targetY,
-                40,
-                0x22d3ee,
-              );
-            }
-            onTurretFireRef.current?.(data);
-          } catch {
-            void 0;
-          }
-        },
-        onTeslaFire: (data) => {
-          try {
-            vfxRef.current?.spawnLightning(data.nodes, 900, 0xc084fc);
-            const chainNodes = data.nodes.map((n) => ({
-              x: Math.round(n.x + (boundsRef.current.left || 0)),
-              y: Math.round(n.y + (boundsRef.current.top || 0)),
-            }));
-            if (chainNodes.length >= 2) {
-              onWeaponFireRef.current?.(
-                "chain",
-                chainNodes[0].x,
-                chainNodes[0].y,
-                {
-                  chainNodes,
-                  color: "#c084fc",
-                },
-              );
-            }
-            onTeslaFireRef.current?.({ structureId: data.structureId });
-          } catch {
-            void 0;
-          }
-        },
         onWeaponEvolution: (weaponId, newTier) => {
           const bounds = boundsRef.current;
           vfxRef.current?.spawnLevelUp?.(
@@ -553,70 +456,26 @@ const BugCanvas = memo(function BugCanvas({
       boundsRef.current = measurement.bounds;
       canvas.width = Math.floor(width * measurement.devicePixelRatio);
       canvas.height = Math.floor(height * measurement.devicePixelRatio);
-      context.setTransform(
-        measurement.devicePixelRatio,
-        0,
-        0,
-        measurement.devicePixelRatio,
-        0,
-        0,
-      );
-      context.clearRect(0, 0, width, height);
-
-      // update swarm size to current canvas and reseed if many bugs clustered at 0,0
-      if (swarmRef.current) {
-        swarmRef.current.width = width;
-        swarmRef.current.height = height;
-        stabilizeQaEngine(swarmRef.current, width, height);
-        syncQaBugPositionsFromEngine(swarmRef.current, boundsRef.current);
-        const bugs = swarmRef.current.getAllBugs() as Array<any>;
-        const nextReseedInfo = reseedClusteredBugs(
-          bugs,
-          width,
-          height,
-          targetSettingsRef.current.speedMultiplier,
-          {
-            baseSpeed:
-              (swarmRef.current as any)?.__baseSpeedOriginal ??
-              DEFAULT_GAME_CONFIG.baseSpeed,
-            thresholdRatio: 0.2,
-          },
-        );
-        if (nextReseedInfo) {
-          console.debug("Engine reseeded on resize", {
-            nextHeight: height,
-            nextWidth: width,
-            clustered: nextReseedInfo.clustered,
-            total: nextReseedInfo.total,
-          });
-          reseedInfoRef.current = nextReseedInfo;
-          setReseedInfo(nextReseedInfo);
-        }
-      }
     };
 
     const updateActivity = () => {
       isActive = !document.hidden && document.hasFocus();
+
       if (isActive && !animationFrameId) {
         animationFrameId = window.requestAnimationFrame(renderFrame);
       }
     };
 
-    // cursor is forwarded to the engine during update calls below
-
     const renderFrame = (timestamp: number) => {
-      animationFrameId = 0;
       const frameStart = performance.now();
 
       if (!isActive) {
+        animationFrameId = 0;
         return;
       }
 
-      const targetFrameMs = interactiveModeRef.current
-        ? INTERACTIVE_TARGET_FRAME_MS
-        : AMBIENT_TARGET_FRAME_MS;
-
-      if (timestamp - lastDrawTime < targetFrameMs) {
+      if (!lastDrawTime) {
+        lastDrawTime = timestamp;
         animationFrameId = window.requestAnimationFrame(renderFrame);
         return;
       }

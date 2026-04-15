@@ -28,13 +28,6 @@ export interface AbsorbingState {
   failChance: number;
 }
 
-export interface AimPhase {
-  targetX: number;
-  targetY: number;
-  angle: number;
-  firesAt: number;
-}
-
 export interface StructureEntry {
   id: string;
   type: StructureId;
@@ -43,10 +36,6 @@ export interface StructureEntry {
   y: number;
   nextCaptureAt: number;
   absorbing: AbsorbingState | null;
-  lastFireAngle?: number;
-  aimPhase?: AimPhase | null;
-  placedAt?: number;
-  firewallNextDamageAt?: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -98,26 +87,9 @@ export interface AgentAbsorbData {
   processingMs?: number;
 }
 
-export interface TurretFireData {
-  structureId: string;
-  srcX: number;
-  srcY: number;
-  targetX: number;
-  targetY: number;
-  angle: number;
-  phase: "aim" | "fire";
-}
-
-export interface TeslaFireData {
-  structureId: string;
-  nodes: Array<{ x: number; y: number }>;
-}
-
 export interface StructureCallbacks {
   onStructureKill?(structureId: string, x: number, y: number, variant: string): void;
   onAgentAbsorb?(data: AgentAbsorbData): void;
-  onTurretFire?(data: TurretFireData): void;
-  onTeslaFire?(data: TeslaFireData): void;
 }
 
 // ---------------------------------------------------------------------------

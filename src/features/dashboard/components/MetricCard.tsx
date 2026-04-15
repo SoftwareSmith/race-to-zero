@@ -27,6 +27,7 @@ function MetricCard({
   tone = "neutral",
   value,
 }: MetricCardProps) {
+  void siegeMode;
   const styles = CARD_TONE_STYLES[tone] ?? CARD_TONE_STYLES.neutral;
   const card = (
     <article

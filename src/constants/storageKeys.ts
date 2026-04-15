@@ -9,6 +9,7 @@ export const STORAGE_KEYS = {
   gameConfig: "race-to-zero:game-config",
   bugCodex: "race-to-zero:bug-codex",
   weaponEvolutionStates: "bugSlayer_weaponEvolutionStates",
+  siegeRunLeaderboard: "race-to-zero:siege-run-leaderboard",
 } as const;
 
 export type StorageKey = (typeof STORAGE_KEYS)[keyof typeof STORAGE_KEYS];

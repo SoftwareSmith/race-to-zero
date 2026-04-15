@@ -155,10 +155,6 @@ const BackgroundField = memo(function BackgroundField({
   const {
     cursorLastFireTimes,
     recordCursorFire,
-    recordTeslaFire,
-    recordTurretFire,
-    teslaLastFireTimes,
-    turretLastFireTimes,
   } = useWeaponFireTimes(gameSessionKey, interactiveMode);
   const [weaponEffects, setWeaponEffects] = useState<WeaponEffectEvent[]>([]);
   const onWeaponFiredRef = useRef(onWeaponFired);
@@ -166,27 +162,6 @@ const BackgroundField = memo(function BackgroundField({
   useEffect(() => {
     onWeaponFiredRef.current = onWeaponFired;
   }, [onWeaponFired]);
-
-  const handleTurretFire = useCallback(
-    (data: {
-      structureId: string;
-      srcX: number;
-      srcY: number;
-      targetX: number;
-      targetY: number;
-      angle: number;
-    }) => {
-      recordTurretFire(data.structureId);
-    },
-    [recordTurretFire],
-  );
-
-  const handleTeslaFire = useCallback(
-    (data: { structureId: string }) => {
-      recordTeslaFire(data.structureId);
-    },
-    [recordTeslaFire],
-  );
 
   const handleWeaponFire = useCallback(
     (
@@ -305,8 +280,6 @@ const BackgroundField = memo(function BackgroundField({
         onStructureKill={interactiveMode ? handleStructureKill : undefined}
         placedStructures={placedStructures}
         onAgentAbsorb={interactiveMode ? onAgentAbsorb : undefined}
-        onTurretFire={interactiveMode ? handleTurretFire : undefined}
-        onTeslaFire={interactiveMode ? handleTeslaFire : undefined}
         placingStructureId={interactiveMode ? placingStructureId : null}
         onStructurePlace={interactiveMode ? onStructurePlace : undefined}
         selectedWeaponId={selectedWeaponId}
@@ -336,8 +309,6 @@ const BackgroundField = memo(function BackgroundField({
           <StructureLayer
             structures={placedStructures}
             agentCaptures={agentCaptures}
-            turretLastFireTimes={turretLastFireTimes}
-            teslaLastFireTimes={teslaLastFireTimes}
           />
         </Suspense>
       ) : null}

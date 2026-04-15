@@ -30,6 +30,7 @@ const CommandCenter = memo(function CommandCenter({
   siegeMode = false,
   summary,
 }: CommandCenterProps) {
+  void siegeMode;
   const isPeriods = activeTab === "periods" && comparisonMetrics;
 
   // choose period or overview values

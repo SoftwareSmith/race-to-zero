@@ -15,40 +15,40 @@ describe("siege progression", () => {
     expect(stats.currentToolLabel).toBe("Hammer");
   });
 
-  it("unlocks zapper at 12 kills", () => {
-    const stats = getSiegeCombatStats(12);
+  it("unlocks garbage collector at 18 kills", () => {
+    const stats = getSiegeCombatStats(18);
 
     expect(stats.unlockedWeapons).toContain("hammer");
-    expect(stats.unlockedWeapons).toContain("zapper");
+    expect(stats.unlockedWeapons).toContain("nullpointer");
     expect(stats.unlockedWeapons).not.toContain("chain");
   });
 
-  it("unlocks chain at 38 kills but not null pointer", () => {
-    const stats = getSiegeCombatStats(38);
-    const snapshots = getSiegeWeaponSnapshots(38, "chain");
+  it("unlocks lightning at 42 kills but not fork bomb", () => {
+    const stats = getSiegeCombatStats(42);
+    const snapshots = getSiegeWeaponSnapshots(42, "chain");
 
     expect(stats.unlockedWeapons).toContain("chain");
-    expect(stats.unlockedWeapons).not.toContain("nullpointer");
+    expect(stats.unlockedWeapons).not.toContain("plasma");
     expect(snapshots.find((s) => s.id === "chain")?.locked).toBe(false);
-    expect(snapshots.find((s) => s.id === "nullpointer")?.locked).toBe(true);
+    expect(snapshots.find((s) => s.id === "plasma")?.locked).toBe(true);
   });
 
-  it("unlocks 4 weapons at 100 kills, all 6 at 130", () => {
+  it("unlocks 5 weapons at 100 kills, all 6 at 132", () => {
     const stats100 = getSiegeCombatStats(100);
-    const stats130 = getSiegeCombatStats(130);
+    const stats132 = getSiegeCombatStats(132);
 
-    expect(stats100.unlockedWeapons.length).toBe(4);
-    expect(stats100.unlockedWeapons).toContain("nullpointer");
-    expect(stats100.unlockedWeapons).not.toContain("plasma");
-    expect(stats130.unlockedWeapons.length).toBe(6);
-    expect(stats130.unlockedWeapons).toContain("void");
+    expect(stats100.unlockedWeapons.length).toBe(5);
+    expect(stats100.unlockedWeapons).toContain("zapper");
+    expect(stats100.unlockedWeapons).not.toContain("void");
+    expect(stats132.unlockedWeapons.length).toBe(6);
+    expect(stats132.unlockedWeapons).toContain("void");
   });
 
   it("label reflects highest unlocked weapon", () => {
     expect(getSiegeCombatStats(0).currentToolLabel).toBe("Hammer");
-    expect(getSiegeCombatStats(11).currentToolLabel).toBe("Hammer");
-    expect(getSiegeCombatStats(12).currentToolLabel).toBe("Bug Zapper");
-    expect(getSiegeCombatStats(100).currentToolLabel).toBe("Null Pointer");
+    expect(getSiegeCombatStats(17).currentToolLabel).toBe("Hammer");
+    expect(getSiegeCombatStats(18).currentToolLabel).toBe("Garbage Collector");
+    expect(getSiegeCombatStats(100).currentToolLabel).toBe("Bug Spray");
   });
 
   it("surfaces evolved tier data in weapon snapshots", () => {
@@ -58,7 +58,7 @@ describe("siege progression", () => {
     };
 
     const snapshots = getSiegeWeaponSnapshots(
-      130,
+      132,
       "hammer",
       false,
       evolutionStates,

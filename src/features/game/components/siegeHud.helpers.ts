@@ -413,9 +413,5 @@ export function getStructureGlyph(structureId: StructureId) {
     return "🔦";
   }
 
-  if (structureId === "turret") {
-    return "🎯";
-  }
-
   return "🤖";
 }

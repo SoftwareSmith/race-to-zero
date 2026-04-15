@@ -26,7 +26,7 @@ const progressionMetrics = {
 };
 
 test.describe("siege progression QA", () => {
-  test("unlocks zapper at 12 kills and tracer bloom at 68 kills", async ({ page }) => {
+  test("unlocks garbage collector at 18 kills and lightning at 42 kills", async ({ page }) => {
     const clientErrors = createConsoleCollectors(page);
 
     await page.setViewportSize({ height: 1200, width: 1440 });
@@ -47,21 +47,21 @@ test.describe("siege progression QA", () => {
       "data-current",
       "true",
     );
-    await expect(page.getByTestId("weapon-zapper")).toHaveAttribute(
+    await expect(page.getByTestId("weapon-nullpointer")).toHaveAttribute(
       "data-locked",
       "true",
     );
-    await expect(page.getByTestId("weapon-laser")).toHaveAttribute(
+    await expect(page.getByTestId("weapon-chain")).toHaveAttribute(
       "data-locked",
       "true",
     );
 
-    await setQaSiegeProgress(page, { kills: 12, remainingBugs: 78 });
+    await setQaSiegeProgress(page, { kills: 18, remainingBugs: 72 });
 
-    await expect(hud.locator("strong").nth(0)).toHaveText("78");
-    await expect(hud.locator("strong").nth(1)).toHaveText("12");
-    await expect(page.getByText("New Bug Zapper weapon unlocked")).toBeVisible();
-    await expect(page.getByTestId("weapon-zapper")).toHaveAttribute(
+    await expect(hud.locator("strong").nth(0)).toHaveText("72");
+    await expect(hud.locator("strong").nth(1)).toHaveText("18");
+    await expect(page.getByText("New Garbage Collector weapon unlocked")).toBeVisible();
+    await expect(page.getByTestId("weapon-nullpointer")).toHaveAttribute(
       "data-locked",
       "false",
     );
@@ -69,17 +69,17 @@ test.describe("siege progression QA", () => {
       "data-current",
       "true",
     );
-    await expect(page.getByTestId("weapon-laser")).toHaveAttribute(
+    await expect(page.getByTestId("weapon-chain")).toHaveAttribute(
       "data-locked",
       "true",
     );
 
-    await setQaSiegeProgress(page, { kills: 68, remainingBugs: 22 });
+    await setQaSiegeProgress(page, { kills: 42, remainingBugs: 48 });
 
-    await expect(hud.locator("strong").nth(0)).toHaveText("22");
-    await expect(hud.locator("strong").nth(1)).toHaveText("68");
-    await expect(page.getByText("New Directional Laser weapon unlocked")).toBeVisible();
-    await expect(page.getByTestId("weapon-laser")).toHaveAttribute(
+    await expect(hud.locator("strong").nth(0)).toHaveText("48");
+    await expect(hud.locator("strong").nth(1)).toHaveText("42");
+    await expect(page.getByText("New Lightning weapon unlocked")).toBeVisible();
+    await expect(page.getByTestId("weapon-chain")).toHaveAttribute(
       "data-locked",
       "false",
     );

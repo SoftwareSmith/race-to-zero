@@ -7,6 +7,9 @@ import {
 } from "@game/progression/progression";
 import { WEAPON_DEFS } from "@config/weaponConfig";
 import { STRUCTURE_DEFS, STRUCTURE_TIER_THRESHOLDS } from "@config/structureConfig";
+import { useSiegeGameDebug } from "./useSiegeGameDebug";
+import { useSiegeGameTimer } from "./useSiegeGameTimer";
+import { useSiegeRunCompletion } from "./useSiegeRunCompletion";
 import type {
   AgentCaptureState,
   PlacedStructure,
@@ -52,7 +55,7 @@ function cancelInterval(intervalId: number): void {
   globalThis.clearInterval(intervalId);
 }
 
-function scheduleAnimationFrame(callback: FrameRequestCallback): number {
+function scheduleAnimationFrame(callback: (timestamp: number) => void): number {
   if (
     typeof window !== "undefined" &&
     typeof window.requestAnimationFrame === "function"
@@ -114,6 +117,22 @@ function getStructureTierForXp(
   return Tier.TIER_ONE;
 }
 
+function getBugCountTotal(bugCounts: BugCounts): number {
+  return Object.values(bugCounts).reduce((total, value) => total + value, 0);
+}
+
+function scaleBugCounts(
+  bugCounts: BugCounts,
+  multiplier: number,
+): BugCounts {
+  return Object.fromEntries(
+    Object.entries(bugCounts).map(([variant, count]) => [
+      variant,
+      Math.max(0, Math.round(count * multiplier)),
+    ]),
+  ) as BugCounts;
+}
+
 function applyStructureXp(
   structure: PlacedStructure,
   xpGain: number,
@@ -140,15 +159,6 @@ interface UseSiegeGameOptions {
     tier: WeaponTier;
   }) => void;
   pauseTimer?: boolean;
-}
-
-interface SiegeQaState {
-  enabled?: boolean;
-  setSiegeProgress?: (progress: {
-    kills: number;
-    points?: number;
-    remainingBugs?: number;
-  }) => void;
 }
 
 interface SiegeRuntimeSnapshot {
@@ -191,24 +201,13 @@ function areRuntimeSnapshotsEqual(
 }
 
 export function useSiegeGame({
-  currentBugCount,
+  currentBugCount: _currentBugCount,
   currentBugCounts,
   evolutionStates,
   onStructureTierUp,
   pauseTimer = false,
 }: UseSiegeGameOptions) {
-  const [debugMode, setDebugMode] = useState(() => {
-    if (typeof window === "undefined") {
-      return false;
-    }
-
-    const params = new URLSearchParams(window.location.search);
-    if (params.get("siegeDebug") === "1") {
-      return true;
-    }
-
-    return window.localStorage.getItem("rtz-siege-debug") === "1";
-  });
+  void _currentBugCount;
   const [siegePhase, setSiegePhase] = useState<SiegePhase>("idle");
   const [gameMode, setGameMode] = useState<SiegeGameMode>("purge");
   const [interactiveInitialBugCounts, setInteractiveInitialBugCounts] =
@@ -286,18 +285,65 @@ export function useSiegeGame({
     streakMultiplier,
   } = runtimeSnapshot;
 
-  const enterInteractiveMode = useCallback((nextMode: SiegeGameMode = gameMode) => {
+  const { completionSummary, leaderboard, resetCompletion } =
+    useSiegeRunCompletion({
+      evolutionStates,
+      gameMode,
+      interactiveKills,
+      interactiveMode,
+      interactiveRemainingBugs,
+      interactiveBaseElapsedMsRef,
+      interactiveRunningSinceRef,
+      selectedWeaponId,
+      siegePhase,
+      updateRuntimeSnapshot,
+    });
+
+  const resetInactiveRuntime = useCallback(() => {
+    interactiveBaseElapsedMsRef.current = 0;
+    interactiveRunningSinceRef.current = null;
+    runtimeSnapshotRef.current = createRuntimeSnapshot();
+    flushRuntimeSnapshot(true);
+  }, [flushRuntimeSnapshot]);
+
+  useSiegeGameTimer({
+    completionSummary,
+    interactiveBaseElapsedMsRef,
+    interactiveMode,
+    interactiveRunningSinceRef,
+    interactiveStartedAt,
+    pauseTimer,
+    resetInactiveRuntime,
+    updateRuntimeSnapshot,
+  });
+
+  const { debugMode, killAllBugs, toggleDebugMode } = useSiegeGameDebug({
+    interactiveInitialBugCounts,
+    interactiveMode,
+    lastKillAtRef,
+    updateRuntimeSnapshot,
+  });
+
+  const enterInteractiveMode = useCallback((
+    nextMode: SiegeGameMode = gameMode,
+    options?: { baseBugCounts?: BugCounts; bugMultiplier?: number },
+  ) => {
+    const baseBugCounts = options?.baseBugCounts ?? currentBugCounts;
+    const bugMultiplier = Math.max(1, options?.bugMultiplier ?? 1);
+    const scaledBugCounts = scaleBugCounts(baseBugCounts, bugMultiplier);
+    const totalBugCount = getBugCountTotal(scaledBugCounts);
     const startedAt = Date.now();
     cancelTimeout(phaseTimerRef.current);
     setGameMode(nextMode);
-    setInteractiveInitialBugCounts(currentBugCounts);
+    setInteractiveInitialBugCounts(scaledBugCounts);
     setInteractiveStartedAt(startedAt);
     interactiveRunningSinceRef.current = startedAt;
     interactiveBaseElapsedMsRef.current = 0;
     setInteractiveSessionKey(`${Date.now()}`);
-    runtimeSnapshotRef.current = createRuntimeSnapshot(currentBugCount);
+    runtimeSnapshotRef.current = createRuntimeSnapshot(totalBugCount);
     flushRuntimeSnapshot(true);
     lastKillAtRef.current = null;
+    resetCompletion();
     setSelectedWeaponId("hammer");
     setPlacedStructures([]);
     setPlacingStructureId(null);
@@ -307,16 +353,18 @@ export function useSiegeGame({
       phaseTimerRef.current = null;
       setSiegePhase("active");
     }, SIEGE_ENTER_DURATION_MS);
-  }, [currentBugCount, currentBugCounts, flushRuntimeSnapshot, gameMode]);
+  }, [currentBugCounts, flushRuntimeSnapshot, gameMode, resetCompletion]);
 
   const exitInteractiveMode = useCallback(() => {
     cancelTimeout(phaseTimerRef.current);
     setSiegePhase("exiting");
     phaseTimerRef.current = scheduleTimeout(() => {
       phaseTimerRef.current = null;
+      setInteractiveStartedAt(null);
+      resetCompletion();
       setSiegePhase("idle");
     }, SIEGE_EXIT_DURATION_MS);
-  }, []);
+  }, [resetCompletion]);
 
   const selectWeapon = useCallback(
     (id: SiegeWeaponId) => {
@@ -346,10 +394,11 @@ export function useSiegeGame({
       canvasY: number,
       structureId?: string,
     ) => {
-      const MAX = 3;
+      const def = STRUCTURE_DEFS.find((entry) => entry.id === structureType);
+      const maxPlaced = def?.maxPlaced ?? 2;
       setPlacedStructures((prev) => {
         const ofType = prev.filter((s) => s.structureType === structureType);
-        const filtered = ofType.length >= MAX
+        const filtered = ofType.length >= maxPlaced
           ? prev.filter((s) => s.structureType !== structureType || s !== ofType[0])
           : prev;
         return [
@@ -494,108 +543,6 @@ export function useSiegeGame({
   }, [interactiveMode]);
 
   useEffect(() => {
-    if (!interactiveMode || interactiveStartedAt == null) {
-      if (!interactiveMode) {
-        interactiveBaseElapsedMsRef.current = 0;
-        interactiveRunningSinceRef.current = null;
-        runtimeSnapshotRef.current = createRuntimeSnapshot();
-        flushRuntimeSnapshot(true);
-        setInteractiveStartedAt(null);
-      }
-      return undefined;
-    }
-
-    if (pauseTimer) {
-      if (interactiveRunningSinceRef.current != null) {
-        const frozenElapsedMs =
-          interactiveBaseElapsedMsRef.current +
-          Math.max(0, Date.now() - interactiveRunningSinceRef.current);
-        interactiveBaseElapsedMsRef.current = frozenElapsedMs;
-        interactiveRunningSinceRef.current = null;
-        updateRuntimeSnapshot(
-          (current) => ({ ...current, elapsedMs: frozenElapsedMs }),
-          true,
-        );
-      }
-
-      return undefined;
-    }
-
-    if (interactiveRunningSinceRef.current == null) {
-      interactiveRunningSinceRef.current = Date.now();
-      return undefined;
-    }
-
-    const syncElapsedMs = () => {
-      updateRuntimeSnapshot((current) => ({
-        ...current,
-        elapsedMs:
-          interactiveBaseElapsedMsRef.current +
-          Math.max(0, Date.now() - (interactiveRunningSinceRef.current ?? Date.now())),
-      }));
-    };
-
-    syncElapsedMs();
-    const intervalId = scheduleInterval(syncElapsedMs, 250);
-
-    return () => {
-      cancelInterval(intervalId);
-    };
-  }, [
-    flushRuntimeSnapshot,
-    interactiveMode,
-    interactiveStartedAt,
-    pauseTimer,
-    updateRuntimeSnapshot,
-  ]);
-
-  useEffect(() => {
-    if (typeof window === "undefined") {
-      return;
-    }
-
-    window.localStorage.setItem("rtz-siege-debug", debugMode ? "1" : "0");
-  }, [debugMode]);
-
-  useEffect(() => {
-    if (typeof window === "undefined") {
-      return undefined;
-    }
-
-    const qaState = (window as Window & { __RTZ_QA__?: SiegeQaState }).__RTZ_QA__;
-    if (!qaState?.enabled) {
-      return undefined;
-    }
-
-    qaState.setSiegeProgress = ({ kills, points, remainingBugs }) => {
-      if (!interactiveMode) {
-        return;
-      }
-
-      const normalizedKills = Math.max(0, kills);
-      updateRuntimeSnapshot(
-        (current) => ({
-          ...current,
-          killStreak: 0,
-          kills: normalizedKills,
-          points: points ?? normalizedKills,
-          remainingBugs:
-            remainingBugs ?? Math.max(0, currentBugCount - normalizedKills),
-          streakMultiplier: 1,
-        }),
-        true,
-      );
-      lastKillAtRef.current = null;
-    };
-
-    return () => {
-      if (qaState.setSiegeProgress) {
-        delete qaState.setSiegeProgress;
-      }
-    };
-  }, [currentBugCount, interactiveMode, updateRuntimeSnapshot]);
-
-  useEffect(() => {
     document.body.classList.toggle("interactive-mode", interactiveMode);
 
     if (interactiveMode) {
@@ -703,10 +650,6 @@ export function useSiegeGame({
     [debugMode, interactiveKills],
   );
 
-  const toggleDebugMode = useCallback(() => {
-    setDebugMode((value) => !value);
-  }, []);
-
   const changeGameMode = useCallback((nextMode: SiegeGameMode) => {
     setGameMode(nextMode);
   }, []);
@@ -753,13 +696,16 @@ export function useSiegeGame({
     interactiveRemainingBugs,
     interactiveStartedAt,
     interactiveSessionKey,
+    killAllBugs,
     killStreak,
     lastFireTimes,
+    leaderboard,
     nextWeaponUnlock,
     placedCountByType,
     placedStructures,
     placingStructureId,
     placeStructure,
+    completionSummary,
     selectedWeaponId,
     selectWeapon,
     setInteractiveMode: (v: boolean) =>

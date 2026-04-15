@@ -19,7 +19,7 @@ const TONE_STYLES = {
 type SurfaceTone = keyof typeof TONE_STYLES;
 
 interface SurfaceProps extends HTMLAttributes<HTMLElement> {
-  as?: keyof HTMLElementTagNameMap;
+  as?: "section" | "div" | "article" | "aside" | "header" | "footer";
   children: ReactNode;
   className?: string;
   tone?: SurfaceTone;

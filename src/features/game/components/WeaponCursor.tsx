@@ -48,24 +48,6 @@ function CursorReticle({
         icon: <span className="text-xl leading-none">🤖</span>,
         size: 48,
       },
-      turret: {
-        accent: "#22d3ee",
-        aura: "0 0 24px rgba(34,211,238,0.35)",
-        icon: <WeaponGlyph className="h-6 w-6 text-cyan-100" id="chain" />,
-        size: 48,
-      },
-      tesla: {
-        accent: "#c084fc",
-        aura: "0 0 24px rgba(192,132,252,0.35)",
-        icon: <span className="text-xl leading-none">⚡</span>,
-        size: 50,
-      },
-      firewall: {
-        accent: "#f97316",
-        aura: "0 0 24px rgba(249,115,22,0.35)",
-        icon: <span className="text-xl leading-none">🔥</span>,
-        size: 50,
-      },
     };
     const active = structureTheme[structureId];
 

@@ -33,7 +33,7 @@ export function drawBugFramePass({
   chartFocus,
   context,
   frameNow,
-  height,
+  height: _height,
   interactiveMode,
   motionProfile,
   particles,
@@ -41,6 +41,7 @@ export function drawBugFramePass({
   sizeMultiplier,
   width,
 }: DrawBugFramePassOptions): RenderedBugPosition[] {
+  void _height;
   const focusX = chartFocus?.relativeIndex ?? 0.5;
   const nextBugPositions: RenderedBugPosition[] = [];
   const useSparseAmbientDraw =

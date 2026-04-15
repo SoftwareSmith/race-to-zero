@@ -22,7 +22,7 @@ export const def: WeaponDef = {
   typeLabel: "Plasma",
   typeHint: "Breaks dense bug packs with overlapping explosive bursts.",
   weaponType: "plasma",
-  unlockKills: 110,
+  unlockKills: 70,
   detail: FORK_BOMB_TIERS[0].detail,
   hitPattern: HitPattern.Area,
   hitRadius: 48,

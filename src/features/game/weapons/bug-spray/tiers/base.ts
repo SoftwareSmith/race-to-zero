@@ -4,18 +4,18 @@ import { BUG_SPRAY_TIER_VFX } from "../vfx";
 
 export const baseTier: WeaponTierDefinition = {
   tier: WeaponTier.TIER_ONE,
-  title: "Patch Deployment",
+  title: "Bug Spray",
   detail:
     "Aerosol cone sprays noxious mist and leaves a toxic cloud that re-poisons anything crossing the zone.",
-  hint: "Hold to spray a cone — bugs are Poisoned; toxic cloud lingers 3 s",
+  hint: "Hold to spray a cone — bugs are Poisoned; toxic cloud lingers 5 s",
   effectColor: "#fde047",
   evolveAtKills: 25,
   hitPattern: HitPattern.Cone,
   config: {
-    hitRadius: 120,
+    hitRadius: 128,
     coneArcDeg: 80,
-    poisonDps: 0.5,
-    poisonDurationMs: 4000,
+    poisonDps: 0.65,
+    poisonDurationMs: 5000,
   },
   vfx: BUG_SPRAY_TIER_VFX.base,
   behavior: {

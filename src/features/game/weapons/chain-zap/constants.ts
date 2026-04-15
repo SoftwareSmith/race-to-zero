@@ -24,7 +24,7 @@ export const def: WeaponDef = {
   typeLabel: "Electric",
   typeHint: "Jumps between clustered targets and rewards charged setups.",
   weaponType: "electric",
-  unlockKills: 38,
+  unlockKills: 42,
   detail: CHAIN_ZAP_TIERS[0].detail,
   hitPattern: HitPattern.Chain,
   hitRadius: 90,
