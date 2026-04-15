@@ -32,7 +32,7 @@ jobs:
         env:
           LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
           LINEAR_TEAM_KEYS: CP,T1,TA
-        run: node scripts/fetch-linear.ts
+        run: npm run sync:linear
 
       - name: Commit updated metrics
         run: |
