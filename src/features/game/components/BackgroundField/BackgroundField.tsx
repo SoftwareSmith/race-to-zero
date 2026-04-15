@@ -92,6 +92,7 @@ interface BackgroundFieldProps {
     weaponId: SiegeWeaponId,
     newTier: import("@game/types").WeaponTier,
   ) => void;
+  onLiveBugCountChange?: (count: number) => void;
   /** Initial evolution states loaded from localStorage. */
   initialEvolutionStates?: Partial<
     Record<SiegeWeaponId, import("@game/types").WeaponEvolutionState>
@@ -124,6 +125,7 @@ const BackgroundField = memo(function BackgroundField({
   getWeaponTier = () => 1 as import("@game/types").WeaponTier,
   onWeaponEvolutionStatesChange,
   onWeaponEvolution,
+  onLiveBugCountChange,
   initialEvolutionStates,
 }: BackgroundFieldProps) {
   const normalizedBugCounts = useMemo(() => bugCounts, [bugCounts]);
@@ -287,6 +289,7 @@ const BackgroundField = memo(function BackgroundField({
         onWeaponFire={interactiveMode ? handleWeaponFire : undefined}
         hammerPositionRef={hammerPositionRef}
         getWeaponTier={getWeaponTier}
+        onLiveBugCountChange={interactiveMode ? onLiveBugCountChange : undefined}
         onWeaponEvolutionStatesChange={onWeaponEvolutionStatesChange}
         onWeaponEvolution={onWeaponEvolution}
         initialEvolutionStates={initialEvolutionStates}

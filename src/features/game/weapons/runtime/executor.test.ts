@@ -64,7 +64,63 @@ describe("weapon executor", () => {
 
     expect(handleHit).toHaveBeenCalledWith(0, 3, true, "hammer");
     expect(onHit).toHaveBeenCalledWith(
-      expect.objectContaining({ defeated: true, pointValue: 1, variant: "low" }),
+      expect.objectContaining({
+        credited: true,
+        defeated: true,
+        pointValue: 1,
+        variant: "low",
+      }),
+    );
+  });
+
+  it("marks delayed damage kills as uncredited so UI counters wait for entity death", () => {
+    const handleHit = vi.fn(() => makeHitResult());
+    const onHit = vi.fn();
+    const ctx: ExecutionContext = {
+      blackHoleVfxIdRef: { current: null },
+      bounds: { height: 300, left: 10, top: 20, width: 300 },
+      canvas: null,
+      engine: {
+        handleHit,
+        getAllBugs: vi.fn(() => [{ x: 100, y: 120, variant: "low" }]),
+        hitTest: vi.fn(),
+        lineHitTest: vi.fn(),
+        radiusHitTest: vi.fn(),
+        coneHitTest: vi.fn(),
+        chainHitTest: vi.fn(),
+        chainHitTestPreferUnfrozen: vi.fn(),
+        closestTargetIndex: vi.fn(),
+        applyPoisonInRadius: vi.fn(),
+        applyBurnInRadius: vi.fn(),
+        applyEnsnareInRadius: vi.fn(),
+        startBlackHole: vi.fn(),
+        getBlackHole: vi.fn(),
+        applyChargedInRadius: vi.fn(),
+        applyMarkedInRadius: vi.fn(),
+        applyUnstableInRadius: vi.fn(),
+        propagateChargedNetwork: vi.fn(),
+        splitBug: vi.fn(),
+        allyBug: vi.fn(),
+        startEventHorizon: vi.fn(),
+        triggerKernelPanicExplosion: vi.fn(),
+        triggerAutoScalerPulse: vi.fn(),
+      },
+      enqueueOverlay: vi.fn(),
+      onHit,
+      updateQaLastHit: vi.fn(),
+      vfx: null,
+      viewportX: 100,
+      viewportY: 150,
+      weaponId: "void",
+    } as ExecutionContext;
+
+    executeCommands(
+      [{ amount: 99, creditOnDeath: false, kind: "damage", targetIndex: 0 }],
+      ctx,
+    );
+
+    expect(onHit).toHaveBeenCalledWith(
+      expect.objectContaining({ credited: false, defeated: true, variant: "low" }),
     );
   });
 });

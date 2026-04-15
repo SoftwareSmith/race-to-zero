@@ -1,6 +1,7 @@
 import type { BugVariant } from "../../../../types/dashboard";
 
 export interface BugHitPayload {
+  credited?: boolean;
   defeated: boolean;
   remainingHp: number;
   variant: BugVariant;

@@ -90,14 +90,17 @@ export function useBackgroundGameState({
   const handleBugHit = useCallback(
     (payload: BugHitPayload) => {
       triggerHammerSwing();
-      onBugHit?.(payload);
+      if (!payload.defeated || payload.credited !== false) {
+        onBugHit?.(payload);
+      }
+
       setGameState((currentValue) => {
         const nextState =
           currentValue.sessionKey === gameSessionKey
             ? currentValue
             : createSessionState(gameSessionKey, totalBugCount);
 
-        if (!payload.defeated) {
+        if (!payload.defeated || payload.credited === false) {
           return {
             ...nextState,
             sessionKey: gameSessionKey,
@@ -119,6 +122,7 @@ export function useBackgroundGameState({
     (structureId: string, x: number, y: number, variant: string) => {
       const bugVariant = variant as BugVariant;
       onBugHit?.({
+        credited: true,
         defeated: true,
         remainingHp: 0,
         variant: bugVariant,
@@ -153,6 +157,7 @@ export function useBackgroundGameState({
 
       const bugVariant = variant as BugVariant;
       onBugHit?.({
+        credited: true,
         defeated: true,
         remainingHp: 0,
         variant: bugVariant,

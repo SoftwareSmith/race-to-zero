@@ -118,6 +118,39 @@ describe("useSiegeGame", () => {
     );
   });
 
+  it("does not count uncredited immediate defeats until the actual death event is reported", () => {
+    const { result } = renderHook(() =>
+      useSiegeGame({
+        currentBugCount: 3,
+        currentBugCounts: { high: 0, low: 3, medium: 0, urgent: 0 },
+        evolutionStates: {},
+      }),
+    );
+
+    act(() => {
+      result.current.enterInteractiveMode();
+      result.current.handleInteractiveHit({
+        credited: false,
+        defeated: true,
+        pointValue: 1,
+      });
+    });
+
+    expect(result.current.interactiveKills).toBe(0);
+    expect(result.current.interactiveRemainingBugs).toBe(3);
+
+    act(() => {
+      result.current.handleInteractiveHit({
+        credited: true,
+        defeated: true,
+        pointValue: 1,
+      });
+    });
+
+    expect(result.current.interactiveKills).toBe(1);
+    expect(result.current.interactiveRemainingBugs).toBe(2);
+  });
+
   it("can force-clear the remaining bugs for debug completion checks", async () => {
     const { result } = renderHook(() =>
       useSiegeGame({
@@ -149,5 +182,22 @@ describe("useSiegeGame", () => {
     expect(result.current.interactivePoints).toBe(5);
     expect(result.current.interactiveRemainingBugs).toBe(0);
     expect(result.current.completionSummary?.bugCount).toBe(5);
+  });
+
+  it("syncs the remaining bug counter from the live engine count", () => {
+    const { result } = renderHook(() =>
+      useSiegeGame({
+        currentBugCount: 20,
+        currentBugCounts: { high: 0, low: 20, medium: 0, urgent: 0 },
+        evolutionStates: {},
+      }),
+    );
+
+    act(() => {
+      result.current.enterInteractiveMode();
+      result.current.syncRemainingBugs(17);
+    });
+
+    expect(result.current.interactiveRemainingBugs).toBe(17);
   });
 });

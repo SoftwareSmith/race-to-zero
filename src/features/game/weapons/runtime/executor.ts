@@ -56,7 +56,9 @@ export function executeCommands(
           const vy = bug
             ? Math.round(bug.y + ctx.bounds.top)
             : ctx.viewportY;
+          const credited = cmd.creditOnDeath ?? true;
           ctx.onHit({
+            credited,
             defeated: result.defeated,
             remainingHp: result.remainingHp,
             variant: result.variant,

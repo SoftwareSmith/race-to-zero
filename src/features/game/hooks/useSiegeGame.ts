@@ -208,9 +208,17 @@ export function useSiegeGame({
     kills: interactiveKills,
     lastFireTimes,
     points: interactivePoints,
-    remainingBugs: interactiveRemainingBugs,
+    remainingBugs: runtimeRemainingBugs,
     streakMultiplier,
   } = runtimeSnapshot;
+  const sessionBugCount = useMemo(
+    () => getBugCountTotal(interactiveInitialBugCounts),
+    [interactiveInitialBugCounts],
+  );
+  const effectiveInteractiveRemainingBugs =
+    interactiveMode && interactiveKills === 0 && runtimeRemainingBugs === 0
+      ? sessionBugCount
+      : runtimeRemainingBugs;
 
   const { completionSummary, leaderboard, resetCompletion } =
     useSiegeRunCompletion({
@@ -218,7 +226,7 @@ export function useSiegeGame({
       gameMode,
       interactiveKills,
       interactiveMode,
-      interactiveRemainingBugs,
+      interactiveRemainingBugs: effectiveInteractiveRemainingBugs,
       interactiveBaseElapsedMsRef,
       interactiveRunningSinceRef,
       selectedWeaponId,
@@ -342,8 +350,13 @@ export function useSiegeGame({
   );
 
   const handleInteractiveHit = useCallback(
-    (payload: { defeated: boolean; pointValue?: number; frozen?: boolean }) => {
-      if (!payload.defeated) {
+    (payload: {
+      credited?: boolean;
+      defeated: boolean;
+      pointValue?: number;
+      frozen?: boolean;
+    }) => {
+      if (!payload.defeated || payload.credited === false) {
         return;
       }
       const now = performance.now();
@@ -476,6 +489,23 @@ export function useSiegeGame({
     }));
   }, [updateRuntimeSnapshot]);
 
+  const syncRemainingBugs = useCallback(
+    (count: number) => {
+      const normalizedCount = Math.max(0, Math.floor(count));
+      updateRuntimeSnapshot((current) => {
+        if (current.remainingBugs === normalizedCount) {
+          return current;
+        }
+
+        return {
+          ...current,
+          remainingBugs: normalizedCount,
+        };
+      });
+    },
+    [updateRuntimeSnapshot],
+  );
+
   return {
     agentCaptures,
     armStructure,
@@ -496,7 +526,7 @@ export function useSiegeGame({
     interactiveKills,
     interactiveMode,
     interactivePoints,
-    interactiveRemainingBugs,
+    interactiveRemainingBugs: effectiveInteractiveRemainingBugs,
     interactiveStartedAt,
     interactiveSessionKey,
     killAllBugs,
@@ -514,6 +544,7 @@ export function useSiegeGame({
     setInteractiveMode: (v: boolean) =>
       v ? enterInteractiveMode() : exitInteractiveMode(),
     siegePhase,
+    syncRemainingBugs,
     streakMultiplier,
     toggleDebugMode,
     weaponSnapshots,

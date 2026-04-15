@@ -167,65 +167,71 @@ const SiegeExperience = memo(function SiegeExperience({
   }, [resetEvolution, siegeGame, ui]);
 
   const backgroundChartFocus = siegeGame.interactiveMode ? ui.chartFocus : null;
+  const shouldRenderSiegeField = siegeGame.siegePhase !== "idle";
 
   return (
     <>
-      <BackgroundField
-        agentCaptures={
-          siegeGame.interactiveMode ? siegeGame.agentCaptures : undefined
-        }
-        bugCounts={siegeGame.displayedBugCounts}
-        bugVisualSettings={settings.bugVisualSettings}
-        chartFocus={backgroundChartFocus}
-        className={siegeGame.interactiveMode ? "z-30" : "z-0"}
-        combatStats={siegeGame.interactiveMode ? siegeGame.combatStats : null}
-        gameConfig={settings.gameConfig}
-        getWeaponTier={getWeaponTier}
-        initialEvolutionStates={evolutionStates}
-        interactiveMode={siegeGame.interactiveMode}
-        interactiveSessionKey={
-          siegeGame.interactiveMode ? siegeGame.interactiveSessionKey : null
-        }
-        onAgentAbsorb={
-          siegeGame.interactiveMode ? siegeGame.handleAgentAbsorb : undefined
-        }
-        onBugHit={
-          siegeGame.interactiveMode ? siegeGame.handleInteractiveHit : undefined
-        }
-        onStructureKill={
-          siegeGame.interactiveMode ? siegeGame.handleStructureKill : undefined
-        }
-        onStructurePlace={
-          siegeGame.interactiveMode
-            ? (type, vx, vy, cx, cy, structureId) =>
-                siegeGame.placeStructure(type, vx, vy, cx, cy, structureId)
-            : undefined
-        }
-        onWeaponEvolution={handleEvolution}
-        onWeaponEvolutionStatesChange={syncFromEngine}
-        onWeaponFired={
-          siegeGame.interactiveMode ? siegeGame.handleWeaponFired : undefined
-        }
-        placedStructures={
-          siegeGame.interactiveMode ? siegeGame.placedStructures : undefined
-        }
-        placingStructureId={
-          siegeGame.interactiveMode ? siegeGame.placingStructureId : undefined
-        }
-        remainingBugCount={
-          siegeGame.interactiveMode
-            ? siegeGame.interactiveRemainingBugs
-            : undefined
-        }
-        selectedWeaponId={
-          siegeGame.interactiveMode ? siegeGame.selectedWeaponId : undefined
-        }
-        siegeZones={siegeZones}
-        streakMultiplier={
-          siegeGame.interactiveMode ? siegeGame.streakMultiplier : 1
-        }
-        tone={metrics.deadlineMetrics.statusTone}
-      />
+      {shouldRenderSiegeField ? (
+        <BackgroundField
+          agentCaptures={
+            siegeGame.interactiveMode ? siegeGame.agentCaptures : undefined
+          }
+          bugCounts={siegeGame.displayedBugCounts}
+          bugVisualSettings={settings.bugVisualSettings}
+          chartFocus={backgroundChartFocus}
+          className={siegeGame.interactiveMode ? "z-30" : "z-0"}
+          combatStats={siegeGame.interactiveMode ? siegeGame.combatStats : null}
+          gameConfig={settings.gameConfig}
+          getWeaponTier={getWeaponTier}
+          initialEvolutionStates={evolutionStates}
+          interactiveMode={siegeGame.interactiveMode}
+          interactiveSessionKey={
+            siegeGame.interactiveMode ? siegeGame.interactiveSessionKey : null
+          }
+          onAgentAbsorb={
+            siegeGame.interactiveMode ? siegeGame.handleAgentAbsorb : undefined
+          }
+          onBugHit={
+            siegeGame.interactiveMode ? siegeGame.handleInteractiveHit : undefined
+          }
+          onStructureKill={
+            siegeGame.interactiveMode ? siegeGame.handleStructureKill : undefined
+          }
+          onStructurePlace={
+            siegeGame.interactiveMode
+              ? (type, vx, vy, cx, cy, structureId) =>
+                  siegeGame.placeStructure(type, vx, vy, cx, cy, structureId)
+              : undefined
+          }
+          onLiveBugCountChange={
+            siegeGame.interactiveMode ? siegeGame.syncRemainingBugs : undefined
+          }
+          onWeaponEvolution={handleEvolution}
+          onWeaponEvolutionStatesChange={syncFromEngine}
+          onWeaponFired={
+            siegeGame.interactiveMode ? siegeGame.handleWeaponFired : undefined
+          }
+          placedStructures={
+            siegeGame.interactiveMode ? siegeGame.placedStructures : undefined
+          }
+          placingStructureId={
+            siegeGame.interactiveMode ? siegeGame.placingStructureId : undefined
+          }
+          remainingBugCount={
+            siegeGame.interactiveMode
+              ? siegeGame.interactiveRemainingBugs
+              : undefined
+          }
+          selectedWeaponId={
+            siegeGame.interactiveMode ? siegeGame.selectedWeaponId : undefined
+          }
+          siegeZones={siegeZones}
+          streakMultiplier={
+            siegeGame.interactiveMode ? siegeGame.streakMultiplier : 1
+          }
+          tone={metrics.deadlineMetrics.statusTone}
+        />
+      ) : null}
       {siegeGame.siegePhase === "entering" ? (
         <div className="pointer-events-none fixed inset-0 z-[100] [animation:siege-flash_520ms_ease-out_forwards]" />
       ) : null}

@@ -146,9 +146,23 @@ export interface BugCanvasProps {
     weaponId: SiegeWeaponId,
     newTier: import("@game/types").WeaponTier,
   ) => void;
+  onLiveBugCountChange?: (count: number) => void;
   initialEvolutionStates?: Partial<
     Record<SiegeWeaponId, import("@game/types").WeaponEvolutionState>
   >;
+}
+
+function shouldHandlePointerDown(
+  interactiveMode: boolean,
+  eventTarget: EventTarget | null,
+) {
+  if (!interactiveMode) {
+    return false;
+  }
+
+  return eventTarget instanceof Element
+    ? !eventTarget.closest("[data-no-hammer]")
+    : true;
 }
 
 const BugCanvas = memo(function BugCanvas({
@@ -176,6 +190,7 @@ const BugCanvas = memo(function BugCanvas({
   getWeaponTier = () => 1 as import("@game/types").WeaponTier,
   onWeaponEvolutionStatesChange,
   onWeaponEvolution,
+  onLiveBugCountChange,
   initialEvolutionStates,
 }: BugCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -194,6 +209,7 @@ const BugCanvas = memo(function BugCanvas({
     onWeaponEvolutionStatesChange,
   );
   const getWeaponTierRef = useRef(getWeaponTier);
+  const onLiveBugCountChangeRef = useRef(onLiveBugCountChange);
   const vfxRef = useRef<VfxEngine | null>(null);
   const blackHoleVfxIdRef = useRef<string | null>(null);
   const placingStructureIdRef = useRef(placingStructureId);
@@ -219,6 +235,7 @@ const BugCanvas = memo(function BugCanvas({
     width: 0,
   });
   const latestBugPositionsRef = useRef<RenderedBugPosition[]>([]);
+  const lastReportedLiveBugCountRef = useRef<number | null>(null);
   const targetSettingsRef = useRef({
     sizeMultiplier: bugVisualSettings?.sizeMultiplier ?? 1,
     speedMultiplier: getSpeedMultiplier(bugVisualSettings?.chaosMultiplier),
@@ -237,6 +254,7 @@ const BugCanvas = memo(function BugCanvas({
     interactiveModeRef.current = interactiveMode;
     onWeaponEvolutionStatesChangeRef.current = onWeaponEvolutionStatesChange;
     getWeaponTierRef.current = getWeaponTier;
+    onLiveBugCountChangeRef.current = onLiveBugCountChange;
     streakMultiplierRef.current = streakMultiplier;
     motionProfileRef.current = motionProfile;
     sceneProfileRef.current = sceneProfile;
@@ -268,6 +286,7 @@ const BugCanvas = memo(function BugCanvas({
     onStructureKill,
     onStructurePlace,
     onWeaponEvolutionStatesChange,
+    onLiveBugCountChange,
     onWeaponFire,
     placingStructureId,
     reseedInfo,
@@ -549,6 +568,15 @@ const BugCanvas = memo(function BugCanvas({
       });
 
       latestBugPositionsRef.current = nextBugPositions;
+      if (interactiveModeRef.current) {
+        const liveBugCount = nextBugPositions.length;
+        if (lastReportedLiveBugCountRef.current !== liveBugCount) {
+          lastReportedLiveBugCountRef.current = liveBugCount;
+          onLiveBugCountChangeRef.current?.(liveBugCount);
+        }
+      } else {
+        lastReportedLiveBugCountRef.current = null;
+      }
       updateQaBugPositions(nextBugPositions, boundsRef.current);
       recordQaFrameTiming(
         performance.now() - frameStart,
@@ -639,12 +667,20 @@ const BugCanvas = memo(function BugCanvas({
       lastFireTimeRef,
     );
 
+      const handleInteractivePointerDown = (event: MouseEvent) => {
+        if (!shouldHandlePointerDown(interactiveModeRef.current, event.target)) {
+          return;
+        }
+
+        handlePointerDown(event);
+      };
+
     document.addEventListener("visibilitychange", updateActivity);
     window.addEventListener("focus", updateActivity);
     window.addEventListener("blur", updateActivity);
     // Single registration - the useEffect cleanup in React Strict Mode re-runs will
     // remove the previous listener before re-registering, so no double-fire risk.
-    window.addEventListener("mousedown", handlePointerDown);
+      window.addEventListener("mousedown", handleInteractivePointerDown);
     animationFrameId = window.requestAnimationFrame(renderFrame);
 
     return () => {
@@ -652,7 +688,7 @@ const BugCanvas = memo(function BugCanvas({
       document.removeEventListener("visibilitychange", updateActivity);
       window.removeEventListener("focus", updateActivity);
       window.removeEventListener("blur", updateActivity);
-      window.removeEventListener("mousedown", handlePointerDown);
+      window.removeEventListener("mousedown", handleInteractivePointerDown);
       if (animationFrameId) {
         window.cancelAnimationFrame(animationFrameId);
       }

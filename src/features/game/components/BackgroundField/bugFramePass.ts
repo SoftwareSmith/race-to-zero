@@ -1,4 +1,5 @@
 import { getCodex } from "@game/engine/bugCodex";
+import { isTerminalEntityState } from "@game/types";
 import { drawBugSprite } from "@game/utils/bugSprite";
 import { drawHealthBar, HEALTHBAR_SHOW_DURATION } from "@game/utils/healthbar";
 import type {
@@ -57,6 +58,10 @@ export function drawBugFramePass({
 
   for (let index = 0; index < particles.length; index += 1) {
     const particle = particles[index];
+    if (isTerminalEntityState(particle.state)) {
+      continue;
+    }
+
     const bugCodex = BUG_CODEX[particle.variant as BugVariant];
     const normalizedX = particle.x / Math.max(1, width);
     const focusDistance = Math.abs(normalizedX - focusX);
