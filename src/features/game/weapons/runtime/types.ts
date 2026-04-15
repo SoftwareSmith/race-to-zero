@@ -122,8 +122,6 @@ export interface GameEngine {
   applyMarkedInRadius(cx: number, cy: number, radius: number, durationMs: number): void;
   applyUnstableInRadius(cx: number, cy: number, radius: number, durationMs: number): void;
   propagateChargedNetwork(sourceIndex: number, damage: number, falloff: number, weaponId?: SiegeWeaponId): void;
-  applyGlobalSlow(multiplier: number, durationMs: number, weaponId?: SiegeWeaponId): void;
-  startDeadlockCluster(cx: number, cy: number, radius: number, pullDurationMs: number): void;
   splitBug(index: number): void;
   allyBug(index: number, durationMs: number): void;
   startEventHorizon(x: number, y: number, radius: number, durationMs: number, weaponId?: SiegeWeaponId): void;
@@ -202,20 +200,6 @@ export type WeaponEffectDescriptor =
       radius: number;
       durationMs: number;
     }
-  | {
-      type: "flameTrailBurst";
-      x: number;
-      y: number;
-      angleDeg: number;
-      count?: number;
-    }
-  | {
-      type: "fireTrailStamp";
-      x: number;
-      y: number;
-      radius: number;
-      durationMs: number;
-    }
   | { type: "burnScar"; x1: number; y1: number; x2: number; y2: number }
   | { type: "crack"; x: number; y: number }
   | {
@@ -226,13 +210,6 @@ export type WeaponEffectDescriptor =
       colorHex?: number;
     }
   | {
-      type: "snowflakeDecals";
-      x: number;
-      y: number;
-      count: number;
-      radius: number;
-    }
-  | {
       type: "lightning";
       nodes: Array<{ x: number; y: number }>;
       lifetimeMs?: number;
@@ -240,13 +217,6 @@ export type WeaponEffectDescriptor =
     }
   | { type: "sparkCrown"; x: number; y: number; colorHex?: number }
   | { type: "binaryBurst"; x: number; y: number }
-  | {
-      type: "netCast";
-      x: number;
-      y: number;
-      radius: number;
-      durationMs: number;
-    }
   | { type: "empBurst"; x: number; y: number; count?: number }
   | { type: "plasmaImplosion"; x: number; y: number; radius: number }
   | { type: "plasmaExplosion"; x: number; y: number; delayMs: number }
@@ -358,8 +328,6 @@ export type WeaponCommand =
   | { kind: "markedRadius"; cx: number; cy: number; radius: number; durationMs: number }
   | { kind: "unstableRadius"; cx: number; cy: number; radius: number; durationMs: number }
   | { kind: "propagateChargedNetwork"; sourceIndex: number; damage: number; falloff: number }
-  | { kind: "applyGlobalSlow"; multiplier: number; durationMs: number }
-  | { kind: "startDeadlockCluster"; cx: number; cy: number; radius: number; pullDurationMs: number }
   | { kind: "splitBug"; targetIndex: number }
   | { kind: "allyBug"; targetIndex: number; durationMs: number }
   | { kind: "startEventHorizon"; x: number; y: number; radius: number; durationMs: number }

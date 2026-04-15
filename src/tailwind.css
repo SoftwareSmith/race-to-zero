@@ -636,16 +636,6 @@ body.hud-system-cursor-active .weapon-cursor-layer {
   }
 }
 
-@keyframes freeze-cone-fade {
-  0% {
-    opacity: 0.9;
-  }
-
-  100% {
-    opacity: 0;
-  }
-}
-
 @keyframes bomb-debris {
   from {
     opacity: 1;

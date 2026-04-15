@@ -51,7 +51,7 @@ function CursorReticle({
       turret: {
         accent: "#22d3ee",
         aura: "0 0 24px rgba(34,211,238,0.35)",
-        icon: <WeaponGlyph className="h-6 w-6 text-cyan-100" id="laser" />,
+        icon: <WeaponGlyph className="h-6 w-6 text-cyan-100" id="chain" />,
         size: 48,
       },
       tesla: {

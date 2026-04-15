@@ -17,19 +17,15 @@ import "../index";
 const EXPECTED_WEAPON_IDS = [
   "hammer",
   "zapper",     // bug-spray
-  "freeze",
   "chain",
-  "flame",
-  "laser",
-  "shockwave",  // static-net
   "nullpointer",
   "plasma",
   "void",
 ] as const;
 
 describe("weapon plugin registry — integrity", () => {
-  it("registers exactly 10 weapons", () => {
-    expect(registeredIds().length).toBe(10);
+  it("registers exactly 6 weapons", () => {
+    expect(registeredIds().length).toBe(6);
   });
 
   it("registers no duplicate IDs", () => {

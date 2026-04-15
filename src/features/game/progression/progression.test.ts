@@ -20,27 +20,27 @@ describe("siege progression", () => {
 
     expect(stats.unlockedWeapons).toContain("hammer");
     expect(stats.unlockedWeapons).toContain("zapper");
-    expect(stats.unlockedWeapons).not.toContain("freeze");
-  });
-
-  it("unlocks freeze at 25 kills but not chain", () => {
-    const stats = getSiegeCombatStats(25);
-    const snapshots = getSiegeWeaponSnapshots(25, "freeze");
-
-    expect(stats.unlockedWeapons).toContain("freeze");
     expect(stats.unlockedWeapons).not.toContain("chain");
-    expect(snapshots.find((s) => s.id === "freeze")?.locked).toBe(false);
-    expect(snapshots.find((s) => s.id === "chain")?.locked).toBe(true);
   });
 
-  it("unlocks 8 weapons at 100 kills, all 10 at 130", () => {
+  it("unlocks chain at 38 kills but not null pointer", () => {
+    const stats = getSiegeCombatStats(38);
+    const snapshots = getSiegeWeaponSnapshots(38, "chain");
+
+    expect(stats.unlockedWeapons).toContain("chain");
+    expect(stats.unlockedWeapons).not.toContain("nullpointer");
+    expect(snapshots.find((s) => s.id === "chain")?.locked).toBe(false);
+    expect(snapshots.find((s) => s.id === "nullpointer")?.locked).toBe(true);
+  });
+
+  it("unlocks 4 weapons at 100 kills, all 6 at 130", () => {
     const stats100 = getSiegeCombatStats(100);
     const stats130 = getSiegeCombatStats(130);
 
-    expect(stats100.unlockedWeapons.length).toBe(8);
+    expect(stats100.unlockedWeapons.length).toBe(4);
     expect(stats100.unlockedWeapons).toContain("nullpointer");
     expect(stats100.unlockedWeapons).not.toContain("plasma");
-    expect(stats130.unlockedWeapons.length).toBe(10);
+    expect(stats130.unlockedWeapons.length).toBe(6);
     expect(stats130.unlockedWeapons).toContain("void");
   });
 

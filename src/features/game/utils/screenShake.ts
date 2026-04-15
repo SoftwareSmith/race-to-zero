@@ -7,12 +7,9 @@
 
 /** Per-weapon shake presets (intensity in px, duration in ms). */
 export const SHAKE_PRESETS: Partial<Record<string, { intensity: number; duration: number }>> = {
-  laser:       { intensity: 3,  duration: 200 },
   nullpointer: { intensity: 6,  duration: 300 },
-  shockwave:   { intensity: 8,  duration: 400 },
   plasma:      { intensity: 5,  duration: 280 },
   void:        { intensity: 10, duration: 500 },
-  flame:       { intensity: 2,  duration: 150 },
   weak:        { intensity: 2,  duration: 120 },
   tierup:      { intensity: 12, duration: 560 },
 };

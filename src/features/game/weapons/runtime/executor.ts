@@ -332,14 +332,6 @@ export function executeCommands(
         );
         break;
 
-      case "applyGlobalSlow":
-        ctx.engine.applyGlobalSlow(cmd.multiplier, cmd.durationMs, ctx.weaponId);
-        break;
-
-      case "startDeadlockCluster":
-        ctx.engine.startDeadlockCluster(cmd.cx, cmd.cy, cmd.radius, cmd.pullDurationMs);
-        break;
-
       case "splitBug":
         ctx.engine.splitBug(cmd.targetIndex);
         break;

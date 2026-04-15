@@ -50,28 +50,6 @@ export function applyEffectDescriptor(
       );
       break;
 
-    case "flameTrailBurst":
-      if (typeof vfx?.spawnFlameTrailBurst === "function") {
-        vfx.spawnFlameTrailBurst(
-          descriptor.x,
-          descriptor.y,
-          descriptor.angleDeg,
-          descriptor.count ?? 4,
-        );
-      }
-      break;
-
-    case "fireTrailStamp":
-      if (typeof vfx?.addFireTrailStamp === "function") {
-        vfx.addFireTrailStamp(
-          descriptor.x,
-          descriptor.y,
-          descriptor.radius,
-          descriptor.durationMs,
-        );
-      }
-      break;
-
     case "burnScar":
       vfx?.addBurnScar(
         descriptor.x1,
@@ -94,17 +72,6 @@ export function applyEffectDescriptor(
       );
       break;
 
-    case "snowflakeDecals":
-      if (typeof vfx?.spawnSnowflakeDecals === "function") {
-        vfx.spawnSnowflakeDecals(
-          descriptor.x,
-          descriptor.y,
-          descriptor.count,
-          descriptor.radius,
-        );
-      }
-      break;
-
     case "lightning":
       vfx?.spawnLightning(
         descriptor.nodes,
@@ -119,15 +86,6 @@ export function applyEffectDescriptor(
 
     case "binaryBurst":
       vfx?.spawnBinaryBurst(descriptor.x, descriptor.y);
-      break;
-
-    case "netCast":
-      vfx?.spawnNetCast(
-        descriptor.x,
-        descriptor.y,
-        descriptor.radius,
-        descriptor.durationMs,
-      );
       break;
 
     case "empBurst":

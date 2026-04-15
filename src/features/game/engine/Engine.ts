@@ -141,8 +141,6 @@ export class Engine {
   /** Per-weapon kill counts and tiers for the evolution system. */
   weaponEvolutionStates: Map<SiegeWeaponId, WeaponEvolutionState>;
   onWeaponEvolution?: (weaponId: SiegeWeaponId, newTier: WeaponTier) => void;
-  /** Active deadlock cluster pulls: each entry pulls bugs toward (cx,cy) until expiresAt. */
-  private deadlockClusters: Array<{ cx: number; cy: number; radius: number; expiresAt: number }> = [];
   /** Active event horizons: consume unstable bugs on contact. */
   private eventHorizons: Array<{
     x: number;
@@ -555,7 +553,7 @@ export class Engine {
 
     // tick structures AFTER entity updates so position fields reflect the current frame
     this.tickStructures(dt * 1000);
-    // tick T3 evolution effects (deadlock clusters, event horizons)
+    // tick T3 evolution effects (event horizons)
     this.tickEvolutionEffects(dt * 1000);
   }
 
@@ -1023,23 +1021,6 @@ export class Engine {
     }
   }
 
-  applyGlobalSlow(multiplier: number, durationMs: number, weaponId?: SiegeWeaponId): void {
-    for (const e of this.entities) {
-      const bug = e as any;
-      if (isTerminalEntityState(bug.state)) continue;
-      if (weaponId) {
-        const matchup = getBugWeaponMatchup(bug.variant as BugVariant, weaponId);
-        if (matchup === WeaponMatchup.Immune) continue;
-      }
-      if (typeof bug.applyFreeze === "function") bug.applyFreeze(multiplier, durationMs);
-    }
-  }
-
-  /** Pull bugs within radius toward centroid for the given duration. */
-  startDeadlockCluster(cx: number, cy: number, radius: number, pullDurationMs: number): void {
-    this.deadlockClusters.push({ cx, cy, radius, expiresAt: this.elapsedMs + pullDurationMs });
-  }
-
   /** Reduce target to 50% HP and spawn a second half-HP clone nearby. */
   splitBug(index: number): void {
     const e = this.entities[index] as any;
@@ -1122,23 +1103,8 @@ export class Engine {
     }
   }
 
-  /** Must be called each update tick to process deadlock cluster pulls and event horizon kills. */
+  /** Must be called each update tick to process event horizon kills. */
   private tickEvolutionEffects(dtMs: number): void {
-    // Deadlock cluster pulls
-    this.deadlockClusters = this.deadlockClusters.filter(c => c.expiresAt > this.elapsedMs);
-    for (const cluster of this.deadlockClusters) {
-      for (const e of this.entities) {
-        const bug = e as any;
-        if (isTerminalEntityState(bug.state)) continue;
-        const dx = cluster.cx - bug.x;
-        const dy = cluster.cy - bug.y;
-        const dist = Math.hypot(dx, dy);
-        if (dist < 1 || dist > cluster.radius) continue;
-        const pull = 1.8 * (dtMs / 16);
-        bug.x += (dx / dist) * pull;
-        bug.y += (dy / dist) * pull;
-      }
-    }
     // Event horizon unstable-bug consumption
     this.eventHorizons = this.eventHorizons.filter(h => h.expiresAt > this.elapsedMs);
     for (const hz of this.eventHorizons) {

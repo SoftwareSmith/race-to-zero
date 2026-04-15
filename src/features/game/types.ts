@@ -13,11 +13,7 @@ export interface SiegeZoneRect {
 export enum WeaponId {
   Hammer = "hammer",
   BugSpray = "zapper",
-  Freeze = "freeze",
   ChainZap = "chain",
-  Flame = "flame",
-  TracerBloom = "laser",
-  StaticNet = "shockwave",
   NullPointer = "nullpointer",
   ForkBomb = "plasma",
   VoidPulse = "void",
@@ -29,11 +25,7 @@ export type SiegeWeaponId = `${WeaponId}`;
 export const ALL_WEAPON_IDS: readonly SiegeWeaponId[] = [
   WeaponId.Hammer,
   WeaponId.BugSpray,
-  WeaponId.Freeze,
   WeaponId.ChainZap,
-  WeaponId.Flame,
-  WeaponId.TracerBloom,
-  WeaponId.StaticNet,
   WeaponId.NullPointer,
   WeaponId.ForkBomb,
   WeaponId.VoidPulse,

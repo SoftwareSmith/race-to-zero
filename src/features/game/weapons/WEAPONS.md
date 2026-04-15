@@ -65,7 +65,7 @@ bounds, `onHit` callback, `updateQaLastHit`, `enqueueOverlay`, and the
 { mode: "once"; commands: WeaponCommand[] }
 ```
 Return from `createSession()` when the entire effect is resolved synchronously
-(hammer, freeze-cone, chain-zap, tracer-bloom, static-net, null-pointer).
+(hammer, chain-zap, null-pointer, fork-bomb).
 
 ### `HoldFireSession` — continuous (mouse held)
 ```ts
@@ -77,7 +77,7 @@ Return from `createSession()` when the entire effect is resolved synchronously
   end(): void;                   // called on mouseup
 }
 ```
-Used by flame and bug-spray. The BackgroundField seam manages the RAF loop and
+Used by bug-spray. The BackgroundField seam manages the RAF loop and
 cleans up listeners automatically.
 
 ### `PersistentFireSession` — timed / self-terminating
@@ -104,12 +104,9 @@ All game-state mutations are expressed as commands executed by `executeCommands(
 | `damage` | `engine.handleHit(index, amount)` → fires `onHit` callback |
 | `applyPoison` | per-bug DoT: `engine.handleHit` each tick internally |
 | `applyBurn` | per-bug fire DoT with decay |
-| `applyFreeze` | per-bug slow (intensity 0–1, durationMs) |
-| `applyEnsnare` | per-bug net slow |
 | `knockback` | direct `dx/dy` impulse on a bug |
 | `poisonRadius` | `engine.applyPoisonInRadius` |
 | `burnRadius` | `engine.applyBurnInRadius` |
-| `ensnareRadius` | `engine.applyEnsnareInRadius` |
 | `repeatPoisonRadius` | repeated poison ticks over `totalMs` at `intervalMs` |
 | `startBlackHole` | `engine.startBlackHole` |
 | `spawnEffect` | visual-only: routes to `applyEffectDescriptor` |
@@ -126,17 +123,12 @@ Passed inside a `spawnEffect` command. Handled by `effects/adapter.ts`.
 |------|----------------|
 | `sprayParticles` | `vfx.spawnSprayParticles` |
 | `toxicCloud` | `vfx.addToxicCloud` |
-| `firePatch` | `vfx.addFirePatch` |
-| `flameTrailBurst` | `vfx.spawnFlameTrailBurst` |
-| `fireTrailStamp` | `vfx.addFirePatch` (small stamp) |
 | `burnScar` | `vfx.addBurnScar` |
 | `crack` | `vfx.spawnCrack` |
 | `explosion` | `vfx.spawnExplosion` |
-| `snowflakeDecals` | `vfx.spawnSnowflakeDecals` |
 | `lightning` | `vfx.spawnLightning` |
 | `sparkCrown` | `vfx.spawnSparkCrown` |
 | `binaryBurst` | `vfx.spawnBinaryBurst` |
-| `netCast` | `vfx.spawnNetCast` |
 | `empBurst` | `vfx.spawnEmpBurst` |
 | `plasmaImplosion` | `vfx.spawnPlasmaImplosion` |
 | `plasmaExplosion` | `vfx.spawnPlasmaExplosion` |
@@ -191,7 +183,7 @@ Only weapons in `OVERLAY_EFFECT_WEAPONS` (set in BackgroundField) fire an SVG
 overlay event:
 
 ```ts
-const OVERLAY_EFFECT_WEAPONS = new Set(["freeze", "chain", "laser", "nullpointer", "void"]);
+const OVERLAY_EFFECT_WEAPONS = new Set(["chain", "nullpointer", "void"]);
 ```
 
 The `overlayEffect` descriptor in these weapons passes viewport-space

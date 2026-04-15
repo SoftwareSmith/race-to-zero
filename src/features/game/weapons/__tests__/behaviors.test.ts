@@ -61,8 +61,6 @@ function makeMockEngine(bugs: BugSnapshot[] = [makeBug()]): GameEngine {
     applyMarkedInRadius: vi.fn(),
     applyUnstableInRadius: vi.fn(),
     propagateChargedNetwork: vi.fn(),
-    applyGlobalSlow: vi.fn(),
-    startDeadlockCluster: vi.fn(),
     splitBug: vi.fn(),
     allyBug: vi.fn(),
     startEventHorizon: vi.fn(),
@@ -153,34 +151,6 @@ describe("bug-spray behavior", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Freeze Cone
-// ---------------------------------------------------------------------------
-
-describe("freeze-cone behavior", () => {
-  it("returns a once session with freeze commands for bugs in range", async () => {
-    const { createSession } = await import("../freeze-cone/behavior");
-    const engine = makeMockEngine([makeBug({ x: 100, y: 100 })]);
-    const session = createSession(makeCtx(engine) as any);
-    if (session.mode !== "once") throw new Error("expected once");
-    const freezeCmd = session.commands.find((c) => c.kind === "applyFreeze");
-    expect(freezeCmd).toBeDefined();
-  });
-
-  it("emits a snowflake decal effect", async () => {
-    const { createSession } = await import("../freeze-cone/behavior");
-    const engine = makeMockEngine();
-    const session = createSession(makeCtx(engine) as any);
-    if (session.mode !== "once") throw new Error("expected once");
-    const decal = session.commands.find(
-      (c) =>
-        c.kind === "spawnEffect" &&
-        (c as any).descriptor.type === "snowflakeDecals",
-    );
-    expect(decal).toBeDefined();
-  });
-});
-
-// ---------------------------------------------------------------------------
 // Chain Zap
 // ---------------------------------------------------------------------------
 
@@ -203,72 +173,6 @@ describe("chain-zap behavior", () => {
         (c as any).descriptor.type === "lightning",
     );
     expect(lightning).toBeDefined();
-  });
-});
-
-// ---------------------------------------------------------------------------
-// Flame
-// ---------------------------------------------------------------------------
-
-describe("flame behavior", () => {
-  it("returns a hold session", async () => {
-    const { createSession } = await import("../flame/behavior");
-    const engine = makeMockEngine();
-    const session = createSession(makeCtx(engine) as any);
-    expect(session.mode).toBe("hold");
-  });
-
-  it("tick() emits a firePatch", async () => {
-    const { createSession } = await import("../flame/behavior");
-    const engine = makeMockEngine();
-    const session = createSession(makeCtx(engine) as any);
-    if (session.mode !== "hold") throw new Error("expected hold");
-    const cmds = session.tick(makeCtx(engine) as any);
-    const patch = cmds.find(
-      (c) =>
-        c.kind === "spawnEffect" && (c as any).descriptor.type === "firePatch",
-    );
-    expect(patch).toBeDefined();
-  });
-});
-
-// ---------------------------------------------------------------------------
-// Tracer Bloom (laser)
-// ---------------------------------------------------------------------------
-
-describe("tracer-bloom behavior", () => {
-  it("returns a once session", async () => {
-    const { createSession } = await import("../tracer-bloom/behavior");
-    const engine = makeMockEngine();
-    const session = createSession(makeCtx(engine) as any);
-    expect(session.mode).toBe("once");
-  });
-
-  it("emits 4 explosion blooms", async () => {
-    const { createSession } = await import("../tracer-bloom/behavior");
-    const engine = makeMockEngine([makeBug()]);
-    const session = createSession(makeCtx(engine) as any);
-    if (session.mode !== "once") throw new Error("expected once");
-    const blooms = session.commands.filter(
-      (c) =>
-        c.kind === "spawnEffect" && (c as any).descriptor.type === "explosion",
-    );
-    expect(blooms).toHaveLength(4);
-  });
-});
-
-// ---------------------------------------------------------------------------
-// Static Net (shockwave)
-// ---------------------------------------------------------------------------
-
-describe("static-net behavior", () => {
-  it("returns a once session with ensnareRadius", async () => {
-    const { createSession } = await import("../static-net/behavior");
-    const engine = makeMockEngine();
-    const session = createSession(makeCtx(engine) as any);
-    if (session.mode !== "once") throw new Error("expected once");
-    const ensnare = session.commands.find((c) => c.kind === "ensnareRadius");
-    expect(ensnare).toBeDefined();
   });
 });
 

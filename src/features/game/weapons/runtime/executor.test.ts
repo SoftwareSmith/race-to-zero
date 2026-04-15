@@ -42,8 +42,6 @@ describe("weapon executor", () => {
         applyMarkedInRadius: vi.fn(),
         applyUnstableInRadius: vi.fn(),
         propagateChargedNetwork: vi.fn(),
-        applyGlobalSlow: vi.fn(),
-        startDeadlockCluster: vi.fn(),
         splitBug: vi.fn(),
         allyBug: vi.fn(),
         startEventHorizon: vi.fn(),

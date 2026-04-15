@@ -22,11 +22,7 @@ import {
 const WEAPON_LABELS: Record<SiegeWeaponId, string> = {
   hammer: "Hammer",
   zapper: "Bug Zapper",
-  freeze: "Freeze Cone",
   chain: "Chain Zap",
-  flame: "Flamethrower",
-  laser: "Directional Laser",
-  shockwave: "Shockwave",
   nullpointer: "Null Pointer",
   plasma: "Plasma Arc",
   void: "Void Pulse",

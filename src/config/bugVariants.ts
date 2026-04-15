@@ -108,30 +108,10 @@ function steadyMatchups(
       state: "steady",
       ...overrides.zapper,
     },
-    freeze: {
-      note: "Slows the target, but low priority unless it's fast or flanking.",
-      state: "steady",
-      ...overrides.freeze,
-    },
     chain: {
       note: "Good at linking clustered bugs, but not always the cleanest answer.",
       state: "steady",
       ...overrides.chain,
-    },
-    flame: {
-      note: "Pressure tool that matters most when bugs stay in the burn zone.",
-      state: "steady",
-      ...overrides.flame,
-    },
-    laser: {
-      note: "Reliable line pressure, best when the route is already clear.",
-      state: "steady",
-      ...overrides.laser,
-    },
-    shockwave: {
-      note: "Useful for clearing surrounding pressure, not a direct counter.",
-      state: "steady",
-      ...overrides.shockwave,
     },
     nullpointer: {
       note: "Reserve for high-HP targets; overkill against low-threat types.",
@@ -212,18 +192,6 @@ export const BUG_VARIANT_DEFS: Record<BugVariant, BugVariantDef> = {
         note: "Electric bounce can miss the smallest runners when the field is loose.",
         state: "risky",
       },
-      flame: {
-        note: "Flammable swarm fodder — flames shred them fast and force panic movement.",
-        state: "favored",
-      },
-      laser: {
-        note: "Works, but the route setup is usually overkill for a 1-HP target.",
-        state: "steady",
-      },
-      shockwave: {
-        note: "Massive overkill on a 1-HP type, but clears the whole swarm in one blast.",
-        state: "favored",
-      },
       plasma: {
         note: "Explosions erase clustered Glitchlings, but single targets waste the payload.",
         state: "steady",
@@ -291,16 +259,8 @@ export const BUG_VARIANT_DEFS: Record<BugVariant, BugVariantDef> = {
         note: "Useful when the board is getting crowded, but not a hard counter by itself.",
         state: "steady",
       },
-      freeze: {
-        note: "Slowing patrol routes gives you crucial breathing room to follow up.",
-        state: "favored",
-      },
       chain: {
         note: "Electric arcs catch patrol formations cleanly and reward grouped pressure.",
-        state: "favored",
-      },
-      flame: {
-        note: "Burning lanes slows the patrol advance, but it is more pressure than counterplay.",
         state: "favored",
       },
     }),
@@ -362,24 +322,8 @@ export const BUG_VARIANT_DEFS: Record<BugVariant, BugVariantDef> = {
         note: "Armored shell shrugs off toxin pressure before poison can matter.",
         state: "immune",
       },
-      freeze: {
-        note: "Best tool against Nullify — halving its speed turns the fast stalker into an easy target.",
-        state: "favored",
-      },
       chain: {
         note: "Electric arcs punish clustered elites and stay effective once the shell is exposed.",
-        state: "favored",
-      },
-      flame: {
-        note: "Armor blunts the burn — useful for space control, not direct deletion.",
-        state: "risky",
-      },
-      laser: {
-        note: "Precision beams cut through the interior lane and delete high-value pressure.",
-        state: "favored",
-      },
-      shockwave: {
-        note: "Static lockdown is solid, but the real value comes from follow-up damage.",
         state: "favored",
       },
       nullpointer: {
@@ -449,22 +393,6 @@ export const BUG_VARIANT_DEFS: Record<BugVariant, BugVariantDef> = {
       hammer: {
         note: "Too volatile to rely on close-range cleanup alone once the outbreak is moving.",
         state: "risky",
-      },
-      freeze: {
-        note: "ZeroDay runs too hot and too erratically — cryo control does not stick.",
-        state: "immune",
-      },
-      flame: {
-        note: "Fast outbreaks slip through the burn window before thermal damage ramps.",
-        state: "risky",
-      },
-      laser: {
-        note: "Precision beams track the chaos better than most tools and keep damage honest.",
-        state: "favored",
-      },
-      shockwave: {
-        note: "Clears surrounding pressure and softens ZeroDay when surrounded by a swarm.",
-        state: "steady",
       },
       nullpointer: {
         note: "The most reliable answer — locks onto ZeroDay regardless of how erratically it moves.",
