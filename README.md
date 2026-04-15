@@ -51,11 +51,12 @@ npm run test:e2e
 
 ## Deployment
 
-Build and publish to the `gh-pages` branch:
+Builds and deploys automatically from GitHub Actions on pushes to `main`.
+
+Set GitHub Pages in the repository settings to deploy from GitHub Actions, then every successful `main` build will publish the Vite output from `dist`.
 
 ```bash
 npm run build
-npm run deploy
 ```
 
 ## GitHub Action Sync
