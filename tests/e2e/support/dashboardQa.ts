@@ -51,6 +51,24 @@ interface QaSiegeProgress {
   remainingBugs?: number;
 }
 
+interface QaPerformanceMetrics {
+  firstBugPositionsAtMs?: number;
+  firstFrameAtMs?: number;
+  frameDurationsMs?: number[];
+  lastFrameDurationMs?: number;
+  lastRenderedBugCount?: number;
+  maxFrameDurationMs?: number;
+  maxRenderedBugCount?: number;
+  measurementStartAtMs?: number;
+  sampleLimit?: number;
+}
+
+interface EnableCanvasQaOptions {
+  performanceSampleLimit?: number;
+  startMeasurementOnInit?: boolean;
+  stabilizeEngine?: boolean;
+}
+
 interface OverviewMetricOptions {
   deadlineDate?: string;
   deadlineFromDate?: string;
@@ -111,7 +129,7 @@ export function getExpectedOverviewMetrics(
         requiredPace: `${formatNumber(summary.bugsPerDayRequired, 2)}/day`,
       },
       deadlineMetrics,
-      overlayLabel: `${formatNumber(summary.bugCount)} bugs rendered`,
+      overlayLabel: `${formatNumber(summary.bugCount)} open bugs`,
       summary,
       viewMetrics: {
         confidence: formatPercent(summary.likelihoodScore),
@@ -251,12 +269,109 @@ export async function mockMetrics(page: Page, metrics: MetricsSource) {
   });
 }
 
-export async function enableCanvasQa(page: Page) {
-  await page.addInitScript(() => {
-    (window as Window & { __RTZ_QA__?: { enabled: boolean } }).__RTZ_QA__ = {
-      enabled: true,
-    };
+export async function enableCanvasQa(
+  page: Page,
+  options: EnableCanvasQaOptions = {},
+) {
+  const {
+    performanceSampleLimit = 180,
+    startMeasurementOnInit = false,
+    stabilizeEngine = true,
+  } = options;
+
+  await page.addInitScript(
+    ({ performanceSampleLimit, startMeasurementOnInit, stabilizeEngine }) => {
+      const qaState: {
+        enabled: boolean;
+        performanceMetrics?: QaPerformanceMetrics;
+        stabilizeEngine?: boolean;
+      } = {
+        enabled: true,
+        stabilizeEngine,
+      };
+
+      if (startMeasurementOnInit) {
+        qaState.performanceMetrics = {
+          frameDurationsMs: [],
+          maxFrameDurationMs: 0,
+          maxRenderedBugCount: 0,
+          measurementStartAtMs: performance.now(),
+          sampleLimit: performanceSampleLimit,
+        };
+      }
+
+      (window as Window & { __RTZ_QA__?: typeof qaState }).__RTZ_QA__ = qaState;
+    },
+    {
+      performanceSampleLimit,
+      startMeasurementOnInit,
+      stabilizeEngine,
+    },
+  );
+}
+
+export async function waitForQaAvailability(page: Page) {
+  await page.waitForFunction(() => {
+    const qaState = (window as Window & {
+      __RTZ_QA__?: { enabled?: boolean };
+    }).__RTZ_QA__;
+
+    return qaState?.enabled === true;
   });
+}
+
+export async function startQaPerformanceMeasurement(
+  page: Page,
+  sampleLimit = 180,
+) {
+  await waitForQaAvailability(page);
+
+  await page.evaluate((nextSampleLimit) => {
+    const qaState = (window as Window & {
+      __RTZ_QA__?: {
+        enabled?: boolean;
+        performanceMetrics?: QaPerformanceMetrics;
+      };
+    }).__RTZ_QA__;
+
+    if (!qaState?.enabled) {
+      throw new Error("QA state is unavailable");
+    }
+
+    qaState.performanceMetrics = {
+      frameDurationsMs: [],
+      maxFrameDurationMs: 0,
+      maxRenderedBugCount: 0,
+      measurementStartAtMs: performance.now(),
+      sampleLimit: nextSampleLimit,
+    };
+  }, sampleLimit);
+}
+
+export async function getQaPerformanceMetrics(page: Page) {
+  return page.evaluate(() => {
+    const qaState = (window as Window & {
+      __RTZ_QA__?: {
+        performanceMetrics?: QaPerformanceMetrics;
+      };
+    }).__RTZ_QA__;
+
+    return qaState?.performanceMetrics ?? null;
+  });
+}
+
+export async function waitForQaRenderedBugCount(page: Page, expectedCount: number) {
+  await page.waitForFunction((nextCount) => {
+    const qaState = (window as Window & {
+      __RTZ_QA__?: { bugPositions?: Array<unknown>; enabled?: boolean };
+    }).__RTZ_QA__;
+
+    return Boolean(
+      qaState?.enabled &&
+        Array.isArray(qaState.bugPositions) &&
+        qaState.bugPositions.length >= nextCount,
+    );
+  }, expectedCount);
 }
 
 export async function waitForQaBugPositions(page: Page) {

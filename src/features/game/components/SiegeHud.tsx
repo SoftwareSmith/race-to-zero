@@ -1,10 +1,4 @@
-import {
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type RefObject,
-} from "react";
+import { useEffect, useMemo, useRef, useState, type RefObject } from "react";
 import { getSiegeWeaponLabel } from "@game/progression/progression";
 import { cn } from "@shared/utils/cn";
 import type {
@@ -217,8 +211,8 @@ export default function SiegeHud({
       />
 
       {killStreak >= 3 || unlockToast || upgradeToast ? (
-        <div className="pointer-events-none fixed inset-x-0 top-[8.9rem] z-[220] flex justify-center px-3 sm:top-[8.15rem]">
-          <div className="mt-1.5 flex flex-wrap items-center justify-center gap-1 text-center">
+        <div className="pointer-events-none fixed inset-x-0 top-[7.15rem] z-[220] flex justify-center px-3 sm:top-[5.95rem]">
+          <div className="mt-0.5 flex flex-wrap items-center justify-center gap-1 text-center">
             {killStreak >= 3 ? (
               <HudEventPill className="border-amber-300/24 bg-amber-400/10 text-amber-100">
                 {`Streak x${streakMultiplier.toFixed(1)}`}

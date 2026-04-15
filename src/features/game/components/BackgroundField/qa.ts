@@ -1,8 +1,54 @@
-import type { BugHitPayload, QaWindowState, RenderedBugPosition } from "./types";
+import type {
+  BugHitPayload,
+  QaPerformanceMetrics,
+  QaWindowState,
+  RenderedBugPosition,
+} from "./types";
 
 function getQaState(): QaWindowState | undefined {
   if (typeof window === "undefined") return undefined;
   return (window as Window & { __RTZ_QA__?: QaWindowState }).__RTZ_QA__;
+}
+
+function getQaPerformanceMetrics(): QaPerformanceMetrics | undefined {
+  return getQaState()?.performanceMetrics;
+}
+
+export function isQaEnabled(): boolean {
+  return Boolean(getQaState()?.enabled);
+}
+
+export function recordQaFrameTiming(
+  frameDurationMs: number,
+  renderedBugCount: number,
+): void {
+  const qaState = getQaState();
+  const metrics = getQaPerformanceMetrics();
+  if (!qaState?.enabled || !metrics) {
+    return;
+  }
+
+  const now = performance.now();
+  if (
+    metrics.measurementStartAtMs != null &&
+    metrics.firstFrameAtMs == null
+  ) {
+    metrics.firstFrameAtMs = now;
+  }
+
+  const sampleLimit = metrics.sampleLimit ?? 180;
+  const frameDurationsMs = metrics.frameDurationsMs ?? (metrics.frameDurationsMs = []);
+  if (frameDurationsMs.length < sampleLimit) {
+    frameDurationsMs.push(frameDurationMs);
+  }
+
+  metrics.lastFrameDurationMs = frameDurationMs;
+  metrics.lastRenderedBugCount = renderedBugCount;
+  metrics.maxFrameDurationMs = Math.max(metrics.maxFrameDurationMs ?? 0, frameDurationMs);
+  metrics.maxRenderedBugCount = Math.max(
+    metrics.maxRenderedBugCount ?? 0,
+    renderedBugCount,
+  );
 }
 
 export function updateQaBugPositions(
@@ -11,6 +57,16 @@ export function updateQaBugPositions(
 ): void {
   const qaState = getQaState();
   if (!qaState?.enabled) return;
+
+  const metrics = getQaPerformanceMetrics();
+  if (
+    metrics &&
+    bugPositions.length > 0 &&
+    metrics.measurementStartAtMs != null &&
+    metrics.firstBugPositionsAtMs == null
+  ) {
+    metrics.firstBugPositionsAtMs = performance.now();
+  }
 
   qaState.bugPositions = bugPositions.map((position) => ({
     index: position.index,
@@ -51,6 +107,7 @@ export function stabilizeQaEngine(
   if (typeof window === "undefined" || !engine) return;
   const qaState = getQaState();
   if (!qaState?.enabled) return;
+  if (qaState.stabilizeEngine === false) return;
 
   const bugs = engine.getAllBugs();
   for (const bug of bugs) {

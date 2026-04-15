@@ -24,6 +24,18 @@ export interface GameState {
   splats: Array<{ id: string; variant: BugVariant; x: number; y: number }>;
 }
 
+export interface QaPerformanceMetrics {
+  firstBugPositionsAtMs?: number;
+  firstFrameAtMs?: number;
+  frameDurationsMs?: number[];
+  lastFrameDurationMs?: number;
+  lastRenderedBugCount?: number;
+  maxFrameDurationMs?: number;
+  maxRenderedBugCount?: number;
+  measurementStartAtMs?: number;
+  sampleLimit?: number;
+}
+
 export interface QaWindowState {
   enabled?: boolean;
   bugPositions?: Array<{ index: number; x: number; y: number; radius: number }>;
@@ -34,4 +46,6 @@ export interface QaWindowState {
     x: number;
     y: number;
   };
+  performanceMetrics?: QaPerformanceMetrics;
+  stabilizeEngine?: boolean;
 }

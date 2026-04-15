@@ -50,6 +50,8 @@ interface StructureEntry {
   firewallNextDamageAt?: number;
 }
 
+type SpatialCell = Entity[];
+
 export interface EngineOptions {
   width: number;
   height: number;
@@ -149,6 +151,11 @@ export class Engine {
     expiresAt: number;
     weaponId?: SiegeWeaponId;
   }> = [];
+  private spatialGrid = new Map<string, SpatialCell>();
+  private spatialCellSize = Math.max(
+    DEFAULT_GAME_CONFIG.separationRadius * 2,
+    56,
+  );
 
   /**
    * Black hole state for Void Pulse.
@@ -223,6 +230,52 @@ export class Engine {
   setSize(w: number, h: number) {
     this.width = w;
     this.height = h;
+  }
+
+  private getSpatialKey(cellX: number, cellY: number): string {
+    return `${cellX}:${cellY}`;
+  }
+
+  private rebuildSpatialGrid(): void {
+    this.spatialGrid.clear();
+
+    for (const entity of this.entities) {
+      if (isTerminalEntityState((entity as any).state)) {
+        continue;
+      }
+
+      const cellX = Math.floor(entity.x / this.spatialCellSize);
+      const cellY = Math.floor(entity.y / this.spatialCellSize);
+      const key = this.getSpatialKey(cellX, cellY);
+      const bucket = this.spatialGrid.get(key);
+      if (bucket) {
+        bucket.push(entity);
+        continue;
+      }
+
+      this.spatialGrid.set(key, [entity]);
+    }
+  }
+
+  private getSpatialCandidates(x: number, y: number, radius: number): Entity[] {
+    const minCellX = Math.floor((x - radius) / this.spatialCellSize);
+    const maxCellX = Math.floor((x + radius) / this.spatialCellSize);
+    const minCellY = Math.floor((y - radius) / this.spatialCellSize);
+    const maxCellY = Math.floor((y + radius) / this.spatialCellSize);
+    const candidates: Entity[] = [];
+
+    for (let cellY = minCellY; cellY <= maxCellY; cellY += 1) {
+      for (let cellX = minCellX; cellX <= maxCellX; cellX += 1) {
+        const bucket = this.spatialGrid.get(this.getSpatialKey(cellX, cellY));
+        if (!bucket?.length) {
+          continue;
+        }
+
+        candidates.push(...bucket);
+      }
+    }
+
+    return candidates;
   }
 
   spawnFromCounts(
@@ -404,7 +457,9 @@ export class Engine {
   getNeighbors(e: Entity, radius: number) {
     const r2 = radius * radius;
     const out: Entity[] = [];
-    for (const o of this.entities) {
+    const candidates = this.getSpatialCandidates(e.x, e.y, radius);
+
+    for (const o of candidates) {
       if (o === e) continue;
       const dx = e.x - o.x;
       const dy = e.y - o.y;
@@ -420,7 +475,9 @@ export class Engine {
     let centerX = 0;
     let centerY = 0;
 
-    for (const entity of this.entities) {
+    const candidates = this.getSpatialCandidates(x, y, radius);
+
+    for (const entity of candidates) {
       if (entity === exclude) continue;
       const dx = entity.x - x;
       const dy = entity.y - y;
@@ -448,6 +505,8 @@ export class Engine {
     for (const ent of this.entities) {
       ent.beginStep();
     }
+
+    this.rebuildSpatialGrid();
 
     // iterate backwards so we can safely remove dead entities into the pool
     for (let i = this.entities.length - 1; i >= 0; i--) {

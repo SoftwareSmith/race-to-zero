@@ -9,6 +9,8 @@ import type {
 import type { RenderedBugPosition } from "./types";
 
 const BUG_CODEX = getCodex();
+const AMBIENT_STRESS_DRAW_THRESHOLD = 1500;
+const AMBIENT_STRESS_TARGET_SPRITES = 1200;
 
 function clampNumber(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max);
@@ -19,8 +21,10 @@ interface DrawBugFramePassOptions {
   context: CanvasRenderingContext2D;
   frameNow: number;
   height: number;
+  interactiveMode: boolean;
   motionProfile: MotionProfile;
   particles: Array<any>;
+  qaEnabled?: boolean;
   sizeMultiplier: number;
   width: number;
 }
@@ -30,13 +34,25 @@ export function drawBugFramePass({
   context,
   frameNow,
   height,
+  interactiveMode,
   motionProfile,
   particles,
+  qaEnabled = false,
   sizeMultiplier,
   width,
 }: DrawBugFramePassOptions): RenderedBugPosition[] {
   const focusX = chartFocus?.relativeIndex ?? 0.5;
   const nextBugPositions: RenderedBugPosition[] = [];
+  const useSparseAmbientDraw =
+    !interactiveMode &&
+    !qaEnabled &&
+    particles.length > AMBIENT_STRESS_DRAW_THRESHOLD;
+  const drawStride = useSparseAmbientDraw
+    ? Math.max(1, Math.ceil(particles.length / AMBIENT_STRESS_TARGET_SPRITES))
+    : 1;
+  const drawOffset = useSparseAmbientDraw
+    ? Math.floor(frameNow / 32) % drawStride
+    : 0;
 
   for (let index = 0; index < particles.length; index += 1) {
     const particle = particles[index];
@@ -70,6 +86,10 @@ export function drawBugFramePass({
       x,
       y,
     });
+
+    if (useSparseAmbientDraw && index % drawStride !== drawOffset) {
+      continue;
+    }
 
     drawBugSprite(context, {
       color: bugCodex?.color,

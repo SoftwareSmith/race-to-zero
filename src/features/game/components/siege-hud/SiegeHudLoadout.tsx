@@ -32,7 +32,9 @@ interface SiegeHudLoadoutProps {
   progressExpanded: boolean;
   selectedSnapshot?: WeaponProgressSnapshot;
   selectedWeaponId: SiegeWeaponId;
-  setProgressExpanded: (value: boolean | ((currentValue: boolean) => boolean)) => void;
+  setProgressExpanded: (
+    value: boolean | ((currentValue: boolean) => boolean),
+  ) => void;
   unlockedStructures?: StructureId[];
   weaponSnapshots: WeaponProgressSnapshot[];
 }
@@ -220,7 +222,8 @@ const SiegeHudLoadout = memo(function SiegeHudLoadout({
                       const isJustUnlocked = justUnlockedStructureIds.includes(
                         structure.id,
                       );
-                      const placedCount = placedCountByType?.[structure.id] ?? 0;
+                      const placedCount =
+                        placedCountByType?.[structure.id] ?? 0;
 
                       return onArmStructure ? (
                         <StructureRailSlot

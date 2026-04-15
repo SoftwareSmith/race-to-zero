@@ -29,12 +29,14 @@ import WeaponCursor from "@game/components/WeaponCursor";
 import { createEffectEvent, isEffectAlive } from "@game/utils/weaponEffects";
 import { getWeaponHeatProfile } from "@game/utils/weaponHeat";
 import type { GameConfig } from "@game/engine/types";
+import { getOverlayRenderer } from "@game/weapons/runtime/registry";
 import BugCanvas from "./BugCanvas";
-import type { BugHitPayload, GameState } from "./types";
+import type { BugHitPayload } from "./types";
 import { getSplatClassName } from "./splat";
 import { getBackgroundSceneConfig } from "./sceneConfig";
 import { useWeaponCursorState } from "./useWeaponCursorState";
 import { useWeaponFireTimes } from "./useWeaponFireTimes";
+import { useBackgroundGameState } from "./useBackgroundGameState";
 
 const WeaponEffectLayer = lazy(
   () => import("@game/components/WeaponEffectLayer"),
@@ -73,6 +75,7 @@ interface BackgroundFieldProps {
   }) => void;
   placingStructureId?: StructureId | null;
   remainingBugCount?: number;
+  openBugCount?: number;
   selectedWeaponId?: SiegeWeaponId;
   streakMultiplier?: number;
   siegeZones?: SiegeZoneRect[];
@@ -111,6 +114,7 @@ const BackgroundField = memo(function BackgroundField({
   onAgentAbsorb,
   placingStructureId,
   remainingBugCount,
+  openBugCount,
   selectedWeaponId = "hammer",
   streakMultiplier = 1,
   siegeZones = [],
@@ -130,6 +134,10 @@ const BackgroundField = memo(function BackgroundField({
   const effectiveBugCount = Math.max(
     0,
     Math.floor(remainingBugCount ?? totalBugCount),
+  );
+  const displayBugCount = Math.max(
+    0,
+    Math.floor(openBugCount ?? effectiveBugCount),
   );
   const { colors, motionProfile, sceneProfile } = useMemo(
     () => getBackgroundSceneConfig(tone, effectiveBugCount),
@@ -173,9 +181,12 @@ const BackgroundField = memo(function BackgroundField({
     [recordTurretFire],
   );
 
-  const handleTeslaFire = useCallback((data: { structureId: string }) => {
-    recordTeslaFire(data.structureId);
-  }, [recordTeslaFire]);
+  const handleTeslaFire = useCallback(
+    (data: { structureId: string }) => {
+      recordTeslaFire(data.structureId);
+    },
+    [recordTeslaFire],
+  );
 
   const handleWeaponFire = useCallback(
     (
@@ -192,21 +203,24 @@ const BackgroundField = memo(function BackgroundField({
         segments?: Array<{ x1: number; y1: number; x2: number; y2: number }>;
       },
     ) => {
-      const tier = getWeaponTier(weapon);
-      const heat = getWeaponHeatProfile(tier);
-      const event = createEffectEvent(weapon, x, y, {
-        ...extras,
-        heatColor: heat.accent,
-        heatCore: heat.core,
-        heatScale: heat.burstScale,
-        heatStage: heat.stage,
-      });
-      const startedAt = event.startedAt;
+      let startedAt = performance.now();
+      if (getOverlayRenderer(weapon)) {
+        const tier = getWeaponTier(weapon);
+        const heat = getWeaponHeatProfile(tier);
+        const event = createEffectEvent(weapon, x, y, {
+          ...extras,
+          heatColor: heat.accent,
+          heatCore: heat.core,
+          heatScale: heat.burstScale,
+          heatStage: heat.stage,
+        });
+        startedAt = event.startedAt;
 
-      setWeaponEffects((prev) => {
-        const now = performance.now();
-        return [...prev.filter((e) => isEffectAlive(e, now)), event];
-      });
+        setWeaponEffects((prev) => {
+          const now = performance.now();
+          return [...prev.filter((e) => isEffectAlive(e, now)), event];
+        });
+      }
 
       recordCursorFire(weapon, startedAt);
       // Always swing hammer cursor on any hammer fire (hit or miss)
@@ -218,20 +232,18 @@ const BackgroundField = memo(function BackgroundField({
     },
     [getWeaponTier, recordCursorFire, triggerHammerSwing],
   );
-
-  const [gameState, setGameState] = useState<GameState>(() => ({
-    remainingTargets: totalBugCount,
-    sessionKey: gameSessionKey,
-    splats: [],
-  }));
-  const activeGameState =
-    gameState.sessionKey === gameSessionKey
-      ? gameState
-      : {
-          remainingTargets: totalBugCount,
-          sessionKey: gameSessionKey,
-          splats: [],
-        };
+  const {
+    activeGameState,
+    handleBugHit,
+    handleEntityDeath,
+    handleStructureKill,
+  } = useBackgroundGameState({
+    gameSessionKey,
+    onBugHit,
+    onStructureKill,
+    totalBugCount,
+    triggerHammerSwing,
+  });
 
   useEffect(() => {
     if (!interactiveMode) {
@@ -259,157 +271,6 @@ const BackgroundField = memo(function BackgroundField({
       window.clearInterval(intervalId);
     };
   }, [interactiveMode, weaponEffects.length]);
-
-  useEffect(() => {
-    if (activeGameState.splats.length === 0) {
-      return undefined;
-    }
-
-    const timeoutId = window.setTimeout(() => {
-      setGameState((currentValue) => {
-        if (
-          currentValue.sessionKey !== gameSessionKey ||
-          currentValue.splats.length <= 3
-        ) {
-          return currentValue;
-        }
-
-        return {
-          ...currentValue,
-          splats: currentValue.splats.slice(-3),
-        };
-      });
-    }, 420);
-
-    return () => {
-      window.clearTimeout(timeoutId);
-    };
-  }, [activeGameState.splats.length, gameSessionKey]);
-
-  const handleBugHit = useCallback(
-    (payload: BugHitPayload) => {
-      triggerHammerSwing();
-      onBugHit?.(payload);
-      setGameState((currentValue) => {
-        const nextState =
-          currentValue.sessionKey === gameSessionKey
-            ? currentValue
-            : {
-                remainingTargets: totalBugCount,
-                sessionKey: gameSessionKey,
-                splats: [],
-              };
-
-        return {
-          remainingTargets: payload.defeated
-            ? Math.max(0, nextState.remainingTargets - 1)
-            : nextState.remainingTargets,
-          sessionKey: gameSessionKey,
-          splats: payload.defeated
-            ? [
-                ...nextState.splats.slice(-5),
-                {
-                  id: `${payload.x}-${payload.y}-${Date.now()}`,
-                  variant: payload.variant,
-                  x: payload.x,
-                  y: payload.y,
-                },
-              ]
-            : nextState.splats,
-        };
-      });
-    },
-    [gameSessionKey, onBugHit, totalBugCount, triggerHammerSwing],
-  );
-
-  const handleStructureKill = useCallback(
-    (structureId: string, x: number, y: number, variant: string) => {
-      onBugHit?.({
-        defeated: true,
-        remainingHp: 0,
-        variant: variant as import("../../../../types/dashboard").BugVariant,
-        x,
-        y,
-        pointValue: 1,
-      });
-      setGameState((currentValue) => {
-        const nextState =
-          currentValue.sessionKey === gameSessionKey
-            ? currentValue
-            : {
-                remainingTargets: totalBugCount,
-                sessionKey: gameSessionKey,
-                splats: [] as GameState["splats"],
-              };
-        return {
-          ...nextState,
-          remainingTargets: Math.max(0, nextState.remainingTargets - 1),
-          splats: [
-            ...nextState.splats.slice(-5),
-            {
-              id: `${x}-${y}-${Date.now()}`,
-              variant:
-                variant as import("../../../../types/dashboard").BugVariant,
-              x,
-              y,
-            },
-          ],
-        };
-      });
-      onStructureKill?.(structureId);
-    },
-    [gameSessionKey, onBugHit, onStructureKill, totalBugCount],
-  );
-
-  const handleEntityDeath = useCallback(
-    (
-      x: number,
-      y: number,
-      variant: string,
-      meta: { credited: boolean; frozen: boolean; pointValue: number },
-    ) => {
-      if (meta.credited) {
-        return;
-      }
-
-      onBugHit?.({
-        defeated: true,
-        remainingHp: 0,
-        variant: variant as import("../../../../types/dashboard").BugVariant,
-        x,
-        y,
-        pointValue: meta.pointValue,
-        frozen: meta.frozen,
-      });
-
-      setGameState((currentValue) => {
-        const nextState =
-          currentValue.sessionKey === gameSessionKey
-            ? currentValue
-            : {
-                remainingTargets: totalBugCount,
-                sessionKey: gameSessionKey,
-                splats: [] as GameState["splats"],
-              };
-
-        return {
-          ...nextState,
-          remainingTargets: Math.max(0, nextState.remainingTargets - 1),
-          splats: [
-            ...nextState.splats.slice(-5),
-            {
-              id: `${x}-${y}-${Date.now()}`,
-              variant:
-                variant as import("../../../../types/dashboard").BugVariant,
-              x,
-              y,
-            },
-          ],
-        };
-      });
-    },
-    [gameSessionKey, onBugHit, totalBugCount],
-  );
 
   return (
     <div
@@ -462,7 +323,7 @@ const BackgroundField = memo(function BackgroundField({
       ) : null}
       {!interactiveMode && bugVisualSettings.showParticleCount ? (
         <div className="pointer-events-none absolute bottom-3 left-3 z-20 rounded-full border border-white/10 bg-black/45 px-2.5 py-1 text-[0.68rem] font-semibold tracking-[0.08em] text-stone-200 backdrop-blur-sm">
-          {`${effectiveBugCount.toLocaleString()} bugs rendered`}
+          <span>{`${displayBugCount.toLocaleString()} open bugs`}</span>
         </div>
       ) : null}
       {interactiveMode ? (

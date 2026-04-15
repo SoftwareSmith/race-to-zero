@@ -85,21 +85,10 @@ const DashboardShell = memo(function DashboardShell({
         interactiveMode ? "pointer-events-none select-none" : "",
       )}
       style={{
-        opacity:
-          siegePhase === "active"
-            ? 0.26
-            : siegePhase === "entering"
-              ? 0.62
-              : siegePhase === "exiting"
-                ? 0.7
-                : 1,
+        opacity: siegePhase === "entering" ? 0 : 1,
         filter:
-          siegePhase === "active"
-            ? "blur(2px) saturate(0.72)"
-            : siegePhase === "entering"
-              ? "blur(1px) saturate(0.82)"
-              : undefined,
-        transform: siegePhase === "active" ? "scale(0.985)" : undefined,
+          siegePhase === "entering" ? "blur(3px) saturate(0.68)" : undefined,
+        transform: siegePhase === "entering" ? "scale(0.98)" : undefined,
         transition:
           "opacity 260ms ease-out, filter 340ms ease-out, transform 340ms ease-out",
       }}
@@ -177,6 +166,7 @@ const DashboardShell = memo(function DashboardShell({
                 onClick={onEnterInteractiveMode}
                 onFocus={onPrefetchSiege}
                 onMouseEnter={onPrefetchSiege}
+                onTouchStart={onPrefetchSiege}
                 type="button"
               >
                 <svg

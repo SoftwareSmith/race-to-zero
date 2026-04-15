@@ -1,5 +1,4 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { getBugVariantMaxHp } from "../../../../constants/bugs";
 import Engine from "@game/engine/Engine";
 import type { GameConfig } from "@game/engine/types";
 import { DEFAULT_GAME_CONFIG } from "@game/engine/types";
@@ -12,27 +11,19 @@ import type {
 } from "@game/types";
 import type {
   BugCounts,
-  BugVariant,
   BugVisualSettings,
   ChartFocusState,
   MotionProfile,
   SceneProfile,
 } from "../../../../types/dashboard";
-import { WEAPON_DEFS } from "@config/weaponConfig";
 import VfxCanvas from "@game/components/VfxCanvas";
 import type { VfxEngine } from "@game/engine/VfxEngine";
-import type {
-  WeaponContext,
-  ExecutionContext,
-  PersistentFireSession,
-} from "@game/weapons/runtime/types";
-import { getEntry, hasEntry } from "@game/weapons/runtime/registry";
-import { executeCommands } from "@game/weapons/runtime/executor";
 import type { BugHitPayload, RenderedBugPosition } from "./types";
 import {
+  isQaEnabled,
+  recordQaFrameTiming,
   updateQaBugPositions,
   syncQaBugPositionsFromEngine,
-  updateQaLastHit,
   stabilizeQaEngine,
 } from "./qa";
 import { drawBugFramePass } from "./bugFramePass";
@@ -43,10 +34,14 @@ import {
   type CanvasBounds,
   type ReseedInfo,
 } from "./canvasState";
+import { createPointerDownHandler } from "./weaponInput";
 
 const AMBIENT_TARGET_FRAME_MS = 1000 / 24;
 const INTERACTIVE_TARGET_FRAME_MS = 1000 / 45;
 const TRANSITION_EASING = 0.08;
+const STRESS_STEP_CAP_1200 = 3;
+const STRESS_STEP_CAP_2500 = 2;
+const STRESS_STEP_CAP_5000 = 1;
 
 function interpolate(
   currentValue: number,
@@ -62,6 +57,24 @@ function clampNumber(value: number, min: number, max: number) {
 
 function getSpeedMultiplier(chaosMultiplier?: number) {
   return clampNumber(Math.sqrt(Math.max(0.2, chaosMultiplier ?? 1)), 0.45, 2.2);
+}
+
+function getSimulationSteps(frameTimeSeconds: number, bugCount: number) {
+  const requestedSteps = Math.max(1, Math.floor(frameTimeSeconds * 60));
+
+  if (bugCount >= 5000) {
+    return Math.min(requestedSteps, STRESS_STEP_CAP_5000);
+  }
+
+  if (bugCount >= 2500) {
+    return Math.min(requestedSteps, STRESS_STEP_CAP_2500);
+  }
+
+  if (bugCount >= 1200) {
+    return Math.min(requestedSteps, STRESS_STEP_CAP_1200);
+  }
+
+  return requestedSteps;
 }
 
 export interface BugCanvasProps {
@@ -208,10 +221,9 @@ const BugCanvas = memo(function BugCanvas({
   }, []);
   const selectedWeaponIdRef = useRef<SiegeWeaponId>(selectedWeaponId);
   const lastFireTimeRef = useRef<Record<string, number>>({});
-  const isFiringRef = useRef(false);
   const currentMouseRef = useRef<{ x: number; y: number } | null>(null);
   const fireIntervalRef = useRef<number | null>(null);
-  const lastPaintPosRef = useRef<{ x: number; y: number } | null>(null);
+  const isFiringRef = useRef(false);
   const reseedInfoRef = useRef<ReseedInfo | null>(null);
   const siegeZonesRef = useRef<SiegeZoneRect[]>(siegeZones);
   const boundsRef = useRef<CanvasBounds>({
@@ -221,7 +233,6 @@ const BugCanvas = memo(function BugCanvas({
     width: 0,
   });
   const latestBugPositionsRef = useRef<RenderedBugPosition[]>([]);
-  const hitPointsRef = useRef<Map<number, number>>(new Map());
   const targetSettingsRef = useRef({
     sizeMultiplier: bugVisualSettings?.sizeMultiplier ?? 1,
     speedMultiplier: getSpeedMultiplier(bugVisualSettings?.chaosMultiplier),
@@ -231,10 +242,25 @@ const BugCanvas = memo(function BugCanvas({
     speedMultiplier: getSpeedMultiplier(bugVisualSettings?.chaosMultiplier),
   });
   const [reseedInfo, setReseedInfo] = useState<ReseedInfo | null>(null);
+  const [vfxActivated, setVfxActivated] = useState(false);
   const gameConfigKey = useMemo(
     () => JSON.stringify(gameConfig ?? {}),
     [gameConfig],
   );
+
+  useEffect(() => {
+    setVfxActivated(false);
+  }, [sessionKey]);
+
+  useEffect(() => {
+    if (!interactiveMode) {
+      return;
+    }
+
+    if (selectedWeaponId !== "hammer" || (placedStructures?.length ?? 0) > 0) {
+      setVfxActivated(true);
+    }
+  }, [interactiveMode, placedStructures?.length, selectedWeaponId]);
 
   useEffect(() => {
     interactiveModeRef.current = interactiveMode;
@@ -479,10 +505,6 @@ const BugCanvas = memo(function BugCanvas({
     if (nextReseedInfo) {
       setReseedInfo(nextReseedInfo);
     }
-    const bugs = swarmRef.current.getAllBugs() as Array<any>;
-    hitPointsRef.current = new Map(
-      bugs.map((b: any, i: number) => [i, getBugVariantMaxHp(b.variant)]),
-    );
     return () => {
       // if effect re-runs or component unmounts, clear engine reference
       if (
@@ -502,13 +524,6 @@ const BugCanvas = memo(function BugCanvas({
     // siege mode activates, giving a seamless visual transition.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionKey, gameConfigKey, getLocalSiegeZones]);
-
-  useEffect(() => {
-    const bugs = (swarmRef.current?.getAllBugs() ?? []) as Array<any>;
-    hitPointsRef.current = new Map(
-      bugs.map((b: any, i: number) => [i, getBugVariantMaxHp(b.variant)]),
-    );
-  }, [sessionKey]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -591,6 +606,7 @@ const BugCanvas = memo(function BugCanvas({
 
     const renderFrame = (timestamp: number) => {
       animationFrameId = 0;
+      const frameStart = performance.now();
 
       if (!isActive) {
         return;
@@ -635,7 +651,10 @@ const BugCanvas = memo(function BugCanvas({
             DEFAULT_GAME_CONFIG.baseSpeed;
           engine.config.baseSpeed = base * speedMultiplier;
         }
-        const steps = Math.max(1, Math.floor(dtSec * 60));
+        const steps = getSimulationSteps(
+          dtSec,
+          (swarmRef.current as any).getAllBugs().length,
+        );
         for (let s = 0; s < steps; s++) {
           if ((swarmRef.current as any).update.length >= 1) {
             (swarmRef.current as any).update(1 / 60, null, null);
@@ -662,14 +681,20 @@ const BugCanvas = memo(function BugCanvas({
         context,
         frameNow,
         height,
+        interactiveMode: interactiveModeRef.current,
         motionProfile: activeMotionProfile,
         particles: activeParticles,
+        qaEnabled: isQaEnabled(),
         sizeMultiplier,
         width,
       });
 
       latestBugPositionsRef.current = nextBugPositions;
       updateQaBugPositions(nextBugPositions, boundsRef.current);
+      recordQaFrameTiming(
+        performance.now() - frameStart,
+        nextBugPositions.length,
+      );
 
       // Tick black hole gravity well (Void Pulse weapon)
       if (
@@ -728,255 +753,32 @@ const BugCanvas = memo(function BugCanvas({
     });
     resizeObserver.observe(canvas);
 
-    const handlePointerDown = (event: MouseEvent) => {
-      if (!interactiveModeRef.current) {
-        return;
-      }
-
-      // Keep bounds fresh on scroll; stale viewport offsets break click→canvas mapping.
-      boundsRef.current = updateLiveCanvasBounds(canvas, boundsRef.current);
-
-      const targetElement =
-        event.target instanceof Element ? event.target : null;
-      if (targetElement?.closest("[data-no-hammer]")) {
-        return;
-      }
-
-      const bounds = boundsRef.current;
-      if (!bounds.width || !bounds.height) {
-        return;
-      }
-
-      // update current mouse position
-      currentMouseRef.current = { x: event.clientX, y: event.clientY };
-
-      const holdWeaponId = selectedWeaponIdRef.current;
-      const holdWeaponDef =
-        WEAPON_DEFS.find((w) => w.id === holdWeaponId) ?? WEAPON_DEFS[0];
-
-      if (holdWeaponDef.inputMode === "hold") {
-        // start continuous firing while mouse is held
-        if (isFiringRef.current) return;
-        isFiringRef.current = true;
-
-        if (hasEntry(holdWeaponId)) {
-          const _hp = hammerPositionRef;
-          const _resolveHoldCtx = (
-            clientX: number,
-            clientY: number,
-          ): { wCtx: WeaponContext; eCtx: ExecutionContext } => {
-            const _pos = _hp?.current ?? { x: 0, y: 0 };
-            const _hasLive =
-              _hp != null &&
-              Number.isFinite(_pos.x) &&
-              Number.isFinite(_pos.y) &&
-              (_pos.x !== 0 || _pos.y !== 0);
-            const _vx = _hasLive ? _pos.x : clientX;
-            const _vy = _hasLive ? _pos.y : clientY;
-            const _b = boundsRef.current;
-            const wCtx: WeaponContext = {
-              targetX: _vx - _b.left,
-              targetY: _vy - _b.top,
-              centerX: _b.width / 2,
-              centerY: _b.height / 2,
-              canvasWidth: _b.width,
-              canvasHeight: _b.height,
-              viewportX: _vx,
-              viewportY: _vy,
-              bounds: _b,
-              now: performance.now(),
-              engine: swarmRef.current as unknown as WeaponContext["engine"],
-              tier: getWeaponTierRef.current(holdWeaponId),
-              weaponId: holdWeaponId,
-            };
-            const eCtx: ExecutionContext = {
-              engine: swarmRef.current as unknown as ExecutionContext["engine"],
-              vfx: vfxRef.current,
-              damageMultiplier: streakMultiplierRef.current,
-              canvas: canvasRef.current,
-              bounds: _b,
-              viewportX: _vx,
-              viewportY: _vy,
-              weaponId: holdWeaponId,
-              onHit: (p) => {
-                onHitRef.current(p as any);
-                if (p.defeated) {
-                  syncWeaponEvolutionStates();
-                }
-              },
-              updateQaLastHit: (p) => updateQaLastHit(p as any),
-              enqueueOverlay: (wid, evx, evy, extras) =>
-                onWeaponFireRef.current?.(wid, evx, evy, extras as any),
-              blackHoleVfxIdRef,
-            };
-            return { wCtx, eCtx };
-          };
-          const { wCtx: _initWCtx, eCtx: _initECtx } = _resolveHoldCtx(
-            event.clientX,
-            event.clientY,
-          );
-          const _holdSession = getEntry(holdWeaponId)!.createSession(_initWCtx);
-          if (_holdSession.mode === "hold") {
-            lastFireTimeRef.current[holdWeaponId] = performance.now();
-            executeCommands(_holdSession.begin(_initWCtx), _initECtx);
-            lastPaintPosRef.current = {
-              x: event.clientX,
-              y: event.clientY,
-            };
-            const _hMoveHandler = (ev: MouseEvent) => {
-              currentMouseRef.current = { x: ev.clientX, y: ev.clientY };
-              if (_holdSession.paint) {
-                const { wCtx: _pw, eCtx: _pe } = _resolveHoldCtx(
-                  ev.clientX,
-                  ev.clientY,
-                );
-                executeCommands(_holdSession.paint(_pw), _pe);
-              }
-            };
-            window.addEventListener("mousemove", _hMoveHandler);
-            const _tickCooldown = Math.max(
-              60,
-              getEntry(holdWeaponId)!.config.cooldownMs ?? 120,
-            );
-            let _rafId = 0;
-            const _rafTick = () => {
-              if (!isFiringRef.current) return;
-              const _m = currentMouseRef.current;
-              const _now = performance.now();
-              const _last = lastFireTimeRef.current[holdWeaponId] ?? 0;
-              if (_m && _now - _last >= _tickCooldown) {
-                lastFireTimeRef.current[holdWeaponId] = _now;
-                const { wCtx: _tw, eCtx: _te } = _resolveHoldCtx(_m.x, _m.y);
-                executeCommands(_holdSession.tick(_tw), _te);
-              }
-              _rafId = window.requestAnimationFrame(_rafTick);
-            };
-            _rafId = window.requestAnimationFrame(_rafTick);
-            fireIntervalRef.current = _rafId as unknown as number;
-            const _hUpHandler = () => {
-              isFiringRef.current = false;
-              _holdSession.end();
-              if (fireIntervalRef.current) {
-                window.cancelAnimationFrame(fireIntervalRef.current);
-                fireIntervalRef.current = null;
-              }
-              lastPaintPosRef.current = null;
-              window.removeEventListener("mousemove", _hMoveHandler);
-              window.removeEventListener("mouseup", _hUpHandler);
-            };
-            window.addEventListener("mouseup", _hUpHandler);
-            return;
-          }
-          isFiringRef.current = false; // plugin did not return a hold session
-        }
-
-        // hold weapon not registered or session was not hold mode — exit hold branch
-        return;
-      }
-
-      const clickX = event.clientX - bounds.left;
-      const clickY = event.clientY - bounds.top;
-      const hpRef = hammerPositionRef;
-      const hasLiveCursor =
-        hpRef != null &&
-        Number.isFinite(hpRef.current.x) &&
-        Number.isFinite(hpRef.current.y) &&
-        (hpRef.current.x !== 0 || hpRef.current.y !== 0);
-      const fireX = hasLiveCursor ? hpRef!.current.x : event.clientX;
-      const fireY = hasLiveCursor ? hpRef!.current.y : event.clientY;
-      const targetX = fireX - bounds.left;
-      const targetY = fireY - bounds.top;
-
-      // ── Structure placement takes priority over weapon fire ─────
-      const placingId = placingStructureIdRef.current;
-      if (placingId) {
-        const placedStructureId = `${placingId}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
-        const engine = swarmRef.current;
-        if (engine) {
-          (engine as any).addStructure(
-            clickX,
-            clickY,
-            placingId,
-            placedStructureId,
-          );
-        }
-        onStructurePlaceRef.current?.(
-          placingId,
-          event.clientX,
-          event.clientY,
-          clickX,
-          clickY,
-          placedStructureId,
-        );
-        return;
-      }
-
-      const weaponId = selectedWeaponIdRef.current;
-      const weaponDef =
-        WEAPON_DEFS.find((w) => w.id === weaponId) ?? WEAPON_DEFS[0];
-
-      // Per-weapon cooldown enforcement
-      if (weaponDef.cooldownMs > 0) {
-        const now = performance.now();
-        const lastFire = lastFireTimeRef.current[weaponId] ?? 0;
-        if (now - lastFire < weaponDef.cooldownMs) {
-          return;
-        }
-        lastFireTimeRef.current[weaponId] = now;
-      }
-
-      const engine = swarmRef.current;
-      if (!engine) return;
-
-      // All click weapons are registered; route through weapon plugin system.
-      if (hasEntry(weaponId)) {
-        const _np_wCtx: WeaponContext = {
-          targetX,
-          targetY,
-          centerX: bounds.width / 2,
-          centerY: bounds.height / 2,
-          canvasWidth: bounds.width,
-          canvasHeight: bounds.height,
-          viewportX: fireX,
-          viewportY: fireY,
-          bounds,
-          now: performance.now(),
-          engine: engine as unknown as WeaponContext["engine"],
-          tier: getWeaponTierRef.current(weaponId),
-          weaponId,
-        };
-        const _np_eCtx: ExecutionContext = {
-          engine: engine as unknown as ExecutionContext["engine"],
-          vfx: vfxRef.current,
-          damageMultiplier: streakMultiplierRef.current,
-          canvas: canvasRef.current,
-          bounds,
-          viewportX: fireX,
-          viewportY: fireY,
-          weaponId,
-          onHit: (p) => {
-            onHitRef.current(p as any);
-            if (p.defeated) {
-              syncWeaponEvolutionStates();
-            }
-          },
-          updateQaLastHit: (p) => updateQaLastHit(p as any),
-          enqueueOverlay: (wid, evx, evy, extras) =>
-            onWeaponFireRef.current?.(wid, evx, evy, extras as any),
-          blackHoleVfxIdRef,
-        };
-        const _np_session = getEntry(weaponId)!.createSession(_np_wCtx);
-        if (_np_session.mode === "once") {
-          executeCommands(_np_session.commands, _np_eCtx);
-        } else if (_np_session.mode === "persistent") {
-          executeCommands(
-            (_np_session as PersistentFireSession).begin(_np_wCtx),
-            _np_eCtx,
-          );
-        }
-        return;
-      }
-    };
+    const handlePointerDown = createPointerDownHandler(
+      {
+        blackHoleVfxIdRef,
+        boundsRef,
+        canvasRef,
+        currentMouseRef,
+        fireIntervalRef,
+        getWeaponTier: (weaponId) => getWeaponTierRef.current(weaponId),
+        hammerPositionRef,
+        isFiringRef,
+        onHit: (payload) => onHitRef.current(payload as any),
+        getOnStructurePlace: () => onStructurePlaceRef.current,
+        getOnWeaponFire: () => onWeaponFireRef.current,
+        getPlacingStructureId: () => placingStructureIdRef.current ?? null,
+        getSelectedWeaponId: () => selectedWeaponIdRef.current,
+        streakMultiplier: streakMultiplierRef.current,
+        getSwarm: () => swarmRef.current,
+        syncWeaponEvolutionStates,
+        updateBounds: () => {
+          boundsRef.current = updateLiveCanvasBounds(canvas, boundsRef.current);
+          return boundsRef.current;
+        },
+        vfxRef,
+      },
+      lastFireTimeRef,
+    );
 
     document.addEventListener("visibilitychange", updateActivity);
     window.addEventListener("focus", updateActivity);
