@@ -7,6 +7,7 @@ import {
   isStoredRecord,
   parseStoredBoolean,
   parseStoredPositiveNumber,
+  serializeStoredValue,
 } from "@shared/utils/storage";
 import type { BugVisualSettingKey } from "../../../types/dashboard";
 
@@ -36,6 +37,14 @@ export function useGameSettings() {
     1.4,
     { parse: parseStoredPositiveNumber },
   );
+  const [showBugParticleCount, setShowBugParticleCount] = useStoredState(
+    STORAGE_KEYS.bugParticleCountVisible,
+    true,
+    {
+      parse: parseStoredBoolean,
+      serialize: serializeStoredValue,
+    },
+  );
   const [gameConfig] = useStoredState(
     STORAGE_KEYS.gameConfig,
     DEFAULT_GAME_CONFIG,
@@ -48,9 +57,10 @@ export function useGameSettings() {
   const bugVisualSettings = useMemo(
     () => ({
       chaosMultiplier: bugChaosMultiplier,
+      showParticleCount: showBugParticleCount,
       sizeMultiplier: bugSizeMultiplier,
     }),
-    [bugChaosMultiplier, bugSizeMultiplier],
+    [bugChaosMultiplier, bugSizeMultiplier, showBugParticleCount],
   );
 
   const handleBugVisualSetting = useCallback(
@@ -67,11 +77,17 @@ export function useGameSettings() {
     [setBugChaosMultiplier, setBugSizeMultiplier],
   );
 
+  const toggleShowBugParticleCount = useCallback(() => {
+    setShowBugParticleCount((currentValue) => !currentValue);
+  }, [setShowBugParticleCount]);
+
   return {
     bugVisualSettings,
     gameConfig,
     handleBugVisualSetting,
     setBugChaosMultiplier,
     setBugSizeMultiplier,
+    showBugParticleCount,
+    toggleShowBugParticleCount,
   };
 }

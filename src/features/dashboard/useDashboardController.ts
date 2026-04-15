@@ -44,6 +44,8 @@ export function useDashboardController() {
   const {
     bugVisualSettings,
     gameConfig,
+    showBugParticleCount,
+    toggleShowBugParticleCount,
   } = useGameSettings();
   const [openTopMenu, setOpenTopMenu] = useState<TopMenuKey>(null);
   const {
@@ -267,6 +269,7 @@ export function useDashboardController() {
     deadlineMetrics,
     error,
     gameConfig,
+    showBugParticleCount,
     handleChartFocusChange,
     handleCompareRangeChange,
     handleCustomFromDateChange,
@@ -277,6 +280,7 @@ export function useDashboardController() {
     handleToggleSetting,
     handleTopMenuToggle,
     handleTopNavInteract,
+    toggleShowBugParticleCount,
     headerEyebrow,
     headerSubtitle,
     openTopMenu,

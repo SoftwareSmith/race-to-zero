@@ -32,6 +32,7 @@ export interface BugSnapshot {
 }
 
 export interface HitResult {
+  comboEvents?: Array<"detonate" | "quench">;
   defeated: boolean;
   matchup: WeaponMatchupState;
   remainingHp: number;

@@ -1,4 +1,4 @@
-import type { ElementType, ReactNode } from "react";
+import type { HTMLAttributes, ReactNode } from "react";
 import { cn } from "@shared/utils/cn";
 import { PANEL_TONE_CLASSES } from "@shared/styles/toneClasses";
 
@@ -18,8 +18,8 @@ const TONE_STYLES = {
 
 type SurfaceTone = keyof typeof TONE_STYLES;
 
-interface SurfaceProps {
-  as?: ElementType;
+interface SurfaceProps extends HTMLAttributes<HTMLElement> {
+  as?: keyof HTMLElementTagNameMap;
   children: ReactNode;
   className?: string;
   tone?: SurfaceTone;
@@ -30,6 +30,7 @@ function Surface({
   children,
   className = "",
   tone = "default",
+  ...rest
 }: SurfaceProps) {
   return (
     <Component
@@ -38,6 +39,7 @@ function Surface({
         TONE_STYLES[tone] ?? TONE_STYLES.default,
         className,
       )}
+      {...rest}
     >
       {children}
     </Component>

@@ -1,4 +1,4 @@
-import type { RefObject } from "react";
+import { memo, type RefObject } from "react";
 import {
   MenuIconButton,
   MenuPanel,
@@ -17,7 +17,7 @@ interface SettingsMenuProps {
   settings: MenuSettingsState;
 }
 
-function SettingsMenu({
+const SettingsMenu = memo(function SettingsMenu({
   containerRef,
   open,
   onMenuToggle,
@@ -65,6 +65,6 @@ function SettingsMenu({
       ) : null}
     </div>
   );
-}
+});
 
 export default SettingsMenu;

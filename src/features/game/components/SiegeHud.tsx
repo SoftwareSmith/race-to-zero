@@ -1,12 +1,14 @@
 import {
+  Suspense,
+  lazy,
   useEffect,
   useMemo,
   useRef,
   useState,
+  type HTMLAttributes,
   type ReactNode,
   type RefObject,
 } from "react";
-import CodexPanel from "@game/components/CodexPanel";
 import { STRUCTURE_DEFS } from "@config/structureConfig";
 import { getSiegeWeaponLabel } from "@game/progression/progression";
 import Tooltip from "@shared/components/Tooltip";
@@ -24,6 +26,7 @@ import {
   getStructureGlyph,
   getTierBarCoreClassName,
   getTierNodeClassName,
+  getTierCopy,
   getTierNodeFillClassName,
   getTierNodeFillWidth,
   getTierNodeOffsetClassName,
@@ -37,6 +40,7 @@ import {
 
 const HUD_SHELL_CLASS_NAME =
   "relative overflow-hidden rounded-[22px] border border-white/12 bg-[linear-gradient(180deg,rgba(6,10,14,0.96),rgba(9,12,16,0.88))] backdrop-blur-2xl";
+const CodexPanel = lazy(() => import("@game/components/CodexPanel"));
 
 interface SiegeHudProps {
   className?: string;
@@ -102,11 +106,13 @@ function HudEventPill({
 
 function HudActionButton({
   active = false,
+  ariaLabel,
   children,
   onClick,
   tone = "default",
 }: {
   active?: boolean;
+  ariaLabel?: string;
   children: ReactNode;
   onClick: () => void;
   tone?: "default" | "danger" | "info";
@@ -125,6 +131,7 @@ function HudActionButton({
 
   return (
     <button
+      aria-label={ariaLabel}
       data-no-hammer
       data-hud-cursor="pointer"
       className={cn(
@@ -143,15 +150,17 @@ function HudShell({
   children,
   className,
   cursor = "default",
+  ...rest
 }: {
   children: ReactNode;
   className?: string;
   cursor?: "default" | "pointer";
-}) {
+} & HTMLAttributes<HTMLDivElement>) {
   return (
     <div
       data-hud-cursor={cursor}
       className={cn(HUD_SHELL_CLASS_NAME, className)}
+      {...rest}
     >
       {children}
     </div>
@@ -395,6 +404,7 @@ export default function SiegeHud({
   const [justUnlockedStructureIds, setJustUnlockedStructureIds] = useState<
     StructureId[]
   >([]);
+  const [progressExpanded, setProgressExpanded] = useState(false);
   const previousUnlockedWeaponIdsRef = useRef<Set<SiegeWeaponId>>(new Set());
   const previousUnlockedStructureIdsRef = useRef<Set<StructureId>>(new Set());
   const selectedSnapshot =
@@ -444,6 +454,26 @@ export default function SiegeHud({
   );
   const timerValue = formatElapsedTime(elapsedMs);
   const bugsLabel = gameMode === "outbreak" ? "Infection" : "Bugs";
+  const codexTrigger = onToggleCodex ? (
+    <Tooltip content="Open codex">
+      <HudActionButton active={codexOpen} onClick={onToggleCodex}>
+        <svg
+          aria-hidden="true"
+          className="h-3.5 w-3.5"
+          fill="none"
+          stroke="currentColor"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth="1.7"
+          viewBox="0 0 24 24"
+        >
+          <path d="M5.5 5.5A2.5 2.5 0 0 1 8 3h10.5v15.5A2.5 2.5 0 0 0 16 16H5.5Z" />
+          <path d="M8 3.5v12.3A2.2 2.2 0 0 0 10.2 18H18" />
+          <path d="M10.1 7.2h5.8M10.1 10.4h5.8" />
+        </svg>
+      </HudActionButton>
+    </Tooltip>
+  ) : null;
 
   useEffect(() => {
     return () => {
@@ -500,7 +530,7 @@ export default function SiegeHud({
     <div
       data-hud-cursor="default"
       data-no-hammer
-      className={cn("select-none", className)}
+      className={cn("pointer-events-none fixed inset-0 select-none", className)}
     >
       <div className="pointer-events-none fixed left-3 top-3 z-[220] sm:left-4 sm:top-4">
         <div
@@ -545,40 +575,21 @@ export default function SiegeHud({
               onPointerLeave={hideSystemCursor}
             >
               {codexMenuRef && onToggleCodex ? (
-                <CodexPanel
-                  containerRef={codexMenuRef}
-                  onMenuToggle={onToggleCodex}
-                  open={codexOpen}
-                  trigger={
-                    <Tooltip content="Open codex">
-                      <HudActionButton
-                        active={codexOpen}
-                        onClick={onToggleCodex}
-                      >
-                        <svg
-                          aria-hidden="true"
-                          className="h-3.5 w-3.5"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth="1.7"
-                          viewBox="0 0 24 24"
-                        >
-                          <path d="M5.5 5.5A2.5 2.5 0 0 1 8 3h10.5v15.5A2.5 2.5 0 0 0 16 16H5.5Z" />
-                          <path d="M8 3.5v12.3A2.2 2.2 0 0 0 10.2 18H18" />
-                          <path d="M10.1 7.2h5.8M10.1 10.4h5.8" />
-                        </svg>
-                      </HudActionButton>
-                    </Tooltip>
-                  }
-                />
+                <Suspense fallback={codexTrigger}>
+                  <CodexPanel
+                    containerRef={codexMenuRef}
+                    onMenuToggle={onToggleCodex}
+                    open={codexOpen}
+                    trigger={codexTrigger}
+                  />
+                </Suspense>
               ) : null}
 
               {onToggleDebugMode ? (
                 <Tooltip content="Toggle debug overlay">
                   <HudActionButton
                     active={debugMode}
+                    ariaLabel="Toggle debug overlay"
                     onClick={onToggleDebugMode}
                     tone="info"
                   >
@@ -602,7 +613,11 @@ export default function SiegeHud({
               ) : null}
 
               <Tooltip content="Exit siege">
-                <HudActionButton onClick={onExit} tone="danger">
+                <HudActionButton
+                  ariaLabel="Back to dashboard"
+                  onClick={onExit}
+                  tone="danger"
+                >
                   <svg
                     aria-hidden="true"
                     className="h-3.5 w-3.5"
@@ -624,8 +639,11 @@ export default function SiegeHud({
       </div>
 
       <div className="pointer-events-none fixed inset-x-0 top-[4.65rem] z-[220] flex justify-center px-3 sm:top-4">
-        <div className="pointer-events-auto w-full max-w-[28rem] select-none !cursor-default [animation:hud-notch-arrive_420ms_cubic-bezier(0.22,1,0.36,1)_forwards]">
-          <HudShell className="px-2 py-1.5 shadow-[0_18px_42px_rgba(0,0,0,0.34)]">
+        <div className="pointer-events-auto w-full max-w-[23rem] select-none !cursor-default [animation:hud-notch-arrive_420ms_cubic-bezier(0.22,1,0.36,1)_forwards]">
+          <HudShell
+            className="px-2 py-1.5 shadow-[0_18px_42px_rgba(0,0,0,0.34)]"
+            data-testid="siege-hud"
+          >
             <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(125,211,252,0.11),transparent_30%),linear-gradient(90deg,rgba(248,113,113,0.05),transparent_34%,rgba(251,191,36,0.05))]" />
 
             <div className="relative">
@@ -708,11 +726,27 @@ export default function SiegeHud({
 
             <div className="relative space-y-2">
               {selectedSnapshot ? (
-                <div className="relative rounded-[14px] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.08),rgba(255,255,255,0.04))] px-3 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]">
+                <button
+                  aria-expanded={progressExpanded}
+                  aria-label={
+                    progressExpanded
+                      ? "Collapse progress details"
+                      : "Expand progress details"
+                  }
+                  className="relative w-full rounded-[14px] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.08),rgba(255,255,255,0.04))] px-3 py-2 text-left shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] transition duration-200 hover:border-white/16 hover:bg-[linear-gradient(180deg,rgba(255,255,255,0.11),rgba(255,255,255,0.05))] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300/40"
+                  data-no-hammer
+                  onClick={() =>
+                    setProgressExpanded((currentValue) => !currentValue)
+                  }
+                  type="button"
+                >
                   <div className="flex items-center gap-2.5">
                     <div className="min-w-0 flex-1">
                       <div className="truncate font-display text-[0.92rem] leading-none tracking-[-0.04em] text-stone-50">
                         {selectedSnapshot.title}
+                      </div>
+                      <div className="mt-1 text-[0.58rem] font-semibold uppercase tracking-[0.14em] text-stone-400">
+                        {`Level ${selectedSnapshot.tier}`}
                       </div>
                     </div>
                     <div className="flex shrink-0 items-center gap-2">
@@ -760,9 +794,26 @@ export default function SiegeHud({
                       <span className="rounded-full border border-white/10 bg-black/24 px-2 py-1 text-[0.54rem] font-semibold uppercase tracking-[0.12em] text-stone-200">
                         {getTierProgressCompact(selectedSnapshot)}
                       </span>
+                      <span
+                        aria-hidden="true"
+                        className="text-[0.72rem] text-stone-400 transition-transform duration-200"
+                        style={{
+                          transform: progressExpanded
+                            ? "rotate(180deg)"
+                            : "rotate(0deg)",
+                        }}
+                      >
+                        ▾
+                      </span>
                     </div>
                   </div>
-                </div>
+
+                  {progressExpanded ? (
+                    <div className="mt-2 border-t border-white/8 pt-2 text-[0.72rem] leading-5 text-stone-300">
+                      {getTierCopy(selectedSnapshot)}
+                    </div>
+                  ) : null}
+                </button>
               ) : null}
 
               <div className="flex items-center gap-2">

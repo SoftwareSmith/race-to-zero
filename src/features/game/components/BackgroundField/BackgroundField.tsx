@@ -1,4 +1,13 @@
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  Suspense,
+  lazy,
+  memo,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { getBugCountsKey, getBugTotal } from "../../../../constants/bugs";
 import {
   getEffectPalette,
@@ -23,14 +32,17 @@ import type {
   Tone,
 } from "../../../../types/dashboard";
 import WeaponCursor from "@game/components/WeaponCursor";
-import WeaponEffectLayer from "@game/components/WeaponEffectLayer";
-import StructureLayer from "@game/components/StructureLayer";
 import { createEffectEvent, isEffectAlive } from "@game/utils/weaponEffects";
 import { getWeaponHeatProfile } from "@game/utils/weaponHeat";
 import type { GameConfig } from "@game/engine/types";
 import BugCanvas from "./BugCanvas";
 import type { BugHitPayload, GameState } from "./types";
 import { getSplatClassName } from "./splat";
+
+const WeaponEffectLayer = lazy(
+  () => import("@game/components/WeaponEffectLayer"),
+);
+const StructureLayer = lazy(() => import("@game/components/StructureLayer"));
 
 interface BackgroundFieldProps {
   bugCounts: BugCounts;
@@ -542,14 +554,25 @@ const BackgroundField = memo(function BackgroundField({
       {effectiveBugCount === 0 ? (
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_35%,rgba(187,247,208,0.12),transparent_28%),radial-gradient(circle_at_60%_68%,rgba(125,211,252,0.08),transparent_34%)] [animation:all-clear-breathe_6s_ease-in-out_infinite]" />
       ) : null}
-      <WeaponEffectLayer effects={interactiveMode ? weaponEffects : []} />
+      {!interactiveMode && bugVisualSettings.showParticleCount ? (
+        <div className="pointer-events-none absolute bottom-3 left-3 z-20 rounded-full border border-white/10 bg-black/45 px-2.5 py-1 text-[0.68rem] font-semibold tracking-[0.08em] text-stone-200 backdrop-blur-sm">
+          {`${effectiveBugCount.toLocaleString()} bugs rendered`}
+        </div>
+      ) : null}
+      {interactiveMode ? (
+        <Suspense fallback={null}>
+          <WeaponEffectLayer effects={weaponEffects} />
+        </Suspense>
+      ) : null}
       {interactiveMode && placedStructures && placedStructures.length > 0 ? (
-        <StructureLayer
-          structures={placedStructures}
-          agentCaptures={agentCaptures}
-          turretLastFireTimes={turretLastFireTimes}
-          teslaLastFireTimes={teslaLastFireTimes}
-        />
+        <Suspense fallback={null}>
+          <StructureLayer
+            structures={placedStructures}
+            agentCaptures={agentCaptures}
+            turretLastFireTimes={turretLastFireTimes}
+            teslaLastFireTimes={teslaLastFireTimes}
+          />
+        </Suspense>
       ) : null}
       {interactiveMode ? (
         <WeaponCursor

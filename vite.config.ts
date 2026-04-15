@@ -30,7 +30,11 @@ export default defineConfig({
             id.includes("chartjs-plugin-datalabels") ||
             id.includes("react-chartjs-2")
           ) {
-            return "charts";
+            return "dashboard-charts";
+          }
+
+          if (id.includes("pixi.js")) {
+            return "siege-vfx";
           }
 
           if (id.includes("react") || id.includes("scheduler")) {
@@ -38,7 +42,7 @@ export default defineConfig({
           }
 
           if (id.includes("date-fns")) {
-            return "vendor";
+            return "dashboard-vendor";
           }
 
           return undefined;

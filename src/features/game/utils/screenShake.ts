@@ -1,11 +1,9 @@
 /**
- * screenShake — GSAP-powered screen shake utility.
+ * screenShake — lightweight translate-based screen shake utility.
  *
  * Call triggerShake(element, intensity, durationMs) to shake any DOM element.
- * Element returns to x=0, y=0 after the shake completes.
+ * Element returns to translate 0 0 after the shake completes.
  */
-
-import { gsap } from "gsap";
 
 /** Per-weapon shake presets (intensity in px, duration in ms). */
 export const SHAKE_PRESETS: Partial<Record<string, { intensity: number; duration: number }>> = {
@@ -19,7 +17,16 @@ export const SHAKE_PRESETS: Partial<Record<string, { intensity: number; duration
   tierup:      { intensity: 12, duration: 560 },
 };
 
-let activeShake: gsap.core.Tween | null = null;
+let activeShake:
+  | {
+      frameId: number;
+      element: HTMLElement;
+    }
+  | null = null;
+
+function resetShake(element: HTMLElement) {
+  element.style.translate = "0 0";
+}
 
 /**
  * Shake a DOM element with lateral + vertical displacement.
@@ -35,27 +42,38 @@ export function triggerShake(
 ): void {
   if (intensity <= 0) return;
 
-  // Kill previous shake so two weapons firing fast don't fight each other
   if (activeShake) {
-    activeShake.kill();
-    gsap.set(el, { x: 0, y: 0 });
+    window.cancelAnimationFrame(activeShake.frameId);
+    resetShake(activeShake.element);
   }
 
-  const repeatCount = Math.max(2, Math.round(durationMs / 50));
-  const singleDuration = durationMs / 1000 / (repeatCount * 2);
+  const startedAt = performance.now();
 
-  activeShake = gsap.to(el, {
-    x: intensity,
-    y: intensity * 0.45,
-    duration: singleDuration,
-    repeat: repeatCount,
-    yoyo: true,
-    ease: "none",
-    onComplete: () => {
-      gsap.set(el, { x: 0, y: 0 });
+  const tick = (timestamp: number) => {
+    const elapsedMs = timestamp - startedAt;
+    const progress = Math.min(1, elapsedMs / durationMs);
+
+    if (progress >= 1) {
+      resetShake(el);
       activeShake = null;
-    },
-  });
+      return;
+    }
+
+    const falloff = 1 - progress;
+    const x = Math.sin(elapsedMs * 0.085) * intensity * falloff;
+    const y = Math.cos(elapsedMs * 0.11) * intensity * 0.45 * falloff;
+    el.style.translate = `${x.toFixed(2)}px ${y.toFixed(2)}px`;
+
+    activeShake = {
+      element: el,
+      frameId: window.requestAnimationFrame(tick),
+    };
+  };
+
+  activeShake = {
+    element: el,
+    frameId: window.requestAnimationFrame(tick),
+  };
 }
 
 /**

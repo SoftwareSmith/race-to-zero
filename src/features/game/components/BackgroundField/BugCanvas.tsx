@@ -39,8 +39,10 @@ import {
   stabilizeQaEngine,
 } from "./qa";
 
-const TARGET_FRAME_MS = 1000 / 24;
+const AMBIENT_TARGET_FRAME_MS = 1000 / 24;
+const INTERACTIVE_TARGET_FRAME_MS = 1000 / 45;
 const TRANSITION_EASING = 0.08;
+const BUG_CODEX = getCodex();
 
 function interpolate(
   currentValue: number,
@@ -606,7 +608,11 @@ const BugCanvas = memo(function BugCanvas({
         return;
       }
 
-      if (timestamp - lastDrawTime < TARGET_FRAME_MS) {
+      const targetFrameMs = interactiveModeRef.current
+        ? INTERACTIVE_TARGET_FRAME_MS
+        : AMBIENT_TARGET_FRAME_MS;
+
+      if (timestamp - lastDrawTime < targetFrameMs) {
         animationFrameId = window.requestAnimationFrame(renderFrame);
         return;
       }
@@ -663,10 +669,12 @@ const BugCanvas = memo(function BugCanvas({
       const activeMotionProfile = motionProfileRef.current;
       const activeChartFocus = chartFocusRef.current;
       const focusX = activeChartFocus?.relativeIndex ?? 0.5;
-      latestBugPositionsRef.current = [];
+      const nextBugPositions: RenderedBugPosition[] = [];
+      const frameNow = performance.now();
 
       for (let index = 0; index < activeParticles.length; index += 1) {
         const particle = activeParticles[index];
+        const bugCodex = BUG_CODEX[particle.variant as BugVariant];
         const normalizedX = particle.x / width;
         const focusDistance = Math.abs(normalizedX - focusX);
         const focusFalloff = activeChartFocus
@@ -683,7 +691,7 @@ const BugCanvas = memo(function BugCanvas({
           particle.size *
           activeMotionProfile.scale *
           sizeMultiplier *
-          (getCodex()[particle.variant as BugVariant]?.size ?? 1) *
+          (bugCodex?.size ?? 1) *
           (activeChartFocus ? 0.92 + focusFalloff * 0.26 : 1);
         const velX = particle.vx ?? particle.driftX ?? 1;
         const velY = particle.vy ?? particle.driftY ?? 0;
@@ -692,7 +700,7 @@ const BugCanvas = memo(function BugCanvas({
             ? particle.heading
             : Math.atan2(velY, velX);
 
-        latestBugPositionsRef.current.push({
+        nextBugPositions.push({
           index,
           radius: Math.max(size * 0.7, 12),
           x,
@@ -700,7 +708,7 @@ const BugCanvas = memo(function BugCanvas({
         });
 
         drawBugSprite(context, {
-          color: getCodex()[particle.variant as BugVariant]?.color,
+          color: bugCodex?.color,
           opacity,
           rotation,
           size,
@@ -714,14 +722,15 @@ const BugCanvas = memo(function BugCanvas({
         const bugMaxHp: number = (particle as any).maxHp ?? 1;
         const bugHp: number = (particle as any).hp ?? 1;
         if (lastHitTime > 0 && bugMaxHp > 1 && bugHp < bugMaxHp) {
-          const elapsed = performance.now() - lastHitTime;
+          const elapsed = frameNow - lastHitTime;
           if (elapsed < HEALTHBAR_SHOW_DURATION) {
             drawHealthBar(context, x, y, bugHp, bugMaxHp, size, elapsed);
           }
         }
       }
 
-      updateQaBugPositions(latestBugPositionsRef.current, boundsRef.current);
+      latestBugPositionsRef.current = nextBugPositions;
+      updateQaBugPositions(nextBugPositions, boundsRef.current);
 
       // Tick black hole gravity well (Void Pulse weapon)
       if (
@@ -1097,7 +1106,7 @@ const BugCanvas = memo(function BugCanvas({
           transform: "translateZ(0)",
         }}
       />
-      <VfxCanvas ref={vfxRef} />
+      {interactiveMode ? <VfxCanvas ref={vfxRef} /> : null}
       {reseedInfo ? (
         <div className="pointer-events-none fixed left-3 bottom-3 z-[120] rounded-md bg-black/60 px-2 py-1 text-xs text-white backdrop-blur-sm">
           <div>Reseeded: {new Date(reseedInfo.ts).toLocaleTimeString()}</div>

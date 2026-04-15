@@ -124,6 +124,7 @@ export interface ChartFocusState {
 
 export interface BugVisualSettings {
   chaosMultiplier: number;
+  showParticleCount: boolean;
   sizeMultiplier: number;
 }
 

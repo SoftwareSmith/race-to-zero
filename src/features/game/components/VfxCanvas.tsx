@@ -10,7 +10,7 @@
  */
 
 import { forwardRef, useEffect, useImperativeHandle, useRef } from "react";
-import { VfxEngine } from "../engine/VfxEngine";
+import type { VfxEngine } from "../engine/VfxEngine";
 
 interface Props {
   className?: string;
@@ -39,6 +39,7 @@ const VfxCanvas = forwardRef<VfxEngine | null, Props>(function VfxCanvas(
       const w = wrapper.clientWidth || window.innerWidth;
       const h = wrapper.clientHeight || window.innerHeight;
 
+      const { VfxEngine } = await import("../engine/VfxEngine");
       const engine = new VfxEngine();
       await engine.init(w, h);
 

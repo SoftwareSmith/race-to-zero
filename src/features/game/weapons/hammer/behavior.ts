@@ -44,7 +44,14 @@ export function createSession(ctx: WeaponContext): ClickFireResult {
   const hit = findNearestBugInRadius(engine, targetX, targetY, SEARCH_RADIUS);
   if (hit) {
     if (tier >= WeaponTier.TIER_THREE) {
-      // T3: Rewrite Engine — convert bug to ally for 8 s
+      // T3: Rewrite Engine keeps the hammer's base hit so progression can
+      // continue, then converts surviving bugs into temporary allies.
+      commands.push({
+        kind: "damage",
+        targetIndex: hit.index,
+        amount: DAMAGE,
+        creditOnDeath: true,
+      });
       commands.push({
         kind: "allyBug",
         targetIndex: hit.index,

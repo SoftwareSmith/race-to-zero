@@ -6,6 +6,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { WeaponTier } from "@game/types";
 import type {
   StructureGameEngine,
   StructureEntry,
@@ -60,6 +61,7 @@ function makeEntry(
   return {
     id: `${type}-test`,
     type,
+    tier: WeaponTier.TIER_ONE,
     x: 200,
     y: 200,
     nextCaptureAt: 0,

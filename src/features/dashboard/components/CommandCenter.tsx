@@ -1,3 +1,4 @@
+import { memo } from "react";
 import StatusTag from "@shared/components/StatusTag";
 import Surface from "@shared/components/Surface";
 import { cn } from "@shared/utils/cn";
@@ -22,7 +23,7 @@ interface CommandCenterProps {
   summary: SummaryMetrics;
 }
 
-function CommandCenter({
+const CommandCenter = memo(function CommandCenter({
   activeTab,
   comparisonMetrics = null,
   deadlineMetrics,
@@ -86,6 +87,7 @@ function CommandCenter({
 
           <div className="grid gap-2 md:grid-cols-3 xl:min-w-[36rem]">
             <div
+              data-siege-panel="fix-velocity"
               className={cn(
                 "rounded-[18px] border px-3 py-2.5",
                 metricShellClassName,
@@ -94,23 +96,27 @@ function CommandCenter({
               <div className="text-[0.58rem] font-semibold uppercase tracking-[0.16em] text-stone-400">
                 Fix velocity
               </div>
-              <div className="mt-1 font-display text-[1.45rem] leading-none tracking-[-0.04em]">
+              <strong className="mt-1 block font-display text-[1.45rem] leading-none tracking-[-0.04em]">
                 {isPeriods
                   ? `${formatNumber(periodWindow!.fixRate, 2)}/day`
                   : `${formatNumber(summary.currentFixRate, 2)}/day`}
-              </div>
+              </strong>
             </div>
-            <div className="rounded-[18px] border border-white/10 bg-white/[0.03] px-3 py-2.5 text-stone-100">
+            <div
+              data-siege-panel="required-pace"
+              className="rounded-[18px] border border-white/10 bg-white/[0.03] px-3 py-2.5 text-stone-100"
+            >
               <div className="text-[0.58rem] font-semibold uppercase tracking-[0.16em] text-stone-400">
                 Required pace
               </div>
-              <div className="mt-1 font-display text-[1.45rem] leading-none tracking-[-0.04em]">
+              <strong className="mt-1 block font-display text-[1.45rem] leading-none tracking-[-0.04em]">
                 {isPeriods
                   ? `${formatNumber(periodWindow!.addRate, 2)}/day`
                   : `${formatNumber(summary.bugsPerDayRequired, 2)}/day`}
-              </div>
+              </strong>
             </div>
             <div
+              data-siege-panel="net-difference"
               className={cn(
                 "rounded-[18px] border px-3 py-2.5",
                 metricShellClassName,
@@ -119,17 +125,17 @@ function CommandCenter({
               <div className="text-[0.58rem] font-semibold uppercase tracking-[0.16em] text-stone-400">
                 Net difference
               </div>
-              <div className="mt-1 font-display text-[1.45rem] leading-none tracking-[-0.04em]">
+              <strong className="mt-1 block font-display text-[1.45rem] leading-none tracking-[-0.04em]">
                 {isPeriods
                   ? `${formatSignedNumber(periodWindow!.netBurnRate, 2)}/day`
                   : `${formatSignedNumber(paceGap, 2)}/day`}
-              </div>
+              </strong>
             </div>
           </div>
         </div>
       </div>
     </Surface>
   );
-}
+});
 
 export default CommandCenter;

@@ -1,7 +1,6 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import fetch from "node-fetch";
 import type { MetricsBug, MetricsSource } from "../src/types/dashboard.js";
 
 const __filename = fileURLToPath(import.meta.url);
