@@ -9,10 +9,12 @@ import {
   getNetChangeTone,
 } from "./utils/dashboard";
 import {
+  buildComparisonRateHistoryChartData,
   buildComparisonWindowHistoryChartData,
   buildComparisonSummaryChartData,
   buildComparisonTimelineChartData,
   buildDeadlineBurndownChartData,
+  buildOpenAgeChartData,
   buildPriorityChartData,
   buildStatusChartData,
 } from "@dashboard/utils/metrics";
@@ -185,12 +187,26 @@ function buildPeriodsMetricCards(
 }
 
 function getStatusDistributionSummary(deadlineMetrics: DeadlineMetrics) {
-  const [leadingStatus] = deadlineMetrics.statusDistribution;
+  const leadingStatus = [...deadlineMetrics.statusDistribution].sort(
+    (left, right) => right.count - left.count,
+  )[0];
   if (!leadingStatus) {
-    return "No unresolved workflow states are currently present in the snapshot.";
+    return "No workflow states are currently represented in the snapshot.";
   }
 
-  return `${leadingStatus.label} is the largest unresolved state with ${formatNumber(leadingStatus.count)} bugs, making it the biggest workflow bottleneck in the current snapshot.`;
+  const doneCount = deadlineMetrics.bugs.filter((bug) => {
+    const rawValue = bug.stateName?.trim() || bug.stateType?.trim() || "";
+    const normalizedValue = rawValue.toLowerCase();
+
+    return (
+      normalizedValue === "done" ||
+      normalizedValue === "completed" ||
+      normalizedValue === "complete" ||
+      (!normalizedValue && Boolean(bug.completedAt))
+    );
+  }).length;
+
+  return `${leadingStatus.label} is currently the largest Linear column with ${formatNumber(leadingStatus.count)} bugs assigned to it. Done is ignored in the chart because its size would dominate the rest of the workflow view (${formatNumber(doneCount)} bugs).`;
 }
 
 function getHistoricalWindowSummary(comparisonMetrics: ComparisonMetrics) {
@@ -202,6 +218,24 @@ function getHistoricalWindowSummary(comparisonMetrics: ComparisonMetrics) {
   ).length;
 
   return `Each bar is one ${comparisonMetrics.currentWindow.dayCount}-day window of backlog movement. ${formatNumber(improvingWindows)} windows reduced the queue while ${formatNumber(regressingWindows)} increased it.`;
+}
+
+function getOpenAgeSummary(deadlineMetrics: DeadlineMetrics) {
+  const ageChartData = buildOpenAgeDistributionSummary(deadlineMetrics);
+  return ageChartData;
+}
+
+function buildOpenAgeDistributionSummary(deadlineMetrics: DeadlineMetrics) {
+  const ageDistribution =
+    buildOpenAgeChartData(deadlineMetrics).datasets[0]?.data ?? [];
+  const olderThanNinety =
+    Number(ageDistribution[3] ?? 0) + Number(ageDistribution[4] ?? 0);
+
+  return `${formatNumber(olderThanNinety)} open bugs are older than 90 days, which helps separate fresh intake from long-running backlog.`;
+}
+
+function getRateHistorySummary(comparisonMetrics: ComparisonMetrics) {
+  return `This trend compares historical fix velocity with intake velocity over matching ${comparisonMetrics.currentWindow.dayCount}-day windows so it is easier to see when throughput actually overtakes incoming bugs.`;
 }
 
 function ChartFallback({ className = "" }: { className?: string }) {
@@ -250,6 +284,10 @@ export const OverviewView = memo(function OverviewView({
     () => buildStatusChartData(deadlineMetrics),
     [deadlineMetrics],
   );
+  const openAgeChartData = useMemo(
+    () => buildOpenAgeChartData(deadlineMetrics),
+    [deadlineMetrics],
+  );
   const metricCards = useMemo(
     () =>
       buildOverviewMetricCards(
@@ -262,6 +300,10 @@ export const OverviewView = memo(function OverviewView({
   );
   const statusSummary = useMemo(
     () => getStatusDistributionSummary(deadlineMetrics),
+    [deadlineMetrics],
+  );
+  const openAgeSummary = useMemo(
+    () => getOpenAgeSummary(deadlineMetrics),
     [deadlineMetrics],
   );
 
@@ -280,11 +322,11 @@ export const OverviewView = memo(function OverviewView({
         ))}
       </div>
 
-      <div className="grid items-stretch gap-2 xl:grid-cols-[minmax(0,1.1fr)_minmax(320px,0.9fr)]">
+      <div className="grid items-stretch gap-2 md:grid-cols-2">
         <Suspense fallback={<ChartFallback />}>
           <ChartCard
             chartKey="bug-burndown"
-            className="h-full xl:row-span-2"
+            className="h-full"
             data={deadlineBurndownData}
             onHoverStateChange={onChartFocusChange}
             siegeMode={siegeMode}
@@ -309,11 +351,24 @@ export const OverviewView = memo(function OverviewView({
             chartKey="status-breakdown"
             className="h-full"
             data={statusChartData}
-            description="Open bugs grouped by their current workflow state so blocked or aging lanes stand out immediately."
+            description="Bug counts grouped by your Linear workflow columns using a fixed dashboard order."
             onHoverStateChange={onChartFocusChange}
             siegeMode={siegeMode}
             summary={statusSummary}
-            title="Open bugs by status"
+            title="Bugs by status"
+            variant="bar"
+          />
+        </Suspense>
+        <Suspense fallback={<ChartFallback />}>
+          <ChartCard
+            chartKey="open-age-breakdown"
+            className="h-full"
+            data={openAgeChartData}
+            description="Open backlog grouped by age so stale work is visible separately from fresh intake."
+            onHoverStateChange={onChartFocusChange}
+            siegeMode={siegeMode}
+            summary={openAgeSummary}
+            title="Open bug age"
             variant="bar"
           />
         </Suspense>
@@ -355,6 +410,10 @@ export const PeriodsView = memo(function PeriodsView({
     () => buildComparisonWindowHistoryChartData(comparisonMetrics),
     [comparisonMetrics],
   );
+  const comparisonRateHistoryData = useMemo(
+    () => buildComparisonRateHistoryChartData(comparisonMetrics),
+    [comparisonMetrics],
+  );
   const metricCards = useMemo(
     () =>
       buildPeriodsMetricCards(
@@ -376,6 +435,10 @@ export const PeriodsView = memo(function PeriodsView({
     () => getHistoricalWindowSummary(comparisonMetrics),
     [comparisonMetrics],
   );
+  const rateHistorySummary = useMemo(
+    () => getRateHistorySummary(comparisonMetrics),
+    [comparisonMetrics],
+  );
 
   return (
     <div className="grid content-start gap-2">
@@ -392,7 +455,7 @@ export const PeriodsView = memo(function PeriodsView({
         ))}
       </div>
 
-      <div className="grid items-stretch gap-2 xl:grid-cols-[minmax(0,1.1fr)_minmax(320px,0.9fr)]">
+      <div className="grid items-stretch gap-2 md:grid-cols-2">
         <Suspense fallback={<ChartFallback />}>
           <ChartCard
             chartKey="comparison-timeline"
@@ -420,7 +483,7 @@ export const PeriodsView = memo(function PeriodsView({
         <Suspense fallback={<ChartFallback />}>
           <ChartCard
             chartKey="period-window-history"
-            className="h-full xl:col-span-2"
+            className="h-full"
             data={comparisonWindowHistoryData}
             description="Non-overlapping historical windows for the currently selected range, colored by whether backlog grew or shrank in each period."
             onHoverStateChange={onChartFocusChange}
@@ -428,6 +491,18 @@ export const PeriodsView = memo(function PeriodsView({
             summary={historicalWindowSummary}
             title="Period-by-period net change"
             variant="bar"
+          />
+        </Suspense>
+        <Suspense fallback={<ChartFallback />}>
+          <ChartCard
+            chartKey="period-rate-history"
+            className="h-full"
+            data={comparisonRateHistoryData}
+            description="Historical intake and fix rates across the same non-overlapping windows as the net-change view."
+            onHoverStateChange={onChartFocusChange}
+            siegeMode={siegeMode}
+            summary={rateHistorySummary}
+            title="Fix vs intake trend"
           />
         </Suspense>
       </div>

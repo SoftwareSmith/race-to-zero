@@ -229,6 +229,15 @@ function WeaponTypeCard({
       bugsByState.risky.push([bugId, entry]);
   }
 
+  const favoredPreview = bugsByState.favored
+    .slice(0, 3)
+    .map(([, entry]) => entry.name)
+    .join(", ");
+  const riskyPreview = [...bugsByState.immune, ...bugsByState.risky]
+    .slice(0, 3)
+    .map(([, entry]) => entry.name)
+    .join(", ");
+
   return (
     <section className="rounded-[24px] border border-white/10 bg-white/[0.03] p-4">
       <div className="flex items-start justify-between gap-4">
@@ -241,6 +250,33 @@ function WeaponTypeCard({
             {lead.typeHint}
           </p>
         </div>
+      </div>
+
+      <div className="mt-4 grid gap-3 md:grid-cols-3">
+        {(
+          [
+            ["Favored", bugsByState.favored.length, "text-emerald-200"],
+            ["Risky", bugsByState.risky.length, "text-amber-200"],
+            ["Immune", bugsByState.immune.length, "text-rose-200"],
+          ] as const
+        ).map(([label, count, tone]) => (
+          <div
+            key={label}
+            className="rounded-[18px] border border-white/8 bg-black/16 p-3"
+          >
+            <p
+              className={cn(
+                "text-[0.65rem] font-semibold uppercase tracking-[0.18em]",
+                tone,
+              )}
+            >
+              {label}
+            </p>
+            <strong className="mt-2 block text-[1.35rem] font-semibold tracking-[-0.03em] text-stone-50">
+              {count}
+            </strong>
+          </div>
+        ))}
       </div>
 
       <div className="mt-4 grid gap-3 md:grid-cols-2">
@@ -258,55 +294,37 @@ function WeaponTypeCard({
                   {weapon.title}
                 </p>
                 <p className="text-xs uppercase tracking-[0.16em] text-stone-500">
-                  {getWeaponTiers(weapon)
-                    .map((tier) => `T${tier.tier} ${tier.title}`)
-                    .join(" · ")}
+                  {weapon.typeLabel}
                 </p>
               </div>
             </div>
             <p className="mt-3 text-xs leading-5 text-stone-400">
-              Unlocks at {weapon.unlockKills} bugs fixed.
+              Unlock at {weapon.unlockKills} kills.{" "}
+              {getWeaponTiers(weapon).length} tiers.
             </p>
           </div>
         ))}
       </div>
 
-      <div className="mt-5 grid gap-3 md:grid-cols-3">
-        {(
-          [
-            ["Favored", bugsByState.favored, "text-emerald-200"],
-            ["Risky", bugsByState.risky, "text-amber-200"],
-            ["Immune", bugsByState.immune, "text-rose-200"],
-          ] as const
-        ).map(([label, bugs, tone]) => (
-          <div
-            key={label}
-            className="rounded-[18px] border border-white/8 bg-black/16 p-3"
-          >
-            <p
-              className={cn(
-                "text-[0.65rem] font-semibold uppercase tracking-[0.18em]",
-                tone,
-              )}
-            >
-              {label}
-            </p>
-            <div className="mt-3 flex flex-wrap gap-2">
-              {bugs.length > 0 ? (
-                bugs.map(([bugId, entry]) => (
-                  <span
-                    key={bugId}
-                    className="inline-flex items-center rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-1 text-xs text-stone-200"
-                  >
-                    {entry.name}
-                  </span>
-                ))
-              ) : (
-                <span className="text-xs text-stone-500">None</span>
-              )}
-            </div>
-          </div>
-        ))}
+      <div className="mt-5 grid gap-3 md:grid-cols-2">
+        <div className="rounded-[18px] border border-white/8 bg-black/16 p-3">
+          <p className="text-[0.65rem] font-semibold uppercase tracking-[0.18em] text-emerald-200">
+            Best Into
+          </p>
+          <p className="mt-2 text-sm leading-6 text-stone-300">
+            {favoredPreview ||
+              "No strong bug matchups are currently mapped for this damage family."}
+          </p>
+        </div>
+        <div className="rounded-[18px] border border-white/8 bg-black/16 p-3">
+          <p className="text-[0.65rem] font-semibold uppercase tracking-[0.18em] text-rose-200">
+            Avoid Into
+          </p>
+          <p className="mt-2 text-sm leading-6 text-stone-300">
+            {riskyPreview ||
+              "No major immunity or risk pockets are currently mapped for this damage family."}
+          </p>
+        </div>
       </div>
     </section>
   );
@@ -413,6 +431,8 @@ function SummaryCard({
 
   return (
     <button
+      data-hud-cursor="pointer"
+      data-testid="codex-summary-card"
       type="button"
       onClick={() => onSelect(id)}
       className={cn(
@@ -576,6 +596,7 @@ export default function CodexPanel({
             <>
               <button
                 aria-label="Close bug codex"
+                data-hud-cursor="default"
                 className="fixed inset-0 z-[260] bg-black/45 backdrop-blur-[2px]"
                 onClick={onMenuToggle}
                 type="button"
@@ -583,6 +604,8 @@ export default function CodexPanel({
               <div
                 className="fixed inset-x-4 top-[8vh] z-[270] mx-auto flex max-h-[78vh] w-full max-w-[58rem] overflow-hidden rounded-[28px] border border-white/10 shadow-[0_30px_90px_rgba(0,0,0,0.52)] backdrop-blur-xl"
                 data-codex-modal-root="true"
+                data-hud-cursor="default"
+                data-testid="codex-modal"
                 style={backdropStyle}
               >
                 <div className="pointer-events-none absolute inset-0 overflow-hidden">
@@ -668,6 +691,7 @@ export default function CodexPanel({
                     <div className="absolute right-5 top-4 z-20 flex items-center gap-2">
                       {selectedEntry ? (
                         <button
+                          data-hud-cursor="pointer"
                           className="rounded-full border border-white/10 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.14em] text-stone-300 transition hover:border-white/20 hover:text-stone-100"
                           onClick={handleBackToGrid}
                           type="button"
@@ -676,6 +700,7 @@ export default function CodexPanel({
                         </button>
                       ) : null}
                       <button
+                        data-hud-cursor="pointer"
                         className="rounded-full border border-white/10 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.14em] text-stone-300 transition hover:border-white/20 hover:text-stone-100"
                         onClick={onMenuToggle}
                         type="button"
@@ -685,16 +710,24 @@ export default function CodexPanel({
                     </div>
                   </div>
 
-                  <div className="relative border-b border-white/8 px-5 py-3">
-                    <Tabs
-                      activeTab={activeView as any}
-                      onChange={(tabId) => setActiveView(tabId as CodexView)}
-                      tabs={CODEX_TABS as any}
-                    />
-                  </div>
+                  {!selectedEntry ? (
+                    <div
+                      className="relative border-b border-white/8 px-5 py-3"
+                      data-testid="codex-tabs"
+                    >
+                      <Tabs
+                        activeTab={activeView as any}
+                        onChange={(tabId) => setActiveView(tabId as CodexView)}
+                        tabs={CODEX_TABS as any}
+                      />
+                    </div>
+                  ) : null}
 
                   {activeView === "bugs" && selectedEntry && selectedVariant ? (
-                    <div className="flex-1 overflow-hidden px-5 py-4 mb-6">
+                    <div
+                      className="mb-6 flex-1 overflow-hidden px-5 py-4"
+                      data-testid="codex-detail-view"
+                    >
                       <div className="mx-auto flex h-full w-full max-w-[46rem] flex-col gap-4">
                         <DossierStats
                           accent={selectedAccent}

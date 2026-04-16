@@ -88,6 +88,7 @@ interface UseSiegeGameOptions {
   currentBugCount: number;
   currentBugCounts: BugCounts;
   evolutionStates?: Partial<Record<SiegeWeaponId, WeaponEvolutionState>>;
+  onEscape?: () => boolean;
   onStructureTierUp?: (payload: {
     structureId: string;
     structureType: import("@game/types").StructureId;
@@ -139,6 +140,7 @@ export function useSiegeGame({
   currentBugCount: _currentBugCount,
   currentBugCounts,
   evolutionStates,
+  onEscape,
   onStructureTierUp,
   pauseTimer = false,
 }: UseSiegeGameOptions) {
@@ -316,13 +318,17 @@ export function useSiegeGame({
   }, [resetCompletion]);
 
   const handleLifecycleEscape = useCallback(() => {
+    if (onEscape?.()) {
+      return;
+    }
+
     if (placingStructureIdRef.current !== null) {
       cancelStructurePlacement();
       return;
     }
 
     exitInteractiveMode();
-  }, [cancelStructurePlacement, exitInteractiveMode, placingStructureIdRef]);
+  }, [cancelStructurePlacement, exitInteractiveMode, onEscape, placingStructureIdRef]);
 
   const handleLifecycleSlotSelect = useCallback((slotIndex: number) => {
     const stats = getSiegeCombatStats(runtimeSnapshotRef.current.kills, debugMode);

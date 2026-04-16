@@ -36,7 +36,24 @@ const PRIORITY_ORDER = [
   "Low",
   "Unspecified",
 ] as const;
-const STATUS_DISTRIBUTION_LIMIT = 6;
+const STATUS_ORDER = [
+  "Backlog",
+  "Triage",
+  "Todo",
+  "In progress",
+  "In review",
+  "Deploy ready",
+  "Cancelled",
+  "Duplicated",
+  "Other",
+] as const;
+const OPEN_AGE_BUCKETS = [
+  { label: "0-7d", maxDays: 7 },
+  { label: "8-30d", maxDays: 30 },
+  { label: "31-90d", maxDays: 90 },
+  { label: "91-180d", maxDays: 180 },
+  { label: "181d+", maxDays: Number.POSITIVE_INFINITY },
+] as const;
 const PREPARED_SOURCE_CACHE = new WeakMap<
   MetricsSource,
   PreparedMetricsSource
@@ -103,47 +120,120 @@ function buildPriorityDistributionFromCounts(
   }));
 }
 
-function toTitleCase(value: string) {
-  return value
-    .split(/[\s_-]+/)
-    .filter(Boolean)
-    .map((segment) => segment.charAt(0).toUpperCase() + segment.slice(1))
-    .join(" ");
-}
+function getLinearStatusLabel(bug: MetricsBug) {
+  const rawValue = bug.stateName?.trim() || bug.stateType?.trim() || "";
+  const normalizedValue = rawValue.toLowerCase();
 
-function getOpenStatusLabel(bug: MetricsBug) {
-  if (bug.stateName?.trim()) {
-    return bug.stateName.trim();
+  if (normalizedValue === "backlog") {
+    return "Backlog";
   }
 
-  if (bug.stateType?.trim()) {
-    return toTitleCase(bug.stateType.trim());
+  if (normalizedValue === "triage" || normalizedValue === "triaged") {
+    return "Triage";
   }
 
-  return "Open";
+  if (
+    normalizedValue === "todo" ||
+    normalizedValue === "to do" ||
+    normalizedValue === "unstarted"
+  ) {
+    return "Todo";
+  }
+
+  if (
+    normalizedValue === "in progress" ||
+    normalizedValue === "in-progress" ||
+    normalizedValue === "started" ||
+    normalizedValue === "doing"
+  ) {
+    return "In progress";
+  }
+
+  if (
+    normalizedValue === "in review" ||
+    normalizedValue === "review" ||
+    normalizedValue === "qa" ||
+    normalizedValue === "testing"
+  ) {
+    return "In review";
+  }
+
+  if (
+    normalizedValue === "deploy ready" ||
+    normalizedValue === "ready to deploy" ||
+    normalizedValue === "deploy-ready" ||
+    normalizedValue === "ready for deploy"
+  ) {
+    return "Deploy ready";
+  }
+
+  if (
+    normalizedValue === "done" ||
+    normalizedValue === "completed" ||
+    normalizedValue === "complete" ||
+    (!normalizedValue && bug.completedAt)
+  ) {
+    return "Done";
+  }
+
+  if (
+    normalizedValue === "cancelled" ||
+    normalizedValue === "canceled" ||
+    normalizedValue === "cancel"
+  ) {
+    return "Cancelled";
+  }
+
+  if (
+    normalizedValue === "duplicated" ||
+    normalizedValue === "duplicate" ||
+    normalizedValue === "duplicate bug"
+  ) {
+    return "Duplicated";
+  }
+
+  return "Other";
 }
 
 function buildStatusDistributionFromCounts(
   counts: Map<string, number>,
 ): StatusDistributionEntry[] {
-  const orderedEntries = [...counts.entries()].sort(
-    ([leftLabel, leftCount], [rightLabel, rightCount]) =>
-      rightCount - leftCount || leftLabel.localeCompare(rightLabel),
+  return STATUS_ORDER.map((label) => ({
+    label,
+    count: counts.get(label) ?? 0,
+  }));
+}
+
+function buildOpenAgeDistribution(
+  bugs: MetricsBug[],
+  today: Date,
+) {
+  const bucketCounts = new Map<string, number>(
+    OPEN_AGE_BUCKETS.map((bucket) => [bucket.label, 0]),
   );
 
-  if (orderedEntries.length <= STATUS_DISTRIBUTION_LIMIT) {
-    return orderedEntries.map(([label, count]) => ({ label, count }));
+  for (const bug of bugs) {
+    if (bug.completedAt) {
+      continue;
+    }
+
+    const createdAt = parseISO(bug.createdAt);
+    const ageInDays = Math.max(differenceInCalendarDays(today, createdAt), 0);
+    const bucket = OPEN_AGE_BUCKETS.find(
+      (entry) => ageInDays <= entry.maxDays,
+    );
+
+    if (!bucket) {
+      continue;
+    }
+
+    bucketCounts.set(bucket.label, (bucketCounts.get(bucket.label) ?? 0) + 1);
   }
 
-  const visibleEntries = orderedEntries.slice(0, STATUS_DISTRIBUTION_LIMIT - 1);
-  const otherCount = orderedEntries
-    .slice(STATUS_DISTRIBUTION_LIMIT - 1)
-    .reduce((total, [, count]) => total + count, 0);
-
-  return [
-    ...visibleEntries.map(([label, count]) => ({ label, count })),
-    { label: "Other", count: otherCount },
-  ];
+  return OPEN_AGE_BUCKETS.map((bucket) => ({
+    label: bucket.label,
+    count: bucketCounts.get(bucket.label) ?? 0,
+  }));
 }
 
 function formatLabel(dateValue: string) {
@@ -323,12 +413,13 @@ function prepareMetricsSource(
   let remainingBugs = 0;
 
   for (const bug of bugs) {
+    const statusLabel = getLinearStatusLabel(bug);
+    statusCounts.set(statusLabel, (statusCounts.get(statusLabel) ?? 0) + 1);
+
     if (!bug.completedAt) {
       remainingBugs += 1;
       const label = getPriorityLabel(bug.priority);
       priorityCounts.set(label, (priorityCounts.get(label) ?? 0) + 1);
-      const statusLabel = getOpenStatusLabel(bug);
-      statusCounts.set(statusLabel, (statusCounts.get(statusLabel) ?? 0) + 1);
     }
   }
 
@@ -767,6 +858,9 @@ export function buildPriorityChartData(
 export function buildStatusChartData(
   deadlineMetrics: DeadlineMetrics,
 ): ChartData<"bar", number[], string> {
+  const visibleStatusEntries = deadlineMetrics.statusDistribution.filter(
+    (entry) => entry.label !== "Done",
+  );
   const palette = [
     ["rgba(56, 189, 248, 0.74)", "#38bdf8"],
     ["rgba(45, 212, 191, 0.72)", "#2dd4bf"],
@@ -777,17 +871,46 @@ export function buildStatusChartData(
   ] as const;
 
   return {
-    labels: deadlineMetrics.statusDistribution.map((entry) => entry.label),
+    labels: visibleStatusEntries.map((entry) => entry.label),
+    datasets: [
+      {
+        label: "Bugs",
+        data: visibleStatusEntries.map((entry) => entry.count),
+        backgroundColor: visibleStatusEntries.map(
+          (_, index) => palette[index % palette.length][0],
+        ),
+        borderColor: visibleStatusEntries.map(
+          (_, index) => palette[index % palette.length][1],
+        ),
+        borderWidth: 1,
+        borderRadius: 8,
+      },
+    ],
+  };
+}
+
+export function buildOpenAgeChartData(
+  deadlineMetrics: DeadlineMetrics,
+): ChartData<"bar", number[], string> {
+  const ageDistribution = buildOpenAgeDistribution(
+    deadlineMetrics.bugs,
+    deadlineMetrics.today,
+  );
+
+  return {
+    labels: ageDistribution.map((entry) => entry.label),
     datasets: [
       {
         label: "Open bugs",
-        data: deadlineMetrics.statusDistribution.map((entry) => entry.count),
-        backgroundColor: deadlineMetrics.statusDistribution.map(
-          (_, index) => palette[index % palette.length][0],
-        ),
-        borderColor: deadlineMetrics.statusDistribution.map(
-          (_, index) => palette[index % palette.length][1],
-        ),
+        data: ageDistribution.map((entry) => entry.count),
+        backgroundColor: [
+          "rgba(56, 189, 248, 0.72)",
+          "rgba(45, 212, 191, 0.72)",
+          "rgba(251, 191, 36, 0.72)",
+          "rgba(249, 115, 22, 0.72)",
+          "rgba(248, 113, 113, 0.72)",
+        ],
+        borderColor: ["#38bdf8", "#2dd4bf", "#fbbf24", "#f97316", "#f87171"],
         borderWidth: 1,
         borderRadius: 8,
       },
@@ -1052,6 +1175,42 @@ export function buildComparisonWindowHistoryChartData(
         }),
         borderWidth: 1,
         borderRadius: 8,
+      },
+    ],
+  };
+}
+
+export function buildComparisonRateHistoryChartData(
+  comparisonMetrics: ComparisonMetrics,
+): ChartData<"line", number[], string> {
+  return {
+    labels: comparisonMetrics.historicalWindows.map((window) =>
+      format(window.endDate, "MMM d"),
+    ),
+    datasets: [
+      {
+        label: "Intake rate",
+        data: comparisonMetrics.historicalWindows.map((window) =>
+          Number(window.addRate.toFixed(2)),
+        ),
+        borderColor: "#fda4af",
+        backgroundColor: "rgba(253, 164, 175, 0.14)",
+        tension: 0.25,
+        borderWidth: 3,
+        pointRadius: 2,
+        pointHoverRadius: 4,
+      },
+      {
+        label: "Fix rate",
+        data: comparisonMetrics.historicalWindows.map((window) =>
+          Number(window.fixRate.toFixed(2)),
+        ),
+        borderColor: "#5eead4",
+        backgroundColor: "rgba(94, 234, 212, 0.14)",
+        tension: 0.25,
+        borderWidth: 3,
+        pointRadius: 2,
+        pointHoverRadius: 4,
       },
     ],
   };

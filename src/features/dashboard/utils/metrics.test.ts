@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   buildComparisonWindowHistoryChartData,
+  buildOpenAgeChartData,
+  buildComparisonRateHistoryChartData,
   buildStatusChartData,
   getComparisonMetrics,
   getDeadlineMetrics,
@@ -79,7 +81,7 @@ describe("metrics", () => {
     expect(summary.currentAddRate).toBeGreaterThan(0);
   });
 
-  it("builds an overview status chart from unresolved workflow states", () => {
+  it("builds a status chart using the fixed Linear column order", () => {
     const metrics = {
       bugs: [
         {
@@ -93,8 +95,8 @@ describe("metrics", () => {
           completedAt: null,
           createdAt: "2026-03-21",
           priority: 3,
-          stateName: "Backlog",
-          stateType: "backlog",
+          stateName: "In Review",
+          stateType: "started",
         },
         {
           completedAt: null,
@@ -110,6 +112,13 @@ describe("metrics", () => {
           stateName: "Done",
           stateType: "completed",
         },
+        {
+          completedAt: null,
+          createdAt: "2026-03-25",
+          priority: 4,
+          stateName: "Duplicate",
+          stateType: "canceled",
+        },
       ],
     };
 
@@ -123,12 +132,80 @@ describe("metrics", () => {
     });
     const chartData = buildStatusChartData(deadlineMetrics);
 
-    expect(deadlineMetrics.statusDistribution).toEqual([
-      { label: "Backlog", count: 2 },
-      { label: "Triage", count: 1 },
+    expect(deadlineMetrics.statusDistribution.map((entry) => entry.label)).toEqual([
+      "Backlog",
+      "Triage",
+      "Todo",
+      "In progress",
+      "In review",
+      "Deploy ready",
+      "Cancelled",
+      "Duplicated",
+      "Other",
     ]);
-    expect(chartData.labels).toEqual(["Backlog", "Triage"]);
-    expect(chartData.datasets[0]?.data).toEqual([2, 1]);
+    expect(chartData.labels).toEqual([
+      "Backlog",
+      "Triage",
+      "Todo",
+      "In progress",
+      "In review",
+      "Deploy ready",
+      "Cancelled",
+      "Duplicated",
+      "Other",
+    ]);
+    expect(chartData.datasets[0]?.data).toEqual([1, 1, 0, 0, 1, 0, 0, 1, 0]);
+  });
+
+  it("builds an open age chart for unresolved backlog buckets", () => {
+    const deadlineMetrics = withFrozenDate("2026-04-16T12:00:00.000Z", () =>
+      getDeadlineMetrics(
+        {
+          bugs: [
+            {
+              completedAt: null,
+              createdAt: "2026-04-15",
+              priority: 2,
+              stateName: "Backlog",
+              stateType: "backlog",
+            },
+            {
+              completedAt: null,
+              createdAt: "2026-04-01",
+              priority: 2,
+              stateName: "Backlog",
+              stateType: "backlog",
+            },
+            {
+              completedAt: null,
+              createdAt: "2026-02-01",
+              priority: 2,
+              stateName: "Backlog",
+              stateType: "backlog",
+            },
+            {
+              completedAt: null,
+              createdAt: "2025-10-01",
+              priority: 2,
+              stateName: "Backlog",
+              stateType: "backlog",
+            },
+          ],
+        },
+        {
+          deadlineDate: "2026-12-31",
+          trackingStartDate: "2026-02-01",
+          workdaySettings: {
+            excludePublicHolidays: false,
+            excludeWeekends: false,
+          },
+        },
+      ),
+    );
+    const chartData = buildOpenAgeChartData(deadlineMetrics);
+
+    expect(chartData.labels).toEqual(["0-7d", "8-30d", "31-90d", "91-180d", "181d+"]);
+    expect(chartData.datasets[0]?.data).toEqual([1, 1, 1, 0, 1]);
   });
 
   it("builds historical net-change windows for the selected period length", () => {
@@ -214,5 +291,11 @@ describe("metrics", () => {
     );
     expect(chartData.datasets[0]?.data).toContain(-1);
     expect(chartData.datasets[0]?.data).toContain(1);
+
+    const rateChartData = buildComparisonRateHistoryChartData(comparisonMetrics);
+    expect(rateChartData.datasets).toHaveLength(2);
+    expect(rateChartData.labels?.length).toBe(
+      comparisonMetrics.historicalWindows.length,
+    );
   });
 });

@@ -56,7 +56,8 @@ test.describe("dashboard core QA", () => {
     await expect(page.getByText(expected.overlayLabel)).toBeVisible();
     await expect(page.getByText("Bug burndown")).toBeVisible();
     await expect(page.getByText("Open bugs by priority")).toBeVisible();
-    await expect(page.getByText("Open bugs by status")).toBeVisible();
+    await expect(page.getByText("Bugs by status")).toBeVisible();
+    await expect(page.getByText("Open bug age")).toBeVisible();
 
     await clientErrors.expectNoClientErrors();
   });
@@ -96,6 +97,7 @@ test.describe("dashboard core QA", () => {
     await expect(page.getByText("Created vs completed over time")).toBeVisible();
     await expect(page.getByText("Current vs previous window")).toBeVisible();
     await expect(page.getByText("Period-by-period net change")).toBeVisible();
+    await expect(page.getByText("Fix vs intake trend")).toBeVisible();
 
     await clientErrors.expectNoClientErrors();
   });
@@ -110,7 +112,8 @@ test.describe("dashboard core QA", () => {
     await expect(page.getByLabel("From date")).toBeVisible();
     await expect(page.getByLabel("Deadline date")).toBeVisible();
     await expect(page.getByText("Bug burndown")).toBeVisible();
-    await expect(page.getByText("Open bugs by status")).toBeVisible();
+    await expect(page.getByText("Bugs by status")).toBeVisible();
+    await expect(page.getByText("Open bug age")).toBeVisible();
 
     await clientErrors.expectNoClientErrors();
   });

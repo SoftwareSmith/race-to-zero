@@ -88,10 +88,20 @@ const SiegeExperience = memo(function SiegeExperience({
     [dashboardRef, getProgressionLabel, showUpgradeToast],
   );
 
+  const handleSiegeEscape = useCallback(() => {
+    if (ui.openTopMenu === "codex") {
+      ui.closeMenus();
+      return true;
+    }
+
+    return false;
+  }, [ui]);
+
   const siegeGame = useSiegeGame({
     currentBugCount: metrics.currentBugCount,
     currentBugCounts: metrics.currentBugCounts,
     evolutionStates,
+    onEscape: handleSiegeEscape,
     onStructureTierUp: handleStructureTierUp,
     pauseTimer: ui.openTopMenu === "codex",
   });

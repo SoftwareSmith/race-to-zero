@@ -25,7 +25,9 @@ export function getLineChartOptions(
         clip: false,
         color: "#f8fafc",
         formatter: (value: unknown) =>
-          typeof value === "number" && Number.isFinite(value) ? value : "",
+          typeof value === "number" && Number.isFinite(value) && value > 0
+            ? value
+            : "",
         font: {
           size: 11,
           weight: 700,
@@ -77,8 +79,17 @@ export function getLineChartOptions(
           color: "rgba(148, 163, 184, 0.08)",
         },
         ticks: {
+          autoSkip: chartKey === "status-breakdown" ? false : undefined,
           color: "#94a3b8",
-          maxRotation: 0,
+          font:
+            chartKey === "status-breakdown"
+              ? {
+                  size: 10,
+                  weight: 500,
+                }
+              : undefined,
+          maxRotation: chartKey === "status-breakdown" ? 50 : 0,
+          minRotation: chartKey === "status-breakdown" ? 50 : 0,
           padding: 10,
         },
       },

@@ -46,7 +46,11 @@ const SiegeHudControls = memo(function SiegeHudControls({
 }: SiegeHudControlsProps) {
   const codexTrigger = onToggleCodex ? (
     <Tooltip content="Open codex">
-      <HudActionButton active={codexOpen} onClick={onToggleCodex}>
+      <HudActionButton
+        active={codexOpen}
+        ariaLabel="Open codex"
+        onClick={onToggleCodex}
+      >
         <svg
           aria-hidden="true"
           className="h-3.5 w-3.5"

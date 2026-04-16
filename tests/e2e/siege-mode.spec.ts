@@ -127,6 +127,42 @@ test("advances the visible siege timer during a live run", async ({ page }) => {
   await expect(hud.locator("strong").nth(3)).toHaveText("00:01");
 });
 
+test("opening the codex pauses the timer and hides the top toggle in detail view", async ({ page }) => {
+  await page.goto("./");
+  await page.getByRole("button", { name: "Open interactive bug game" }).click();
+
+  const hud = page.getByTestId("siege-hud");
+  await expect(hud).toBeVisible();
+  await expect(hud.locator("strong").nth(3)).toHaveText("00:00");
+
+  await page.getByRole("button", { name: "Open codex" }).click();
+
+  const codexModal = page.getByTestId("codex-modal");
+  await expect(codexModal).toBeVisible();
+  await expect
+    .poll(() => codexModal.evaluate((element) => getComputedStyle(element).cursor))
+    .toBe("default");
+  await page.waitForTimeout(1400);
+  await expect(hud.locator("strong").nth(3)).toHaveText("00:00");
+
+  const summaryCard = codexModal.getByTestId("codex-summary-card").first();
+  await expect
+    .poll(() => summaryCard.evaluate((element) => getComputedStyle(element).cursor))
+    .toBe("pointer");
+
+  await summaryCard.click();
+  await expect(page.getByTestId("codex-detail-view")).toBeVisible();
+  await expect(page.getByTestId("codex-tabs")).toHaveCount(0);
+
+  await page.keyboard.press("Escape");
+  await expect(codexModal).toBeHidden();
+  await expect(page.getByTestId("siege-hud")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Open interactive bug game" })).toHaveCount(0);
+
+  await page.waitForTimeout(1400);
+  await expect(hud.locator("strong").nth(3)).toHaveText("00:01");
+});
+
 test("shows the completion overlay when the live siege progress reaches zero bugs", async ({ page }) => {
   await page.setViewportSize({ height: 1200, width: 1440 });
   await enableCanvasQa(page);
