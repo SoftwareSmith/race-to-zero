@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-04-15T21:39:33.926Z",
-  "lastUpdated": "2026-04-15T21:39:33.926Z",
+  "generatedAt": "2026-04-16T00:20:13.933Z",
+  "lastUpdated": "2026-04-16T00:20:13.933Z",
   "bugs": [
     {
       "createdAt": "2023-09-18",
@@ -1558,8 +1558,8 @@
       "createdAt": "2024-05-30",
       "completedAt": null,
       "priority": 4,
-      "stateName": "Backlog",
-      "stateType": "backlog",
+      "stateName": "Canceled",
+      "stateType": "canceled",
       "teamKey": "CP"
     },
     {
