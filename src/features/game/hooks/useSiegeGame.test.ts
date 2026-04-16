@@ -200,4 +200,64 @@ describe("useSiegeGame", () => {
 
     expect(result.current.interactiveRemainingBugs).toBe(17);
   });
+
+  it("advances the timer during an active run", async () => {
+    const { result } = renderHook(() =>
+      useSiegeGame({
+        currentBugCount: 20,
+        currentBugCounts: { high: 0, low: 20, medium: 0, urgent: 0 },
+        evolutionStates: {},
+      }),
+    );
+
+    act(() => {
+      result.current.enterInteractiveMode();
+    });
+
+    await waitFor(() => {
+      expect(result.current.siegePhase).toBe("active");
+    });
+
+    const elapsedAtStart = result.current.interactiveElapsedMs;
+
+    await waitFor(
+      () => {
+        expect(result.current.interactiveElapsedMs).toBeGreaterThan(
+          elapsedAtStart,
+        );
+      },
+      { timeout: 2000 },
+    );
+  });
+
+  it("creates a completion summary when the live engine count reaches zero", async () => {
+    const { result } = renderHook(() =>
+      useSiegeGame({
+        currentBugCount: 3,
+        currentBugCounts: { high: 0, low: 3, medium: 0, urgent: 0 },
+        evolutionStates: {},
+      }),
+    );
+
+    act(() => {
+      result.current.enterInteractiveMode();
+    });
+
+    await waitFor(() => {
+      expect(result.current.siegePhase).toBe("active");
+    });
+
+    act(() => {
+      result.current.handleInteractiveHit({ defeated: true, pointValue: 1 });
+      result.current.handleInteractiveHit({ defeated: true, pointValue: 1 });
+      result.current.handleInteractiveHit({ defeated: true, pointValue: 1 });
+      result.current.syncRemainingBugs(0);
+    });
+
+    await waitFor(() => {
+      expect(result.current.completionSummary).not.toBeNull();
+    });
+
+    expect(result.current.interactiveRemainingBugs).toBe(0);
+  });
 });

@@ -29,7 +29,7 @@ export default function CompareRangePicker({
 
   return (
     <div
-      className="flex flex-wrap gap-2"
+      className="flex flex-wrap gap-1.5"
       role="tablist"
       aria-label="Comparison period selector"
     >
@@ -41,7 +41,7 @@ export default function CompareRangePicker({
             key={option.value}
             aria-selected={isActive}
             className={cn(
-              "h-9 rounded-full border px-3.5 text-[0.82rem] font-semibold transition duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300/40",
+              "h-8.5 rounded-full border px-3 text-[0.78rem] font-semibold transition duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300/40 sm:h-9 sm:px-3.5 sm:text-[0.82rem]",
               isActive
                 ? "border-sky-400/24 bg-sky-400/8 text-sky-100 shadow-[inset_0_0_0_1px_rgba(56,189,248,0.12)]"
                 : "border-white/6 bg-zinc-950/60 text-stone-400 hover:-translate-y-0.5 hover:border-white/10 hover:bg-zinc-900/88 hover:text-stone-100",

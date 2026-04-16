@@ -56,6 +56,7 @@ test.describe("dashboard core QA", () => {
     await expect(page.getByText(expected.overlayLabel)).toBeVisible();
     await expect(page.getByText("Bug burndown")).toBeVisible();
     await expect(page.getByText("Open bugs by priority")).toBeVisible();
+    await expect(page.getByText("Open bugs by status")).toBeVisible();
 
     await clientErrors.expectNoClientErrors();
   });
@@ -94,6 +95,22 @@ test.describe("dashboard core QA", () => {
 
     await expect(page.getByText("Created vs completed over time")).toBeVisible();
     await expect(page.getByText("Current vs previous window")).toBeVisible();
+    await expect(page.getByText("Period-by-period net change")).toBeVisible();
+
+    await clientErrors.expectNoClientErrors();
+  });
+
+  test("stays usable on a narrow dashboard viewport", async ({ page }) => {
+    const clientErrors = createConsoleCollectors(page);
+
+    await page.setViewportSize({ width: 390, height: 844 });
+    await gotoDashboard(page);
+
+    await expect(page.getByRole("tab", { name: "Overview" })).toBeVisible();
+    await expect(page.getByLabel("From date")).toBeVisible();
+    await expect(page.getByLabel("Deadline date")).toBeVisible();
+    await expect(page.getByText("Bug burndown")).toBeVisible();
+    await expect(page.getByText("Open bugs by status")).toBeVisible();
 
     await clientErrors.expectNoClientErrors();
   });

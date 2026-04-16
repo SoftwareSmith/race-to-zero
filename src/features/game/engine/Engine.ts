@@ -409,6 +409,20 @@ export class Engine {
     return this.entities;
   }
 
+  clearAllBugs(): number {
+    const clearedCount = this.entities.reduce((total, entity) => {
+      if (isTerminalEntityState((entity as any).state)) {
+        return total;
+      }
+
+      this.pool.push(entity as BugEntity);
+      return total + 1;
+    }, 0);
+
+    this.entities = [];
+    return clearedCount;
+  }
+
   getNeighbors(e: Entity, radius: number) {
     const r2 = radius * radius;
     const out: Entity[] = [];

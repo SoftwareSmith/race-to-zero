@@ -95,7 +95,7 @@ const ChartCard = memo(function ChartCard({
     <article
       data-siege-panel={chartKey}
       className={cn(
-        "group relative flex min-h-0 flex-col overflow-hidden rounded-[24px] border border-white/10 bg-[linear-gradient(180deg,rgba(10,12,18,0.96),rgba(19,23,32,0.96))] p-3.5 text-stone-50 shadow-[0_18px_38px_rgba(0,0,0,0.28)] transition duration-200 hover:-translate-y-0.5 hover:shadow-[0_22px_46px_rgba(0,0,0,0.32)]",
+        "group relative flex min-h-0 flex-col overflow-hidden rounded-[22px] border border-white/10 bg-[linear-gradient(180deg,rgba(10,12,18,0.96),rgba(19,23,32,0.96))] p-3 text-stone-50 shadow-[0_16px_32px_rgba(0,0,0,0.24)] transition duration-200 hover:-translate-y-0.5 hover:shadow-[0_20px_40px_rgba(0,0,0,0.3)] sm:rounded-[24px] sm:p-3.5",
         className,
       )}
       onMouseLeave={() => onHoverStateChange?.(null)}
@@ -108,11 +108,11 @@ const ChartCard = memo(function ChartCard({
       <div className="absolute inset-x-8 top-0 h-px bg-gradient-to-r from-transparent via-white/35 to-transparent opacity-0 transition duration-200 group-hover:opacity-100" />
       <div className="relative flex h-full flex-col">
         <div className="shrink-0">
-          <h3 className="mt-0.5 font-display text-[1.55rem] leading-tight tracking-[-0.04em] text-stone-50 sm:text-[1.85rem]">
+          <h3 className="mt-0.5 font-display text-[1.32rem] leading-tight tracking-[-0.04em] text-stone-50 sm:text-[1.7rem] xl:text-[1.82rem]">
             {title}
           </h3>
           {description ? (
-            <p className="mt-1.5 w-full text-[0.76rem] leading-5 text-stone-300">
+            <p className="mt-1.5 w-full text-[0.72rem] leading-5 text-stone-300 sm:text-[0.76rem]">
               {description}
             </p>
           ) : null}
@@ -120,7 +120,7 @@ const ChartCard = memo(function ChartCard({
 
         <div
           className={cn(
-            "mt-2.5 h-[192px] shrink-0 sm:h-[208px] xl:h-[224px]",
+            "mt-2.5 h-[176px] shrink-0 sm:h-[204px] xl:h-[220px]",
             description ? "sm:mt-3" : "",
           )}
         >
@@ -132,7 +132,7 @@ const ChartCard = memo(function ChartCard({
         </div>
 
         {summary ? (
-          <p className="mt-2 shrink-0 max-w-2xl text-[0.72rem] leading-5 text-stone-400">
+          <p className="mt-2 shrink-0 max-w-2xl text-[0.7rem] leading-5 text-stone-400 sm:text-[0.72rem]">
             {summary}
           </p>
         ) : null}

@@ -15,7 +15,10 @@ export function getLineChartOptions(
     },
     plugins: {
       datalabels: {
-        display: variant === "bar",
+        display:
+          variant === "bar" &&
+          chartKey !== "period-window-history" &&
+          chartKey !== "comparison-summary",
         anchor: "end",
         align: "end",
         clamp: true,
@@ -83,10 +86,14 @@ export function getLineChartOptions(
         beginAtZero: true,
         grace: variant === "bar" ? "10%" : 0,
         title:
-          chartKey === "comparison-summary"
+          chartKey === "comparison-summary" ||
+          chartKey === "period-window-history"
             ? {
                 display: true,
-                text: "Value",
+                text:
+                  chartKey === "period-window-history"
+                    ? "Net change"
+                    : "Value",
                 color: "#cbd5e1",
                 padding: { bottom: 8 },
                 font: {

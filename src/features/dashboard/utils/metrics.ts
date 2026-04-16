@@ -21,6 +21,7 @@ import type {
   MetricsBug,
   MetricsSource,
   PriorityDistributionEntry,
+  StatusDistributionEntry,
   SummaryMetrics,
   Tone,
   WorkdaySettings,
@@ -35,6 +36,7 @@ const PRIORITY_ORDER = [
   "Low",
   "Unspecified",
 ] as const;
+const STATUS_DISTRIBUTION_LIMIT = 6;
 const PREPARED_SOURCE_CACHE = new WeakMap<
   MetricsSource,
   PreparedMetricsSource
@@ -58,6 +60,7 @@ interface PreparedMetricsSource {
   remainingBugs: number;
   remainingIndex: SeriesIndex;
   remainingSeries: DailyCountEntry[];
+  statusDistribution: StatusDistributionEntry[];
 }
 
 function normalizeBugRecords(
@@ -98,6 +101,49 @@ function buildPriorityDistributionFromCounts(
     label,
     count: counts.get(label) ?? 0,
   }));
+}
+
+function toTitleCase(value: string) {
+  return value
+    .split(/[\s_-]+/)
+    .filter(Boolean)
+    .map((segment) => segment.charAt(0).toUpperCase() + segment.slice(1))
+    .join(" ");
+}
+
+function getOpenStatusLabel(bug: MetricsBug) {
+  if (bug.stateName?.trim()) {
+    return bug.stateName.trim();
+  }
+
+  if (bug.stateType?.trim()) {
+    return toTitleCase(bug.stateType.trim());
+  }
+
+  return "Open";
+}
+
+function buildStatusDistributionFromCounts(
+  counts: Map<string, number>,
+): StatusDistributionEntry[] {
+  const orderedEntries = [...counts.entries()].sort(
+    ([leftLabel, leftCount], [rightLabel, rightCount]) =>
+      rightCount - leftCount || leftLabel.localeCompare(rightLabel),
+  );
+
+  if (orderedEntries.length <= STATUS_DISTRIBUTION_LIMIT) {
+    return orderedEntries.map(([label, count]) => ({ label, count }));
+  }
+
+  const visibleEntries = orderedEntries.slice(0, STATUS_DISTRIBUTION_LIMIT - 1);
+  const otherCount = orderedEntries
+    .slice(STATUS_DISTRIBUTION_LIMIT - 1)
+    .reduce((total, [, count]) => total + count, 0);
+
+  return [
+    ...visibleEntries.map(([label, count]) => ({ label, count })),
+    { label: "Other", count: otherCount },
+  ];
 }
 
 function formatLabel(dateValue: string) {
@@ -273,6 +319,7 @@ function prepareMetricsSource(
 
   const bugs = normalizeBugRecords(source);
   const priorityCounts = new Map<string, number>();
+  const statusCounts = new Map<string, number>();
   let remainingBugs = 0;
 
   for (const bug of bugs) {
@@ -280,6 +327,8 @@ function prepareMetricsSource(
       remainingBugs += 1;
       const label = getPriorityLabel(bug.priority);
       priorityCounts.set(label, (priorityCounts.get(label) ?? 0) + 1);
+      const statusLabel = getOpenStatusLabel(bug);
+      statusCounts.set(statusLabel, (statusCounts.get(statusLabel) ?? 0) + 1);
     }
   }
 
@@ -297,6 +346,7 @@ function prepareMetricsSource(
     remainingBugs,
     remainingIndex: buildSeriesIndex(remainingSeries, { usePrefixSums: false }),
     remainingSeries,
+    statusDistribution: buildStatusDistributionFromCounts(statusCounts),
   };
 
   if (source) {
@@ -366,6 +416,33 @@ function getWindowStats(
     completionRate,
     label: getDisplayRangeLabel(startDate, endDate),
   };
+}
+
+function buildHistoricalWindows(
+  preparedSource: PreparedMetricsSource,
+  earliestDate: Date,
+  currentEndDate: Date,
+  windowSizeDays: number,
+) {
+  const windows: ComparisonWindowMetrics[] = [];
+  let windowEnd = currentEndDate;
+
+  while (compareAsc(windowEnd, earliestDate) >= 0) {
+    let windowStart = subDays(windowEnd, windowSizeDays - 1);
+    if (compareAsc(windowStart, earliestDate) < 0) {
+      windowStart = earliestDate;
+    }
+
+    windows.push(getWindowStats(preparedSource, windowStart, windowEnd));
+
+    if (compareAsc(windowStart, earliestDate) <= 0) {
+      break;
+    }
+
+    windowEnd = subDays(windowStart, 1);
+  }
+
+  return windows.reverse();
 }
 
 function getDeadlineStatus({
@@ -571,6 +648,7 @@ export function getDeadlineMetrics(
       daysUntilDeadline,
     }),
     priorityDistribution: preparedSource.priorityDistribution,
+    statusDistribution: preparedSource.statusDistribution,
     today,
     workdaySettings: activeWorkdaySettings,
   };
@@ -686,6 +764,37 @@ export function buildPriorityChartData(
   };
 }
 
+export function buildStatusChartData(
+  deadlineMetrics: DeadlineMetrics,
+): ChartData<"bar", number[], string> {
+  const palette = [
+    ["rgba(56, 189, 248, 0.74)", "#38bdf8"],
+    ["rgba(45, 212, 191, 0.72)", "#2dd4bf"],
+    ["rgba(251, 191, 36, 0.7)", "#fbbf24"],
+    ["rgba(248, 113, 113, 0.72)", "#f87171"],
+    ["rgba(167, 139, 250, 0.7)", "#a78bfa"],
+    ["rgba(148, 163, 184, 0.72)", "#94a3b8"],
+  ] as const;
+
+  return {
+    labels: deadlineMetrics.statusDistribution.map((entry) => entry.label),
+    datasets: [
+      {
+        label: "Open bugs",
+        data: deadlineMetrics.statusDistribution.map((entry) => entry.count),
+        backgroundColor: deadlineMetrics.statusDistribution.map(
+          (_, index) => palette[index % palette.length][0],
+        ),
+        borderColor: deadlineMetrics.statusDistribution.map(
+          (_, index) => palette[index % palette.length][1],
+        ),
+        borderWidth: 1,
+        borderRadius: 8,
+      },
+    ],
+  };
+}
+
 export function getComparisonMetrics(
   source: MetricsSource | null,
   {
@@ -744,6 +853,12 @@ export function getComparisonMetrics(
     currentStartDate,
     currentEndDate,
   );
+  const historicalWindows = buildHistoricalWindows(
+    preparedSource,
+    earliestDate,
+    currentEndDate,
+    currentWindow.dayCount,
+  );
 
   let tone: Tone =
     currentWindow.netChange > 0
@@ -791,6 +906,7 @@ export function getComparisonMetrics(
     body,
     createdSeries,
     completedSeries,
+    historicalWindows,
     rangeLabel: isAllTime
       ? "All time"
       : isCustom
@@ -894,6 +1010,50 @@ export function buildComparisonSummaryChartData(
       "Completion rate %",
     ],
     datasets,
+  };
+}
+
+export function buildComparisonWindowHistoryChartData(
+  comparisonMetrics: ComparisonMetrics,
+): ChartData<"bar", number[], string> {
+  const values = comparisonMetrics.historicalWindows.map(
+    (window) => window.netChange,
+  );
+
+  return {
+    labels: comparisonMetrics.historicalWindows.map((window) =>
+      format(window.endDate, "MMM d"),
+    ),
+    datasets: [
+      {
+        label: `Net change per ${comparisonMetrics.currentWindow.dayCount}-day window`,
+        data: values,
+        backgroundColor: values.map((value) => {
+          if (value < 0) {
+            return "rgba(45, 212, 191, 0.72)";
+          }
+
+          if (value > 0) {
+            return "rgba(248, 113, 113, 0.72)";
+          }
+
+          return "rgba(148, 163, 184, 0.72)";
+        }),
+        borderColor: values.map((value) => {
+          if (value < 0) {
+            return "#2dd4bf";
+          }
+
+          if (value > 0) {
+            return "#f87171";
+          }
+
+          return "#94a3b8";
+        }),
+        borderWidth: 1,
+        borderRadius: 8,
+      },
+    ],
   };
 }
 

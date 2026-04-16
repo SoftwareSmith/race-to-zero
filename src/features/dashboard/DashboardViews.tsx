@@ -9,10 +9,12 @@ import {
   getNetChangeTone,
 } from "./utils/dashboard";
 import {
+  buildComparisonWindowHistoryChartData,
   buildComparisonSummaryChartData,
   buildComparisonTimelineChartData,
   buildDeadlineBurndownChartData,
   buildPriorityChartData,
+  buildStatusChartData,
 } from "@dashboard/utils/metrics";
 import type {
   ChartFocusState,
@@ -182,6 +184,26 @@ function buildPeriodsMetricCards(
   ];
 }
 
+function getStatusDistributionSummary(deadlineMetrics: DeadlineMetrics) {
+  const [leadingStatus] = deadlineMetrics.statusDistribution;
+  if (!leadingStatus) {
+    return "No unresolved workflow states are currently present in the snapshot.";
+  }
+
+  return `${leadingStatus.label} is the largest unresolved state with ${formatNumber(leadingStatus.count)} bugs, making it the biggest workflow bottleneck in the current snapshot.`;
+}
+
+function getHistoricalWindowSummary(comparisonMetrics: ComparisonMetrics) {
+  const improvingWindows = comparisonMetrics.historicalWindows.filter(
+    (window) => window.netChange < 0,
+  ).length;
+  const regressingWindows = comparisonMetrics.historicalWindows.filter(
+    (window) => window.netChange > 0,
+  ).length;
+
+  return `Each bar is one ${comparisonMetrics.currentWindow.dayCount}-day window of backlog movement. ${formatNumber(improvingWindows)} windows reduced the queue while ${formatNumber(regressingWindows)} increased it.`;
+}
+
 function ChartFallback({ className = "" }: { className?: string }) {
   return (
     <div
@@ -224,6 +246,10 @@ export const OverviewView = memo(function OverviewView({
     () => buildPriorityChartData(deadlineMetrics),
     [deadlineMetrics],
   );
+  const statusChartData = useMemo(
+    () => buildStatusChartData(deadlineMetrics),
+    [deadlineMetrics],
+  );
   const metricCards = useMemo(
     () =>
       buildOverviewMetricCards(
@@ -234,10 +260,14 @@ export const OverviewView = memo(function OverviewView({
       ),
     [deadlineMetrics, isWorkdayMode, metricTone, summary],
   );
+  const statusSummary = useMemo(
+    () => getStatusDistributionSummary(deadlineMetrics),
+    [deadlineMetrics],
+  );
 
   return (
     <div className="grid content-start gap-2">
-      <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-5">
+      <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
         {metricCards.map((metricCard) => (
           <MetricCard
             key={metricCard.label}
@@ -250,11 +280,11 @@ export const OverviewView = memo(function OverviewView({
         ))}
       </div>
 
-      <div className="grid items-stretch gap-2 xl:grid-cols-[minmax(0,1.15fr)_minmax(280px,0.85fr)]">
+      <div className="grid items-stretch gap-2 xl:grid-cols-[minmax(0,1.1fr)_minmax(320px,0.9fr)]">
         <Suspense fallback={<ChartFallback />}>
           <ChartCard
             chartKey="bug-burndown"
-            className="h-full"
+            className="h-full xl:row-span-2"
             data={deadlineBurndownData}
             onHoverStateChange={onChartFocusChange}
             siegeMode={siegeMode}
@@ -271,6 +301,19 @@ export const OverviewView = memo(function OverviewView({
             onHoverStateChange={onChartFocusChange}
             siegeMode={siegeMode}
             title="Open bugs by priority"
+            variant="bar"
+          />
+        </Suspense>
+        <Suspense fallback={<ChartFallback />}>
+          <ChartCard
+            chartKey="status-breakdown"
+            className="h-full"
+            data={statusChartData}
+            description="Open bugs grouped by their current workflow state so blocked or aging lanes stand out immediately."
+            onHoverStateChange={onChartFocusChange}
+            siegeMode={siegeMode}
+            summary={statusSummary}
+            title="Open bugs by status"
             variant="bar"
           />
         </Suspense>
@@ -308,6 +351,10 @@ export const PeriodsView = memo(function PeriodsView({
     () => buildComparisonSummaryChartData(comparisonMetrics),
     [comparisonMetrics],
   );
+  const comparisonWindowHistoryData = useMemo(
+    () => buildComparisonWindowHistoryChartData(comparisonMetrics),
+    [comparisonMetrics],
+  );
   const metricCards = useMemo(
     () =>
       buildPeriodsMetricCards(
@@ -325,10 +372,14 @@ export const PeriodsView = memo(function PeriodsView({
       netChangeTone,
     ],
   );
+  const historicalWindowSummary = useMemo(
+    () => getHistoricalWindowSummary(comparisonMetrics),
+    [comparisonMetrics],
+  );
 
   return (
     <div className="grid content-start gap-2">
-      <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
         {metricCards.map((metricCard) => (
           <MetricCard
             key={metricCard.label}
@@ -341,7 +392,7 @@ export const PeriodsView = memo(function PeriodsView({
         ))}
       </div>
 
-      <div className="grid items-stretch gap-2 xl:grid-cols-[minmax(0,1.15fr)_minmax(280px,0.85fr)]">
+      <div className="grid items-stretch gap-2 xl:grid-cols-[minmax(0,1.1fr)_minmax(320px,0.9fr)]">
         <Suspense fallback={<ChartFallback />}>
           <ChartCard
             chartKey="comparison-timeline"
@@ -363,6 +414,19 @@ export const PeriodsView = memo(function PeriodsView({
             siegeMode={siegeMode}
             summary="These bars compare the current period with the previous one across intake, completions, net movement, and completion rate."
             title="Current vs previous window"
+            variant="bar"
+          />
+        </Suspense>
+        <Suspense fallback={<ChartFallback />}>
+          <ChartCard
+            chartKey="period-window-history"
+            className="h-full xl:col-span-2"
+            data={comparisonWindowHistoryData}
+            description="Non-overlapping historical windows for the currently selected range, colored by whether backlog grew or shrank in each period."
+            onHoverStateChange={onChartFocusChange}
+            siegeMode={siegeMode}
+            summary={historicalWindowSummary}
+            title="Period-by-period net change"
             variant="bar"
           />
         </Suspense>

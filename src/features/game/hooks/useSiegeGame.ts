@@ -252,7 +252,7 @@ export function useSiegeGame({
     updateRuntimeSnapshot,
   });
 
-  const { debugMode, killAllBugs, toggleDebugMode } = useSiegeGameDebug({
+  const { clearSwarmRequestId, debugMode, killAllBugs, toggleDebugMode } = useSiegeGameDebug({
     interactiveInitialBugCounts,
     interactiveMode,
     lastKillAtRef,
@@ -492,6 +492,10 @@ export function useSiegeGame({
   const syncRemainingBugs = useCallback(
     (count: number) => {
       const normalizedCount = Math.max(0, Math.floor(count));
+      const shouldForceFlush =
+        runtimeSnapshotRef.current.remainingBugs !== normalizedCount ||
+        normalizedCount === 0;
+
       updateRuntimeSnapshot((current) => {
         if (current.remainingBugs === normalizedCount) {
           return current;
@@ -501,7 +505,7 @@ export function useSiegeGame({
           ...current,
           remainingBugs: normalizedCount,
         };
-      });
+      }, shouldForceFlush);
     },
     [updateRuntimeSnapshot],
   );
@@ -512,6 +516,7 @@ export function useSiegeGame({
     cancelStructurePlacement,
     combatStats,
     changeGameMode,
+    clearSwarmRequestId,
     displayedBugCounts,
     debugMode,
     enterInteractiveMode,

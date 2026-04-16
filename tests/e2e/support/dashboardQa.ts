@@ -484,7 +484,12 @@ export function createConsoleCollectors(page: Page) {
 
   page.on("console", (message) => {
     if (message.type() === "error") {
-      consoleErrors.push(message.text());
+      const text = message.text();
+      if (text.includes("ERR_NETWORK_IO_SUSPENDED")) {
+        return;
+      }
+
+      consoleErrors.push(text);
     }
   });
 

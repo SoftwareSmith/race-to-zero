@@ -41,6 +41,11 @@ export interface PriorityDistributionEntry {
   label: string;
 }
 
+export interface StatusDistributionEntry {
+  count: number;
+  label: string;
+}
+
 export interface DailyCountEntry {
   count: number;
   date: string;
@@ -78,6 +83,7 @@ export interface DeadlineMetrics {
   statusBody: string;
   statusHeadline: string;
   statusSignal: string;
+  statusDistribution: StatusDistributionEntry[];
   statusTone: Tone;
   today: Date;
   trackingStartBacklog: number;
@@ -108,6 +114,7 @@ export interface ComparisonMetrics {
   currentWindow: ComparisonWindowMetrics;
   hasComparisonWindow: boolean;
   headline: string;
+  historicalWindows: ComparisonWindowMetrics[];
   previousWindow: ComparisonWindowMetrics | null;
   rangeKey: string;
   rangeLabel: string;

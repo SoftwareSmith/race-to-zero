@@ -66,4 +66,38 @@ test.describe("siege combat QA", () => {
 
     await clientErrors.expectNoClientErrors();
   });
+
+  test("shows the completion overlay after the final live bug is killed", async ({ page }) => {
+    await page.setViewportSize({ height: 1200, width: 1440 });
+    await enableCanvasQa(page);
+    await mockMetrics(page, singleLowBugMetrics);
+    await seedDashboardState(page, {
+      gameConfig: getStaticSiegeGameConfig(),
+    });
+
+    await page.goto("./");
+    await page.getByRole("button", { name: "Open interactive bug game" }).click();
+
+    const hud = page.getByTestId("siege-hud");
+    await expect(hud).toBeVisible();
+    await expect(hud.locator("strong").nth(0)).toHaveText("1");
+
+    await waitForQaBugPositions(page);
+    const [bug] = await getQaBugPositions(page);
+    const canvas = page.locator("canvas").first();
+    const canvasBox = await canvas.boundingBox();
+    expect(bug).toBeTruthy();
+    expect(canvasBox).toBeTruthy();
+
+    await canvas.click({
+      force: true,
+      position: {
+        x: bug.x - (canvasBox?.x ?? 0),
+        y: bug.y - (canvasBox?.y ?? 0),
+      },
+    });
+
+    await expect(hud.locator("strong").nth(0)).toHaveText("0");
+    await expect(page.getByTestId("siege-complete-overlay")).toBeVisible();
+  });
 });

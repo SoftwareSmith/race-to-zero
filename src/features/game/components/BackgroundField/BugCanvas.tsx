@@ -146,6 +146,7 @@ export interface BugCanvasProps {
     weaponId: SiegeWeaponId,
     newTier: import("@game/types").WeaponTier,
   ) => void;
+  clearSwarmRequestId?: number;
   onLiveBugCountChange?: (count: number) => void;
   initialEvolutionStates?: Partial<
     Record<SiegeWeaponId, import("@game/types").WeaponEvolutionState>
@@ -190,6 +191,7 @@ const BugCanvas = memo(function BugCanvas({
   getWeaponTier = () => 1 as import("@game/types").WeaponTier,
   onWeaponEvolutionStatesChange,
   onWeaponEvolution,
+  clearSwarmRequestId = 0,
   onLiveBugCountChange,
   initialEvolutionStates,
 }: BugCanvasProps) {
@@ -475,6 +477,15 @@ const BugCanvas = memo(function BugCanvas({
       boundsRef.current = measurement.bounds;
       canvas.width = Math.floor(width * measurement.devicePixelRatio);
       canvas.height = Math.floor(height * measurement.devicePixelRatio);
+      context.setTransform(
+        measurement.devicePixelRatio,
+        0,
+        0,
+        measurement.devicePixelRatio,
+        0,
+        0,
+      );
+      swarmRef.current?.setSize?.(width, height);
     };
 
     const updateActivity = () => {
@@ -667,20 +678,20 @@ const BugCanvas = memo(function BugCanvas({
       lastFireTimeRef,
     );
 
-      const handleInteractivePointerDown = (event: MouseEvent) => {
-        if (!shouldHandlePointerDown(interactiveModeRef.current, event.target)) {
-          return;
-        }
+    const handleInteractivePointerDown = (event: MouseEvent) => {
+      if (!shouldHandlePointerDown(interactiveModeRef.current, event.target)) {
+        return;
+      }
 
-        handlePointerDown(event);
-      };
+      handlePointerDown(event);
+    };
 
     document.addEventListener("visibilitychange", updateActivity);
     window.addEventListener("focus", updateActivity);
     window.addEventListener("blur", updateActivity);
     // Single registration - the useEffect cleanup in React Strict Mode re-runs will
     // remove the previous listener before re-registering, so no double-fire risk.
-      window.addEventListener("mousedown", handleInteractivePointerDown);
+    window.addEventListener("mousedown", handleInteractivePointerDown);
     animationFrameId = window.requestAnimationFrame(renderFrame);
 
     return () => {
@@ -712,6 +723,25 @@ const BugCanvas = memo(function BugCanvas({
       engine.updateStructureTier?.(structure.id, structure.tier);
     }
   }, [placedStructures]);
+
+  useEffect(() => {
+    if (!interactiveMode || clearSwarmRequestId === 0) {
+      return;
+    }
+
+    const engine = swarmRef.current as
+      | (Engine & { clearAllBugs?: () => number })
+      | null;
+    if (!engine?.clearAllBugs) {
+      return;
+    }
+
+    engine.clearAllBugs();
+    latestBugPositionsRef.current = [];
+    lastReportedLiveBugCountRef.current = 0;
+    onLiveBugCountChangeRef.current?.(0);
+    updateQaBugPositions([], boundsRef.current);
+  }, [clearSwarmRequestId, interactiveMode]);
 
   return (
     <>

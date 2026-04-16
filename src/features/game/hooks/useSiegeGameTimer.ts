@@ -67,7 +67,6 @@ export function useSiegeGameTimer({
 
     if (interactiveRunningSinceRef.current == null) {
       interactiveRunningSinceRef.current = Date.now();
-      return undefined;
     }
 
     const syncElapsedMs = () => {

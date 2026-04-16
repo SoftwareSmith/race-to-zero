@@ -41,14 +41,14 @@ const TopNav = memo(function TopNav({
 }: TopNavProps) {
   return (
     <div
-      className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between"
+      className="flex flex-col gap-1.5 lg:flex-row lg:items-center lg:justify-between"
       onMouseDownCapture={() => onInteract()}
       onTouchStartCapture={() => onInteract()}
     >
       <Tabs activeTab={activeTab} onChange={onTabChange} tabs={TAB_ITEMS} />
 
       {activeTab === "overview" ? (
-        <div className="flex flex-wrap gap-1.5 lg:justify-end">
+        <div className="flex w-full flex-wrap gap-1.5 lg:w-auto lg:justify-end">
           <CompactDateField
             label="From"
             max={deadlineDate}
@@ -63,7 +63,7 @@ const TopNav = memo(function TopNav({
           />
         </div>
       ) : (
-        <div className="flex flex-wrap items-center gap-1.5 lg:justify-end">
+        <div className="flex w-full flex-wrap items-center gap-1.5 lg:w-auto lg:justify-end">
           <CompareRangePicker
             compareRangeKey={compareRangeKey}
             onChange={onCompareRangeChange}

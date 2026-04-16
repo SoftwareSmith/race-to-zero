@@ -46,6 +46,7 @@ export function useSiegeGameDebug({
   updateRuntimeSnapshot,
 }: UseSiegeGameDebugOptions) {
   const [debugMode, setDebugMode] = useState(getInitialDebugMode);
+  const [clearSwarmRequestId, setClearSwarmRequestId] = useState(0);
 
   useEffect(() => {
     if (typeof window === "undefined") {
@@ -122,9 +123,11 @@ export function useSiegeGameDebug({
       true,
     );
     lastKillAtRef.current = null;
+    setClearSwarmRequestId((current) => current + 1);
   }, [interactiveMode, lastKillAtRef, updateRuntimeSnapshot]);
 
   return {
+    clearSwarmRequestId,
     debugMode,
     killAllBugs,
     toggleDebugMode,

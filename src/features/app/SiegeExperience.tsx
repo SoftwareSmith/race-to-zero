@@ -192,16 +192,23 @@ const SiegeExperience = memo(function SiegeExperience({
             siegeGame.interactiveMode ? siegeGame.handleAgentAbsorb : undefined
           }
           onBugHit={
-            siegeGame.interactiveMode ? siegeGame.handleInteractiveHit : undefined
+            siegeGame.interactiveMode
+              ? siegeGame.handleInteractiveHit
+              : undefined
           }
           onStructureKill={
-            siegeGame.interactiveMode ? siegeGame.handleStructureKill : undefined
+            siegeGame.interactiveMode
+              ? siegeGame.handleStructureKill
+              : undefined
           }
           onStructurePlace={
             siegeGame.interactiveMode
               ? (type, vx, vy, cx, cy, structureId) =>
                   siegeGame.placeStructure(type, vx, vy, cx, cy, structureId)
               : undefined
+          }
+          clearSwarmRequestId={
+            siegeGame.interactiveMode ? siegeGame.clearSwarmRequestId : 0
           }
           onLiveBugCountChange={
             siegeGame.interactiveMode ? siegeGame.syncRemainingBugs : undefined

@@ -81,7 +81,7 @@ const DashboardShell = memo(function DashboardShell({
     <div
       ref={dashboardRef}
       className={cn(
-        "relative z-10 mx-auto grid w-full max-w-[1480px] content-start gap-2 px-2 py-2 sm:px-3 sm:py-3 lg:px-4 lg:py-4",
+        "relative z-10 mx-auto grid w-full max-w-[1360px] content-start gap-1.5 px-1.5 py-1.5 sm:gap-2 sm:px-2.5 sm:py-2.5 lg:px-3 lg:py-3",
         interactiveMode ? "pointer-events-none select-none" : "",
       )}
       style={{
@@ -95,26 +95,26 @@ const DashboardShell = memo(function DashboardShell({
     >
       <header
         className={cn(
-          "relative z-20 grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3",
+          "relative z-20 grid grid-cols-1 gap-2.5 md:grid-cols-[minmax(0,1fr)_auto] md:items-start md:gap-3",
           CHROME_TRANSITION_CLASSNAME,
           chromeHidden
             ? "-translate-y-5 opacity-0 blur-sm"
             : "translate-y-0 opacity-100 blur-0",
         )}
       >
-        <div className="min-w-0 max-w-4xl">
+        <div className="min-w-0 max-w-3xl">
           <p className="text-[0.72rem] font-semibold uppercase tracking-[0.28em] text-stone-500">
             {metrics.headerEyebrow}
           </p>
-          <h1 className="mt-1.5 font-display text-3xl leading-[0.92] tracking-[-0.06em] text-stone-50 sm:text-[2.65rem] xl:text-[3.25rem]">
+          <h1 className="mt-1 font-display text-[2.2rem] leading-[0.92] tracking-[-0.06em] text-stone-50 sm:mt-1.5 sm:text-[2.6rem] xl:text-[3.1rem]">
             Race to Zero Bugs
           </h1>
-          <p className="mt-2 max-w-2xl text-[0.82rem] leading-5 text-stone-400 sm:text-sm">
+          <p className="mt-1.5 max-w-2xl text-[0.78rem] leading-5 text-stone-400 sm:mt-2 sm:text-sm">
             {metrics.headerSubtitle}
           </p>
         </div>
 
-        <div className="flex flex-wrap items-start justify-end gap-2 self-start">
+        <div className="flex flex-wrap items-start justify-start gap-1.5 self-start md:justify-end md:gap-2">
           <SettingsMenu
             containerRef={ui.settingsMenuRef}
             onMenuToggle={() => ui.handleTopMenuToggle("settings")}
@@ -190,7 +190,7 @@ const DashboardShell = memo(function DashboardShell({
 
       <div
         className={cn(
-          "relative z-10 mt-2 rounded-[24px] px-2 py-1.5 sm:mt-3 sm:px-3 sm:py-2",
+          "relative z-10 mt-1 rounded-[22px] px-1.5 py-1 sm:mt-2 sm:px-2.5 sm:py-1.5",
           CHROME_TRANSITION_CLASSNAME,
           chromeHidden
             ? "translate-y-[-12px] opacity-0 blur-sm"
@@ -234,7 +234,7 @@ const DashboardShell = memo(function DashboardShell({
         />
       </div>
 
-      <main className="grid content-start gap-2 self-start">
+      <main className="grid content-start gap-1.5 self-start sm:gap-2">
         <div>
           {ui.activeTab === "overview" ? (
             <OverviewView
