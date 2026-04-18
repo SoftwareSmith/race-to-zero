@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-04-17T00:18:38.426Z",
-  "lastUpdated": "2026-04-17T00:18:38.426Z",
+  "generatedAt": "2026-04-18T00:16:14.372Z",
+  "lastUpdated": "2026-04-18T00:16:14.372Z",
   "bugs": [
     {
       "createdAt": "2023-09-18",
@@ -12704,6 +12704,46 @@
       "priority": 1,
       "stateName": "Canceled",
       "stateType": "canceled",
+      "teamKey": "CP"
+    },
+    {
+      "createdAt": "2026-04-17",
+      "completedAt": null,
+      "priority": 3,
+      "stateName": "Todo",
+      "stateType": "unstarted",
+      "teamKey": "TA"
+    },
+    {
+      "createdAt": "2026-04-17",
+      "completedAt": null,
+      "priority": 4,
+      "stateName": "Todo",
+      "stateType": "unstarted",
+      "teamKey": "TA"
+    },
+    {
+      "createdAt": "2026-04-17",
+      "completedAt": null,
+      "priority": 4,
+      "stateName": "Todo",
+      "stateType": "unstarted",
+      "teamKey": "CP"
+    },
+    {
+      "createdAt": "2026-04-17",
+      "completedAt": null,
+      "priority": 4,
+      "stateName": "Backlog",
+      "stateType": "backlog",
+      "teamKey": "T1"
+    },
+    {
+      "createdAt": "2026-04-17",
+      "completedAt": null,
+      "priority": 2,
+      "stateName": "Triage",
+      "stateType": "triage",
       "teamKey": "CP"
     }
   ]
