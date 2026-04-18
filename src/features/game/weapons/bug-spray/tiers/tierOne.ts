@@ -10,8 +10,10 @@ export const tierOneTier: WeaponTierDefinition = {
   hint: "T2: Secondary poison clouds erupt around each freshly poisoned bug",
   effectColor: "#fde047",
   evolveAtKills: 70,
-  config: {
+  toggles: {
     poisonDps: 0.75,
+    secondaryRadius: 56,
+    secondaryDurationMs: 800,
   },
   vfx: BUG_SPRAY_TIER_VFX.tierOne,
   behavior: {

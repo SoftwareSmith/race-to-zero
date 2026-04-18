@@ -11,11 +11,14 @@ export const baseTier: WeaponTierDefinition = {
   effectColor: "#fde047",
   evolveAtKills: 25,
   hitPattern: HitPattern.Cone,
-  config: {
+  toggles: {
     hitRadius: 128,
     coneArcDeg: 80,
     poisonDps: 0.65,
-    poisonDurationMs: 5000,
+    poisonDurationMs: 450,
+    cloudRadius: 96,
+    cloudDurationMs: 2400,
+    cloudIntervalMs: 400,
   },
   vfx: BUG_SPRAY_TIER_VFX.base,
   behavior: {

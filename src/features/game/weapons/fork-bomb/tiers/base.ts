@@ -11,9 +11,11 @@ export const baseTier: WeaponTierDefinition = {
   effectColor: "#38bdf8",
   evolveAtKills: 20,
   hitPattern: HitPattern.Area,
-  config: {
+  toggles: {
     hitRadius: 48,
     damage: 2,
+    burstRadius: 34,
+    burstOffsetDistance: 52,
   },
   vfx: FORK_BOMB_TIER_VFX.base,
   behavior: {

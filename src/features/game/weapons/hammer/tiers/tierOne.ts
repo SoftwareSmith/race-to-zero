@@ -10,7 +10,7 @@ export const tierOneTier: WeaponTierDefinition = {
   hint: "T2: High-HP bugs split into two half-HP clones",
   effectColor: "#fbbf24",
   evolveAtKills: 60,
-  config: {
+  toggles: {
     damage: 2,
   },
   vfx: HAMMER_TIER_VFX.tierOne,

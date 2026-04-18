@@ -11,9 +11,11 @@ export const baseTier: WeaponTierDefinition = {
   effectColor: "#c084fc",
   evolveAtKills: 15,
   hitPattern: HitPattern.BlackHole,
-  config: {
+  toggles: {
     hitRadius: 300,
     blackHoleDurationMs: 2000,
+    blackHoleRadius: 300,
+    blackHoleCoreRadius: 80,
   },
   vfx: VOID_PULSE_TIER_VFX.base,
   behavior: {

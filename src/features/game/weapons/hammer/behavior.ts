@@ -11,17 +11,14 @@ import type {
 } from "@game/weapons/runtime/types";
 import { WeaponId, WeaponTier } from "@game/types";
 import { findNearestBugInRadius } from "@game/weapons/runtime/targetingHelpers";
-
-/** Damage per strike. */
-const DAMAGE = 2;
-/** Hit search radius when engine.hitTest misses. */
-const SEARCH_RADIUS = 48;
-/** T3: ally conversion duration. */
-const T3_ALLY_DURATION_MS = 8000;
+import { BASE_TOGGLES } from "./constants";
 
 export function createSession(ctx: WeaponContext): ClickFireResult {
   const { engine, targetX, targetY } = ctx;
   const tier = ctx.tier ?? WeaponTier.TIER_ONE;
+  const damage = ctx.config?.damage ?? BASE_TOGGLES.damage;
+  const searchRadius = ctx.config?.hitRadius ?? BASE_TOGGLES.hitRadius;
+  const allyDurationMs = ctx.config?.allyDurationMs ?? BASE_TOGGLES.allyDurationMs;
   const commands: WeaponCommand[] = [];
 
   // Always emit the crack decal at the aim point
@@ -41,7 +38,7 @@ export function createSession(ctx: WeaponContext): ClickFireResult {
     },
   });
 
-  const hit = findNearestBugInRadius(engine, targetX, targetY, SEARCH_RADIUS);
+  const hit = findNearestBugInRadius(engine, targetX, targetY, searchRadius);
   if (hit) {
     if (tier >= WeaponTier.TIER_THREE) {
       // T3: Rewrite Engine keeps the hammer's base hit so progression can
@@ -49,13 +46,13 @@ export function createSession(ctx: WeaponContext): ClickFireResult {
       commands.push({
         kind: "damage",
         targetIndex: hit.index,
-        amount: DAMAGE,
+        amount: damage,
         creditOnDeath: true,
       });
       commands.push({
         kind: "allyBug",
         targetIndex: hit.index,
-        durationMs: T3_ALLY_DURATION_MS,
+        durationMs: allyDurationMs,
       });
     } else if (tier >= WeaponTier.TIER_TWO) {
       // T2: Refactor Tool — split healthy bugs; damage near-dead ones
@@ -68,7 +65,7 @@ export function createSession(ctx: WeaponContext): ClickFireResult {
         commands.push({
           kind: "damage",
           targetIndex: hit.index,
-          amount: DAMAGE,
+          amount: damage,
           creditOnDeath: true,
         });
       }
@@ -76,7 +73,7 @@ export function createSession(ctx: WeaponContext): ClickFireResult {
       commands.push({
         kind: "damage",
         targetIndex: hit.index,
-        amount: DAMAGE,
+        amount: damage,
         creditOnDeath: true,
       });
     }

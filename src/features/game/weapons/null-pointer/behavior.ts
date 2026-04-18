@@ -14,19 +14,10 @@ import type {
 } from "@game/weapons/runtime/types";
 import { WeaponTier } from "@game/types";
 import { canvasToViewport } from "@game/weapons/runtime/targetingHelpers";
-import {
-  ID,
-  DAMAGE,
-  SPLASH_DAMAGE,
-  SEEK_RADIUS,
-  SPLASH_RADIUS,
-  MARK_RADIUS,
-  MARK_DURATION_MS,
-} from "./constants";
+import { BASE_TOGGLES } from "./constants";
 import {
   canSpreadMarks,
   canTriggerAutoScaler,
-  getExecuteHpLimit,
 } from "./helpers";
 import {
   createBinaryBurst,
@@ -37,9 +28,17 @@ import {
 export function createSession(ctx: WeaponContext): ClickFireResult {
   const { engine, targetX, targetY, viewportX, viewportY, bounds } = ctx;
   const tier = ctx.tier ?? WeaponTier.TIER_ONE;
+  const damage = ctx.config?.damage ?? BASE_TOGGLES.damage;
+  const splashDamage = ctx.config?.splashDamage ?? BASE_TOGGLES.splashDamage;
+  const seekRadius = ctx.config?.seekRadius ?? BASE_TOGGLES.seekRadius;
+  const splashRadius = ctx.config?.splashRadius ?? BASE_TOGGLES.splashRadius;
+  const markRadius = ctx.config?.markRadius ?? BASE_TOGGLES.markRadius;
+  const markDurationMs = ctx.config?.markDurationMs ?? BASE_TOGGLES.markDurationMs;
+  const executeHpLimit =
+    ctx.config?.executeHpLimit ?? BASE_TOGGLES.executeHpLimit;
   const commands: WeaponCommand[] = [];
 
-  const targetIdx = engine.closestTargetIndex(targetX, targetY, SEEK_RADIUS);
+  const targetIdx = engine.closestTargetIndex(targetX, targetY, seekRadius);
   const targetBug = targetIdx >= 0 ? engine.getAllBugs()[targetIdx] : null;
 
   const seekTargetVp = targetBug
@@ -57,22 +56,22 @@ export function createSession(ctx: WeaponContext): ClickFireResult {
 
   // T3: emit auto-scaler pulse (kills all marked bugs below threshold globally)
   if (canTriggerAutoScaler(tier)) {
-    commands.push({ kind: "autoScalerPulse", hpThreshold: getExecuteHpLimit(tier) });
+    commands.push({ kind: "autoScalerPulse", hpThreshold: executeHpLimit });
   }
 
   // T2+: apply marked to bug and nearby bugs
   if (canSpreadMarks(tier)) {
-    commands.push({ kind: "applyMarked", targetIndex: targetIdx, durationMs: MARK_DURATION_MS });
+    commands.push({ kind: "applyMarked", targetIndex: targetIdx, durationMs: markDurationMs });
     commands.push({
       kind: "markedRadius",
       cx: targetBug.x,
       cy: targetBug.y,
-      radius: MARK_RADIUS,
-      durationMs: MARK_DURATION_MS,
+      radius: markRadius,
+      durationMs: markDurationMs,
     });
   } else {
     // T1: apply mark to primary target only
-    commands.push({ kind: "applyMarked", targetIndex: targetIdx, durationMs: MARK_DURATION_MS });
+    commands.push({ kind: "applyMarked", targetIndex: targetIdx, durationMs: markDurationMs });
   }
 
   // Pixi: explosion + binary burst at bug position
@@ -83,12 +82,11 @@ export function createSession(ctx: WeaponContext): ClickFireResult {
   commands.push({
     kind: "damage",
     targetIndex: targetIdx,
-    amount: DAMAGE,
+    amount: damage,
     creditOnDeath: true,
   });
 
   // Execute if HP is low enough
-  const executeHpLimit = getExecuteHpLimit(tier);
   if ((targetBug.hp ?? 1) <= executeHpLimit && targetBug.marked) {
     commands.push({
       kind: "damage",
@@ -100,14 +98,14 @@ export function createSession(ctx: WeaponContext): ClickFireResult {
 
   // Splash damage on nearby bugs (excluding primary)
   const splashIndexes = engine
-    .radiusHitTest(targetBug.x, targetBug.y, SPLASH_RADIUS)
+    .radiusHitTest(targetBug.x, targetBug.y, splashRadius)
     .filter((i) => i !== targetIdx);
 
   for (const idx of splashIndexes) {
     commands.push({
       kind: "damage",
       targetIndex: idx,
-      amount: SPLASH_DAMAGE,
+      amount: splashDamage,
       creditOnDeath: true,
     });
   }

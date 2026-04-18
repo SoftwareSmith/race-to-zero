@@ -55,7 +55,7 @@ test.describe("garbage collector", () => {
     const errs = createConsoleCollectors(page);
     await openSiegeGame(page, 60);
 
-    await expect(page.getByTestId("weapon-nullpointer")).toHaveAttribute("data-locked", "true");
+    await expect(page.getByTestId("weapon-nullpointer")).toHaveCount(0);
     await killBugs(page, 18);
     await expect(page.getByTestId("weapon-nullpointer")).toHaveAttribute("data-locked", "false");
 
@@ -114,7 +114,7 @@ test.describe("bug spray", () => {
     const errs = createConsoleCollectors(page);
     await openSiegeGame(page, 120);
 
-    await expect(page.getByTestId("weapon-zapper")).toHaveAttribute("data-locked", "true");
+    await expect(page.getByTestId("weapon-zapper")).toHaveCount(0);
     await killBugs(page, 98);
     await expect(page.getByTestId("weapon-zapper")).toHaveAttribute("data-locked", "false");
 

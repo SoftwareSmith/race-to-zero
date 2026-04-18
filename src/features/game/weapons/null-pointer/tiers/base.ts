@@ -10,6 +10,15 @@ export const baseTier: WeaponTierDefinition = {
   hint: "Click anywhere — missile curves to highest-HP bug, binary burst on impact",
   effectColor: "#fb7185",
   evolveAtKills: 20,
+  toggles: {
+    damage: 3,
+    seekRadius: 500,
+    splashRadius: 60,
+    splashDamage: 1,
+    markRadius: 80,
+    markDurationMs: 6000,
+    executeHpLimit: 1,
+  },
   vfx: NULL_POINTER_TIER_VFX.base,
   behavior: {
     summary: "Single-target clean-up shot that marks only the primary bug.",

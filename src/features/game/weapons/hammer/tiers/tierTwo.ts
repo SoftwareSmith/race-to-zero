@@ -9,8 +9,9 @@ export const tierTwoTier: WeaponTierDefinition = {
     "Converts the hit bug into an ally for 8 seconds, removing it from the active threat stream.",
   hint: "T3: Convert the hit bug to an ally for 8 seconds",
   effectColor: "#fbbf24",
-  config: {
+  toggles: {
     damage: 2,
+    allyDurationMs: 8000,
   },
   vfx: HAMMER_TIER_VFX.tierTwo,
   behavior: {

@@ -19,19 +19,27 @@ import type {
   WeaponCommand,
 } from "@game/weapons/runtime/types";
 import { WeaponId, WeaponTier } from "@game/types";
-
-const DAMAGE = 2; // collapse shockring damage
-const BLACK_HOLE_RADIUS = 300;
-const CORE_RADIUS = 80;
-const DURATION_MS = 2000;
-const T2_BURN_PEAK_DPS = 1.5;
-const T2_BURN_DURATION_MS = 3000;
-const T3_EVENT_HORIZON_RADIUS = 200;
-const T3_EVENT_HORIZON_DURATION_MS = 5000;
+import { BASE_TOGGLES } from "./constants";
 
 export function createSession(ctx: WeaponContext): PersistentFireSession {
   const { targetX, targetY, viewportX, viewportY, engine } = ctx;
   const tier = ctx.tier ?? WeaponTier.TIER_ONE;
+  const damage = ctx.config?.damage ?? BASE_TOGGLES.damage;
+  const blackHoleRadius =
+    ctx.config?.blackHoleRadius ?? BASE_TOGGLES.blackHoleRadius;
+  const coreRadius =
+    ctx.config?.blackHoleCoreRadius ?? BASE_TOGGLES.blackHoleCoreRadius;
+  const durationMs =
+    ctx.config?.blackHoleDurationMs ?? BASE_TOGGLES.blackHoleDurationMs;
+  const burnDps = ctx.config?.burnDps ?? BASE_TOGGLES.burnDps;
+  const burnDurationMs =
+    ctx.config?.burnDurationMs ?? BASE_TOGGLES.burnDurationMs;
+  const burnDecayPerSecond =
+    ctx.config?.burnDecayPerSecond ?? BASE_TOGGLES.burnDecayPerSecond;
+  const eventHorizonRadius =
+    ctx.config?.eventHorizonRadius ?? BASE_TOGGLES.eventHorizonRadius;
+  const eventHorizonDurationMs =
+    ctx.config?.eventHorizonDurationMs ?? BASE_TOGGLES.eventHorizonDurationMs;
 
   // Singleton guard — refuse if a black hole is already active
   if (engine.getBlackHole()?.active) {
@@ -56,10 +64,10 @@ export function createSession(ctx: WeaponContext): PersistentFireSession {
       const started = engine.startBlackHole(
         targetX,
         targetY,
-        BLACK_HOLE_RADIUS,
-        CORE_RADIUS,
-        DURATION_MS,
-        DAMAGE,
+        blackHoleRadius,
+        coreRadius,
+        durationMs,
+        damage,
         WeaponId.VoidPulse,
       );
 
@@ -78,12 +86,12 @@ export function createSession(ctx: WeaponContext): PersistentFireSession {
           engine.startEventHorizon(
             targetX,
             targetY,
-            T3_EVENT_HORIZON_RADIUS,
-            T3_EVENT_HORIZON_DURATION_MS,
+            eventHorizonRadius,
+            eventHorizonDurationMs,
             WeaponId.VoidPulse,
           );
         }
-      }, DURATION_MS + 100);
+      }, durationMs + 100);
 
       const commands: WeaponCommand[] = [];
 
@@ -110,10 +118,10 @@ export function createSession(ctx: WeaponContext): PersistentFireSession {
           kind: "burnRadius",
           cx: targetX,
           cy: targetY,
-          radius: CORE_RADIUS * 2,
-          peakDps: T2_BURN_PEAK_DPS,
-          durationMs: T2_BURN_DURATION_MS,
-          decayPerSecond: 0.5,
+          radius: coreRadius * 2,
+          peakDps: burnDps,
+          durationMs: burnDurationMs,
+          decayPerSecond: burnDecayPerSecond,
         });
       }
 

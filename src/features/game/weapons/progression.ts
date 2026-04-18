@@ -1,5 +1,9 @@
 import { WeaponTier, type WeaponEvolutionState } from "@game/types";
-import type { WeaponDef, WeaponTierDefinition } from "@game/weapons/types";
+import type {
+  ResolvedWeaponConfig,
+  WeaponDef,
+  WeaponTierDefinition,
+} from "@game/weapons/types";
 
 function getTierIndex(tier: WeaponTier): number {
   return tier - 1;
@@ -74,6 +78,41 @@ export function getWeaponTierHint(def: WeaponDef, tier: WeaponTier): string {
 
 export function getWeaponTierDetail(def: WeaponDef, tier: WeaponTier): string {
   return getWeaponTierDefinition(def, tier).detail;
+}
+
+export function resolveWeaponConfig(
+  def: WeaponDef,
+  tier: WeaponTier,
+): ResolvedWeaponConfig {
+  const tierDefinition = getWeaponTierDefinition(def, tier);
+  const toggles = {
+    ...def.toggles,
+    ...(tierDefinition.toggles ?? {}),
+  };
+
+  return {
+    ...def,
+    ...toggles,
+    cooldownMs: toggles.cooldownMs ?? def.cooldownMs,
+    damage: toggles.damage ?? def.damage,
+    hitRadius: toggles.hitRadius ?? def.hitRadius,
+    coneArcDeg: toggles.coneArcDeg ?? def.coneArcDeg,
+    chainMaxBounces: toggles.chainMaxBounces ?? def.chainMaxBounces,
+    seekRadius: toggles.seekRadius ?? def.seekRadius,
+    splashRadius: toggles.splashRadius ?? def.splashRadius,
+    poisonDps: toggles.poisonDps ?? def.poisonDps,
+    poisonDurationMs: toggles.poisonDurationMs ?? def.poisonDurationMs,
+    burnDps: toggles.burnDps ?? def.burnDps,
+    burnDurationMs: toggles.burnDurationMs ?? def.burnDurationMs,
+    burnDecayPerSecond:
+      toggles.burnDecayPerSecond ?? def.burnDecayPerSecond,
+    blackHoleRadius: toggles.blackHoleRadius ?? def.blackHoleRadius,
+    blackHoleCoreRadius:
+      toggles.blackHoleCoreRadius ?? def.blackHoleCoreRadius,
+    blackHoleDurationMs:
+      toggles.blackHoleDurationMs ?? def.blackHoleDurationMs,
+    toggles,
+  };
 }
 
 export function getWeaponEvolutionThresholds(def: WeaponDef): [number, number] {

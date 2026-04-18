@@ -14,23 +14,23 @@ import {
   findNearestBugInRadius,
   canvasToViewport,
 } from "@game/weapons/runtime/targetingHelpers";
-
-const DAMAGE = 2;
-const CHAIN_RADIUS = 90;
-const MAX_BOUNCES = 3;
-const MAX_BOUNCES_T2 = 6;
+import { BASE_TOGGLES } from "./constants";
 
 export function createSession(ctx: WeaponContext): ClickFireResult {
   const { engine, targetX, targetY, viewportX, viewportY, bounds } = ctx;
   const tier = ctx.tier ?? WeaponTier.TIER_ONE;
   const commands: WeaponCommand[] = [];
-  const maxBounces = tier >= WeaponTier.TIER_TWO ? MAX_BOUNCES_T2 : MAX_BOUNCES;
+  const damage = ctx.config?.damage ?? BASE_TOGGLES.damage;
+  const chainRadius = ctx.config?.chainRadius ?? BASE_TOGGLES.chainRadius;
+  const maxBounces = ctx.config?.chainMaxBounces ?? BASE_TOGGLES.chainMaxBounces;
+  const secondaryDamage =
+    ctx.config?.secondaryDamage ?? BASE_TOGGLES.secondaryDamage;
 
   const initial = findNearestBugInRadius(
     engine,
     targetX,
     targetY,
-    CHAIN_RADIUS,
+    chainRadius,
   );
 
   if (!initial) {
@@ -56,7 +56,7 @@ export function createSession(ctx: WeaponContext): ClickFireResult {
 
   const chainIndexes = [
     initial.index,
-    ...chainFn(initial.index, CHAIN_RADIUS, maxBounces),
+    ...chainFn(initial.index, chainRadius, maxBounces),
   ];
 
   const bugs = engine.getAllBugs();
@@ -83,7 +83,7 @@ export function createSession(ctx: WeaponContext): ClickFireResult {
     commands.push({
       kind: "damage",
       targetIndex: idx,
-      amount: DAMAGE,
+      amount: damage,
       creditOnDeath: true,
     });
     // T2+: apply Charged status to each hit bug
@@ -97,7 +97,7 @@ export function createSession(ctx: WeaponContext): ClickFireResult {
     commands.push({
       kind: "propagateChargedNetwork",
       sourceIndex: chainIndexes[0],
-      damage: 1,
+        damage: secondaryDamage,
       falloff: 0.7,
     });
   }

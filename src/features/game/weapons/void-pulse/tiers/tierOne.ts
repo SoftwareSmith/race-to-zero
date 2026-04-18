@@ -10,6 +10,11 @@ export const tierOneTier: WeaponTierDefinition = {
   hint: "T2: Stronger pull + burn DOT during the well phase",
   effectColor: "#c084fc",
   evolveAtKills: 50,
+  toggles: {
+    burnDps: 1.5,
+    burnDurationMs: 3000,
+    burnDecayPerSecond: 0.5,
+  },
   vfx: VOID_PULSE_TIER_VFX.tierOne,
   behavior: {
     summary: "Layers sustained damage onto the pull window without changing the single-hole constraint.",

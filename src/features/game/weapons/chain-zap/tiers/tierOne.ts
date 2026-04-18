@@ -10,7 +10,7 @@ export const tierOneTier: WeaponTierDefinition = {
   hint: "T2: 6 bounces + each hit applies Charged status",
   effectColor: "#6ee7b7",
   evolveAtKills: 75,
-  config: {
+  toggles: {
     chainMaxBounces: 6,
   },
   vfx: CHAIN_ZAP_TIER_VFX.tierOne,

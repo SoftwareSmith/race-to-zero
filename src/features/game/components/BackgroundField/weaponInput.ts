@@ -1,5 +1,6 @@
 import type { MutableRefObject, RefObject } from "react";
 import { WEAPON_DEFS } from "@config/weaponConfig";
+import { resolveWeaponConfig } from "@game/weapons/progression";
 import { executeCommands } from "@game/weapons/runtime/executor";
 import { getEntry, hasEntry } from "@game/weapons/runtime/registry";
 import type {
@@ -65,6 +66,9 @@ function createWeaponContext(
   engine: any,
   getWeaponTier: PointerDownHandlerOptions["getWeaponTier"],
 ): WeaponContext {
+  const entry = getEntry(weaponId);
+  const tier = getWeaponTier(weaponId);
+
   return {
     targetX: viewportX - bounds.left,
     targetY: viewportY - bounds.top,
@@ -77,8 +81,12 @@ function createWeaponContext(
     bounds,
     now: performance.now(),
     engine: engine as WeaponContext["engine"],
-    tier: getWeaponTier(weaponId),
+    tier,
     weaponId,
+    config: resolveWeaponConfig(
+      entry?.config ?? WEAPON_DEFS.find((weapon) => weapon.id === weaponId)!,
+      tier,
+    ),
   };
 }
 
@@ -205,7 +213,7 @@ function startHoldSession(
     executeCommands(holdSession.paint(nextWeaponContext), nextExecutionContext);
   };
 
-  const tickCooldown = Math.max(60, entry.config.cooldownMs ?? 120);
+  const tickCooldown = Math.max(60, initialWeaponContext.config.cooldownMs ?? 120);
   let animationFrameId = 0;
   const tick = () => {
     if (!options.isFiringRef.current) {

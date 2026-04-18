@@ -9,6 +9,9 @@ export const tierTwoTier: WeaponTierDefinition = {
     "Adds an expanding outer ring of detonations so the cascade keeps growing after the initial fork.",
   hint: "T3: Recursive cascade — expanding rings of AoE explosions",
   effectColor: "#38bdf8",
+  toggles: {
+    ringRadius: 90,
+  },
   vfx: FORK_BOMB_TIER_VFX.tierTwo,
   behavior: {
     summary: "Scales the weapon from dense-pack breaker into full-pocket collapse.",

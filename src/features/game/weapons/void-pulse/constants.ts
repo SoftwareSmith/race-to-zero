@@ -16,6 +16,20 @@ export const CURSOR = {
   showCrosshair: false,
 } as const;
 
+export const BASE_TOGGLES = {
+  damage: 2,
+  hitRadius: 300,
+  cooldownMs: 6000,
+  blackHoleRadius: 300,
+  blackHoleCoreRadius: 80,
+  blackHoleDurationMs: 2000,
+  burnDps: 1.5,
+  burnDurationMs: 3000,
+  burnDecayPerSecond: 0.5,
+  eventHorizonRadius: 200,
+  eventHorizonDurationMs: 5000,
+} as const;
+
 export const def: WeaponDef = {
   id: ID,
   title: VOID_PULSE_TIERS[0].title,
@@ -28,16 +42,17 @@ export const def: WeaponDef = {
   hitRadius: 300,
   cursor: CURSOR,
   overlayEffectDurationMs: OVERLAY_EFFECT_DURATION_MS,
-  damage: 2,
+  damage: BASE_TOGGLES.damage,
   blackHoleMode: true,
-  blackHoleDurationMs: 2000,
-  blackHoleRadius: 300,
-  blackHoleCoreRadius: 80,
+  blackHoleDurationMs: BASE_TOGGLES.blackHoleDurationMs,
+  blackHoleRadius: BASE_TOGGLES.blackHoleRadius,
+  blackHoleCoreRadius: BASE_TOGGLES.blackHoleCoreRadius,
   instakillLowHp: false,
   appliesKnockback: true,
   effectColor: CURSOR.accent,
-  cooldownMs: 6000,
+  cooldownMs: BASE_TOGGLES.cooldownMs,
   inputMode: WeaponInputMode.Click,
   hint: VOID_PULSE_TIERS[0].hint,
+  toggles: BASE_TOGGLES,
   tiers: VOID_PULSE_TIERS,
 };

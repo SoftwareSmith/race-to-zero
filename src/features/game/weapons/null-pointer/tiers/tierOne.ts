@@ -10,6 +10,11 @@ export const tierOneTier: WeaponTierDefinition = {
   hint: "T2: Marks the target + nearby bugs; executes at 50% HP",
   effectColor: "#fb7185",
   evolveAtKills: 60,
+  toggles: {
+    executeHpLimit: 2,
+    markRadius: 80,
+    markDurationMs: 6000,
+  },
   vfx: NULL_POINTER_TIER_VFX.tierOne,
   behavior: {
     summary: "Extends mark application to the nearby cluster and broadens execute setups.",

@@ -10,6 +10,9 @@ export const tierOneTier: WeaponTierDefinition = {
   hint: "T2: Each detonation spawns child explosions from hit bugs",
   effectColor: "#38bdf8",
   evolveAtKills: 60,
+  toggles: {
+    secondaryRadius: 36,
+  },
   vfx: FORK_BOMB_TIER_VFX.tierOne,
   behavior: {
     summary: "Turns every confirmed hit into another local blast origin.",

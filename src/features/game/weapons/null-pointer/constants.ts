@@ -50,6 +50,18 @@ export const T1_EXECUTE_HP = 1;
 /** HP threshold: bugs at or below this are executed by T2+ (≈ 2 HP). */
 export const T2_EXECUTE_HP = 2;
 
+export const BASE_TOGGLES = {
+  damage: DAMAGE,
+  hitRadius: SEEK_RADIUS,
+  cooldownMs: 3200,
+  seekRadius: SEEK_RADIUS,
+  splashRadius: SPLASH_RADIUS,
+  splashDamage: SPLASH_DAMAGE,
+  markRadius: MARK_RADIUS,
+  markDurationMs: MARK_DURATION_MS,
+  executeHpLimit: T1_EXECUTE_HP,
+} as const;
+
 // ─── Static weapon definition ────────────────────────────────────────────────
 
 export const def: WeaponDef = {
@@ -64,12 +76,13 @@ export const def: WeaponDef = {
   hitRadius: SEEK_RADIUS,
   cursor: CURSOR,
   overlayEffectDurationMs: OVERLAY_EFFECT_DURATION_MS,
-  damage: 2,
-  seekRadius: SEEK_RADIUS,
-  splashRadius: SPLASH_RADIUS,
+  damage: BASE_TOGGLES.damage,
+  seekRadius: BASE_TOGGLES.seekRadius,
+  splashRadius: BASE_TOGGLES.splashRadius,
   effectColor: CURSOR.accent,
-  cooldownMs: 3200,
+  cooldownMs: BASE_TOGGLES.cooldownMs,
   inputMode: WeaponInputMode.Seeking,
   tiers: NULL_POINTER_TIERS,
   hint: NULL_POINTER_TIERS[0].hint,
+  toggles: BASE_TOGGLES,
 };

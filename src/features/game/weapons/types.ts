@@ -42,6 +42,43 @@ export interface WeaponTierBehaviorDefinition {
   summary: string;
 }
 
+export interface WeaponToggles {
+  damage?: number;
+  cooldownMs?: number;
+  hitRadius?: number;
+  coneArcDeg?: number;
+  seekRadius?: number;
+  splashRadius?: number;
+  splashDamage?: number;
+  chainRadius?: number;
+  chainMaxBounces?: number;
+  cloudRadius?: number;
+  cloudDurationMs?: number;
+  cloudIntervalMs?: number;
+  poisonDps?: number;
+  poisonDurationMs?: number;
+  burnDps?: number;
+  burnDurationMs?: number;
+  burnDecayPerSecond?: number;
+  secondaryRadius?: number;
+  secondaryDurationMs?: number;
+  secondaryDamage?: number;
+  burstRadius?: number;
+  burstOffsetDistance?: number;
+  ringRadius?: number;
+  allyDurationMs?: number;
+  markRadius?: number;
+  markDurationMs?: number;
+  executeHpLimit?: number;
+  blackHoleRadius?: number;
+  blackHoleCoreRadius?: number;
+  blackHoleDurationMs?: number;
+  eventHorizonRadius?: number;
+  eventHorizonDurationMs?: number;
+}
+
+export type WeaponToggleOverrides = Partial<WeaponToggles>;
+
 export interface WeaponTierDefinition {
   tier: WeaponTier;
   title: string;
@@ -50,7 +87,7 @@ export interface WeaponTierDefinition {
   effectColor?: string;
   evolveAtKills?: number;
   hitPattern?: HitPattern;
-  config?: Partial<WeaponDef>;
+  toggles?: WeaponToggleOverrides;
   vfx?: WeaponTierVfxDefinition;
   behavior?: WeaponTierBehaviorDefinition;
   evolution?: WeaponTierDefinition;
@@ -105,5 +142,10 @@ export interface WeaponDef {
   hint: string;
   effectColor: string;
   cooldownMs: number;
+  toggles: WeaponToggles;
   tiers: readonly WeaponTierDefinition[];
+}
+
+export interface ResolvedWeaponConfig extends WeaponDef, WeaponToggles {
+  toggles: WeaponToggles;
 }

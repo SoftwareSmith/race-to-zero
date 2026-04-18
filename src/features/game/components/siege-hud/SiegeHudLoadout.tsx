@@ -56,7 +56,10 @@ const SiegeHudLoadout = memo(function SiegeHudLoadout({
   weaponSnapshots,
 }: SiegeHudLoadoutProps) {
   const visibleStructureIds = unlockedStructures ?? [];
-  const weaponCount = weaponSnapshots.length;
+  const visibleWeaponSnapshots = weaponSnapshots.filter(
+    (snapshot) => !snapshot.locked,
+  );
+  const weaponCount = visibleWeaponSnapshots.length;
   const structureCount = visibleStructureIds.length;
   const weaponSlotRem = 2.35;
   const structureSlotRem = 2;
@@ -180,15 +183,16 @@ const SiegeHudLoadout = memo(function SiegeHudLoadout({
               </button>
             ) : null}
 
-            <div className="flex items-center gap-2">
+            <div className="flex items-center justify-center gap-2">
               <div
+                data-testid="weapon-rail"
                 data-no-hammer
                 className="grid min-w-0 flex-none grid-flow-col auto-cols-[2.35rem] gap-1"
                 role="radiogroup"
                 aria-label="Select weapon"
                 style={{ width: `${weaponRailWidthRem}rem` }}
               >
-                {weaponSnapshots.map((snapshot) => {
+                {visibleWeaponSnapshots.map((snapshot) => {
                   const isSelected = snapshot.id === selectedWeaponId;
 
                   return (

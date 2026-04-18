@@ -84,6 +84,7 @@ function makeCtx(engine: GameEngine, overrides = {}) {
     engine,
     tier: 1 as const,
     weaponId: "hammer" as import("@game/types").SiegeWeaponId,
+    config: {},
     ...overrides,
   };
 }

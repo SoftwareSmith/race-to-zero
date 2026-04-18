@@ -16,6 +16,16 @@ export const CURSOR = {
   showCrosshair: false,
 } as const;
 
+export const BASE_TOGGLES = {
+  damage: 2,
+  hitRadius: 48,
+  cooldownMs: 1100,
+  burstRadius: 34,
+  burstOffsetDistance: 52,
+  secondaryRadius: 36,
+  ringRadius: 90,
+} as const;
+
 export const def: WeaponDef = {
   id: ID,
   title: FORK_BOMB_TIERS[0].title,
@@ -28,10 +38,11 @@ export const def: WeaponDef = {
   hitRadius: 48,
   cursor: CURSOR,
   overlayEffectDurationMs: OVERLAY_EFFECT_DURATION_MS,
-  damage: 2,
+  damage: BASE_TOGGLES.damage,
   effectColor: CURSOR.accent,
-  cooldownMs: 1100,
+  cooldownMs: BASE_TOGGLES.cooldownMs,
   inputMode: WeaponInputMode.Click,
   hint: FORK_BOMB_TIERS[0].hint,
+  toggles: BASE_TOGGLES,
   tiers: FORK_BOMB_TIERS,
 };

@@ -20,6 +20,13 @@ export const DAMAGE = 2;
 export const SEARCH_RADIUS = 48;
 export const T3_ALLY_DURATION_MS = 8000;
 
+export const BASE_TOGGLES = {
+  damage: DAMAGE,
+  hitRadius: SEARCH_RADIUS,
+  cooldownMs: 300,
+  allyDurationMs: T3_ALLY_DURATION_MS,
+} as const;
+
 export const def: WeaponDef = {
   id: ID,
   title: HAMMER_TIERS[0].title,
@@ -32,10 +39,11 @@ export const def: WeaponDef = {
   hitRadius: SEARCH_RADIUS,
   cursor: CURSOR,
   overlayEffectDurationMs: OVERLAY_EFFECT_DURATION_MS,
-  damage: DAMAGE,
+  damage: BASE_TOGGLES.damage,
   effectColor: CURSOR.accent,
-  cooldownMs: 300,
+  cooldownMs: BASE_TOGGLES.cooldownMs,
   inputMode: WeaponInputMode.Click,
   hint: HAMMER_TIERS[0].hint,
+  toggles: BASE_TOGGLES,
   tiers: HAMMER_TIERS,
 };

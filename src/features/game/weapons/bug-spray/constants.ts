@@ -16,6 +16,19 @@ export const CURSOR = {
   showCrosshair: false,
 } as const;
 
+export const BASE_TOGGLES = {
+  hitRadius: 128,
+  cooldownMs: 120,
+  coneArcDeg: 80,
+  poisonDps: 0.65,
+  poisonDurationMs: 450,
+  cloudRadius: 96,
+  cloudDurationMs: 2400,
+  cloudIntervalMs: 400,
+  secondaryRadius: 56,
+  secondaryDurationMs: 800,
+} as const;
+
 export const def: WeaponDef = {
   id: ID,
   title: BUG_SPRAY_TIERS[0].title,
@@ -31,11 +44,12 @@ export const def: WeaponDef = {
   coneArcDeg: 80,
   damage: 0,
   applyPoison: true,
-  poisonDps: 0.65,
-  poisonDurationMs: 5000,
+  poisonDps: BASE_TOGGLES.poisonDps,
+  poisonDurationMs: BASE_TOGGLES.poisonDurationMs,
   effectColor: CURSOR.accent,
-  cooldownMs: 120,
+  cooldownMs: BASE_TOGGLES.cooldownMs,
   inputMode: WeaponInputMode.Hold,
   hint: BUG_SPRAY_TIERS[0].hint,
+  toggles: BASE_TOGGLES,
   tiers: BUG_SPRAY_TIERS,
 };

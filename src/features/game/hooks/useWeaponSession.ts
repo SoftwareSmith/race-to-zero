@@ -11,6 +11,7 @@ import type { RefObject, MutableRefObject } from "react";
 import type Engine from "@game/engine/Engine";
 import type { VfxEngine } from "@game/engine/VfxEngine";
 import type { SiegeWeaponId, WeaponTier } from "@game/types";
+import { resolveWeaponConfig } from "@game/weapons/progression";
 import type {
   WeaponContext,
   ExecutionContext,
@@ -87,7 +88,11 @@ function buildContext(
 ): WeaponContext | null {
   const engine = opts.engineRef.current;
   const bounds = opts.boundsRef.current;
-  if (!engine || !bounds.width || !bounds.height) return null;
+  const entry = getEntry(weaponId);
+  if (!engine || !bounds.width || !bounds.height || !entry) return null;
+
+  const tier = opts.getWeaponTier ? opts.getWeaponTier(weaponId) : 1;
+  const config = resolveWeaponConfig(entry.config, tier);
 
   return {
     targetX,
@@ -101,8 +106,9 @@ function buildContext(
     bounds,
     now: performance.now(),
     engine: engine as unknown as WeaponContext["engine"],
-    tier: opts.getWeaponTier ? opts.getWeaponTier(weaponId) : 1,
+    tier,
     weaponId,
+    config,
   };
 }
 
@@ -193,12 +199,14 @@ export function useWeaponSession(
     (weaponId: SiegeWeaponId, clientX: number, clientY: number): boolean => {
       const entry = getEntry(weaponId);
       if (!entry) return false;
+      const tier = opts.getWeaponTier ? opts.getWeaponTier(weaponId) : 1;
+      const config = resolveWeaponConfig(entry.config, tier);
 
       const bounds = opts.boundsRef.current;
       if (!bounds.width || !bounds.height) return false;
 
       // Cooldown check using the centralized manager
-      if (!canFire(weaponId, entry.config.cooldownMs)) return false;
+      if (!canFire(weaponId, config.cooldownMs)) return false;
       recordFire(weaponId);
 
       const { viewportX, viewportY, targetX, targetY } = resolveFire(
@@ -248,11 +256,13 @@ export function useWeaponSession(
     ): HoldFireSession | null => {
       const entry = getEntry(weaponId);
       if (!entry || entry.config.inputMode !== "hold") return null;
+      const tier = opts.getWeaponTier ? opts.getWeaponTier(weaponId) : 1;
+      const config = resolveWeaponConfig(entry.config, tier);
 
       const bounds = opts.boundsRef.current;
       if (!bounds.width || !bounds.height) return null;
 
-      if (!canFire(weaponId, entry.config.cooldownMs)) return null;
+      if (!canFire(weaponId, config.cooldownMs)) return null;
       recordFire(weaponId);
 
       const { viewportX, viewportY, targetX, targetY } = resolveFire(
@@ -287,8 +297,10 @@ export function useWeaponSession(
 
       const entry = getEntry(weaponId);
       if (!entry) return;
+      const tier = opts.getWeaponTier ? opts.getWeaponTier(weaponId) : 1;
+      const config = resolveWeaponConfig(entry.config, tier);
 
-      if (!canFire(weaponId, entry.config.cooldownMs)) return;
+      if (!canFire(weaponId, config.cooldownMs)) return;
       recordFire(weaponId);
 
       const bounds = opts.boundsRef.current;
@@ -353,11 +365,13 @@ export function useWeaponSession(
     ): PersistentFireSession | null => {
       const entry = getEntry(weaponId);
       if (!entry) return null;
+      const tier = opts.getWeaponTier ? opts.getWeaponTier(weaponId) : 1;
+      const config = resolveWeaponConfig(entry.config, tier);
 
       const bounds = opts.boundsRef.current;
       if (!bounds.width || !bounds.height) return null;
 
-      if (!canFire(weaponId, entry.config.cooldownMs)) return null;
+      if (!canFire(weaponId, config.cooldownMs)) return null;
       recordFire(weaponId);
 
       const { viewportX, viewportY, targetX, targetY } = resolveFire(

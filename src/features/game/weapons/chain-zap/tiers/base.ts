@@ -11,9 +11,10 @@ export const baseTier: WeaponTierDefinition = {
   effectColor: "#6ee7b7",
   evolveAtKills: 25,
   hitPattern: HitPattern.Chain,
-  config: {
+  toggles: {
     damage: 2,
     chainMaxBounces: 3,
+    chainRadius: 90,
   },
   vfx: CHAIN_ZAP_TIER_VFX.base,
   behavior: {

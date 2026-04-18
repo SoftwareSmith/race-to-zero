@@ -163,6 +163,46 @@ test("opening the codex pauses the timer and hides the top toggle in detail view
   await expect(hud.locator("strong").nth(3)).toHaveText("00:01");
 });
 
+test("codex shows weapon and structure grids with drill-down detail views", async ({ page }) => {
+  await page.goto("./");
+  await page.getByRole("button", { name: "Open interactive bug game" }).click();
+  await page.getByRole("button", { name: "Open codex" }).click();
+
+  const codexModal = page.getByTestId("codex-modal");
+  await expect(codexModal).toBeVisible();
+
+  await codexModal.getByRole("tab", { name: "Weapons" }).click();
+  await expect(page.getByTestId("codex-weapon-card-hammer")).toBeVisible();
+
+  await page
+    .getByTestId("codex-weapon-card-hammer")
+    .getByTestId("codex-matchup-bug")
+    .first()
+    .click();
+  await expect(page.getByTestId("codex-detail-view")).toBeVisible();
+  await expect(page.getByTestId("codex-tabs")).toHaveCount(0);
+
+  await codexModal.getByRole("button", { name: "Back" }).click();
+  await expect(page.getByTestId("codex-tabs")).toBeVisible();
+  await codexModal.getByRole("tab", { name: "Weapons" }).click();
+
+  await page.getByTestId("codex-weapon-card-hammer").click();
+  await expect(page.getByTestId("codex-weapon-detail-view")).toBeVisible();
+  await expect(page.getByText("Tier Comparison")).toBeVisible();
+  await expect(page.getByText("Overdrive", { exact: true })).toBeVisible();
+  await expect(page.getByTestId("codex-tabs")).toHaveCount(0);
+
+  await codexModal.getByRole("button", { name: "Back" }).click();
+  await expect(page.getByTestId("codex-tabs")).toBeVisible();
+
+  await codexModal.getByRole("tab", { name: "Structures" }).click();
+  await expect(page.getByTestId("codex-structure-card-lantern")).toBeVisible();
+
+  await page.getByTestId("codex-structure-card-lantern").click();
+  await expect(page.getByTestId("codex-structure-detail-view")).toBeVisible();
+  await expect(page.getByText("Tier Growth")).toBeVisible();
+});
+
 test("shows the completion overlay when the live siege progress reaches zero bugs", async ({ page }) => {
   await page.setViewportSize({ height: 1200, width: 1440 });
   await enableCanvasQa(page);

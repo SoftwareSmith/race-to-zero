@@ -18,6 +18,15 @@ export const CURSOR = {
   ringClassName: "[animation:laser-cursor-breathe_2s_ease-in-out_infinite]",
 } as const;
 
+export const BASE_TOGGLES = {
+  damage: 2,
+  hitRadius: 90,
+  cooldownMs: 950,
+  chainRadius: 90,
+  chainMaxBounces: 3,
+  secondaryDamage: 1,
+} as const;
+
 export const def: WeaponDef = {
   id: ID,
   title: CHAIN_ZAP_TIERS[0].title,
@@ -30,11 +39,12 @@ export const def: WeaponDef = {
   hitRadius: 90,
   cursor: CURSOR,
   overlayEffectDurationMs: OVERLAY_EFFECT_DURATION_MS,
-  damage: 2,
-  chainMaxBounces: 3,
+  damage: BASE_TOGGLES.damage,
+  chainMaxBounces: BASE_TOGGLES.chainMaxBounces,
   effectColor: CURSOR.accent,
-  cooldownMs: 950,
+  cooldownMs: BASE_TOGGLES.cooldownMs,
   inputMode: WeaponInputMode.Click,
   hint: CHAIN_ZAP_TIERS[0].hint,
+  toggles: BASE_TOGGLES,
   tiers: CHAIN_ZAP_TIERS,
 };

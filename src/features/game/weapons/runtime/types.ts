@@ -7,7 +7,7 @@
 
 import type { SiegeWeaponId, WeaponTier } from "@game/types";
 import type { WeaponMatchupState } from "@game/types";
-import type { WeaponDef } from "@game/weapons/types";
+import type { ResolvedWeaponConfig, WeaponDef } from "@game/weapons/types";
 
 // ─── Re-exports ────────────────────────────────────────────────────────────────
 export type { SiegeWeaponId, WeaponDef, WeaponTier };
@@ -163,6 +163,8 @@ export interface WeaponContext {
   readonly tier: WeaponTier;
   /** The weapon ID being fired (for kill attribution in commands). */
   readonly weaponId: SiegeWeaponId;
+  /** Fully resolved runtime config for the current weapon tier. */
+  readonly config: ResolvedWeaponConfig;
 }
 
 // ---------------------------------------------------------------------------

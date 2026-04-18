@@ -11,7 +11,7 @@ export const baseTier: WeaponTierDefinition = {
   effectColor: "#fbbf24",
   evolveAtKills: 20,
   hitPattern: HitPattern.Single,
-  config: {
+  toggles: {
     damage: 2,
     hitRadius: 48,
   },

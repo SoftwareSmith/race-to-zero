@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { MenuIconButton } from "@shared/components/MenuControls";
 import { getCodex } from "@game/engine/bugCodex";
+import { STRUCTURE_DEFS, type StructureDef } from "@config/structureConfig";
 import type {
   BugType,
   BugWeaponId,
@@ -17,8 +18,10 @@ import {
 import type { BugVariant } from "../../../types/dashboard";
 import {
   WeaponMatchup,
+  WeaponTier,
   type SiegeWeaponId,
-  type WeaponType,
+  type StructureId,
+  type WeaponProgressSnapshot,
 } from "@game/types";
 import { getColoredSvgUrl } from "@game/utils/bugSprite";
 import { cn } from "@shared/utils/cn";
@@ -27,6 +30,17 @@ import Tooltip from "@shared/components/Tooltip";
 import MetricInfoCard from "@dashboard/components/MetricInfoCard";
 import Tabs from "@shared/components/Tabs";
 import { getWeaponTiers } from "@game/weapons/progression";
+import {
+  getStructureGlyph,
+  getTierBarCoreClassName,
+  getTierNodeClassName,
+  getTierNodeFillClassName,
+  getTierNodeFillWidth,
+  getTierNodeOffsetClassName,
+  getTierSelectedFrameClassName,
+  WEAPON_TIER_NODE_COUNT,
+} from "./siegeHud.helpers";
+import type { WeaponDef, WeaponTierDefinition } from "@game/weapons/types";
 import {
   getBehaviorLabel,
   getPresenceLabel,
@@ -46,25 +60,382 @@ interface CodexPanelProps {
   trigger?: ReactNode;
 }
 
-type CodexView = "bugs" | "weapons";
+type CodexView = "bugs" | "weapons" | "structures";
+type SelectedCodexEntry =
+  | { id: string; kind: "bug" }
+  | { id: SiegeWeaponId; kind: "weapon" }
+  | { id: StructureId; kind: "structure" }
+  | null;
 
 const CODEX_TABS = [
   { id: "bugs", label: "Bugs" },
   { id: "weapons", label: "Weapons" },
+  { id: "structures", label: "Structures" },
 ] as const;
 
-const WEAPON_TYPE_ORDER: WeaponType[] = [
-  "blunt",
-  "toxin",
-  "cryo",
-  "thermal",
-  "electric",
-  "precision",
-  "plasma",
-  "gravity",
-];
-
 const BUILTIN_ICON_VARIANTS: BugVariant[] = ["low", "medium", "high", "urgent"];
+const WEAPON_STAGE_LABELS: Record<WeaponTier, string> = {
+  [WeaponTier.TIER_ONE]: "Tier 1",
+  [WeaponTier.TIER_TWO]: "Tier 2",
+  [WeaponTier.TIER_THREE]: "Overdrive",
+};
+
+function formatDurationMs(durationMs: number) {
+  if (durationMs < 1000) {
+    return `${durationMs}ms`;
+  }
+
+  const seconds = durationMs / 1000;
+  return Number.isInteger(seconds) ? `${seconds}s` : `${seconds.toFixed(1)}s`;
+}
+
+function getInputModeLabel(inputMode: WeaponDef["inputMode"]) {
+  switch (inputMode) {
+    case "directional":
+      return "Directional cast";
+    case "hold":
+      return "Hold to channel";
+    case "seeking":
+      return "Seeks target";
+    default:
+      return "Point click";
+  }
+}
+
+function getHitPatternLabel(hitPattern: WeaponDef["hitPattern"]) {
+  switch (hitPattern) {
+    case "area":
+      return "Area burst";
+    case "blackhole":
+      return "Gravity well";
+    case "chain":
+      return "Chain arc";
+    case "cone":
+      return "Cone sweep";
+    case "line":
+      return "Line strike";
+    case "seeking":
+      return "Seeking path";
+    default:
+      return "Single impact";
+  }
+}
+
+function getStructureEffectLabel(effectType: StructureDef["effectType"]) {
+  return effectType === "capture"
+    ? "Captures priority bugs"
+    : "Pulls bugs inward";
+}
+
+function buildCardBackground(primary: string, secondary?: string) {
+  return {
+    background: `radial-gradient(circle at 18% 18%, color-mix(in srgb, ${primary} 28%, transparent), transparent 26%), radial-gradient(circle at 82% 24%, color-mix(in srgb, ${secondary ?? primary} 18%, transparent), transparent 22%), linear-gradient(145deg, color-mix(in srgb, ${primary} 18%, rgba(12,14,20,0.98)), color-mix(in srgb, ${secondary ?? primary} 14%, rgba(12,14,20,0.9)))`,
+    boxShadow: `inset 0 1px 0 rgba(255,255,255,0.05), 0 18px 40px color-mix(in srgb, ${primary} 12%, rgba(0,0,0,0.28))`,
+  } satisfies CSSProperties;
+}
+
+function buildNeutralWeaponBackground() {
+  return {
+    background:
+      "radial-gradient(circle at 16% 18%, rgba(255,255,255,0.08), transparent 24%), radial-gradient(circle at 84% 22%, rgba(148,163,184,0.12), transparent 22%), linear-gradient(145deg, rgba(16,19,25,0.98), rgba(22,27,36,0.94))",
+    boxShadow:
+      "inset 0 1px 0 rgba(255,255,255,0.06), 0 18px 40px rgba(0,0,0,0.24)",
+  } satisfies CSSProperties;
+}
+
+function createTierPreviewSnapshot(
+  weapon: WeaponDef,
+  tierDefinition: WeaponTierDefinition,
+): WeaponProgressSnapshot {
+  const tiers = getWeaponTiers(weapon);
+  const tierIndex = tiers.findIndex(
+    (tier) => tier.tier === tierDefinition.tier,
+  );
+  const previousThreshold =
+    tierIndex > 0 ? (tiers[tierIndex - 1]?.evolveAtKills ?? 0) : 0;
+  const nextThreshold = tierDefinition.evolveAtKills ?? null;
+  const isMaxTier = nextThreshold == null;
+  const progressWindow = Math.max(
+    1,
+    (nextThreshold ?? previousThreshold + 10) - previousThreshold,
+  );
+  const weaponKills = isMaxTier
+    ? Math.max(previousThreshold + 6, previousThreshold)
+    : previousThreshold + Math.max(1, Math.round(progressWindow * 0.62));
+  const killsToNextTier = isMaxTier
+    ? null
+    : Math.max(0, nextThreshold - weaponKills);
+
+  return {
+    cooldownMs: weapon.cooldownMs,
+    current: false,
+    currentTierStartKills: previousThreshold,
+    detail: tierDefinition.detail,
+    hint: tierDefinition.hint,
+    id: weapon.id,
+    inputMode: weapon.inputMode,
+    locked: false,
+    matchupSummary: [],
+    nextTierGoalKills: nextThreshold,
+    progressText: tierDefinition.title,
+    title: tierDefinition.title,
+    typeHint: weapon.typeHint,
+    typeLabel: weapon.typeLabel,
+    unlockKills: weapon.unlockKills,
+    tier: tierDefinition.tier,
+    weaponKills,
+    killsToNextTier,
+  };
+}
+
+function getBugCardStyle(entry: BugType, id: string) {
+  const variant = (entry.iconVariant ?? id) as BugVariant;
+  const primary = entry.color ?? getBugVariantColor(variant);
+  const secondary =
+    variant === "urgent"
+      ? "#f472b6"
+      : variant === "high"
+        ? "#fb923c"
+        : variant === "medium"
+          ? "#fde047"
+          : "#2dd4bf";
+
+  return buildCardBackground(primary, secondary);
+}
+
+function WeaponMotif({ weapon }: { weapon: WeaponDef }) {
+  if (weapon.id === "chain") {
+    return (
+      <>
+        <div className="absolute right-8 top-6 h-[2px] w-20 rotate-[18deg] rounded-full bg-white/40 opacity-70 animate-pulse" />
+        <div className="absolute right-10 top-12 h-10 w-10 rounded-full border border-white/12 opacity-70 animate-pulse" />
+      </>
+    );
+  }
+
+  if (weapon.id === "void") {
+    return (
+      <>
+        <div className="absolute right-7 top-5 h-14 w-14 rounded-full border border-white/12 opacity-80 animate-pulse" />
+        <div className="absolute right-10 top-8 h-8 w-8 rounded-full border border-slate-200/10 opacity-70 animate-pulse" />
+      </>
+    );
+  }
+
+  if (weapon.id === "plasma") {
+    return (
+      <>
+        <div className="absolute right-8 top-6 h-12 w-12 rounded-full bg-white/6 blur-xl animate-pulse" />
+        <div className="absolute right-12 top-10 h-5 w-5 rounded-full border border-white/12 animate-pulse" />
+        <div className="absolute right-4 top-14 h-3 w-3 rounded-full bg-slate-200/16 animate-pulse" />
+      </>
+    );
+  }
+
+  if (weapon.id === "zapper") {
+    return (
+      <>
+        <div className="absolute right-10 top-6 h-12 w-16 rounded-[100%_0_100%_0/100%_0_100%_0] border border-white/12 opacity-80 animate-pulse" />
+        <div className="absolute right-8 top-10 h-2 w-2 rounded-full bg-white/24 animate-pulse" />
+        <div className="absolute right-4 top-16 h-1.5 w-1.5 rounded-full bg-slate-200/24 animate-pulse" />
+      </>
+    );
+  }
+
+  if (weapon.id === "nullpointer") {
+    return (
+      <>
+        <div className="absolute right-8 top-5 h-16 w-[2px] bg-white/24 animate-pulse" />
+        <div className="absolute right-14 top-8 h-12 w-[2px] bg-white/14 animate-pulse" />
+        <div className="absolute right-2 top-10 h-10 w-[2px] bg-slate-200/14 animate-pulse" />
+      </>
+    );
+  }
+
+  return (
+    <>
+      <div className="absolute right-7 top-8 h-3.5 w-14 rounded-[8px] bg-white/8 animate-pulse" />
+      <div className="absolute right-10 top-14 h-3.5 w-10 rounded-[8px] bg-white/6 animate-pulse" />
+    </>
+  );
+}
+
+function StructureMotif({ structure }: { structure: StructureDef }) {
+  if (structure.id === "agent") {
+    return (
+      <>
+        <div className="absolute right-8 top-6 h-12 w-12 rounded-full border border-emerald-200/18 animate-pulse" />
+        <div className="absolute right-12 top-10 h-[2px] w-16 bg-emerald-200/24 animate-pulse" />
+        <div className="absolute right-6 top-16 h-2 w-2 rounded-full bg-emerald-200/30 animate-pulse" />
+      </>
+    );
+  }
+
+  return (
+    <>
+      <div className="absolute right-6 top-6 h-14 w-14 rounded-full border border-amber-200/18 animate-pulse" />
+      <div className="absolute right-10 top-10 h-6 w-6 rounded-full border border-amber-100/14 animate-pulse" />
+      <div className="absolute right-2 top-14 h-10 w-10 rounded-full bg-amber-100/8 blur-xl animate-pulse" />
+    </>
+  );
+}
+
+function getWeaponMatchupBuckets(
+  bugEntries: Array<[string, BugType]>,
+  weaponId: SiegeWeaponId,
+) {
+  const favored = bugEntries.filter(
+    ([, entry]) =>
+      entry.weaponMatchups[weaponId].state === WeaponMatchup.Favored,
+  );
+  const risky = bugEntries.filter(([, entry]) => {
+    const state = entry.weaponMatchups[weaponId].state;
+    return state === WeaponMatchup.Immune || state === WeaponMatchup.Risky;
+  });
+
+  return { favored, risky };
+}
+
+function getBugWeaponMatchupBuckets(entry: BugType) {
+  const favored: Array<[BugWeaponId, BugWeaponMatchup]> = [];
+  const risky: Array<[BugWeaponId, BugWeaponMatchup]> = [];
+
+  for (const [weaponId, matchup] of Object.entries(
+    entry.weaponMatchups,
+  ) as Array<[BugWeaponId, BugWeaponMatchup]>) {
+    if (matchup.state === WeaponMatchup.Favored) {
+      favored.push([weaponId, matchup]);
+      continue;
+    }
+
+    if (
+      matchup.state === WeaponMatchup.Immune ||
+      matchup.state === WeaponMatchup.Risky
+    ) {
+      risky.push([weaponId, matchup]);
+    }
+  }
+
+  return { favored, risky };
+}
+
+function MatchupBugStrip({
+  bugEntries,
+  emptyLabel,
+  onSelectBug,
+  toneClassName,
+  title,
+}: {
+  bugEntries: Array<[string, BugType]>;
+  emptyLabel: string;
+  onSelectBug?: (id: string) => void;
+  title: string;
+  toneClassName: string;
+}) {
+  const preview = bugEntries.slice(0, 4);
+  const overflowCount = Math.max(0, bugEntries.length - preview.length);
+
+  return (
+    <div className="rounded-[16px] border border-white/8 bg-black/18 px-3 py-2.5">
+      <div className="flex items-center justify-between gap-3">
+        <p
+          className={cn(
+            "text-[0.65rem] font-semibold uppercase tracking-[0.18em]",
+            toneClassName,
+          )}
+        >
+          {title}
+        </p>
+        <span className="text-[0.68rem] text-stone-500">
+          {bugEntries.length}
+        </span>
+      </div>
+
+      {preview.length > 0 ? (
+        <div className="mt-2 flex items-center gap-1.5">
+          {preview.map(([id, entry]) => (
+            <button
+              key={`${title}-${id}`}
+              data-hud-cursor="pointer"
+              data-testid="codex-matchup-bug"
+              className="flex h-9 w-9 items-center justify-center rounded-[12px] border border-white/10 bg-white/[0.05] shadow-[0_10px_18px_rgba(0,0,0,0.18)]"
+              title={entry.name}
+              type="button"
+              onClick={(event) => {
+                event.stopPropagation();
+                onSelectBug?.(id);
+              }}
+            >
+              <img
+                alt={entry.name}
+                className="h-5 w-5 object-contain"
+                src={getTabIconSrc(entry, id)}
+              />
+            </button>
+          ))}
+          {overflowCount > 0 ? (
+            <span className="inline-flex h-9 min-w-9 items-center justify-center rounded-[12px] border border-white/10 bg-white/[0.05] px-2 text-[0.68rem] font-semibold text-stone-200">
+              +{overflowCount}
+            </span>
+          ) : null}
+        </div>
+      ) : (
+        <p className="mt-2 text-xs leading-5 text-stone-500">{emptyLabel}</p>
+      )}
+    </div>
+  );
+}
+
+function MatchupWeaponStrip({
+  emptyLabel,
+  title,
+  toneClassName,
+  weaponEntries,
+}: {
+  emptyLabel: string;
+  title: string;
+  toneClassName: string;
+  weaponEntries: Array<[BugWeaponId, BugWeaponMatchup]>;
+}) {
+  const preview = weaponEntries.slice(0, 4);
+  const overflowCount = Math.max(0, weaponEntries.length - preview.length);
+
+  return (
+    <div className="px-0.5 py-1">
+      <div className="flex items-center gap-3">
+        <p
+          className={cn(
+            "text-[0.65rem] font-semibold uppercase tracking-[0.18em]",
+            toneClassName,
+          )}
+        >
+          {title}
+        </p>
+      </div>
+
+      {preview.length > 0 ? (
+        <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+          {preview.map(([weaponId, matchup]) => (
+            <div
+              key={`${title}-${weaponId}`}
+              className="flex h-9 w-9 items-center justify-center rounded-[12px] bg-white/[0.05] text-stone-100 shadow-[0_10px_18px_rgba(0,0,0,0.18)]"
+              title={`${weaponId}: ${matchup.note}`}
+            >
+              <WeaponGlyph className="h-5 w-5" id={weaponId as SiegeWeaponId} />
+            </div>
+          ))}
+          {overflowCount > 0 ? (
+            <span className="text-[0.68rem] font-semibold text-stone-300">
+              +{overflowCount}
+            </span>
+          ) : null}
+        </div>
+      ) : (
+        <p className="mt-2 text-xs leading-5 text-stone-500">{emptyLabel}</p>
+      )}
+    </div>
+  );
+}
 
 function getTabIconSrc(entry: BugType, id: string) {
   if (entry.iconUrl) return entry.iconUrl;
@@ -121,11 +492,13 @@ function SectionHeading({
   return (
     <div>
       <SectionEyebrow>{eyebrow}</SectionEyebrow>
-      <h4 className="mt-1 text-[1.08rem] font-semibold tracking-[-0.03em] text-stone-50">
+      <h4 className="mt-1 text-[0.98rem] font-semibold tracking-[-0.03em] text-stone-50">
         {title}
       </h4>
       {subtitle ? (
-        <p className="mt-1 text-sm leading-6 text-stone-400">{subtitle}</p>
+        <p className="mt-1 text-[0.82rem] leading-5 text-stone-400">
+          {subtitle}
+        </p>
       ) : null}
     </div>
   );
@@ -154,7 +527,7 @@ function CompactReadoutCard({
       }}
       valueClassName={accent.metricValueClass}
       valueAccentClass={accent.metricValueClass}
-      className="min-h-[5.9rem]"
+      className="min-h-[5.1rem]"
     />
   );
 }
@@ -198,135 +571,684 @@ function WeaponEffectivenessRow({
   );
 }
 
-function WeaponTypeCard({
-  bugEntries,
-  type,
+function CodexSummaryCard({
+  description,
+  footer,
+  icon,
+  iconShellClassName,
+  onActivate,
+  overlay,
+  rightSlot,
+  style,
+  subtitle,
+  testId,
+  title,
 }: {
-  bugEntries: Array<[string, BugType]>;
-  type: WeaponType;
+  description: string;
+  footer?: ReactNode;
+  icon: ReactNode;
+  iconShellClassName?: string;
+  onActivate: () => void;
+  overlay?: ReactNode;
+  rightSlot?: ReactNode;
+  style: CSSProperties;
+  subtitle?: string;
+  testId: string;
+  title: string;
 }) {
-  const weapons = WEAPON_DEFS.filter((weapon) => weapon.weaponType === type);
-  if (weapons.length === 0) {
-    return null;
-  }
-
-  const lead = weapons[0];
-  const bugsByState = {
-    favored: [] as Array<[string, BugType]>,
-    immune: [] as Array<[string, BugType]>,
-    risky: [] as Array<[string, BugType]>,
-  };
-
-  for (const [bugId, entry] of bugEntries) {
-    const states = weapons.map(
-      (weapon) => entry.weaponMatchups[weapon.id].state,
-    );
-    if (states.includes(WeaponMatchup.Favored))
-      bugsByState.favored.push([bugId, entry]);
-    if (states.includes(WeaponMatchup.Immune))
-      bugsByState.immune.push([bugId, entry]);
-    if (states.includes(WeaponMatchup.Risky))
-      bugsByState.risky.push([bugId, entry]);
-  }
-
-  const favoredPreview = bugsByState.favored
-    .slice(0, 3)
-    .map(([, entry]) => entry.name)
-    .join(", ");
-  const riskyPreview = [...bugsByState.immune, ...bugsByState.risky]
-    .slice(0, 3)
-    .map(([, entry]) => entry.name)
-    .join(", ");
-
   return (
-    <section className="rounded-[24px] border border-white/10 bg-white/[0.03] p-4">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <SectionEyebrow>Weapon Type</SectionEyebrow>
-          <h3 className="mt-1 text-[1.15rem] font-semibold tracking-[-0.03em] text-stone-50">
-            {lead.typeLabel}
-          </h3>
-          <p className="mt-1 max-w-[36rem] text-sm leading-6 text-stone-400">
-            {lead.typeHint}
-          </p>
+    <div
+      data-hud-cursor="pointer"
+      data-testid={testId}
+      onClick={onActivate}
+      onKeyDown={(event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          onActivate();
+        }
+      }}
+      role="button"
+      tabIndex={0}
+      className="group relative overflow-hidden rounded-[20px] border border-white/10 p-3 text-left transition duration-200 hover:-translate-y-1 hover:border-white/18 hover:bg-white/[0.05]"
+      style={style}
+    >
+      {overlay ? (
+        <div className="pointer-events-none absolute inset-0 opacity-80">
+          {overlay}
         </div>
-      </div>
+      ) : null}
 
-      <div className="mt-4 grid gap-3 md:grid-cols-3">
-        {(
-          [
-            ["Favored", bugsByState.favored.length, "text-emerald-200"],
-            ["Risky", bugsByState.risky.length, "text-amber-200"],
-            ["Immune", bugsByState.immune.length, "text-rose-200"],
-          ] as const
-        ).map(([label, count, tone]) => (
-          <div
-            key={label}
-            className="rounded-[18px] border border-white/8 bg-black/16 p-3"
-          >
-            <p
+      <div className="relative flex h-full flex-col gap-2.5">
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex min-w-0 items-center gap-3">
+            <div
               className={cn(
-                "text-[0.65rem] font-semibold uppercase tracking-[0.18em]",
-                tone,
+                "flex h-12 w-12 shrink-0 items-center justify-center rounded-[16px] border border-white/24 bg-gradient-to-br p-2.5 shadow-[0_0_20px_rgba(0,0,0,0.16)] ring-1 ring-white/12",
+                iconShellClassName,
               )}
             >
-              {label}
+              {icon}
+            </div>
+            <div className="min-w-0">
+              <h3 className="truncate text-[1.12rem] font-semibold tracking-[-0.03em] text-stone-50">
+                {title}
+              </h3>
+              {subtitle ? (
+                <p className="text-xs uppercase tracking-[0.18em] text-stone-300/80">
+                  {subtitle}
+                </p>
+              ) : null}
+            </div>
+          </div>
+
+          {rightSlot ? (
+            <div className="flex items-center gap-2">{rightSlot}</div>
+          ) : null}
+        </div>
+
+        <p className="text-[0.82rem] leading-5 text-stone-200">{description}</p>
+
+        {footer}
+      </div>
+    </div>
+  );
+}
+
+function WeaponSummaryCard({
+  bugEntries,
+  onJumpToBug,
+  onSelect,
+  weapon,
+}: {
+  bugEntries: Array<[string, BugType]>;
+  onJumpToBug: (id: string) => void;
+  onSelect: (id: SiegeWeaponId) => void;
+  weapon: WeaponDef;
+}) {
+  const { favored, risky } = getWeaponMatchupBuckets(bugEntries, weapon.id);
+
+  return (
+    <CodexSummaryCard
+      description={weapon.detail}
+      footer={
+        <div className="grid gap-2.5 sm:grid-cols-2">
+          <MatchupBugStrip
+            bugEntries={favored}
+            emptyLabel="No favored bugs mapped yet."
+            onSelectBug={onJumpToBug}
+            title="Effective Against"
+            toneClassName="text-emerald-200"
+          />
+          <MatchupBugStrip
+            bugEntries={risky}
+            emptyLabel="No risk pockets mapped yet."
+            onSelectBug={onJumpToBug}
+            title="Ineffective Against"
+            toneClassName="text-rose-200"
+          />
+        </div>
+      }
+      icon={<WeaponGlyph className="h-7 w-7" id={weapon.id} />}
+      iconShellClassName="border-white/28 bg-[linear-gradient(180deg,rgba(255,255,255,0.16),rgba(255,255,255,0.05))] text-stone-50 shadow-[0_12px_22px_rgba(0,0,0,0.22)] ring-white/10"
+      onActivate={() => onSelect(weapon.id)}
+      overlay={
+        <>
+          <div
+            className="absolute left-2 top-2 h-20 w-20 rounded-full blur-3xl"
+            style={{ background: "rgba(255,255,255,0.08)" }}
+          />
+          <WeaponMotif weapon={weapon} />
+          <div className="absolute inset-0 opacity-[0.08] [background-image:radial-gradient(circle_at_1px_1px,rgba(255,255,255,0.7)_1px,transparent_0)] [background-size:18px_18px]" />
+        </>
+      }
+      rightSlot={
+        <Badge className="border-white/16 bg-black/18 text-stone-100">
+          {getHitPatternLabel(weapon.hitPattern)}
+        </Badge>
+      }
+      style={buildNeutralWeaponBackground()}
+      subtitle={weapon.typeLabel}
+      testId={`codex-weapon-card-${weapon.id}`}
+      title={weapon.title}
+    />
+  );
+}
+
+function StructureSummaryCard({
+  onSelect,
+  structure,
+}: {
+  onSelect: (id: StructureId) => void;
+  structure: StructureDef;
+}) {
+  return (
+    <button
+      data-hud-cursor="pointer"
+      data-testid={`codex-structure-card-${structure.id}`}
+      type="button"
+      onClick={() => onSelect(structure.id)}
+      className="group relative overflow-hidden rounded-[22px] border border-white/10 p-3 text-left transition duration-200 hover:-translate-y-1 hover:border-white/18"
+      style={buildCardBackground(structure.accentColor)}
+    >
+      <div className="pointer-events-none absolute inset-0 opacity-80">
+        <div
+          className="absolute left-2 top-2 h-20 w-20 rounded-full blur-3xl"
+          style={{ background: structure.accentColor }}
+        />
+        <StructureMotif structure={structure} />
+        <div className="absolute right-0 top-0 h-32 w-32 rounded-full bg-white/5 blur-3xl" />
+        <div className="absolute inset-0 opacity-[0.08] [background-image:radial-gradient(circle_at_1px_1px,rgba(255,255,255,0.7)_1px,transparent_0)] [background-size:18px_18px]" />
+      </div>
+      <div className="relative flex h-full flex-col gap-2.5">
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex min-w-0 items-center gap-3">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[16px] border border-white/18 bg-[linear-gradient(180deg,rgba(255,255,255,0.12),rgba(255,255,255,0.04))] text-[1.25rem] shadow-[0_12px_22px_rgba(0,0,0,0.22)]">
+              {getStructureGlyph(structure.id)}
+            </div>
+            <div className="min-w-0">
+              <h3 className="truncate text-[1.02rem] font-semibold tracking-[-0.03em] text-stone-50">
+                {structure.title}
+              </h3>
+              <p className="text-xs uppercase tracking-[0.18em] text-stone-300/80">
+                {getStructureEffectLabel(structure.effectType)}
+              </p>
+            </div>
+          </div>
+          <Badge className="border-white/16 bg-black/18 text-stone-100">
+            {`${structure.effectRadius}px radius`}
+          </Badge>
+        </div>
+
+        <p className="text-[0.82rem] leading-5 text-stone-200">
+          {structure.detail}
+        </p>
+
+        <div className="grid gap-2.5 sm:grid-cols-2">
+          <div className="rounded-[16px] border border-white/8 bg-black/16 p-2.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+            <p className="text-[0.65rem] font-semibold uppercase tracking-[0.18em] text-amber-200">
+              Unlock
             </p>
-            <strong className="mt-2 block text-[1.35rem] font-semibold tracking-[-0.03em] text-stone-50">
-              {count}
+            <strong className="mt-1.5 block text-[1.15rem] font-semibold tracking-[-0.03em] text-stone-50">
+              {structure.unlockKills} kills
             </strong>
           </div>
-        ))}
+          <div className="rounded-[16px] border border-white/8 bg-black/16 p-2.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+            <p className="text-[0.65rem] font-semibold uppercase tracking-[0.18em] text-emerald-200">
+              Capacity
+            </p>
+            <strong className="mt-1.5 block text-[1.15rem] font-semibold tracking-[-0.03em] text-stone-50">
+              {structure.maxPlaced} live
+            </strong>
+          </div>
+        </div>
       </div>
+    </button>
+  );
+}
 
-      <div className="mt-4 grid gap-3 md:grid-cols-2">
-        {weapons.map((weapon) => (
-          <div
-            key={weapon.id}
-            className="rounded-[18px] border border-white/8 bg-black/20 p-3"
-          >
-            <div className="flex items-center gap-3">
-              <div className="flex h-11 w-11 items-center justify-center rounded-[14px] border border-white/10 bg-white/[0.04] text-stone-50">
-                <WeaponGlyph className="h-5 w-5" id={weapon.id} />
+function WeaponTierCard({ tier }: { tier: WeaponTierDefinition }) {
+  const weapon = WEAPON_DEFS.find((candidate) =>
+    candidate.tiers.some((candidateTier) => candidateTier.title === tier.title),
+  );
+  const snapshot = weapon ? createTierPreviewSnapshot(weapon, tier) : null;
+
+  return (
+    <div
+      className={cn(
+        "rounded-[16px] border p-2.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]",
+        snapshot
+          ? getTierSelectedFrameClassName(snapshot)
+          : "border-white/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.06),rgba(255,255,255,0.02))]",
+      )}
+    >
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-[0.62rem] font-semibold uppercase tracking-[0.2em] text-stone-500">
+          {WEAPON_STAGE_LABELS[tier.tier]}
+        </p>
+        {snapshot ? (
+          <span className="rounded-full border border-white/12 bg-black/20 px-2 py-1 text-[0.58rem] font-semibold uppercase tracking-[0.14em] text-stone-100">
+            {snapshot.killsToNextTier == null
+              ? "Max Tier"
+              : `HUD ${snapshot.tier}`}
+          </span>
+        ) : null}
+      </div>
+      {snapshot ? (
+        <div className="mt-2 grid grid-cols-2 gap-1.5">
+          {Array.from({ length: WEAPON_TIER_NODE_COUNT }, (_, index) => (
+            <span
+              key={`${tier.title}-node-${index + 1}`}
+              className={cn(
+                getTierNodeOffsetClassName(snapshot, index + 1),
+                getTierNodeClassName(snapshot, index + 1, "panel"),
+              )}
+            >
+              <span
+                className={cn(
+                  "absolute inset-y-0 left-0 rounded-full transition-[width] duration-300",
+                  getTierNodeFillClassName(snapshot),
+                )}
+                style={{ width: getTierNodeFillWidth(snapshot, index + 1) }}
+              >
+                <span
+                  className={cn(
+                    "absolute inset-y-0 left-0 right-0 rounded-full",
+                    getTierBarCoreClassName(snapshot),
+                  )}
+                />
+              </span>
+            </span>
+          ))}
+        </div>
+      ) : null}
+      <h4 className="mt-1 text-[0.9rem] font-semibold tracking-[-0.03em] text-stone-50">
+        {tier.title}
+      </h4>
+      <p className="mt-1 text-[0.76rem] leading-5 text-stone-300">
+        {tier.detail}
+      </p>
+      <div className="mt-2 space-y-1 text-[0.7rem] leading-5 text-stone-400">
+        <p>
+          <span className="font-semibold uppercase tracking-[0.14em] text-stone-500">
+            Trigger
+          </span>{" "}
+          {tier.evolveAtKills == null
+            ? "Online at run start"
+            : `Reaches this stage by ${tier.evolveAtKills} weapon kills`}
+        </p>
+        <p>
+          <span className="font-semibold uppercase tracking-[0.14em] text-stone-500">
+            Handling
+          </span>{" "}
+          {tier.hint}
+        </p>
+        {tier.behavior?.summary ? (
+          <p>
+            <span className="font-semibold uppercase tracking-[0.14em] text-stone-500">
+              Behavior
+            </span>{" "}
+            {tier.behavior.summary}
+          </p>
+        ) : null}
+        {tier.vfx?.summary ? (
+          <p>
+            <span className="font-semibold uppercase tracking-[0.14em] text-stone-500">
+              VFX
+            </span>{" "}
+            {tier.vfx.summary}
+          </p>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+function WeaponDetailView({
+  bugEntries,
+  onJumpToBug,
+  weapon,
+}: {
+  bugEntries: Array<[string, BugType]>;
+  onJumpToBug: (id: string) => void;
+  weapon: WeaponDef;
+}) {
+  const tiers = getWeaponTiers(weapon);
+  const { favored, risky } = getWeaponMatchupBuckets(bugEntries, weapon.id);
+
+  return (
+    <div
+      className="mx-auto flex h-full w-full max-w-[50rem] flex-col gap-2.5"
+      data-testid="codex-weapon-detail-view"
+    >
+      <section
+        className="rounded-[20px] border border-white/10 p-3"
+        style={buildNeutralWeaponBackground()}
+      >
+        <div className="grid gap-2.5 lg:grid-cols-[minmax(0,1.25fr)_minmax(17rem,0.9fr)]">
+          <div>
+            <div className="flex flex-wrap items-start gap-3">
+              <div className="flex h-14 w-14 items-center justify-center rounded-[18px] border border-white/28 bg-[linear-gradient(180deg,rgba(255,255,255,0.16),rgba(255,255,255,0.05))] text-stone-50 shadow-[0_14px_24px_rgba(0,0,0,0.22)] ring-1 ring-white/10">
+                <WeaponGlyph className="h-7 w-7" id={weapon.id} />
               </div>
-              <div className="min-w-0">
-                <p className="truncate text-sm font-semibold text-stone-100">
-                  {weapon.title}
-                </p>
-                <p className="text-xs uppercase tracking-[0.16em] text-stone-500">
-                  {weapon.typeLabel}
+              <div className="min-w-0 flex-1">
+                <SectionEyebrow>Weapon Dossier</SectionEyebrow>
+                <div className="mt-1 flex flex-wrap items-center gap-2">
+                  <h3 className="text-[1.12rem] font-semibold tracking-[-0.03em] text-stone-50">
+                    {weapon.title}
+                  </h3>
+                  <Badge className="border-white/16 bg-black/18 text-stone-100">
+                    {weapon.typeLabel}
+                  </Badge>
+                </div>
+                <p className="mt-1.5 text-[0.82rem] leading-5 text-stone-200">
+                  {weapon.detail}
                 </p>
               </div>
             </div>
-            <p className="mt-3 text-xs leading-5 text-stone-400">
-              Unlock at {weapon.unlockKills} kills.{" "}
-              {getWeaponTiers(weapon).length} tiers.
+
+            <div className="mt-2.5 grid gap-2 sm:grid-cols-2">
+              <MatchupBugStrip
+                bugEntries={favored}
+                emptyLabel="No favored bugs are mapped for this weapon."
+                onSelectBug={onJumpToBug}
+                title="Effective Against"
+                toneClassName="text-emerald-200"
+              />
+              <MatchupBugStrip
+                bugEntries={risky}
+                emptyLabel="No weak pockets are mapped for this weapon."
+                onSelectBug={onJumpToBug}
+                title="Ineffective Against"
+                toneClassName="text-rose-200"
+              />
+            </div>
+          </div>
+
+          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-2">
+            <div className="rounded-[14px] border border-white/8 bg-black/16 p-2.5">
+              <SectionEyebrow>Pattern</SectionEyebrow>
+              <p className="mt-1.5 text-sm font-semibold text-stone-100">
+                {getHitPatternLabel(weapon.hitPattern)}
+              </p>
+            </div>
+            <div className="rounded-[14px] border border-white/8 bg-black/16 p-2.5">
+              <SectionEyebrow>Input</SectionEyebrow>
+              <p className="mt-1.5 text-sm font-semibold text-stone-100">
+                {getInputModeLabel(weapon.inputMode)}
+              </p>
+            </div>
+            <div className="rounded-[14px] border border-white/8 bg-black/16 p-2.5">
+              <SectionEyebrow>Cooldown</SectionEyebrow>
+              <p className="mt-1.5 text-sm font-semibold text-stone-100">
+                {formatDurationMs(weapon.cooldownMs)}
+              </p>
+            </div>
+            <div className="rounded-[14px] border border-white/8 bg-black/16 p-2.5">
+              <SectionEyebrow>Unlock</SectionEyebrow>
+              <p className="mt-1.5 text-sm font-semibold text-stone-100">
+                {weapon.unlockKills === 0
+                  ? "Run start"
+                  : `${weapon.unlockKills} kills`}
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="space-y-2 rounded-[20px] border border-white/10 bg-white/[0.03] p-3">
+        <SectionHeading
+          eyebrow="Evolution"
+          title="Tier Comparison"
+          subtitle="Compare the base weapon, the mid-tier upgrade, and the final overdrive state side by side."
+        />
+        <div className="grid gap-2 md:grid-cols-3">
+          {tiers.map((tier) => (
+            <WeaponTierCard key={tier.tier} tier={tier} />
+          ))}
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function StructureDetailView({ structure }: { structure: StructureDef }) {
+  const [tierTwoThreshold, tierThreeThreshold] = structure.tierThresholds;
+
+  return (
+    <div
+      className="mx-auto flex h-full w-full max-w-[50rem] flex-col gap-2.5"
+      data-testid="codex-structure-detail-view"
+    >
+      <section
+        className="rounded-[20px] border border-white/10 p-3"
+        style={buildCardBackground(structure.accentColor)}
+      >
+        <div className="grid gap-2.5 lg:grid-cols-[minmax(0,1.25fr)_minmax(17rem,0.9fr)]">
+          <div>
+            <div className="flex flex-wrap items-start gap-3">
+              <div className="flex h-14 w-14 items-center justify-center rounded-[18px] border border-white/16 bg-[linear-gradient(180deg,rgba(255,255,255,0.12),rgba(255,255,255,0.04))] text-[1.55rem] shadow-[0_14px_24px_rgba(0,0,0,0.22)]">
+                {getStructureGlyph(structure.id)}
+              </div>
+              <div className="min-w-0 flex-1">
+                <SectionEyebrow>Structure Dossier</SectionEyebrow>
+                <div className="mt-1 flex flex-wrap items-center gap-2">
+                  <h3 className="text-[1.12rem] font-semibold tracking-[-0.03em] text-stone-50">
+                    {structure.title}
+                  </h3>
+                  <Badge className="border-white/16 bg-black/18 text-stone-100">
+                    {getStructureEffectLabel(structure.effectType)}
+                  </Badge>
+                </div>
+                <p className="mt-1.5 text-[0.82rem] leading-5 text-stone-200">
+                  {structure.detail}
+                </p>
+              </div>
+            </div>
+            <div className="mt-2.5 rounded-[16px] border border-white/8 bg-black/16 p-2.5">
+              <SectionEyebrow>Placement Hint</SectionEyebrow>
+              <p className="mt-1.5 text-sm leading-5 text-stone-200">
+                {structure.hint}
+              </p>
+            </div>
+          </div>
+
+          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-2">
+            <div className="rounded-[14px] border border-white/8 bg-black/16 p-2.5">
+              <SectionEyebrow>Radius</SectionEyebrow>
+              <p className="mt-1.5 text-sm font-semibold text-stone-100">
+                {structure.effectRadius}px
+              </p>
+            </div>
+            <div className="rounded-[14px] border border-white/8 bg-black/16 p-2.5">
+              <SectionEyebrow>Capacity</SectionEyebrow>
+              <p className="mt-1.5 text-sm font-semibold text-stone-100">
+                {structure.maxPlaced} placed
+              </p>
+            </div>
+            <div className="rounded-[14px] border border-white/8 bg-black/16 p-2.5">
+              <SectionEyebrow>Unlock</SectionEyebrow>
+              <p className="mt-1.5 text-sm font-semibold text-stone-100">
+                {structure.unlockKills} kills
+              </p>
+            </div>
+            <div className="rounded-[14px] border border-white/8 bg-black/16 p-2.5">
+              <SectionEyebrow>Specialty</SectionEyebrow>
+              <p className="mt-1.5 text-sm font-semibold text-stone-100">
+                {structure.effectType === "capture"
+                  ? "Single target control"
+                  : "Lane shaping"}
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="space-y-2 rounded-[20px] border border-white/10 bg-white/[0.03] p-3">
+        <SectionHeading
+          eyebrow="Progression"
+          title="Tier Growth"
+          subtitle={structure.hint}
+        />
+        <div className="grid gap-2 md:grid-cols-3">
+          <div className="rounded-[16px] border border-white/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.06),rgba(255,255,255,0.02))] p-2.5">
+            <p className="text-[0.62rem] font-semibold uppercase tracking-[0.2em] text-stone-500">
+              Tier 1
+            </p>
+            <h4 className="mt-1 text-[0.9rem] font-semibold tracking-[-0.03em] text-stone-50">
+              Baseline Field
+            </h4>
+            <p className="mt-1 text-[0.76rem] leading-5 text-stone-300">
+              Deploys the base version of the structure with its full placement
+              radius and default behavior.
             </p>
           </div>
-        ))}
-      </div>
+          <div className="rounded-[16px] border border-white/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.06),rgba(255,255,255,0.02))] p-2.5">
+            <p className="text-[0.62rem] font-semibold uppercase tracking-[0.2em] text-stone-500">
+              Tier 2
+            </p>
+            <h4 className="mt-1 text-[0.9rem] font-semibold tracking-[-0.03em] text-stone-50">
+              Expanded Output
+            </h4>
+            <p className="mt-1 text-[0.76rem] leading-5 text-stone-300">
+              After {tierTwoThreshold} structure kills, the structure widens its
+              field and pushes harder on its specialty.
+            </p>
+          </div>
+          <div className="rounded-[16px] border border-white/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.06),rgba(255,255,255,0.02))] p-2.5">
+            <p className="text-[0.62rem] font-semibold uppercase tracking-[0.2em] text-stone-500">
+              Tier 3
+            </p>
+            <h4 className="mt-1 text-[0.9rem] font-semibold tracking-[-0.03em] text-stone-50">
+              Overdrive
+            </h4>
+            <p className="mt-1 text-[0.76rem] leading-5 text-stone-300">
+              After {tierThreeThreshold} structure kills, the structure reaches
+              its final operating range and strongest passive impact.
+            </p>
+          </div>
+        </div>
+      </section>
+    </div>
+  );
+}
 
-      <div className="mt-5 grid gap-3 md:grid-cols-2">
-        <div className="rounded-[18px] border border-white/8 bg-black/16 p-3">
-          <p className="text-[0.65rem] font-semibold uppercase tracking-[0.18em] text-emerald-200">
-            Best Into
-          </p>
-          <p className="mt-2 text-sm leading-6 text-stone-300">
-            {favoredPreview ||
-              "No strong bug matchups are currently mapped for this damage family."}
-          </p>
+function BugDetailMotif({ accent }: { accent: VariantAccent }) {
+  return (
+    <>
+      <div
+        className="absolute right-8 top-6 h-14 w-14 rounded-full border border-white/10 opacity-80 animate-pulse"
+        style={{ boxShadow: `0 0 24px ${accent.washA}` }}
+      />
+      <div
+        className="absolute right-14 top-12 h-[2px] w-20 rotate-[14deg] rounded-full opacity-80 animate-pulse"
+        style={{ background: accent.metricFillGradient }}
+      />
+      <div
+        className="absolute right-6 top-20 h-2.5 w-2.5 rounded-full opacity-70 animate-pulse"
+        style={{ background: accent.washB }}
+      />
+    </>
+  );
+}
+
+function BugDossierCard({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-[14px] border border-white/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.06),rgba(255,255,255,0.02))] p-2.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+      <SectionEyebrow>{label}</SectionEyebrow>
+      <p className="mt-1 text-[0.76rem] leading-5 text-stone-200">{value}</p>
+    </div>
+  );
+}
+
+function BugDetailView({
+  activeEntry,
+  activeMaxHp,
+  activeVariantConfig,
+  accent,
+  id,
+}: {
+  activeEntry: BugType;
+  activeMaxHp: number;
+  activeVariantConfig: (typeof BUG_VARIANT_CONFIG)[BugVariant] | null;
+  accent: VariantAccent;
+  id: string;
+}) {
+  const { favored, risky } = getBugWeaponMatchupBuckets(activeEntry);
+
+  return (
+    <div
+      className="mx-auto flex h-full w-full max-w-[50rem] flex-col gap-2.5"
+      data-testid="codex-detail-view"
+    >
+      <section
+        className="relative overflow-hidden rounded-[20px] border border-white/10 p-3"
+        style={buildCardBackground(accent.washA, accent.washB)}
+      >
+        <div className="pointer-events-none absolute inset-0 opacity-[0.08] [background-image:radial-gradient(circle_at_1px_1px,rgba(255,255,255,0.7)_1px,transparent_0)] [background-size:18px_18px]" />
+        <BugDetailMotif accent={accent} />
+
+        <div className="relative grid gap-2.5 lg:grid-cols-[minmax(0,1.2fr)_minmax(16.5rem,0.95fr)]">
+          <div>
+            <div className="flex flex-wrap items-start gap-3">
+              <div
+                className={cn(
+                  "flex h-14 w-14 items-center justify-center rounded-[18px] border bg-[linear-gradient(180deg,rgba(255,255,255,0.16),rgba(255,255,255,0.06))] p-2.5 shadow-[0_14px_24px_rgba(0,0,0,0.22)] ring-1 ring-white/14",
+                  accent.iconBorderClass,
+                )}
+              >
+                <img
+                  alt=""
+                  className="h-8 w-8 object-contain"
+                  src={getTabIconSrc(activeEntry, id)}
+                />
+              </div>
+
+              <div className="min-w-0 flex-1">
+                <SectionEyebrow>Bug Dossier</SectionEyebrow>
+                <div className="mt-1 flex flex-wrap items-center gap-2">
+                  <h3 className="text-[1.12rem] font-semibold tracking-[-0.03em] text-stone-50">
+                    {activeEntry.name}
+                  </h3>
+                  <Badge className={accent.badgeClass}>
+                    {getThreatLabel(
+                      (activeEntry.iconVariant ?? id) as BugVariant,
+                    )}
+                  </Badge>
+                  <Badge className={accent.behaviorClass}>
+                    {getBehaviorLabel(activeEntry.profile.behavior)}
+                  </Badge>
+                </div>
+                <p className="mt-1.5 text-[0.82rem] leading-5 text-stone-200">
+                  {activeEntry.description}
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-2.5 grid gap-2 sm:grid-cols-2">
+              <BugDossierCard
+                label="Encounter"
+                value={activeEntry.dossier.encounter}
+              />
+              <BugDossierCard
+                label="Pressure"
+                value={activeEntry.dossier.pressure}
+              />
+            </div>
+          </div>
+
+          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-2">
+            <MatchupWeaponStrip
+              emptyLabel="No weapon weak spots mapped yet."
+              title="Weaknesses"
+              toneClassName="text-emerald-200"
+              weaponEntries={favored}
+            />
+            <MatchupWeaponStrip
+              emptyLabel="No weapon resistances mapped yet."
+              title="Strengths"
+              toneClassName="text-rose-200"
+              weaponEntries={risky}
+            />
+            <BugDossierCard
+              label="Susceptibility"
+              value={activeEntry.dossier.susceptibility}
+            />
+            <BugDossierCard
+              label="Behavior"
+              value={`${getAffinityLabel(activeEntry.socialAffinity)}. ${getSpeedLabel(activeEntry)}.`}
+            />
+          </div>
         </div>
-        <div className="rounded-[18px] border border-white/8 bg-black/16 p-3">
-          <p className="text-[0.65rem] font-semibold uppercase tracking-[0.18em] text-rose-200">
-            Avoid Into
-          </p>
-          <p className="mt-2 text-sm leading-6 text-stone-300">
-            {riskyPreview ||
-              "No major immunity or risk pockets are currently mapped for this damage family."}
-          </p>
-        </div>
-      </div>
-    </section>
+      </section>
+
+      <DossierStats
+        accent={accent}
+        activeEntry={activeEntry}
+        activeMaxHp={activeMaxHp}
+        activeVariantConfig={activeVariantConfig}
+      />
+      <FieldNotes activeEntry={activeEntry} accent={accent} />
+    </div>
   );
 }
 
@@ -346,10 +1268,10 @@ function DossierStats({
   );
 
   return (
-    <div className="space-y-2 p-2">
+    <section className="space-y-2 rounded-[20px] border border-white/10 bg-white/[0.03] p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
       <SectionHeading eyebrow="Core Readout" title="Tactical Profile" />
 
-      <div className="grid gap-3 sm:grid-cols-2">
+      <div className="grid gap-2 sm:grid-cols-2">
         <CompactReadoutCard
           accent={accent}
           metricLabel={getResilienceLabel(activeMaxHp)}
@@ -384,7 +1306,7 @@ function DossierStats({
           signalValue={visibility}
         />
       </div>
-    </div>
+    </section>
   );
 }
 
@@ -396,10 +1318,10 @@ function FieldNotes({
   accent: VariantAccent;
 }) {
   return (
-    <div className="space-y-2 p-2">
+    <section className="space-y-2 rounded-[20px] border border-white/10 bg-white/[0.03] p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
       <SectionHeading eyebrow="Field Notes" title="Strengths + Weaknesses" />
 
-      <div className="grid gap-3 sm:grid-cols-2">
+      <div className="grid gap-2 sm:grid-cols-2">
         {(
           Object.entries(activeEntry.weaponMatchups) as Array<
             [BugWeaponId, BugWeaponMatchup]
@@ -413,7 +1335,7 @@ function FieldNotes({
           />
         ))}
       </div>
-    </div>
+    </section>
   );
 }
 
@@ -428,67 +1350,70 @@ function SummaryCard({
 }) {
   const variant = (entry.iconVariant ?? id) as BugVariant;
   const accent = getVariantAccent(variant);
+  const { favored, risky } = getBugWeaponMatchupBuckets(entry);
 
   return (
-    <button
-      data-hud-cursor="pointer"
-      data-testid="codex-summary-card"
-      type="button"
-      onClick={() => onSelect(id)}
-      className={cn(
-        "group relative overflow-hidden rounded-[24px] border border-white/10 bg-gradient-to-br p-4 text-left transition duration-200 hover:-translate-y-1 hover:border-white/18 hover:bg-white/[0.05]",
-        accent.cardClass,
-      )}
-    >
-      <div className="pointer-events-none absolute inset-0 opacity-90">
-        <div
-          className="absolute left-2 top-2 h-20 w-20 rounded-full blur-3xl"
-          style={{ background: accent.washA }}
-        />
-        <div
-          className="absolute right-2 bottom-2 h-16 w-16 rounded-full blur-3xl"
-          style={{ background: accent.washB }}
-        />
-      </div>
-
-      <div className="relative flex h-full flex-col gap-4">
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex min-w-0 items-center gap-3">
-            <div
-              className={cn(
-                "flex h-14 w-14 shrink-0 items-center justify-center rounded-[18px] border border-white/20 bg-gradient-to-br p-3 shadow-[0_0_24px_rgba(0,0,0,0.18)]",
-                accent.iconPanel,
-              )}
-            >
-              <img
-                alt=""
-                className="h-8 w-8 object-contain transition duration-200 group-hover:scale-110"
-                src={getTabIconSrc(entry, id)}
-              />
-            </div>
-
-            <h3 className="min-w-0 truncate text-[1.4rem] font-semibold tracking-[-0.03em] text-stone-50">
-              {entry.name}
-            </h3>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <div className="flex-shrink-0">
-              <Badge className={accent.badgeClass}>
-                {getThreatLabel(variant)}
-              </Badge>
-            </div>
-            <div className="flex-shrink-0">
-              <Badge className={accent.behaviorClass}>
-                {getBehaviorLabel(entry.profile.behavior)}
-              </Badge>
-            </div>
-          </div>
+    <CodexSummaryCard
+      description={entry.description}
+      footer={
+        <div className="grid gap-2 sm:grid-cols-2">
+          <MatchupWeaponStrip
+            emptyLabel="No mapped weak spots yet."
+            title="Weaknesses"
+            toneClassName="text-emerald-200"
+            weaponEntries={favored}
+          />
+          <MatchupWeaponStrip
+            emptyLabel="No mapped resistances yet."
+            title="Strengths"
+            toneClassName="text-rose-200"
+            weaponEntries={risky}
+          />
         </div>
-
-        <p className="text-sm leading-6 text-stone-200">{entry.description}</p>
-      </div>
-    </button>
+      }
+      icon={
+        <img
+          alt=""
+          className="h-7 w-7 object-contain transition duration-200 group-hover:scale-110"
+          src={getTabIconSrc(entry, id)}
+        />
+      }
+      iconShellClassName={cn(
+        "border-white/24 bg-gradient-to-br shadow-[0_0_20px_rgba(0,0,0,0.16)] ring-white/12",
+        accent.iconPanel,
+      )}
+      onActivate={() => onSelect(id)}
+      overlay={
+        <>
+          <div
+            className="absolute left-2 top-2 h-20 w-20 rounded-full blur-3xl"
+            style={{ background: accent.washA }}
+          />
+          <div
+            className="absolute right-2 bottom-2 h-16 w-16 rounded-full blur-3xl"
+            style={{ background: accent.washB }}
+          />
+          <div className="absolute inset-0 opacity-[0.08] [background-image:radial-gradient(circle_at_1px_1px,rgba(255,255,255,0.7)_1px,transparent_0)] [background-size:18px_18px]" />
+        </>
+      }
+      rightSlot={
+        <>
+          <div className="flex-shrink-0">
+            <Badge className={accent.badgeClass}>
+              {getThreatLabel(variant)}
+            </Badge>
+          </div>
+          <div className="flex-shrink-0">
+            <Badge className={accent.behaviorClass}>
+              {getBehaviorLabel(entry.profile.behavior)}
+            </Badge>
+          </div>
+        </>
+      }
+      style={getBugCardStyle(entry, id)}
+      testId="codex-summary-card"
+      title={entry.name}
+    />
   );
 }
 
@@ -500,7 +1425,7 @@ export default function CodexPanel({
 }: CodexPanelProps) {
   const codex = useMemo(() => getCodex(), []);
   const [activeView, setActiveView] = useState<CodexView>("bugs");
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedEntry, setSelectedEntry] = useState<SelectedCodexEntry>(null);
 
   useEffect(() => {
     if (open) {
@@ -508,7 +1433,7 @@ export default function CodexPanel({
       // always starts on the list view. Defer to avoid synchronous
       // setState inside an effect.
       const t1 = setTimeout(() => setActiveView("bugs"), 0);
-      const t2 = setTimeout(() => setSelectedId(null), 0);
+      const t2 = setTimeout(() => setSelectedEntry(null), 0);
       return () => {
         clearTimeout(t1);
         clearTimeout(t2);
@@ -519,33 +1444,58 @@ export default function CodexPanel({
 
   const entries = useMemo(() => Object.entries(codex), [codex]);
   const fallbackId = entries[0]?.[0] ?? "low";
-  const backdropId = selectedId ?? fallbackId;
+  const bugEntry =
+    selectedEntry?.kind === "bug" ? codex[selectedEntry.id] : null;
+  const selectedWeapon =
+    selectedEntry?.kind === "weapon"
+      ? (WEAPON_DEFS.find((weapon) => weapon.id === selectedEntry.id) ?? null)
+      : null;
+  const selectedStructure =
+    selectedEntry?.kind === "structure"
+      ? (STRUCTURE_DEFS.find(
+          (structure) => structure.id === selectedEntry.id,
+        ) ?? null)
+      : null;
+  const backdropId =
+    selectedEntry?.kind === "bug" ? selectedEntry.id : fallbackId;
   const backdropEntry = codex[backdropId];
-  const selectedEntry = selectedId ? codex[selectedId] : null;
 
   const handleMenuButtonClick = useCallback(() => {
     onMenuToggle();
   }, [onMenuToggle]);
 
-  const handleSelectEntry = useCallback((id: string) => {
-    setSelectedId(id);
+  const handleSelectBug = useCallback((id: string) => {
+    setSelectedEntry({ id, kind: "bug" });
+  }, []);
+
+  const handleSelectWeapon = useCallback((id: SiegeWeaponId) => {
+    setSelectedEntry({ id, kind: "weapon" });
+  }, []);
+
+  const handleSelectStructure = useCallback((id: StructureId) => {
+    setSelectedEntry({ id, kind: "structure" });
+  }, []);
+
+  const handleJumpToBug = useCallback((id: string) => {
+    setActiveView("bugs");
+    setSelectedEntry({ id, kind: "bug" });
   }, []);
 
   const handleBackToGrid = useCallback(() => {
-    setSelectedId(null);
+    setSelectedEntry(null);
   }, []);
 
   const backdropVariant = (backdropEntry?.iconVariant ??
     backdropId) as BugVariant;
   const backdropAccent = getVariantAccent(backdropVariant);
-  const selectedVariant = selectedEntry
-    ? ((selectedEntry.iconVariant ?? selectedId) as BugVariant)
+  const selectedVariant = bugEntry
+    ? ((bugEntry.iconVariant ?? selectedEntry?.id) as BugVariant)
     : null;
   const selectedAccent = selectedVariant
     ? getVariantAccent(selectedVariant)
     : backdropAccent;
   const selectedMaxHp =
-    selectedEntry && selectedVariant ? getBugVariantMaxHp(selectedVariant) : 0;
+    bugEntry && selectedVariant ? getBugVariantMaxHp(selectedVariant) : 0;
   const selectedVariantConfig = selectedVariant
     ? (BUG_VARIANT_CONFIG[selectedVariant] ?? null)
     : null;
@@ -621,31 +1571,31 @@ export default function CodexPanel({
                 </div>
 
                 <div className="relative flex min-w-0 flex-1 flex-col">
-                  <div className="relative flex items-start justify-between gap-4 border-b border-white/8 px-5 py-4">
+                  <div className="relative flex items-start justify-between gap-4 border-b border-white/8 px-4 py-3.5">
                     <div className="min-w-0 flex-1 pr-28">
-                      {selectedEntry && selectedVariant ? (
+                      {bugEntry && selectedVariant ? (
                         <>
                           <div className="flex min-w-0 flex-wrap items-center gap-3">
                             <div className="flex min-w-0 items-center gap-3">
                               <div
                                 className={cn(
-                                  "flex h-14 w-14 shrink-0 items-center justify-center rounded-[18px] border bg-gradient-to-br p-3 shadow-[0_0_24px_rgba(0,0,0,0.18)]",
+                                  "flex h-12 w-12 shrink-0 items-center justify-center rounded-[16px] border bg-gradient-to-br p-2.5 shadow-[0_0_20px_rgba(0,0,0,0.16)] ring-1 ring-white/12",
                                   selectedAccent.iconPanel,
                                   selectedAccent.iconBorderClass,
                                 )}
                               >
                                 <img
                                   alt=""
-                                  className="h-8 w-8 object-contain"
+                                  className="h-7 w-7 object-contain"
                                   src={getTabIconSrc(
-                                    selectedEntry,
-                                    selectedId ?? fallbackId,
+                                    bugEntry,
+                                    selectedEntry?.id ?? fallbackId,
                                   )}
                                 />
                               </div>
 
-                              <h3 className="min-w-0 truncate text-[1.4rem] font-semibold tracking-[-0.03em] text-stone-50">
-                                {selectedEntry.name}
+                              <h3 className="min-w-0 truncate text-[1.15rem] font-semibold tracking-[-0.03em] text-stone-50">
+                                {bugEntry.name}
                               </h3>
                             </div>
 
@@ -654,41 +1604,43 @@ export default function CodexPanel({
                                 {getThreatLabel(selectedVariant)}
                               </Badge>
                               <Badge className={selectedAccent.behaviorClass}>
-                                {getBehaviorLabel(
-                                  selectedEntry.profile.behavior,
-                                )}
+                                {getBehaviorLabel(bugEntry.profile.behavior)}
                               </Badge>
                             </div>
                           </div>
 
                           <div className="mt-2 px-1">
-                            <p className="max-w-[44rem] text-sm leading-6 text-stone-300">
-                              {selectedEntry.description}
+                            <p className="max-w-[40rem] text-[0.82rem] leading-5 text-stone-300">
+                              {bugEntry.description}
                             </p>
                           </div>
                         </>
                       ) : (
                         <>
                           {/* eyebrow intentionally hidden on list view */}
-                          <h2 className="mt-1 text-[1.55rem] font-semibold tracking-[-0.04em] text-stone-50">
+                          <h2 className="mt-1 text-[1.3rem] font-semibold tracking-[-0.04em] text-stone-50">
                             {activeView === "weapons"
                               ? "Weapon Codex"
-                              : selectedEntry
-                                ? selectedEntry.name
-                                : "Bug Codex"}
+                              : activeView === "structures"
+                                ? "Structure Codex"
+                                : selectedEntry
+                                  ? selectedEntry.id
+                                  : "Bug Codex"}
                           </h2>
-                          <p className="mt-2 max-w-[40rem] text-sm leading-6 text-stone-300">
+                          <p className="mt-1.5 text-[0.82rem] leading-5 text-stone-300">
                             {activeView === "weapons"
-                              ? "Review weapon types, tier names, and which bugs each damage family punishes or fails against."
-                              : selectedEntry
-                                ? "Review full encounter details, pressure profile, and field notes for the selected bug."
-                                : "Scout the swarm, a pocket catalog of the midnight bugs that keep engineers up."}
+                              ? "Review each weapon as its own dossier, then compare Tier 1, Tier 2, and Overdrive behavior side by side."
+                              : activeView === "structures"
+                                ? "Review placeable structures, what each passive does, and how they scale as they rank up during a run."
+                                : selectedEntry
+                                  ? "Review full encounter details, pressure profile, and field notes for the selected bug."
+                                  : "Scout the swarm, a pocket catalog of the midnight bugs that keep engineers up."}
                           </p>
                         </>
                       )}
                     </div>
 
-                    <div className="absolute right-5 top-4 z-20 flex items-center gap-2">
+                    <div className="absolute right-4 top-3.5 z-20 flex items-center gap-2">
                       {selectedEntry ? (
                         <button
                           data-hud-cursor="pointer"
@@ -712,7 +1664,7 @@ export default function CodexPanel({
 
                   {!selectedEntry ? (
                     <div
-                      className="relative border-b border-white/8 px-5 py-3"
+                      className="relative border-b border-white/8 px-4 py-2.5"
                       data-testid="codex-tabs"
                     >
                       <Tabs
@@ -723,45 +1675,63 @@ export default function CodexPanel({
                     </div>
                   ) : null}
 
-                  {activeView === "bugs" && selectedEntry && selectedVariant ? (
-                    <div
-                      className="mb-6 flex-1 overflow-hidden px-5 py-4"
-                      data-testid="codex-detail-view"
-                    >
-                      <div className="mx-auto flex h-full w-full max-w-[46rem] flex-col gap-4">
-                        <DossierStats
-                          accent={selectedAccent}
-                          activeEntry={selectedEntry}
-                          activeMaxHp={selectedMaxHp}
-                          activeVariantConfig={selectedVariantConfig}
-                        />
-                        <FieldNotes
-                          activeEntry={selectedEntry}
-                          accent={selectedAccent}
-                        />
-                      </div>
+                  {activeView === "bugs" && bugEntry && selectedVariant ? (
+                    <div className="mb-4 flex-1 overflow-hidden px-4 py-3">
+                      <BugDetailView
+                        accent={selectedAccent}
+                        activeEntry={bugEntry}
+                        activeMaxHp={selectedMaxHp}
+                        activeVariantConfig={selectedVariantConfig}
+                        id={selectedEntry?.id ?? fallbackId}
+                      />
                     </div>
                   ) : activeView === "bugs" ? (
-                    <div className="flex-1 overflow-y-auto px-5 py-5">
-                      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-2">
+                    <div className="flex-1 overflow-y-auto px-4 py-4">
+                      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-2">
                         {entries.map(([id, entry]) => (
                           <SummaryCard
                             key={id}
                             id={id}
                             entry={entry}
-                            onSelect={handleSelectEntry}
+                            onSelect={handleSelectBug}
                           />
                         ))}
                       </div>
                     </div>
-                  ) : (
-                    <div className="flex-1 overflow-y-auto px-5 py-5">
-                      <div className="space-y-4">
-                        {WEAPON_TYPE_ORDER.map((type) => (
-                          <WeaponTypeCard
-                            key={type}
+                  ) : activeView === "weapons" && selectedWeapon ? (
+                    <div className="mb-4 flex-1 overflow-hidden px-4 py-3">
+                      <WeaponDetailView
+                        bugEntries={entries}
+                        onJumpToBug={handleJumpToBug}
+                        weapon={selectedWeapon}
+                      />
+                    </div>
+                  ) : activeView === "weapons" ? (
+                    <div className="flex-1 overflow-y-auto px-4 py-4">
+                      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-2">
+                        {WEAPON_DEFS.map((weapon) => (
+                          <WeaponSummaryCard
+                            key={weapon.id}
                             bugEntries={entries}
-                            type={type}
+                            onJumpToBug={handleJumpToBug}
+                            onSelect={handleSelectWeapon}
+                            weapon={weapon}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  ) : selectedStructure ? (
+                    <div className="mb-4 flex-1 overflow-hidden px-4 py-3">
+                      <StructureDetailView structure={selectedStructure} />
+                    </div>
+                  ) : (
+                    <div className="flex-1 overflow-y-auto px-4 py-4">
+                      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-2">
+                        {STRUCTURE_DEFS.map((structure) => (
+                          <StructureSummaryCard
+                            key={structure.id}
+                            onSelect={handleSelectStructure}
+                            structure={structure}
                           />
                         ))}
                       </div>

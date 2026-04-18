@@ -13,30 +13,23 @@ import type {
 } from "@game/weapons/runtime/types";
 import { WeaponId, WeaponTier } from "@game/types";
 import { coneAngleAway } from "@game/weapons/runtime/targetingHelpers";
-
-// Spray params
-// Cloud poison duration is kept just over the re-apply interval so the
-// effect expires within one cycle once the player stops spraying or the
-// bug leaves the cloud.  Without this, bugs carry 4 s of poison even after
-// moving far away from the cloud.
-const POISON_DPS = 0.5;
-const POISON_DURATION_MS = 450;  // ~1 interval; expires very quickly outside cloud
-const CLOUD_RADIUS = 96;
-const CLOUD_MS = 2400;
-const CLOUD_INTERVAL_MS = 400;
-const T2_SECONDARY_RADIUS = 56;
-const T2_SECONDARY_DURATION_MS = 800;
-const T3_CLOUD_RADIUS = 144;
-const T3_CLOUD_MS = 3200;
+import { BASE_TOGGLES } from "./constants";
 
 function buildTickCommands(ctx: WeaponContext): WeaponCommand[] {
   const { targetX, targetY, centerX, centerY } = ctx;
-  const tier = ctx.tier ?? WeaponTier.TIER_ONE;
   const sprayAngle = coneAngleAway(targetX, targetY, centerX, centerY);
   const commands: WeaponCommand[] = [];
-
-  const cloudRadius = tier >= WeaponTier.TIER_THREE ? T3_CLOUD_RADIUS : CLOUD_RADIUS;
-  const cloudMs = tier >= WeaponTier.TIER_THREE ? T3_CLOUD_MS : CLOUD_MS;
+  const poisonDps = ctx.config?.poisonDps ?? BASE_TOGGLES.poisonDps;
+  const poisonDurationMs =
+    ctx.config?.poisonDurationMs ?? BASE_TOGGLES.poisonDurationMs;
+  const cloudRadius = ctx.config?.cloudRadius ?? BASE_TOGGLES.cloudRadius;
+  const cloudMs = ctx.config?.cloudDurationMs ?? BASE_TOGGLES.cloudDurationMs;
+  const cloudIntervalMs =
+    ctx.config?.cloudIntervalMs ?? BASE_TOGGLES.cloudIntervalMs;
+  const secondaryRadius =
+    ctx.config?.secondaryRadius ?? BASE_TOGGLES.secondaryRadius;
+  const secondaryDurationMs =
+    ctx.config?.secondaryDurationMs ?? BASE_TOGGLES.secondaryDurationMs;
 
   // Note: we do NOT apply individual applyPoison per bug here.
   // The repeatPoisonRadius cloud below re-poisons every 400 ms for 2.4-3.2 s,
@@ -49,14 +42,14 @@ function buildTickCommands(ctx: WeaponContext): WeaponCommand[] {
     cx: targetX,
     cy: targetY,
     radius: cloudRadius,
-    dps: POISON_DPS,
-    durationMs: POISON_DURATION_MS,
-    intervalMs: CLOUD_INTERVAL_MS,
+    dps: poisonDps,
+    durationMs: poisonDurationMs,
+    intervalMs: cloudIntervalMs,
     totalMs: cloudMs,
   });
 
   // T2+: secondary poison cloud around each bug caught in the main spray
-  if (tier >= WeaponTier.TIER_TWO) {
+  if ((ctx.tier ?? WeaponTier.TIER_ONE) >= WeaponTier.TIER_TWO) {
     const bugs = ctx.engine.getAllBugs();
     for (const idx of ctx.engine.radiusHitTest(targetX, targetY, cloudRadius)) {
       const bug = bugs[idx];
@@ -65,9 +58,9 @@ function buildTickCommands(ctx: WeaponContext): WeaponCommand[] {
         kind: "poisonRadius",
         cx: bug.x,
         cy: bug.y,
-        radius: T2_SECONDARY_RADIUS,
-        dps: POISON_DPS,
-        durationMs: T2_SECONDARY_DURATION_MS,
+        radius: secondaryRadius,
+        dps: poisonDps,
+        durationMs: secondaryDurationMs,
       });
     }
   }
