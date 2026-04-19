@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-04-18T00:16:14.372Z",
-  "lastUpdated": "2026-04-18T00:16:14.372Z",
+  "generatedAt": "2026-04-19T00:16:30.754Z",
+  "lastUpdated": "2026-04-19T00:16:30.754Z",
   "bugs": [
     {
       "createdAt": "2023-09-18",
@@ -11764,14 +11764,6 @@
     },
     {
       "createdAt": "2026-03-09",
-      "completedAt": "2026-03-10",
-      "priority": 1,
-      "stateName": "Done",
-      "stateType": "completed",
-      "teamKey": "T1"
-    },
-    {
-      "createdAt": "2026-03-09",
       "completedAt": "2026-04-07",
       "priority": 3,
       "stateName": "Done",
@@ -12201,14 +12193,6 @@
       "stateName": "Backlog",
       "stateType": "backlog",
       "teamKey": "TA"
-    },
-    {
-      "createdAt": "2026-03-17",
-      "completedAt": null,
-      "priority": 1,
-      "stateName": "Canceled",
-      "stateType": "canceled",
-      "teamKey": "CP"
     },
     {
       "createdAt": "2026-03-17",
