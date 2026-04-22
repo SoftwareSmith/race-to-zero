@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-04-21T00:19:11.345Z",
-  "lastUpdated": "2026-04-21T00:19:11.345Z",
+  "generatedAt": "2026-04-22T00:16:24.066Z",
+  "lastUpdated": "2026-04-22T00:16:24.066Z",
   "bugs": [
     {
       "createdAt": "2023-09-18",
@@ -12550,8 +12550,8 @@
       "createdAt": "2026-04-09",
       "completedAt": null,
       "priority": 3,
-      "stateName": "Todo",
-      "stateType": "unstarted",
+      "stateName": "Canceled",
+      "stateType": "canceled",
       "teamKey": "T1"
     },
     {
@@ -12566,8 +12566,8 @@
       "createdAt": "2026-04-10",
       "completedAt": null,
       "priority": 2,
-      "stateName": "Canceled",
-      "stateType": "canceled",
+      "stateName": "In Review",
+      "stateType": "started",
       "teamKey": "TA"
     },
     {
@@ -12620,10 +12620,10 @@
     },
     {
       "createdAt": "2026-04-13",
-      "completedAt": null,
+      "completedAt": "2026-04-21",
       "priority": 3,
-      "stateName": "In Review",
-      "stateType": "started",
+      "stateName": "Done",
+      "stateType": "completed",
       "teamKey": "T1"
     },
     {
@@ -12696,7 +12696,7 @@
       "priority": 4,
       "stateName": "Todo",
       "stateType": "unstarted",
-      "teamKey": "CP"
+      "teamKey": "T1"
     },
     {
       "createdAt": "2026-04-17",
@@ -12724,11 +12724,43 @@
     },
     {
       "createdAt": "2026-04-20",
+      "completedAt": "2026-04-21",
+      "priority": 3,
+      "stateName": "Done",
+      "stateType": "completed",
+      "teamKey": "TA"
+    },
+    {
+      "createdAt": "2026-04-21",
+      "completedAt": null,
+      "priority": 4,
+      "stateName": "Todo",
+      "stateType": "unstarted",
+      "teamKey": "T1"
+    },
+    {
+      "createdAt": "2026-04-21",
+      "completedAt": null,
+      "priority": 4,
+      "stateName": "In Review",
+      "stateType": "started",
+      "teamKey": "TA"
+    },
+    {
+      "createdAt": "2026-04-21",
       "completedAt": null,
       "priority": 3,
-      "stateName": "Triage",
-      "stateType": "triage",
-      "teamKey": "CP"
+      "stateName": "In Progress",
+      "stateType": "started",
+      "teamKey": "TA"
+    },
+    {
+      "createdAt": "2026-04-21",
+      "completedAt": null,
+      "priority": 2,
+      "stateName": "Backlog",
+      "stateType": "backlog",
+      "teamKey": "TA"
     }
   ]
 }
