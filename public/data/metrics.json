@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-04-26T00:18:18.723Z",
-  "lastUpdated": "2026-04-26T00:18:18.723Z",
+  "generatedAt": "2026-04-27T00:19:09.694Z",
+  "lastUpdated": "2026-04-27T00:19:09.694Z",
   "bugs": [
     {
       "createdAt": "2023-09-18",
@@ -254,8 +254,8 @@
       "createdAt": "2024-04-08",
       "completedAt": null,
       "priority": 4,
-      "stateName": "Backlog",
-      "stateType": "backlog",
+      "stateName": "In Progress",
+      "stateType": "started",
       "teamKey": "CP"
     },
     {
@@ -12060,10 +12060,10 @@
     },
     {
       "createdAt": "2026-03-24",
-      "completedAt": "2026-04-24",
+      "completedAt": null,
       "priority": 2,
-      "stateName": "Done",
-      "stateType": "completed",
+      "stateName": "In Review",
+      "stateType": "started",
       "teamKey": "TA"
     },
     {
