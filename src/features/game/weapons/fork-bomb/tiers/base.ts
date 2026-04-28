@@ -14,8 +14,14 @@ export const baseTier: WeaponTierDefinition = {
   toggles: {
     hitRadius: 48,
     damage: 2,
+    clusterCount: 5,
     burstRadius: 34,
     burstOffsetDistance: 52,
+    implosionRadius: 28,
+    impactRadius: 22,
+    reticleRadius: 52,
+    shockwaveRadius: 90,
+    chaosScale: 1,
   },
   vfx: FORK_BOMB_TIER_VFX.base,
   behavior: {

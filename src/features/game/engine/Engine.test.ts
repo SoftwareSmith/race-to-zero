@@ -1,7 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { WEAPON_EVOLVE_THRESHOLDS } from "@config/gameDefaults";
-import { ALL_WEAPON_IDS, WeaponTier } from "@game/types";
+import { WeaponTier } from "@game/types";
+import { WEAPON_REGISTRY } from "@game/weapons";
 import BUG_CODEX, { cloneCodex, setCodex } from "./bugCodex";
 import { BugEntity } from "./BugEntity";
 import { Engine } from "./Engine";
@@ -95,6 +96,22 @@ describe("engine death attribution", () => {
     expect(engine.getWeaponEvolutionStates().get("zapper")?.kills).toBe(1);
   });
 
+  it("does not double-count a direct kill after poison was already applied", () => {
+    const engine = new Engine(createCanvas(), {
+      height: 200,
+      width: 200,
+    });
+    const bug = new BugEntity({ size: 10, variant: "low", x: 100, y: 100 });
+
+    bug.applyPoison(120, 1000, "zapper");
+    engine.entities = [bug];
+    engine.handleHit(0, bug.maxHp, true, "hammer");
+    advanceUntilRemoved(engine);
+
+    expect(engine.getWeaponEvolutionStates().get("hammer")?.kills).toBe(1);
+    expect(engine.getWeaponEvolutionStates().get("zapper")?.kills).toBe(0);
+  });
+
   it("reports delayed burn kills as uncredited so the UI can count them", () => {
     const onEntityDeath = vi.fn();
     const engine = new Engine(createCanvas(), {
@@ -149,7 +166,45 @@ describe("engine death attribution", () => {
     expect(engine.getWeaponEvolutionStates().get("void")?.kills).toBe(1);
   });
 
-  it.each(ALL_WEAPON_IDS)("promotes %s through all three tiers at its kill thresholds", (weaponId) => {
+  it("caps temporary allies so conversion stays readable", () => {
+    const engine = new Engine(createCanvas(), {
+      height: 200,
+      width: 200,
+    });
+
+    engine.entities = Array.from({ length: 7 }, (_, index) =>
+      new BugEntity({ size: 10, variant: "low", x: 60 + index * 12, y: 100 }),
+    );
+
+    for (let index = 0; index < engine.entities.length; index += 1) {
+      engine.allyBug(index, { durationMs: 2000, maxActiveAllies: 5 });
+    }
+
+    const activeAllies = engine.getAllBugs().filter((bug: any) => bug.ally).length;
+    expect(activeAllies).toBe(5);
+  });
+
+  it("uses config-driven ally caps instead of a fixed engine limit", () => {
+    const engine = new Engine(createCanvas(), {
+      height: 200,
+      width: 200,
+    });
+
+    engine.entities = Array.from({ length: 7 }, (_, index) =>
+      new BugEntity({ size: 10, variant: "low", x: 60 + index * 12, y: 100 }),
+    );
+
+    for (let index = 0; index < engine.entities.length; index += 1) {
+      engine.allyBug(index, { durationMs: 2000, maxActiveAllies: 3 });
+    }
+
+    const activeAllies = engine.getAllBugs().filter((bug: any) => bug.ally).length;
+    expect(activeAllies).toBe(3);
+  });
+
+  it.each(WEAPON_REGISTRY.map((weapon) => weapon.id))(
+    "promotes %s through all three tiers at its kill thresholds",
+    (weaponId) => {
     const onWeaponEvolution = vi.fn();
     const engine = new Engine(createCanvas(), {
       height: 200,
@@ -201,5 +256,6 @@ describe("engine death attribution", () => {
       tier: WeaponTier.TIER_THREE,
     });
     expect(onWeaponEvolution).toHaveBeenCalledTimes(2);
-  });
+    },
+  );
 });

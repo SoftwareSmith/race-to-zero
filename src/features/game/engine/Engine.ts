@@ -5,14 +5,12 @@ import { Entity } from "./Entity";
 import { getBugVariantMaxHp } from "../../../constants/bugs";
 import { ALL_WEAPON_IDS, EntityState, WeaponMatchup, WeaponTier, isTerminalEntityState } from "../types";
 import type { StructureId, SiegeWeaponId, WeaponEvolutionState } from "../types";
-import { STRUCTURE_DEFS } from "@config/structureConfig";
-import { hasEntry, getEntry } from "@game/structures/runtime/registry";
-import type { StructureTickContext, StructureGameEngine } from "@game/structures/runtime/types";
+import type { SiegeStatusId } from "@game/status/statusCatalog";
 import { WEAPON_EVOLVE_THRESHOLDS } from "@config/gameDefaults";
 import { applyMatchupDamage, getBugWeaponMatchup } from "@game/combat/weaponMatchups";
+import type { AllyConversionConfig } from "@game/weapons/runtime/types";
 import type { BugVariant } from "../../../types/dashboard";
-// Trigger all structure plugin self-registrations at Engine load time.
-import "@game/structures/index";
+import type { BugTransitionSnapshotItem } from "@game/components/BackgroundField/types";
 
 interface StructureEntry {
   id: string;
@@ -38,6 +36,8 @@ interface StructureEntry {
   } | null;
 }
 
+const DEFAULT_MAX_ACTIVE_ALLIES = 5;
+
 type SpatialCell = Entity[];
 
 export interface EngineOptions {
@@ -48,7 +48,13 @@ export interface EngineOptions {
     x: number,
     y: number,
     variant: string,
-    meta: { credited: boolean; frozen: boolean; pointValue: number },
+    meta: {
+      credited: boolean;
+      finisherStatus?: SiegeStatusId | null;
+      frozen: boolean;
+      pointValue: number;
+      supportStatuses?: SiegeStatusId[];
+    },
   ) => void;
   /** Called when a structure kills a bug — counts toward the player kill tally */
   onStructureKill?: (structureId: string, x: number, y: number, variant: string) => void;
@@ -82,7 +88,13 @@ export class Engine {
     x: number,
     y: number,
     variant: string,
-    meta: { credited: boolean; frozen: boolean; pointValue: number },
+    meta: {
+      credited: boolean;
+      finisherStatus?: SiegeStatusId | null;
+      frozen: boolean;
+      pointValue: number;
+      supportStatuses?: SiegeStatusId[];
+    },
   ) => void;
   onStructureKill?: (structureId: string, x: number, y: number, variant: string) => void;
   onAgentAbsorb?: (data: {
@@ -128,6 +140,8 @@ export class Engine {
     durationMs: number;
     active: boolean;
     weaponId?: SiegeWeaponId;
+    eventHorizonRadius?: number;
+    eventHorizonDurationMs?: number;
   } | null = null;
 
   constructor(canvas: HTMLCanvasElement, opts: EngineOptions) {
@@ -331,6 +345,45 @@ export class Engine {
     }
   }
 
+  spawnFromSnapshot(snapshot: BugTransitionSnapshotItem[]) {
+    this.entities = [];
+
+    for (const item of snapshot) {
+      let bug = this.pool.pop();
+
+      if (bug) {
+        bug.revive(this.width, this.height);
+        bug.variant = item.variant;
+        bug.size = item.size;
+        bug.baseSize = item.size;
+        bug.maxHp = item.maxHp;
+        bug.hp = item.hp;
+        bug.x = item.x;
+        bug.y = item.y;
+        bug.vx = item.vx;
+        bug.vy = item.vy;
+        bug.heading = item.heading;
+        bug.opacity = item.opacity;
+      } else {
+        bug = new BugEntity({
+          heading: item.heading,
+          opacity: item.opacity,
+          size: item.size,
+          variant: item.variant,
+          vx: item.vx,
+          vy: item.vy,
+          x: item.x,
+          y: item.y,
+        } as any);
+        bug.baseSize = item.size;
+        bug.maxHp = item.maxHp;
+        bug.hp = item.hp;
+      }
+
+      this.entities.push(bug);
+    }
+  }
+
   // hit-test in canvas-local coordinates (x,y) -> returns nearest entity index within radius
   hitTest(x: number, y: number) {
     let best: { index: number; distance: number } | null = null;
@@ -503,15 +556,23 @@ export class Engine {
       if ((ent as any).state === EntityState.Dead) {
         const be = ent as any as BugEntity;
         // Attribute DOT kills to the source weapon
-        if (be.dotSourceWeaponId) {
+        if (
+          be.dotSourceWeaponId &&
+          !be.deathCredited &&
+          (be.finalBlowStatus === "poison" ||
+            be.finalBlowStatus === "burn" ||
+            be.finalBlowStatus === "looped")
+        ) {
           this.recordWeaponKill(be.dotSourceWeaponId as SiegeWeaponId);
         }
         try {
           this.onEntityDeath?.(be.x, be.y, be.variant, {
             credited: be.deathCredited,
+            finisherStatus: be.finalBlowStatus,
             frozen:
               be.slow !== null && performance.now() < be.slow.expiresAt,
-            pointValue: be.typeSpec?.pointValue ?? 1,
+            pointValue: be.deathPointValue,
+            supportStatuses: be.supportStatusesAtDeath,
           });
         } catch {
           void 0;
@@ -522,8 +583,6 @@ export class Engine {
       }
     }
 
-    // tick structures AFTER entity updates so position fields reflect the current frame
-    this.tickStructures(dt * 1000);
     // tick T3 evolution effects (event horizons)
     this.tickEvolutionEffects(dt * 1000);
   }
@@ -691,8 +750,7 @@ export class Engine {
     type: StructureId,
     forcedId?: string,
   ): string {
-    const def = STRUCTURE_DEFS.find((entry) => entry.id === type);
-    const maxPlaced = def?.maxPlaced ?? 2;
+    const maxPlaced = 2;
     const existing = this.structures.filter((s) => s.type === type);
     if (existing.length >= maxPlaced) {
       const oldest = existing[0];
@@ -722,45 +780,6 @@ export class Engine {
 
   getStructures(): Array<{ id: string; type: StructureId; tier: WeaponTier; x: number; y: number }> {
     return this.structures.map(({ id, type, tier, x, y }) => ({ id, type, tier, x, y }));
-  }
-
-  /** Build the StructureTickContext passed to each plugin's tick() method. */
-  private _buildStructureCtx(dtMs: number): StructureTickContext {
-    const self = this;
-    const engineFacade: StructureGameEngine = {
-      get elapsedMs() { return self.elapsedMs; },
-      getEntities() { return self.entities as any[]; },
-      spliceEntity(index: number) {
-        const [removed] = self.entities.splice(index, 1);
-        return removed as any;
-      },
-      returnToPool(entity: any) {
-        self.pool.push(entity as BugEntity);
-      },
-      handleHit(index, damage, creditOnDeath) {
-        return self.handleHit(index, damage, creditOnDeath);
-      },
-    };
-    return {
-      now: this.elapsedMs,
-      dtMs,
-      engine: engineFacade,
-      callbacks: {
-        onStructureKill: this.onStructureKill?.bind(this),
-        onAgentAbsorb: this.onAgentAbsorb?.bind(this),
-      },
-    };
-  }
-
-  private tickStructures(dtMs: number): void {
-    this.elapsedMs += dtMs;
-    const ctx = this._buildStructureCtx(dtMs);
-    for (const s of this.structures) {
-      const behavior = hasEntry(s.type) ? getEntry(s.type) : undefined;
-      if (behavior) {
-        behavior.tick(s as any, ctx);
-      }
-    }
   }
 
   // ── Status-effect area applicators ─────────────────────────────────
@@ -827,6 +846,8 @@ export class Engine {
     radius: number, coreRadius: number,
     durationMs: number, collapseDamage: number,
     weaponId?: SiegeWeaponId,
+    eventHorizonRadius?: number,
+    eventHorizonDurationMs?: number,
   ): boolean {
     if (this.blackHole?.active) return false;
     this.blackHole = {
@@ -836,6 +857,8 @@ export class Engine {
       durationMs,
       active: true,
       weaponId,
+      eventHorizonRadius,
+      eventHorizonDurationMs,
     };
     return true;
   }
@@ -848,7 +871,17 @@ export class Engine {
   tickBlackHole(dtMs: number, onCollapse: (x: number, y: number, radius: number) => void): void {
     if (!this.blackHole?.active) return;
     const age = this.elapsedMs - this.blackHole.startedAt;
-    const { x, y, radius, coreRadius, collapseDamage, durationMs, weaponId } = this.blackHole;
+    const {
+      x,
+      y,
+      radius,
+      coreRadius,
+      collapseDamage,
+      durationMs,
+      weaponId,
+      eventHorizonRadius,
+      eventHorizonDurationMs,
+    } = this.blackHole;
 
     // Gravity pull towards core
     for (let index = 0; index < this.entities.length; index++) {
@@ -871,6 +904,15 @@ export class Engine {
     if (age >= durationMs) {
       const hits = this.radiusHitTest(x, y, radius);
       for (const idx of hits) this.handleHit(idx, collapseDamage, false, weaponId);
+      if (eventHorizonRadius && eventHorizonDurationMs) {
+        this.startEventHorizon(
+          x,
+          y,
+          eventHorizonRadius,
+          eventHorizonDurationMs,
+          weaponId,
+        );
+      }
       onCollapse(x, y, radius);
       this.blackHole = null;
     }
@@ -1005,10 +1047,18 @@ export class Engine {
   }
 
   /** Put a bug in ally state — it stops targeting the player base. */
-  allyBug(index: number, durationMs: number): void {
+  allyBug(index: number, config: AllyConversionConfig): void {
     const e = this.entities[index] as any;
     if (!e || isTerminalEntityState(e.state)) return;
-    if (typeof e.applyAlly === "function") e.applyAlly(durationMs);
+    const maxActiveAllies = config.maxActiveAllies ?? DEFAULT_MAX_ACTIVE_ALLIES;
+    const activeAllies = this.entities.reduce((count, entity) => {
+      const bug = entity as any;
+      return bug.ally && !isTerminalEntityState(bug.state) ? count + 1 : count;
+    }, 0);
+    if (!e.ally && activeAllies >= maxActiveAllies) {
+      return;
+    }
+    if (typeof e.applyAlly === "function") e.applyAlly(config);
   }
 
   /** Leave a persistent trap zone that instantly kills unstable bugs on contact. */

@@ -1,11 +1,24 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { WeaponTier } from "@game/types";
+import { triggerNamedShake } from "@game/utils/screenShake";
 
 export function useWeaponCursorState(interactiveMode: boolean) {
   const hammerPositionRef = useRef({ x: 0, y: 0 });
   const [hammerSwing, setHammerSwing] = useState(false);
 
-  const triggerHammerSwing = useCallback(() => {
+  const setCursorPosition = useCallback((x: number, y: number) => {
+    hammerPositionRef.current = { x, y };
+  }, []);
+
+  const triggerHammerSwing = useCallback((tier?: WeaponTier) => {
     setHammerSwing(true);
+
+    if (tier === WeaponTier.TIER_THREE) {
+      const root = document.querySelector<HTMLElement>("[data-background-field-root='true']");
+      if (root) {
+        triggerNamedShake(root, "hammer-overdrive");
+      }
+    }
   }, []);
 
   useEffect(() => {
@@ -14,7 +27,7 @@ export function useWeaponCursorState(interactiveMode: boolean) {
     return () => {
       document.body.classList.remove("cursor-none");
     };
-  }, [interactiveMode]);
+  }, [interactiveMode, setCursorPosition]);
 
   useEffect(() => {
     if (!interactiveMode) {
@@ -23,17 +36,14 @@ export function useWeaponCursorState(interactiveMode: boolean) {
     }
 
     const handlePointerMove = (event: globalThis.MouseEvent) => {
-      hammerPositionRef.current = {
-        x: event.clientX,
-        y: event.clientY,
-      };
+      setCursorPosition(event.clientX, event.clientY);
     };
 
     window.addEventListener("mousemove", handlePointerMove);
     return () => {
       window.removeEventListener("mousemove", handlePointerMove);
     };
-  }, [interactiveMode]);
+  }, [interactiveMode, setCursorPosition]);
 
   useEffect(() => {
     if (!hammerSwing) {
@@ -52,6 +62,7 @@ export function useWeaponCursorState(interactiveMode: boolean) {
   return {
     hammerPositionRef,
     hammerSwing,
+    setCursorPosition,
     triggerHammerSwing,
   };
 }

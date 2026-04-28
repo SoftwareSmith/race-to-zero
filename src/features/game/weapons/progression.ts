@@ -115,12 +115,11 @@ export function resolveWeaponConfig(
   };
 }
 
-export function getWeaponEvolutionThresholds(def: WeaponDef): [number, number] {
+export function getWeaponEvolutionThresholds(def: WeaponDef): number[] {
   const tiers = getWeaponTiers(def);
-  return [
-    tiers[0]?.evolveAtKills ?? 0,
-    tiers[1]?.evolveAtKills ?? Number.MAX_SAFE_INTEGER,
-  ];
+  return tiers
+    .map((tier) => tier.evolveAtKills)
+    .filter((threshold): threshold is number => threshold != null);
 }
 
 export function getKillsToNextTier(

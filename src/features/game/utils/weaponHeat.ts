@@ -16,7 +16,7 @@ export function getWeaponHeatStage(
   tier: WeaponTier | number,
   isMaxed = false,
 ): WeaponHeatStage {
-  if (tier >= WeaponTier.TIER_THREE || isMaxed) {
+  if (tier >= WeaponTier.TIER_FOUR || isMaxed) {
     return "overdrive";
   }
 

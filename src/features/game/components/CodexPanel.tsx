@@ -3,7 +3,6 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { MenuIconButton } from "@shared/components/MenuControls";
 import { getCodex } from "@game/engine/bugCodex";
-import { STRUCTURE_DEFS, type StructureDef } from "@config/structureConfig";
 import type {
   BugType,
   BugWeaponId,
@@ -20,7 +19,6 @@ import {
   WeaponMatchup,
   WeaponTier,
   type SiegeWeaponId,
-  type StructureId,
   type WeaponProgressSnapshot,
 } from "@game/types";
 import { getColoredSvgUrl } from "@game/utils/bugSprite";
@@ -31,16 +29,23 @@ import MetricInfoCard from "@dashboard/components/MetricInfoCard";
 import Tabs from "@shared/components/Tabs";
 import { getWeaponTiers } from "@game/weapons/progression";
 import {
-  getStructureGlyph,
+  getWeaponTierNodeCount,
   getTierBarCoreClassName,
   getTierNodeClassName,
   getTierNodeFillClassName,
   getTierNodeFillWidth,
   getTierNodeOffsetClassName,
   getTierSelectedFrameClassName,
-  WEAPON_TIER_NODE_COUNT,
 } from "./siegeHud.helpers";
 import type { WeaponDef, WeaponTierDefinition } from "@game/weapons/types";
+import {
+  STATUS_DEFS,
+  STATUS_PRIORITY,
+  getWeaponStatuses,
+  type SiegeStatusId,
+} from "@game/status/statusCatalog";
+import { getWeaponChaosReadouts } from "@game/weapons/chaosReadouts";
+import { getBugSwarmProfile } from "@game/engine/swarmProfile";
 import {
   getBehaviorLabel,
   getPresenceLabel,
@@ -60,24 +65,24 @@ interface CodexPanelProps {
   trigger?: ReactNode;
 }
 
-type CodexView = "bugs" | "weapons" | "structures";
+type CodexView = "bugs" | "weapons";
 type SelectedCodexEntry =
   | { id: string; kind: "bug" }
   | { id: SiegeWeaponId; kind: "weapon" }
-  | { id: StructureId; kind: "structure" }
   | null;
 
 const CODEX_TABS = [
   { id: "bugs", label: "Bugs" },
   { id: "weapons", label: "Weapons" },
-  { id: "structures", label: "Structures" },
 ] as const;
 
 const BUILTIN_ICON_VARIANTS: BugVariant[] = ["low", "medium", "high", "urgent"];
 const WEAPON_STAGE_LABELS: Record<WeaponTier, string> = {
   [WeaponTier.TIER_ONE]: "Tier 1",
   [WeaponTier.TIER_TWO]: "Tier 2",
-  [WeaponTier.TIER_THREE]: "Overdrive",
+  [WeaponTier.TIER_THREE]: "Tier 3",
+  [WeaponTier.TIER_FOUR]: "Tier 4",
+  [WeaponTier.TIER_FIVE]: "Overdrive",
 };
 
 function formatDurationMs(durationMs: number) {
@@ -119,12 +124,6 @@ function getHitPatternLabel(hitPattern: WeaponDef["hitPattern"]) {
     default:
       return "Single impact";
   }
-}
-
-function getStructureEffectLabel(effectType: StructureDef["effectType"]) {
-  return effectType === "capture"
-    ? "Captures priority bugs"
-    : "Pulls bugs inward";
 }
 
 function buildCardBackground(primary: string, secondary?: string) {
@@ -175,6 +174,7 @@ function createTierPreviewSnapshot(
     id: weapon.id,
     inputMode: weapon.inputMode,
     locked: false,
+    maxTier: tiers[tiers.length - 1]?.tier ?? WeaponTier.TIER_ONE,
     matchupSummary: [],
     nextTierGoalKills: nextThreshold,
     progressText: tierDefinition.title,
@@ -256,26 +256,6 @@ function WeaponMotif({ weapon }: { weapon: WeaponDef }) {
     <>
       <div className="absolute right-7 top-8 h-3.5 w-14 rounded-[8px] bg-white/8 animate-pulse" />
       <div className="absolute right-10 top-14 h-3.5 w-10 rounded-[8px] bg-white/6 animate-pulse" />
-    </>
-  );
-}
-
-function StructureMotif({ structure }: { structure: StructureDef }) {
-  if (structure.id === "agent") {
-    return (
-      <>
-        <div className="absolute right-8 top-6 h-12 w-12 rounded-full border border-emerald-200/18 animate-pulse" />
-        <div className="absolute right-12 top-10 h-[2px] w-16 bg-emerald-200/24 animate-pulse" />
-        <div className="absolute right-6 top-16 h-2 w-2 rounded-full bg-emerald-200/30 animate-pulse" />
-      </>
-    );
-  }
-
-  return (
-    <>
-      <div className="absolute right-6 top-6 h-14 w-14 rounded-full border border-amber-200/18 animate-pulse" />
-      <div className="absolute right-10 top-10 h-6 w-6 rounded-full border border-amber-100/14 animate-pulse" />
-      <div className="absolute right-2 top-14 h-10 w-10 rounded-full bg-amber-100/8 blur-xl animate-pulse" />
     </>
   );
 }
@@ -714,83 +694,15 @@ function WeaponSummaryCard({
   );
 }
 
-function StructureSummaryCard({
-  onSelect,
-  structure,
+function WeaponTierCard({
+  tier,
+  weapon,
 }: {
-  onSelect: (id: StructureId) => void;
-  structure: StructureDef;
+  tier: WeaponTierDefinition;
+  weapon: WeaponDef;
 }) {
-  return (
-    <button
-      data-hud-cursor="pointer"
-      data-testid={`codex-structure-card-${structure.id}`}
-      type="button"
-      onClick={() => onSelect(structure.id)}
-      className="group relative overflow-hidden rounded-[22px] border border-white/10 p-3 text-left transition duration-200 hover:-translate-y-1 hover:border-white/18"
-      style={buildCardBackground(structure.accentColor)}
-    >
-      <div className="pointer-events-none absolute inset-0 opacity-80">
-        <div
-          className="absolute left-2 top-2 h-20 w-20 rounded-full blur-3xl"
-          style={{ background: structure.accentColor }}
-        />
-        <StructureMotif structure={structure} />
-        <div className="absolute right-0 top-0 h-32 w-32 rounded-full bg-white/5 blur-3xl" />
-        <div className="absolute inset-0 opacity-[0.08] [background-image:radial-gradient(circle_at_1px_1px,rgba(255,255,255,0.7)_1px,transparent_0)] [background-size:18px_18px]" />
-      </div>
-      <div className="relative flex h-full flex-col gap-2.5">
-        <div className="flex items-start justify-between gap-3">
-          <div className="flex min-w-0 items-center gap-3">
-            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[16px] border border-white/18 bg-[linear-gradient(180deg,rgba(255,255,255,0.12),rgba(255,255,255,0.04))] text-[1.25rem] shadow-[0_12px_22px_rgba(0,0,0,0.22)]">
-              {getStructureGlyph(structure.id)}
-            </div>
-            <div className="min-w-0">
-              <h3 className="truncate text-[1.02rem] font-semibold tracking-[-0.03em] text-stone-50">
-                {structure.title}
-              </h3>
-              <p className="text-xs uppercase tracking-[0.18em] text-stone-300/80">
-                {getStructureEffectLabel(structure.effectType)}
-              </p>
-            </div>
-          </div>
-          <Badge className="border-white/16 bg-black/18 text-stone-100">
-            {`${structure.effectRadius}px radius`}
-          </Badge>
-        </div>
-
-        <p className="text-[0.82rem] leading-5 text-stone-200">
-          {structure.detail}
-        </p>
-
-        <div className="grid gap-2.5 sm:grid-cols-2">
-          <div className="rounded-[16px] border border-white/8 bg-black/16 p-2.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
-            <p className="text-[0.65rem] font-semibold uppercase tracking-[0.18em] text-amber-200">
-              Unlock
-            </p>
-            <strong className="mt-1.5 block text-[1.15rem] font-semibold tracking-[-0.03em] text-stone-50">
-              {structure.unlockKills} kills
-            </strong>
-          </div>
-          <div className="rounded-[16px] border border-white/8 bg-black/16 p-2.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
-            <p className="text-[0.65rem] font-semibold uppercase tracking-[0.18em] text-emerald-200">
-              Capacity
-            </p>
-            <strong className="mt-1.5 block text-[1.15rem] font-semibold tracking-[-0.03em] text-stone-50">
-              {structure.maxPlaced} live
-            </strong>
-          </div>
-        </div>
-      </div>
-    </button>
-  );
-}
-
-function WeaponTierCard({ tier }: { tier: WeaponTierDefinition }) {
-  const weapon = WEAPON_DEFS.find((candidate) =>
-    candidate.tiers.some((candidateTier) => candidateTier.title === tier.title),
-  );
-  const snapshot = weapon ? createTierPreviewSnapshot(weapon, tier) : null;
+  const snapshot = createTierPreviewSnapshot(weapon, tier);
+  const chaosReadouts = getWeaponChaosReadouts(weapon, tier);
 
   return (
     <div
@@ -814,31 +726,39 @@ function WeaponTierCard({ tier }: { tier: WeaponTierDefinition }) {
         ) : null}
       </div>
       {snapshot ? (
-        <div className="mt-2 grid grid-cols-2 gap-1.5">
-          {Array.from({ length: WEAPON_TIER_NODE_COUNT }, (_, index) => (
-            <span
-              key={`${tier.title}-node-${index + 1}`}
-              className={cn(
-                getTierNodeOffsetClassName(snapshot, index + 1),
-                getTierNodeClassName(snapshot, index + 1, "panel"),
-              )}
-            >
+        <div
+          className="mt-2 grid gap-1.5"
+          style={{
+            gridTemplateColumns: `repeat(${getWeaponTierNodeCount(snapshot)}, minmax(0, 1fr))`,
+          }}
+        >
+          {Array.from(
+            { length: getWeaponTierNodeCount(snapshot) },
+            (_, index) => (
               <span
+                key={`${tier.title}-node-${index + 1}`}
                 className={cn(
-                  "absolute inset-y-0 left-0 rounded-full transition-[width] duration-300",
-                  getTierNodeFillClassName(snapshot),
+                  getTierNodeOffsetClassName(snapshot, index + 1),
+                  getTierNodeClassName(snapshot, index + 1, "panel"),
                 )}
-                style={{ width: getTierNodeFillWidth(snapshot, index + 1) }}
               >
                 <span
                   className={cn(
-                    "absolute inset-y-0 left-0 right-0 rounded-full",
-                    getTierBarCoreClassName(snapshot),
+                    "absolute inset-y-0 left-0 rounded-full transition-[width] duration-300",
+                    getTierNodeFillClassName(snapshot),
                   )}
-                />
+                  style={{ width: getTierNodeFillWidth(snapshot, index + 1) }}
+                >
+                  <span
+                    className={cn(
+                      "absolute inset-y-0 left-0 right-0 rounded-full",
+                      getTierBarCoreClassName(snapshot),
+                    )}
+                  />
+                </span>
               </span>
-            </span>
-          ))}
+            ),
+          )}
         </div>
       ) : null}
       <h4 className="mt-1 text-[0.9rem] font-semibold tracking-[-0.03em] text-stone-50">
@@ -879,6 +799,24 @@ function WeaponTierCard({ tier }: { tier: WeaponTierDefinition }) {
           </p>
         ) : null}
       </div>
+      {chaosReadouts.length > 0 ? (
+        <div className="mt-2.5 rounded-[14px] border border-white/8 bg-black/16 p-2">
+          <p className="text-[0.58rem] font-semibold uppercase tracking-[0.18em] text-stone-500">
+            Chaos Toggles
+          </p>
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {chaosReadouts.map((readout) => (
+              <span
+                key={`${tier.title}-${readout.label}`}
+                className="rounded-full border border-white/10 bg-white/[0.06] px-2.5 py-1 text-[0.64rem] font-medium tracking-[-0.01em] text-stone-200"
+              >
+                <span className="text-stone-400">{readout.label}</span>{" "}
+                <span className="text-stone-100">{readout.value}</span>
+              </span>
+            ))}
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -894,6 +832,9 @@ function WeaponDetailView({
 }) {
   const tiers = getWeaponTiers(weapon);
   const { favored, risky } = getWeaponMatchupBuckets(bugEntries, weapon.id);
+  const weaponStatuses = getWeaponStatuses(weapon.id).map(
+    (status) => status.id,
+  );
 
   return (
     <div
@@ -979,135 +920,20 @@ function WeaponDetailView({
         <SectionHeading
           eyebrow="Evolution"
           title="Tier Comparison"
-          subtitle="Compare the base weapon, the mid-tier upgrade, and the final overdrive state side by side."
+          subtitle="Compare the base weapon, the mid-tier upgrade, and the final overdrive state side by side, including the exact toggles that got louder, bigger, or faster."
         />
         <div className="grid gap-2 md:grid-cols-3">
           {tiers.map((tier) => (
-            <WeaponTierCard key={tier.tier} tier={tier} />
+            <WeaponTierCard key={tier.tier} tier={tier} weapon={weapon} />
           ))}
         </div>
       </section>
-    </div>
-  );
-}
 
-function StructureDetailView({ structure }: { structure: StructureDef }) {
-  const [tierTwoThreshold, tierThreeThreshold] = structure.tierThresholds;
-
-  return (
-    <div
-      className="mx-auto flex h-full w-full max-w-[50rem] flex-col gap-2.5"
-      data-testid="codex-structure-detail-view"
-    >
-      <section
-        className="rounded-[20px] border border-white/10 p-3"
-        style={buildCardBackground(structure.accentColor)}
-      >
-        <div className="grid gap-2.5 lg:grid-cols-[minmax(0,1.25fr)_minmax(17rem,0.9fr)]">
-          <div>
-            <div className="flex flex-wrap items-start gap-3">
-              <div className="flex h-14 w-14 items-center justify-center rounded-[18px] border border-white/16 bg-[linear-gradient(180deg,rgba(255,255,255,0.12),rgba(255,255,255,0.04))] text-[1.55rem] shadow-[0_14px_24px_rgba(0,0,0,0.22)]">
-                {getStructureGlyph(structure.id)}
-              </div>
-              <div className="min-w-0 flex-1">
-                <SectionEyebrow>Structure Dossier</SectionEyebrow>
-                <div className="mt-1 flex flex-wrap items-center gap-2">
-                  <h3 className="text-[1.12rem] font-semibold tracking-[-0.03em] text-stone-50">
-                    {structure.title}
-                  </h3>
-                  <Badge className="border-white/16 bg-black/18 text-stone-100">
-                    {getStructureEffectLabel(structure.effectType)}
-                  </Badge>
-                </div>
-                <p className="mt-1.5 text-[0.82rem] leading-5 text-stone-200">
-                  {structure.detail}
-                </p>
-              </div>
-            </div>
-            <div className="mt-2.5 rounded-[16px] border border-white/8 bg-black/16 p-2.5">
-              <SectionEyebrow>Placement Hint</SectionEyebrow>
-              <p className="mt-1.5 text-sm leading-5 text-stone-200">
-                {structure.hint}
-              </p>
-            </div>
-          </div>
-
-          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-2">
-            <div className="rounded-[14px] border border-white/8 bg-black/16 p-2.5">
-              <SectionEyebrow>Radius</SectionEyebrow>
-              <p className="mt-1.5 text-sm font-semibold text-stone-100">
-                {structure.effectRadius}px
-              </p>
-            </div>
-            <div className="rounded-[14px] border border-white/8 bg-black/16 p-2.5">
-              <SectionEyebrow>Capacity</SectionEyebrow>
-              <p className="mt-1.5 text-sm font-semibold text-stone-100">
-                {structure.maxPlaced} placed
-              </p>
-            </div>
-            <div className="rounded-[14px] border border-white/8 bg-black/16 p-2.5">
-              <SectionEyebrow>Unlock</SectionEyebrow>
-              <p className="mt-1.5 text-sm font-semibold text-stone-100">
-                {structure.unlockKills} kills
-              </p>
-            </div>
-            <div className="rounded-[14px] border border-white/8 bg-black/16 p-2.5">
-              <SectionEyebrow>Specialty</SectionEyebrow>
-              <p className="mt-1.5 text-sm font-semibold text-stone-100">
-                {structure.effectType === "capture"
-                  ? "Single target control"
-                  : "Lane shaping"}
-              </p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section className="space-y-2 rounded-[20px] border border-white/10 bg-white/[0.03] p-3">
-        <SectionHeading
-          eyebrow="Progression"
-          title="Tier Growth"
-          subtitle={structure.hint}
-        />
-        <div className="grid gap-2 md:grid-cols-3">
-          <div className="rounded-[16px] border border-white/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.06),rgba(255,255,255,0.02))] p-2.5">
-            <p className="text-[0.62rem] font-semibold uppercase tracking-[0.2em] text-stone-500">
-              Tier 1
-            </p>
-            <h4 className="mt-1 text-[0.9rem] font-semibold tracking-[-0.03em] text-stone-50">
-              Baseline Field
-            </h4>
-            <p className="mt-1 text-[0.76rem] leading-5 text-stone-300">
-              Deploys the base version of the structure with its full placement
-              radius and default behavior.
-            </p>
-          </div>
-          <div className="rounded-[16px] border border-white/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.06),rgba(255,255,255,0.02))] p-2.5">
-            <p className="text-[0.62rem] font-semibold uppercase tracking-[0.2em] text-stone-500">
-              Tier 2
-            </p>
-            <h4 className="mt-1 text-[0.9rem] font-semibold tracking-[-0.03em] text-stone-50">
-              Expanded Output
-            </h4>
-            <p className="mt-1 text-[0.76rem] leading-5 text-stone-300">
-              After {tierTwoThreshold} structure kills, the structure widens its
-              field and pushes harder on its specialty.
-            </p>
-          </div>
-          <div className="rounded-[16px] border border-white/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.06),rgba(255,255,255,0.02))] p-2.5">
-            <p className="text-[0.62rem] font-semibold uppercase tracking-[0.2em] text-stone-500">
-              Tier 3
-            </p>
-            <h4 className="mt-1 text-[0.9rem] font-semibold tracking-[-0.03em] text-stone-50">
-              Overdrive
-            </h4>
-            <p className="mt-1 text-[0.76rem] leading-5 text-stone-300">
-              After {tierThreeThreshold} structure kills, the structure reaches
-              its final operating range and strongest passive impact.
-            </p>
-          </div>
-        </div>
-      </section>
+      <StatusReferenceSection
+        highlightStatuses={weaponStatuses}
+        subtitle="Highlighted entries are the statuses this weapon applies or cashes in on during combat."
+        title="Status Playbook"
+      />
     </div>
   );
 }
@@ -1247,6 +1073,10 @@ function BugDetailView({
         activeMaxHp={activeMaxHp}
         activeVariantConfig={activeVariantConfig}
       />
+      <StatusReferenceSection
+        subtitle="Use this reference when reading bug silhouettes mid-run: one strong primary read, then smaller secondary accents."
+        title="Status Reads"
+      />
       <FieldNotes activeEntry={activeEntry} accent={accent} />
     </div>
   );
@@ -1266,6 +1096,7 @@ function DossierStats({
   const visibility = Math.round(
     (activeVariantConfig?.defaultOpacity ?? 1) * 100,
   );
+  const swarmProfile = getBugSwarmProfile(activeEntry);
 
   return (
     <section className="space-y-2 rounded-[20px] border border-white/10 bg-white/[0.03] p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
@@ -1301,10 +1132,133 @@ function DossierStats({
         />
         <CompactReadoutCard
           accent={accent}
+          metricLabel={swarmProfile.label}
+          signalLabel="Swarm posture"
+          signalValue={swarmProfile.pressure}
+        />
+        <CompactReadoutCard
+          accent={accent}
           metricLabel={getPresenceLabel(visibility)}
           signalLabel="Presence"
           signalValue={visibility}
         />
+      </div>
+
+      <div className="rounded-[14px] border border-white/8 bg-black/16 p-2.5">
+        <SectionEyebrow>Coordination Note</SectionEyebrow>
+        <p className="mt-1 text-[0.82rem] leading-5 text-stone-300">
+          <span className="font-medium text-stone-100">
+            {swarmProfile.coordination}.
+          </span>{" "}
+          {swarmProfile.summary}
+        </p>
+      </div>
+    </section>
+  );
+}
+
+function StatusReferenceSection({
+  highlightStatuses = [],
+  subtitle,
+  title,
+}: {
+  highlightStatuses?: SiegeStatusId[];
+  subtitle: string;
+  title: string;
+}) {
+  const highlighted = new Set(highlightStatuses);
+
+  return (
+    <section className="space-y-2 rounded-[20px] border border-white/10 bg-white/[0.03] p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+      <SectionHeading
+        eyebrow="Status Primer"
+        title={title}
+        subtitle={subtitle}
+      />
+
+      <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+        {STATUS_PRIORITY.map((statusId) => {
+          const status = STATUS_DEFS[statusId];
+          const isHighlighted = highlighted.has(status.id);
+
+          return (
+            <div
+              key={status.id}
+              className={cn(
+                "rounded-[16px] border p-2.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]",
+                isHighlighted
+                  ? "border-white/16 bg-white/[0.05]"
+                  : "border-white/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.02))]",
+              )}
+              style={
+                isHighlighted
+                  ? {
+                      boxShadow: `inset 0 1px 0 rgba(255,255,255,0.04), 0 16px 36px ${status.color}22`,
+                    }
+                  : undefined
+              }
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-[0.56rem] font-semibold uppercase tracking-[0.18em] text-stone-500">
+                    {status.role}
+                  </p>
+                  <h4 className="mt-1 text-[0.82rem] font-semibold tracking-[-0.03em] text-stone-50">
+                    {status.label}
+                  </h4>
+                </div>
+                {isHighlighted ? (
+                  <Badge className="border-white/16 bg-black/18 text-stone-100">
+                    Applied here
+                  </Badge>
+                ) : null}
+              </div>
+
+              <p className="mt-1.5 text-[0.68rem] leading-4.5 text-stone-200">
+                {status.summary}
+              </p>
+
+              <div className="mt-1.5 space-y-1 text-[0.64rem] leading-4 text-stone-400">
+                <p>
+                  <span className="font-semibold uppercase tracking-[0.12em] text-stone-500">
+                    Read
+                  </span>{" "}
+                  {status.visualRead}
+                </p>
+                <p>
+                  <span className="font-semibold uppercase tracking-[0.12em] text-stone-500">
+                    Support
+                  </span>{" "}
+                  {status.supportCopy}
+                </p>
+                <p>
+                  <span className="font-semibold uppercase tracking-[0.12em] text-stone-500">
+                    Finish
+                  </span>{" "}
+                  {status.finisherCopy}
+                </p>
+              </div>
+
+              <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                {status.weaponIds.length > 0 ? (
+                  status.weaponIds.map((weaponId) => (
+                    <span
+                      key={`${status.id}-${weaponId}`}
+                      className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-black/18 px-2 py-1 text-[0.58rem] font-semibold uppercase tracking-[0.12em] text-stone-200"
+                    >
+                      <WeaponGlyph className="h-3.5 w-3.5" id={weaponId} />
+                      {weaponId}
+                    </span>
+                  ))
+                ) : (
+                  <span className="inline-flex items-center rounded-full border border-white/10 bg-black/18 px-2 py-1 text-[0.58rem] font-semibold uppercase tracking-[0.12em] text-stone-400">
+                    Contextual
+                  </span>
+                )}
+              </div>
+            </div>
+          );
+        })}
       </div>
     </section>
   );
@@ -1450,12 +1404,6 @@ export default function CodexPanel({
     selectedEntry?.kind === "weapon"
       ? (WEAPON_DEFS.find((weapon) => weapon.id === selectedEntry.id) ?? null)
       : null;
-  const selectedStructure =
-    selectedEntry?.kind === "structure"
-      ? (STRUCTURE_DEFS.find(
-          (structure) => structure.id === selectedEntry.id,
-        ) ?? null)
-      : null;
   const backdropId =
     selectedEntry?.kind === "bug" ? selectedEntry.id : fallbackId;
   const backdropEntry = codex[backdropId];
@@ -1470,10 +1418,6 @@ export default function CodexPanel({
 
   const handleSelectWeapon = useCallback((id: SiegeWeaponId) => {
     setSelectedEntry({ id, kind: "weapon" });
-  }, []);
-
-  const handleSelectStructure = useCallback((id: StructureId) => {
-    setSelectedEntry({ id, kind: "structure" });
   }, []);
 
   const handleJumpToBug = useCallback((id: string) => {
@@ -1621,20 +1565,16 @@ export default function CodexPanel({
                           <h2 className="mt-1 text-[1.3rem] font-semibold tracking-[-0.04em] text-stone-50">
                             {activeView === "weapons"
                               ? "Weapon Codex"
-                              : activeView === "structures"
-                                ? "Structure Codex"
-                                : selectedEntry
-                                  ? selectedEntry.id
-                                  : "Bug Codex"}
+                              : selectedEntry
+                                ? selectedEntry.id
+                                : "Bug Codex"}
                           </h2>
                           <p className="mt-1.5 text-[0.82rem] leading-5 text-stone-300">
                             {activeView === "weapons"
                               ? "Review each weapon as its own dossier, then compare Tier 1, Tier 2, and Overdrive behavior side by side."
-                              : activeView === "structures"
-                                ? "Review placeable structures, what each passive does, and how they scale as they rank up during a run."
-                                : selectedEntry
-                                  ? "Review full encounter details, pressure profile, and field notes for the selected bug."
-                                  : "Scout the swarm, a pocket catalog of the midnight bugs that keep engineers up."}
+                              : selectedEntry
+                                ? "Review full encounter details, pressure profile, and field notes for the selected bug."
+                                : "Scout the swarm, a pocket catalog of the midnight bugs that keep engineers up."}
                           </p>
                         </>
                       )}
@@ -1720,22 +1660,8 @@ export default function CodexPanel({
                         ))}
                       </div>
                     </div>
-                  ) : selectedStructure ? (
-                    <div className="mb-4 flex-1 overflow-hidden px-4 py-3">
-                      <StructureDetailView structure={selectedStructure} />
-                    </div>
                   ) : (
-                    <div className="flex-1 overflow-y-auto px-4 py-4">
-                      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-2">
-                        {STRUCTURE_DEFS.map((structure) => (
-                          <StructureSummaryCard
-                            key={structure.id}
-                            onSelect={handleSelectStructure}
-                            structure={structure}
-                          />
-                        ))}
-                      </div>
-                    </div>
+                    <div className="flex-1 overflow-y-auto px-4 py-4" />
                   )}
                 </div>
               </div>

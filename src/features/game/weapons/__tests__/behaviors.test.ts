@@ -115,6 +115,37 @@ describe("hammer behavior", () => {
     );
     expect(effectCmds.length).toBeGreaterThan(0);
   });
+
+  it("emits config-driven ally conversion data at tier three", async () => {
+    const { createSession } = await import("../hammer/behavior");
+    const engine = makeMockEngine([makeBug({ x: 100, y: 100, hp: 4 })]);
+    const session = createSession(
+      makeCtx(engine, {
+        tier: 3,
+        weaponId: "hammer",
+        config: {
+          damage: 2,
+          hitRadius: 48,
+          allyDurationMs: 6500,
+          allyCap: 5,
+          allyInterceptForce: 2.5,
+          allyExpireBurstRadius: 54,
+          allyExpireBurstDamage: 1,
+        },
+      }) as any,
+    );
+    if (session.mode !== "once") throw new Error("expected once");
+
+    const allyCommand = session.commands.find((c) => c.kind === "allyBug") as any;
+
+    expect(allyCommand?.config).toMatchObject({
+      durationMs: 6500,
+      expireBurstDamage: 1,
+      expireBurstRadius: 54,
+      interceptForce: 2.5,
+      maxActiveAllies: 5,
+    });
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -149,6 +180,30 @@ describe("bug-spray behavior", () => {
     if (session.mode !== "hold") throw new Error("expected hold");
     expect(() => session.end()).not.toThrow();
   });
+
+  it("adds lane-control clouds and ensnare fields at survival tiers", async () => {
+    const { createSession } = await import("../bug-spray/behavior");
+    const { BASE_TOGGLES } = await import("../bug-spray/constants");
+    const engine = makeMockEngine([makeBug({ x: 110, y: 110 })]);
+    const ctx = makeCtx(engine, {
+      tier: 5,
+      config: {
+        ...(BASE_TOGGLES as any),
+        cloudRadius: 180,
+        secondaryRadius: 96,
+      },
+      weaponId: "zapper",
+    }) as any;
+    const session = createSession(ctx);
+    if (session.mode !== "hold") throw new Error("expected hold");
+
+    const commands = session.begin(ctx);
+    const repeatedClouds = commands.filter((c) => c.kind === "repeatPoisonRadius");
+    const ensnare = commands.find((c) => c.kind === "ensnareRadius");
+
+    expect(repeatedClouds.length).toBeGreaterThanOrEqual(4);
+    expect(ensnare).toBeDefined();
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -174,6 +229,45 @@ describe("chain-zap behavior", () => {
         (c as any).descriptor.type === "lightning",
     );
     expect(lightning).toBeDefined();
+  });
+
+  it("scales overlay width and branch chaos from config at higher tiers", async () => {
+    const { createSession } = await import("../chain-zap/behavior");
+    const { BASE_TOGGLES } = await import("../chain-zap/constants");
+    const engine = makeMockEngine([
+      makeBug({ x: 100, y: 100 }),
+      makeBug({ x: 138, y: 108 }),
+      makeBug({ x: 170, y: 124 }),
+      makeBug({ x: 205, y: 136 }),
+    ]);
+    const session = createSession(
+      makeCtx(engine, {
+        tier: 3,
+        config: {
+          ...(BASE_TOGGLES as any),
+          beamGlowWidth: 10.4,
+          beamWidth: 4,
+          chainMaxBounces: 6,
+          chainRadius: 108,
+          chaosScale: 1.42,
+          secondaryDamage: 1,
+        },
+        weaponId: "chain",
+      }) as any,
+    );
+
+    if (session.mode !== "once") throw new Error("expected once");
+
+    const overlayCommand = session.commands.find(
+      (c) =>
+        c.kind === "spawnEffect" &&
+        (c as any).descriptor.type === "overlayEffect",
+    ) as any;
+
+    expect(overlayCommand?.descriptor?.extras?.beamWidth).toBe(4);
+    expect(overlayCommand?.descriptor?.extras?.beamGlowWidth).toBe(10.4);
+    expect(overlayCommand?.descriptor?.extras?.chaosScale).toBe(1.42);
+    expect(overlayCommand?.descriptor?.extras?.chainNodes?.length).toBeGreaterThan(1);
   });
 });
 
@@ -201,6 +295,64 @@ describe("null-pointer behavior", () => {
     );
     expect(burst).toBeDefined();
   });
+
+  it("scales into multiple independent target locks at higher tiers", async () => {
+    const { createSession } = await import("../null-pointer/behavior");
+    const engine = makeMockEngine([
+      makeBug({ hp: 6, x: 110, y: 110, variant: "urgent" }),
+      makeBug({ hp: 5, x: 140, y: 90, variant: "high" }),
+      makeBug({ hp: 4, x: 170, y: 120, variant: "medium" }),
+      makeBug({ hp: 2, x: 220, y: 220, variant: "low" }),
+    ]);
+    const session = createSession(
+      makeCtx(engine, {
+        tier: 3,
+        config: {
+          ...((await import("../null-pointer/constants")).BASE_TOGGLES as any),
+          targetCount: 3,
+          binaryBurstCount: 3,
+        },
+        weaponId: "nullpointer",
+      }) as any,
+    );
+    if (session.mode !== "once") throw new Error("expected once");
+
+    const damageCommands = session.commands.filter((c) => c.kind === "damage");
+    const overlayCommand = session.commands.find(
+      (c) =>
+        c.kind === "spawnEffect" &&
+        (c as any).descriptor.type === "overlayEffect",
+    ) as any;
+
+    expect(damageCommands.length).toBeGreaterThanOrEqual(3);
+    expect(overlayCommand?.descriptor?.extras?.targetPoints).toHaveLength(3);
+  });
+
+  it("adds unstable execution fields and kernel panic at overdrive tiers", async () => {
+    const { createSession } = await import("../null-pointer/behavior");
+    const engine = makeMockEngine([
+      makeBug({ hp: 3, x: 110, y: 110 }),
+      makeBug({ hp: 1, x: 145, y: 120 }),
+      makeBug({ hp: 2, x: 172, y: 130 }),
+    ]);
+    const session = createSession(
+      makeCtx(engine, {
+        tier: 5,
+        config: {
+          ...((await import("../null-pointer/constants")).BASE_TOGGLES as any),
+          targetCount: 2,
+          executeHpLimit: 3,
+          markRadius: 140,
+          splashRadius: 92,
+        },
+        weaponId: "nullpointer",
+      }) as any,
+    );
+    if (session.mode !== "once") throw new Error("expected once");
+
+    expect(session.commands.some((c) => c.kind === "unstableRadius")).toBe(true);
+    expect(session.commands.some((c) => c.kind === "triggerKernelPanic")).toBe(true);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -225,6 +377,76 @@ describe("fork-bomb behavior", () => {
     );
     expect(bursts).toHaveLength(5);
   });
+
+  it("scales cluster, implosion, and ring overlay data from config", async () => {
+    const { createSession } = await import("../fork-bomb/behavior");
+    const { BASE_TOGGLES } = await import("../fork-bomb/constants");
+    const engine = makeMockEngine([makeBug()]);
+    const session = createSession(
+      makeCtx(engine, {
+        tier: 3,
+        config: {
+          ...(BASE_TOGGLES as any),
+          clusterCount: 9,
+          implosionRadius: 40,
+          ringCount: 12,
+          chaosScale: 1.34,
+          impactRadius: 28,
+          reticleRadius: 66,
+          shockwaveRadius: 122,
+        },
+        weaponId: "plasma",
+      }) as any,
+    );
+
+    if (session.mode !== "once") throw new Error("expected once");
+
+    const implosion = session.commands.find(
+      (c) =>
+        c.kind === "spawnEffect" &&
+        (c as any).descriptor.type === "plasmaImplosion",
+    ) as any;
+    const overlayCommand = session.commands.find(
+      (c) =>
+        c.kind === "spawnEffect" &&
+        (c as any).descriptor.type === "overlayEffect",
+    ) as any;
+
+    expect(implosion?.descriptor?.radius).toBe(40);
+    expect(overlayCommand?.descriptor?.extras?.targetPoints).toHaveLength(21);
+    expect(overlayCommand?.descriptor?.extras?.chaosScale).toBe(1.34);
+  });
+
+  it("adds unstable web nodes and collapse detonations at overdrive tiers", async () => {
+    const { createSession } = await import("../fork-bomb/behavior");
+    const { BASE_TOGGLES } = await import("../fork-bomb/constants");
+    const engine = makeMockEngine([
+      makeBug({ x: 100, y: 100 }),
+      makeBug({ x: 150, y: 100 }),
+      makeBug({ x: 180, y: 120 }),
+    ]);
+    const session = createSession(
+      makeCtx(engine, {
+        tier: 5,
+        config: {
+          ...(BASE_TOGGLES as any),
+          ringCount: 10,
+          ringRadius: 120,
+          secondaryRadius: 48,
+        },
+        weaponId: "plasma",
+      }) as any,
+    );
+    if (session.mode !== "once") throw new Error("expected once");
+
+    expect(session.commands.some((c) => c.kind === "unstableRadius")).toBe(true);
+    expect(session.commands.some((c) => c.kind === "triggerKernelPanic")).toBe(true);
+    expect(
+      session.commands.filter(
+        (c) => c.kind === "spawnEffect" && (c as any).descriptor.type === "plasmaExplosion",
+      ).length,
+    ).toBeGreaterThan(0);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -232,11 +454,11 @@ describe("fork-bomb behavior", () => {
 // ---------------------------------------------------------------------------
 
 describe("void-pulse behavior", () => {
-  it("returns a persistent session", async () => {
+  it("returns a one-shot timed session", async () => {
     const { createSession } = await import("../void-pulse/behavior");
     const engine = makeMockEngine();
     const session = createSession(makeCtx(engine) as any);
-    expect(session.mode).toBe("persistent");
+    expect(session.mode).toBe("once");
   });
 
   it("blocks if a black hole is already active", async () => {
@@ -249,57 +471,64 @@ describe("void-pulse behavior", () => {
       radius: 300,
     });
     const session = createSession(makeCtx(engine) as any);
-    if (session.mode !== "persistent") throw new Error("expected persistent");
-    // When a black hole is active, begin() should emit zero commands.
-    const cmds = session.begin(makeCtx(engine) as any);
-    expect(cmds).toHaveLength(0);
+    if (session.mode !== "once") throw new Error("expected once");
+    expect(session.commands).toHaveLength(0);
   });
 
-  it("abort() does not throw", async () => {
+  it("stores event-horizon timing on the black-hole command for collapse handling", async () => {
     const { createSession } = await import("../void-pulse/behavior");
-    const engine = makeMockEngine();
-    const session = createSession(makeCtx(engine) as any);
-    if (session.mode !== "persistent") throw new Error("expected persistent");
-    expect(() => session.abort()).not.toThrow();
+    const ctx = makeCtx(makeMockEngine(), {
+      tier: 3 as const,
+      weaponId: "void" as import("@game/types").SiegeWeaponId,
+    });
+    const session = createSession(ctx as any);
+
+    if (session.mode !== "once") throw new Error("expected once");
+
+    const blackHoleCommand = session.commands.find((command) => command.kind === "startBlackHole");
+
+    expect(blackHoleCommand).toMatchObject({
+      x: 100,
+      y: 100,
+      radius: 300,
+      coreRadius: 80,
+      durationMs: 2000,
+      collapseDamage: 2,
+      eventHorizonRadius: 200,
+      eventHorizonDurationMs: 5000,
+    });
   });
 
-  it("attributes the black hole and event horizon to void pulse", async () => {
-    vi.useFakeTimers();
+  it("scales collapse overlay and burn ring from config", async () => {
+    const { createSession } = await import("../void-pulse/behavior");
+    const { BASE_TOGGLES } = await import("../void-pulse/constants");
+    const engine = makeMockEngine();
+    const ctx = makeCtx(engine, {
+      tier: 3 as const,
+      weaponId: "void" as import("@game/types").SiegeWeaponId,
+      config: {
+        ...(BASE_TOGGLES as any),
+        impactRadius: 360,
+        reticleRadius: 118,
+        shockwaveRadius: 90,
+        secondaryRadius: 210,
+        chaosScale: 1.38,
+      },
+    });
+    const session = createSession(ctx as any);
 
-    try {
-      const { createSession } = await import("../void-pulse/behavior");
-      const engine = makeMockEngine();
-      const ctx = makeCtx(engine, {
-        tier: 3 as const,
-        weaponId: "void" as import("@game/types").SiegeWeaponId,
-      });
-      const session = createSession(ctx as any);
+    if (session.mode !== "once") throw new Error("expected once");
 
-      if (session.mode !== "persistent") throw new Error("expected persistent");
+    const commands = session.commands as any[];
+    const overlayCommand = commands.find(
+      (c) => c.kind === "spawnEffect" && c.descriptor.type === "overlayEffect",
+    );
+    const burnRadiusCommand = commands.find((c) => c.kind === "burnRadius");
 
-      session.begin(ctx as any);
-
-      expect(engine.startBlackHole).toHaveBeenCalledWith(
-        100,
-        100,
-        300,
-        80,
-        2000,
-        2,
-        "void",
-      );
-
-      vi.advanceTimersByTime(2100);
-
-      expect(engine.startEventHorizon).toHaveBeenCalledWith(
-        100,
-        100,
-        200,
-        5000,
-        "void",
-      );
-    } finally {
-      vi.useRealTimers();
-    }
+    expect(overlayCommand?.descriptor?.extras?.impactRadius).toBe(360);
+    expect(overlayCommand?.descriptor?.extras?.reticleRadius).toBe(118);
+    expect(overlayCommand?.descriptor?.extras?.shockwaveRadius).toBe(90);
+    expect(overlayCommand?.descriptor?.extras?.chaosScale).toBe(1.38);
+    expect(burnRadiusCommand?.radius).toBe(210);
   });
 });

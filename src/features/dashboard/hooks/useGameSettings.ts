@@ -34,7 +34,7 @@ export function useGameSettings() {
   );
   const [bugChaosMultiplier, setBugChaosMultiplier] = useStoredState(
     STORAGE_KEYS.bugChaosMultiplier,
-    1.4,
+    1.15,
     { parse: parseStoredPositiveNumber },
   );
   const [showBugParticleCount, setShowBugParticleCount] = useStoredState(

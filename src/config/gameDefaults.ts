@@ -33,7 +33,7 @@ export const DEFAULT_GAME_CONFIG: GameConfig = {
   separationRadius: 28,
   separationStrength: 0.14,
   wanderStrength: 0.2,
-  baseSpeed: 24,
+  baseSpeed: 20,
   sizeMultiplier: 1,
   chaseRadius: 160,
   fleeRadius: 84,
@@ -52,9 +52,9 @@ export const DEFAULT_GAME_CONFIG: GameConfig = {
 
 /**
  * Per-weapon kill thresholds for tier evolution.
- * [killsForT2, killsForT3] — tune these to adjust pacing.
+ * Tier promotion thresholds derived from weapon definitions.
  */
-export const WEAPON_EVOLVE_THRESHOLDS: Record<SiegeWeaponId, [number, number]> =
+export const WEAPON_EVOLVE_THRESHOLDS: Record<SiegeWeaponId, number[]> =
   Object.fromEntries(
     WEAPON_REGISTRY.map((weapon) => [weapon.id, getWeaponEvolutionThresholds(weapon)]),
-  ) as Record<SiegeWeaponId, [number, number]>;
+  ) as Record<SiegeWeaponId, number[]>;

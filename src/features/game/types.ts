@@ -17,6 +17,8 @@ export enum WeaponId {
   NullPointer = "nullpointer",
   ForkBomb = "plasma",
   VoidPulse = "void",
+  PulseBeacon = "beacon",
+  DaemonLeash = "daemon",
 }
 
 /** Union of all valid weapon ID strings. */
@@ -29,6 +31,8 @@ export const ALL_WEAPON_IDS: readonly SiegeWeaponId[] = [
   WeaponId.NullPointer,
   WeaponId.ForkBomb,
   WeaponId.VoidPulse,
+  WeaponId.PulseBeacon,
+  WeaponId.DaemonLeash,
 ] as const;
 
 /** @deprecated Use WeaponId instead. Kept as alias for backward compatibility. */
@@ -81,6 +85,8 @@ export enum WeaponTier {
   TIER_ONE = 1,
   TIER_TWO = 2,
   TIER_THREE = 3,
+  TIER_FOUR = 4,
+  TIER_FIVE = 5,
 }
 
 /** Current evolution tier of a weapon (1 = base, 2 = enhanced, 3 = catastrophic). */
@@ -102,17 +108,20 @@ export const SIEGE_GAME_MODE_META: Record<
   {
     description: string;
     label: string;
+    maxWeaponTier: WeaponTier;
     shortLabel: string;
   }
 > = {
   purge: {
     description: "Fastest time to clear the current bug loadout.",
     label: "Purge Mode",
+    maxWeaponTier: WeaponTier.TIER_THREE,
     shortLabel: "Time Attack",
   },
   outbreak: {
     description: "Survive a shifting outbreak with bugs spawning and changing over time.",
     label: "Outbreak",
+    maxWeaponTier: WeaponTier.TIER_FIVE,
     shortLabel: "Survival",
   },
 };
@@ -136,6 +145,20 @@ export interface WeaponEffectEvent {
   targetX?: number;
   /** For seeking weapons: viewport y of the target bug */
   targetY?: number;
+  /** For multi-lock overlays: viewport-space target points. */
+  targetPoints?: Array<{ x: number; y: number }>;
+  /** Optional beam width override for overlay effects. */
+  beamWidth?: number;
+  /** Optional outer glow width override for overlay effects. */
+  beamGlowWidth?: number;
+  /** Optional impact radius override for overlay effects. */
+  impactRadius?: number;
+  /** Optional reticle radius override for overlay effects. */
+  reticleRadius?: number;
+  /** Optional shockwave radius override for overlay effects. */
+  shockwaveRadius?: number;
+  /** Optional scale multiplier used by chaotic overlays. */
+  chaosScale?: number;
   /** Optional viewport-space segments for path-based overlay effects. */
   segments?: Array<{ x1: number; y1: number; x2: number; y2: number }>;
   /** Optional color tint override for effect rendering (e.g. turret pointer in cyan). */
@@ -159,6 +182,7 @@ export interface WeaponProgressSnapshot {
   id: SiegeWeaponId;
   inputMode: "click" | "directional" | "seeking" | "hold";
   locked: boolean;
+  maxTier: WeaponTier;
   matchupSummary: WeaponMatchupSummaryItem[];
   nextTierGoalKills: number | null;
   progressText: string;
@@ -166,11 +190,11 @@ export interface WeaponProgressSnapshot {
   typeHint: string;
   typeLabel: string;
   unlockKills: number;
-  /** Current evolution tier (1–3). */
+  /** Current evolution tier for the active mode. */
   tier: WeaponTier;
   /** Kills earned with this weapon so far. */
   weaponKills: number;
-  /** Kills needed to reach next tier. null when already at T3. */
+  /** Kills needed to reach next tier. null when already at the active mode cap. */
   killsToNextTier: number | null;
 }
 
@@ -178,11 +202,7 @@ export interface SiegeCombatStats {
   /** Ordered list of currently-unlocked weapon IDs (always includes "wrench"). */
   unlockedWeapons: SiegeWeaponId[];
   currentToolLabel: string;
-  /** Ordered list of currently-unlocked structure IDs. */
-  unlockedStructures: StructureId[];
 }
-
-// ── Structure types ──────────────────────────────────────────────
 
 export type StructureId = "lantern" | "agent";
 
@@ -193,15 +213,10 @@ export interface PlacedStructure {
   xp: number;
   nextTierXp: number | null;
   kills: number;
-  /** Viewport x coordinate */
   x: number;
-  /** Viewport y coordinate */
   y: number;
   placedAt: number;
-
-  /** Canvas-local x (relative to BugCanvas top-left) */
   canvasX: number;
-  /** Canvas-local y (relative to BugCanvas top-left) */
   canvasY: number;
 }
 

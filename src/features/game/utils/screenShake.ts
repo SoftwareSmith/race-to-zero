@@ -11,6 +11,7 @@ export const SHAKE_PRESETS: Partial<Record<string, { intensity: number; duration
   plasma:      { intensity: 5,  duration: 280 },
   void:        { intensity: 10, duration: 500 },
   weak:        { intensity: 2,  duration: 120 },
+  "hammer-overdrive": { intensity: 11, duration: 260 },
   tierup:      { intensity: 12, duration: 560 },
 };
 

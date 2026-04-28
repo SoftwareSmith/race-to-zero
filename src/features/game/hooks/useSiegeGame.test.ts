@@ -57,38 +57,6 @@ describe("useSiegeGame", () => {
     expect(result.current.gameMode).toBe("outbreak");
   });
 
-  it("levels placed structures from attributed kills", () => {
-    const { result } = renderHook(() =>
-      useSiegeGame({
-        currentBugCount: 20,
-        currentBugCounts: { high: 0, low: 20, medium: 0, urgent: 0 },
-        evolutionStates: {},
-      }),
-    );
-
-    act(() => {
-      result.current.enterInteractiveMode();
-      result.current.placeStructure(
-        "agent",
-        100,
-        120,
-        80,
-        90,
-        "agent-alpha",
-      );
-    });
-
-    expect(result.current.placedStructures[0]?.tier).toBe(1);
-
-    act(() => {
-      result.current.handleStructureKill("agent-alpha");
-      result.current.handleStructureKill("agent-alpha");
-    });
-
-    expect(result.current.placedStructures[0]?.kills).toBe(2);
-    expect(result.current.placedStructures[0]?.tier).toBe(3);
-  });
-
   it("freezes the run and stores a leaderboard entry when bugs run out", async () => {
     const { result } = renderHook(() =>
       useSiegeGame({

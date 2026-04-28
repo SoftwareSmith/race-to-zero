@@ -46,10 +46,21 @@ export interface WeaponToggles {
   damage?: number;
   cooldownMs?: number;
   hitRadius?: number;
+  targetCount?: number;
+  clusterCount?: number;
+  ringCount?: number;
   coneArcDeg?: number;
   seekRadius?: number;
   splashRadius?: number;
   splashDamage?: number;
+  impactRadius?: number;
+  implosionRadius?: number;
+  reticleRadius?: number;
+  shockwaveRadius?: number;
+  beamWidth?: number;
+  beamGlowWidth?: number;
+  binaryBurstCount?: number;
+  chaosScale?: number;
   chainRadius?: number;
   chainMaxBounces?: number;
   cloudRadius?: number;
@@ -67,6 +78,10 @@ export interface WeaponToggles {
   burstOffsetDistance?: number;
   ringRadius?: number;
   allyDurationMs?: number;
+  allyCap?: number;
+  allyInterceptForce?: number;
+  allyExpireBurstRadius?: number;
+  allyExpireBurstDamage?: number;
   markRadius?: number;
   markDurationMs?: number;
   executeHpLimit?: number;
@@ -146,6 +161,8 @@ export interface WeaponDef {
   tiers: readonly WeaponTierDefinition[];
 }
 
-export interface ResolvedWeaponConfig extends WeaponDef, WeaponToggles {
-  toggles: WeaponToggles;
-}
+export type ResolvedWeaponConfig = Omit<WeaponDef, keyof WeaponToggles | "toggles"> &
+  WeaponToggles & {
+    cooldownMs: number;
+    toggles: WeaponToggles;
+  };

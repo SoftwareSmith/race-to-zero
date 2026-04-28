@@ -142,6 +142,39 @@ export default function WeaponGlyph({ className, id }: WeaponGlyphProps) {
     );
   }
 
+  if (id === "beacon") {
+    return (
+      <svg
+        className={className}
+        viewBox="0 0 24 24"
+        {...SVG_BASE}
+        strokeWidth="1.6"
+      >
+        <circle cx="12" cy="12" r="3.2" />
+        <circle cx="12" cy="12" r="7" strokeDasharray="2.4 2.2" />
+        <path d="M12 2.5 V6" />
+        <path d="M21.5 12 H18" />
+        <path d="M12 21.5 V18" />
+        <path d="M2.5 12 H6" />
+      </svg>
+    );
+  }
+
+  if (id === "daemon") {
+    return (
+      <svg
+        className={className}
+        viewBox="0 0 24 24"
+        {...SVG_BASE}
+        strokeWidth="1.6"
+      >
+        <path d="M6 8.5 C6 5.8 8.2 4 12 4 C15.8 4 18 5.8 18 8.5 C18 11.2 16.3 13.1 12 17.5 C7.7 13.1 6 11.2 6 8.5 Z" />
+        <path d="M12 10.5 L12 20" />
+        <path d="M9 17.5 L12 20 L15 17.5" />
+      </svg>
+    );
+  }
+
   // ── Fallback (null / unknown) ──────────────────────────────────────
   return (
     <svg

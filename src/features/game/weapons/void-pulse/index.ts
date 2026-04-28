@@ -21,6 +21,10 @@ register(entry);
 registerOverlay(def.id, (effect) =>
   createElement(VoidPulseOverlay, {
     key: effect.id,
+    chaosScale: effect.chaosScale,
+    impactRadius: effect.impactRadius,
+    reticleRadius: effect.reticleRadius,
+    shockwaveRadius: effect.shockwaveRadius,
     x: effect.x,
     y: effect.y,
   }),

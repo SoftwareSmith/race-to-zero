@@ -7,9 +7,15 @@ export interface ChainOverlayProps {
   y: number;
   chainNodes?: Array<{ x: number; y: number }>;
   jagOffsets?: number[];
+  beamWidth?: number;
+  beamGlowWidth?: number;
+  chaosScale?: number;
 }
 
 export function ChainOverlay({
+  beamGlowWidth = 7.2,
+  beamWidth = 2.4,
+  chaosScale = 1,
   x,
   y,
   chainNodes,
@@ -43,13 +49,19 @@ export function ChainOverlay({
               x2={(Math.cos(a) * 28).toFixed(1)}
               y2={(Math.sin(a) * 28).toFixed(1)}
               stroke="#6ee7b7"
-              strokeWidth="1.5"
+              strokeWidth={(beamWidth * 0.7).toFixed(1)}
               strokeLinecap="round"
               opacity="0.8"
             />
           );
         })}
-        <circle cx="0" cy="0" r="4" fill="#6ee7b7" opacity="0.95" />
+        <circle
+          cx="0"
+          cy="0"
+          r={4 + (chaosScale - 1) * 4}
+          fill="#6ee7b7"
+          opacity="0.95"
+        />
       </svg>
     );
   }
@@ -79,25 +91,42 @@ export function ChainOverlay({
           fy = from.y - svgTop;
         const tx = node.x - svgLeft,
           ty = node.y - svgTop;
-        const mx = (fx + tx) / 2 + (jagOffsets ? (jagOffsets[i * 2] ?? 0) : 0);
+        const mx =
+          (fx + tx) / 2 +
+          (jagOffsets ? (jagOffsets[i * 2] ?? 0) * chaosScale : 0);
         const my =
-          (fy + ty) / 2 + (jagOffsets ? (jagOffsets[i * 2 + 1] ?? 0) : 0);
+          (fy + ty) / 2 +
+          (jagOffsets ? (jagOffsets[i * 2 + 1] ?? 0) * chaosScale : 0);
         const dx = tx - fx,
           dy = ty - fy;
         const len = Math.hypot(dx, dy) || 1;
-        const px = (-dy / len) * 3,
-          py = (dx / len) * 3;
+        const px = (-dy / len) * (beamWidth + chaosScale),
+          py = (dx / len) * (beamWidth + chaosScale);
         const approxLen = len + 50;
         return (
           <g key={i}>
             <path
               d={`M ${fx} ${fy} Q ${mx} ${my} ${tx} ${ty}`}
-              stroke="#6ee7b7"
-              strokeWidth="2.5"
+              stroke="rgba(110,231,183,0.35)"
+              strokeWidth={beamGlowWidth}
               strokeLinecap="round"
               fill="none"
               opacity="0.9"
-              filter="drop-shadow(0 0 5px rgba(110,231,183,0.8))"
+              filter={`drop-shadow(0 0 ${beamGlowWidth}px rgba(110,231,183,0.72))`}
+              strokeDasharray={approxLen}
+              strokeDashoffset={approxLen}
+              style={{
+                animation: `chain-bolt-draw ${280 + i * 60}ms ease-out forwards`,
+              }}
+            />
+            <path
+              d={`M ${fx} ${fy} Q ${mx} ${my} ${tx} ${ty}`}
+              stroke="#6ee7b7"
+              strokeWidth={beamWidth}
+              strokeLinecap="round"
+              fill="none"
+              opacity="0.9"
+              filter={`drop-shadow(0 0 ${Math.max(4, beamGlowWidth * 0.7)}px rgba(110,231,183,0.82))`}
               strokeDasharray={approxLen}
               strokeDashoffset={approxLen}
               style={{
@@ -107,10 +136,10 @@ export function ChainOverlay({
             <path
               d={`M ${fx + px} ${fy + py} Q ${mx + px} ${my + py} ${tx + px} ${ty + py}`}
               stroke="#a7f3d0"
-              strokeWidth="1"
+              strokeWidth={Math.max(1, beamWidth * 0.44)}
               strokeLinecap="round"
               fill="none"
-              opacity="0.55"
+              opacity={Math.min(0.72, 0.48 + chaosScale * 0.08)}
               strokeDasharray={approxLen}
               strokeDashoffset={approxLen}
               style={{
@@ -125,14 +154,16 @@ export function ChainOverlay({
           <circle
             cx={node.x - svgLeft}
             cy={node.y - svgTop}
-            r={i === 0 ? 9 : 6}
+            r={i === 0 ? 9 + (chaosScale - 1) * 4 : 6 + (chaosScale - 1) * 3}
             fill={i === 0 ? "rgba(110,231,183,0.22)" : "rgba(167,243,208,0.18)"}
             filter="drop-shadow(0 0 4px rgba(110,231,183,0.5))"
           />
           <circle
             cx={node.x - svgLeft}
             cy={node.y - svgTop}
-            r={i === 0 ? 5 : 3}
+            r={
+              i === 0 ? 5 + (chaosScale - 1) * 2.5 : 3 + (chaosScale - 1) * 1.5
+            }
             fill={i === 0 ? "#6ee7b7" : "#a7f3d0"}
             opacity="0.95"
           />
@@ -145,20 +176,32 @@ export function ChainOverlay({
         const lx = last.x - svgLeft,
           ly = last.y - svgTop;
         const inAngle = Math.atan2(last.y - prev.y, last.x - prev.x);
-        const FORK_LEN = 28;
-        return [inAngle - 0.5, inAngle + 0.5].map((a, fi) => (
+        const forkSpread = 0.42 + chaosScale * 0.24;
+        const forkAngles =
+          chaosScale >= 1.35
+            ? [
+                inAngle - forkSpread,
+                inAngle - forkSpread * 0.42,
+                inAngle + forkSpread * 0.42,
+                inAngle + forkSpread,
+              ]
+            : chaosScale >= 1.1
+              ? [inAngle - forkSpread, inAngle, inAngle + forkSpread]
+              : [inAngle - forkSpread, inAngle + forkSpread];
+        const forkLength = 28 + (chaosScale - 1) * 18;
+        return forkAngles.map((a, fi) => (
           <line
             key={`fork-${fi}`}
             x1={lx}
             y1={ly}
-            x2={(lx + Math.cos(a) * FORK_LEN).toFixed(1)}
-            y2={(ly + Math.sin(a) * FORK_LEN).toFixed(1)}
+            x2={(lx + Math.cos(a) * forkLength).toFixed(1)}
+            y2={(ly + Math.sin(a) * forkLength).toFixed(1)}
             stroke="#a7f3d0"
-            strokeWidth="1.5"
+            strokeWidth={Math.max(1.3, beamWidth * 0.55)}
             strokeLinecap="round"
             opacity="0.7"
-            strokeDasharray={FORK_LEN + 4}
-            strokeDashoffset={FORK_LEN + 4}
+            strokeDasharray={forkLength + 4}
+            strokeDashoffset={forkLength + 4}
             style={{
               animation: `chain-bolt-draw 400ms ease-out ${nodes.length * 60}ms forwards`,
             }}

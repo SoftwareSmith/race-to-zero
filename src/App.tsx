@@ -3,10 +3,15 @@ import {
   lazy,
   startTransition,
   useCallback,
+  useMemo,
   useRef,
   useState,
 } from "react";
 import type { SiegePhase } from "@game/types";
+import type {
+  BackgroundFieldHandle,
+  BugTransitionSnapshotItem,
+} from "@game/components/BackgroundField/types";
 import DashboardShell from "./features/app/DashboardShell";
 import { DashboardProvider } from "./features/dashboard/context/DashboardContext";
 
@@ -18,6 +23,7 @@ const AmbientBackgroundHarness = lazy(
 
 function AppContent() {
   const dashboardRef = useRef<HTMLDivElement | null>(null);
+  const ambientFieldRef = useRef<BackgroundFieldHandle | null>(null);
   const [siegeMounted, setSiegeMounted] = useState(false);
   const [ambientPerfMode] = useState(() => {
     if (typeof window === "undefined") {
@@ -29,6 +35,9 @@ function AppContent() {
     );
   });
   const [startRequestId, setStartRequestId] = useState(0);
+  const [transitionSnapshot, setTransitionSnapshot] = useState<
+    BugTransitionSnapshotItem[] | null
+  >(null);
   const [shellState, setShellState] = useState<{
     interactiveMode: boolean;
     siegePhase: SiegePhase;
@@ -39,6 +48,10 @@ function AppContent() {
   const shouldRenderDashboard =
     shellState.siegePhase === "idle" || shellState.siegePhase === "entering";
   const shouldRenderAmbient = shellState.siegePhase === "idle";
+  const stableTransitionSnapshot = useMemo(
+    () => transitionSnapshot,
+    [transitionSnapshot],
+  );
 
   const prefetchSiege = useCallback(() => {
     void loadSiegeExperience();
@@ -46,6 +59,9 @@ function AppContent() {
 
   const handleEnterInteractiveMode = useCallback(() => {
     prefetchSiege();
+    setTransitionSnapshot(
+      ambientFieldRef.current?.captureTransitionSnapshot() ?? null,
+    );
     startTransition(() => {
       setSiegeMounted(true);
       setStartRequestId((value) => value + 1);
@@ -58,7 +74,10 @@ function AppContent() {
       <div className="pointer-events-none absolute inset-x-[12%] top-[-18%] h-[42vh] rounded-full bg-[radial-gradient(circle,rgba(244,114,182,0.14),transparent_62%)] blur-3xl" />
       {shouldRenderAmbient ? (
         <Suspense fallback={null}>
-          <AmbientBackgroundHarness fullDensity={ambientPerfMode} />
+          <AmbientBackgroundHarness
+            ref={ambientFieldRef}
+            fullDensity={ambientPerfMode}
+          />
         </Suspense>
       ) : null}
       {siegeMounted ? (
@@ -67,6 +86,7 @@ function AppContent() {
             dashboardRef={dashboardRef}
             onShellStateChange={setShellState}
             startRequestId={startRequestId}
+            transitionSnapshot={stableTransitionSnapshot}
           />
         </Suspense>
       ) : null}

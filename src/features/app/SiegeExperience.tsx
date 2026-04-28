@@ -11,7 +11,6 @@ import {
   useDashboardSettings,
   useDashboardUi,
 } from "@dashboard/context/DashboardContext";
-import { STRUCTURE_DEFS } from "@config/structureConfig";
 import { WEAPON_DEFS } from "@config/weaponConfig";
 import BackgroundField from "@game/components/BackgroundField";
 import SiegeHud from "@game/components/SiegeHud";
@@ -19,14 +18,10 @@ import SiegeRunCompleteOverlay from "@game/components/SiegeRunCompleteOverlay";
 import { useSiegeGame } from "@game/hooks/useSiegeGame";
 import { useSiegeZones } from "@game/hooks/useSiegeZones";
 import { useWeaponEvolution } from "@game/hooks/useWeaponEvolution";
-import type {
-  SiegePhase,
-  SiegeWeaponId,
-  StructureId,
-  WeaponTier,
-} from "@game/types";
+import type { SiegePhase, SiegeWeaponId, WeaponTier } from "@game/types";
 import { triggerNamedShake } from "@game/utils/screenShake";
 import { getWeaponTierTitle } from "@game/weapons/progression";
+import type { BugTransitionSnapshotItem } from "@game/components/BackgroundField/types";
 
 interface SiegeExperienceProps {
   dashboardRef: RefObject<HTMLDivElement | null>;
@@ -35,12 +30,14 @@ interface SiegeExperienceProps {
     siegePhase: SiegePhase;
   }) => void;
   startRequestId: number;
+  transitionSnapshot?: BugTransitionSnapshotItem[] | null;
 }
 
 const SiegeExperience = memo(function SiegeExperience({
   dashboardRef,
   onShellStateChange,
   startRequestId,
+  transitionSnapshot = null,
 }: SiegeExperienceProps) {
   const metrics = useDashboardMetrics();
   const settings = useDashboardSettings();
@@ -62,32 +59,6 @@ const SiegeExperience = memo(function SiegeExperience({
     window.setTimeout(() => setUpgradeToast(null), 3500);
   }, []);
 
-  const getProgressionLabel = useCallback((tier: WeaponTier) => {
-    return tier === 3 ? "Overdrive" : `Tier ${tier}`;
-  }, []);
-
-  const handleStructureTierUp = useCallback(
-    ({
-      structureType,
-      tier,
-    }: {
-      structureId: string;
-      structureType: StructureId;
-      tier: WeaponTier;
-    }) => {
-      const structureTitle =
-        STRUCTURE_DEFS.find((structure) => structure.id === structureType)
-          ?.title ?? structureType;
-      showUpgradeToast(
-        `${structureTitle} upgraded to ${getProgressionLabel(tier)}`,
-      );
-      if (dashboardRef.current) {
-        triggerNamedShake(dashboardRef.current, "tierup");
-      }
-    },
-    [dashboardRef, getProgressionLabel, showUpgradeToast],
-  );
-
   const handleSiegeEscape = useCallback(() => {
     if (ui.openTopMenu === "codex") {
       ui.closeMenus();
@@ -102,7 +73,6 @@ const SiegeExperience = memo(function SiegeExperience({
     currentBugCounts: metrics.currentBugCounts,
     evolutionStates,
     onEscape: handleSiegeEscape,
-    onStructureTierUp: handleStructureTierUp,
     pauseTimer: ui.openTopMenu === "codex",
   });
 
@@ -183,9 +153,6 @@ const SiegeExperience = memo(function SiegeExperience({
     <>
       {shouldRenderSiegeField ? (
         <BackgroundField
-          agentCaptures={
-            siegeGame.interactiveMode ? siegeGame.agentCaptures : undefined
-          }
           bugCounts={siegeGame.displayedBugCounts}
           bugVisualSettings={settings.bugVisualSettings}
           chartFocus={backgroundChartFocus}
@@ -198,23 +165,9 @@ const SiegeExperience = memo(function SiegeExperience({
           interactiveSessionKey={
             siegeGame.interactiveMode ? siegeGame.interactiveSessionKey : null
           }
-          onAgentAbsorb={
-            siegeGame.interactiveMode ? siegeGame.handleAgentAbsorb : undefined
-          }
           onBugHit={
             siegeGame.interactiveMode
               ? siegeGame.handleInteractiveHit
-              : undefined
-          }
-          onStructureKill={
-            siegeGame.interactiveMode
-              ? siegeGame.handleStructureKill
-              : undefined
-          }
-          onStructurePlace={
-            siegeGame.interactiveMode
-              ? (type, vx, vy, cx, cy, structureId) =>
-                  siegeGame.placeStructure(type, vx, vy, cx, cy, structureId)
               : undefined
           }
           clearSwarmRequestId={
@@ -227,12 +180,6 @@ const SiegeExperience = memo(function SiegeExperience({
           onWeaponEvolutionStatesChange={syncFromEngine}
           onWeaponFired={
             siegeGame.interactiveMode ? siegeGame.handleWeaponFired : undefined
-          }
-          placedStructures={
-            siegeGame.interactiveMode ? siegeGame.placedStructures : undefined
-          }
-          placingStructureId={
-            siegeGame.interactiveMode ? siegeGame.placingStructureId : undefined
           }
           remainingBugCount={
             siegeGame.interactiveMode
@@ -247,6 +194,7 @@ const SiegeExperience = memo(function SiegeExperience({
             siegeGame.interactiveMode ? siegeGame.streakMultiplier : 1
           }
           tone={metrics.deadlineMetrics.statusTone}
+          transitionSnapshot={transitionSnapshot}
         />
       ) : null}
       {siegeGame.siegePhase === "entering" ? (
@@ -268,18 +216,14 @@ const SiegeExperience = memo(function SiegeExperience({
           killStreak={siegeGame.killStreak}
           lastFireTimes={siegeGame.lastFireTimes}
           nextWeaponUnlock={siegeGame.nextWeaponUnlock}
-          onArmStructure={siegeGame.armStructure}
           onChangeGameMode={siegeGame.changeGameMode}
           onExit={handleExitInteractiveMode}
           onKillAllBugs={siegeGame.killAllBugs}
           onSelectWeapon={siegeGame.selectWeapon}
           onToggleCodex={() => ui.handleTopMenuToggle("codex")}
           onToggleDebugMode={siegeGame.toggleDebugMode}
-          placedCountByType={siegeGame.placedCountByType}
-          placingStructureId={siegeGame.placingStructureId}
           selectedWeaponId={siegeGame.selectedWeaponId}
           streakMultiplier={siegeGame.streakMultiplier}
-          unlockedStructures={siegeGame.combatStats.unlockedStructures}
           upgradeToast={upgradeToast}
           weaponSnapshots={siegeGame.weaponSnapshots}
         />

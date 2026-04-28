@@ -21,6 +21,7 @@
     "test:qa:headed": "playwright test --headed tests/e2e"
   },
   "dependencies": {
+    "@dimforge/rapier2d-compat": "^0.19.3",
     "chart.js": "^4.5.1",
     "chartjs-plugin-datalabels": "^2.2.0",
     "date-fns": "^4.1.0",

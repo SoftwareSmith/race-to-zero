@@ -1,8 +1,11 @@
 import { Entity } from "./Entity";
 import { drawBugSprite } from "@game/utils/bugSprite";
+import type { SiegeStatusId } from "@game/status/statusCatalog";
+import { STATUS_PRIORITY } from "@game/status/statusCatalog";
 import { DEFAULT_GAME_CONFIG } from "./types";
 import { getCodex, type CrawlProfile, type BugType } from "./bugCodex";
 import { EntityState, isTerminalEntityState } from "../types";
+import type { AllyConversionConfig } from "@game/weapons/runtime/types";
 
 function clamp(value: number, min: number, max: number) {
   return Math.max(min, Math.min(max, value));
@@ -57,6 +60,20 @@ function perlin1D(position: number, seed: number) {
 
 type BugState = "patrol" | "flee" | EntityState.Dying | EntityState.Dead;
 
+const ALLY_CONTACT_DAMAGE = 2;
+const ALLY_CONTACT_COOLDOWN_MS = 260;
+const ALLY_INTERCEPT_RADIUS = 196;
+
+function isStatusActive(
+  status:
+    | { expiresAt: number }
+    | { expiresAt: number; dps: number; accumulatedDmg: number }
+    | null,
+  now: number,
+) {
+  return status !== null && now < status.expiresAt;
+}
+
 interface BugUpdateContext {
   getNeighbors: (e: BugEntity, r: number) => BugEntity[];
   targetX?: number | null;
@@ -108,11 +125,20 @@ export class BugEntity extends Entity {
   /** Looped — periodic echo DOT damage. */
   looped: { dps: number; expiresAt: number; accumulatedDmg: number } | null;
   /** Ally state — bug is temporarily converted; stops targeting the player base. */
-  ally: { expiresAt: number } | null;
+  ally: {
+    expiresAt: number;
+    expireBurstDamage: number;
+    expireBurstRadius: number;
+    interceptForce: number;
+  } | null;
+  allyContactReadyAt: number;
   /** Whether this bug's eventual death has already been credited to the player. */
   deathCredited: boolean;
   /** Weapon ID that will receive kill credit for any pending DOT death. */
   dotSourceWeaponId: string | null;
+  finalBlowStatus: SiegeStatusId | null;
+  supportStatusesAtDeath: SiegeStatusId[];
+  deathPointValue: number;
 
   constructor(opts: Partial<Entity> & { id?: string } = {}) {
     super(opts as Entity);
@@ -140,8 +166,66 @@ export class BugEntity extends Entity {
     this.unstable = null;
     this.looped = null;
     this.ally = null;
+    this.allyContactReadyAt = 0;
     this.deathCredited = false;
     this.dotSourceWeaponId = null;
+    this.finalBlowStatus = null;
+    this.supportStatusesAtDeath = [];
+    this.deathPointValue = 1;
+  }
+
+  private getBasePointValue() {
+    return this.typeSpec?.pointValue ?? 1;
+  }
+
+  private isAllyActive(now: number) {
+    return isStatusActive(this.ally, now);
+  }
+
+  private getActiveSupportStatuses(now: number, finisherStatus?: SiegeStatusId | null) {
+    const statuses: SiegeStatusId[] = [];
+
+    if (this.isAllyActive(now)) statuses.push("ally");
+    if (isStatusActive(this.burn, now)) statuses.push("burn");
+    if (isStatusActive(this.charged, now)) statuses.push("charged");
+    if (isStatusActive(this.ensnare, now)) statuses.push("ensnare");
+    if (isStatusActive(this.slow, now)) statuses.push("freeze");
+    if (isStatusActive(this.looped, now)) statuses.push("looped");
+    if (isStatusActive(this.marked, now)) statuses.push("marked");
+    if (isStatusActive(this.poison, now)) statuses.push("poison");
+    if (isStatusActive(this.unstable, now)) statuses.push("unstable");
+
+    const filtered = finisherStatus
+      ? statuses.filter((status) => status !== finisherStatus)
+      : statuses;
+
+    return STATUS_PRIORITY.filter((status) => filtered.includes(status));
+  }
+
+  private enterDyingState(finisherStatus: SiegeStatusId | null, supportStatuses?: SiegeStatusId[]) {
+    this.finalBlowStatus = finisherStatus;
+    this.supportStatusesAtDeath = supportStatuses ?? this.getActiveSupportStatuses(performance.now(), finisherStatus);
+    this.deathPointValue = finisherStatus === "ally" ? 0 : this.getBasePointValue();
+    this.state = EntityState.Dying;
+    this.deathProgress = 0;
+    this.vx = 0;
+    this.vy = 0;
+    this.deathCredited = false;
+  }
+
+  private applyIncidentalDamage(amount: number, finisherStatus: SiegeStatusId) {
+    if (amount <= 0 || isTerminalEntityState(this.state)) {
+      return false;
+    }
+
+    this.lastHitTime = performance.now();
+    this.hp = Math.max(0, this.hp - amount);
+    if (this.hp > 0) {
+      return false;
+    }
+
+    this.enterDyingState(finisherStatus);
+    return true;
   }
 
   private syncTypeSpec() {
@@ -291,9 +375,12 @@ export class BugEntity extends Entity {
       }
     }
 
+    const now = performance.now();
     const targetX = ctx.targetX ?? null;
     const targetY = ctx.targetY ?? null;
+    const isAlly = this.isAllyActive(now);
     const hasThreat =
+      !isAlly &&
       targetX != null &&
       targetY != null &&
       getLength(this.x - targetX, this.y - targetY) <= config.fleeRadius * 1.8;
@@ -306,21 +393,33 @@ export class BugEntity extends Entity {
     }
 
     const desired = {
-      x: Math.cos(this.heading) * 0.42,
-      y: Math.sin(this.heading) * 0.42,
+      x: Math.cos(this.heading) * 0.28,
+      y: Math.sin(this.heading) * 0.28,
     };
     const wallSteering = this.getWallSteering(bounds, config);
 
     desired.x += wallSteering.x;
     desired.y += wallSteering.y;
 
-    const wanderNoise = perlin1D(
-      this.motionTime * 0.38 + this.seed * 9.7,
-      this.seed * 21.3,
+    const driftNoiseX = perlin1D(
+      this.motionTime * 0.29 + this.seed * 11.3,
+      this.seed * 17.9,
     );
-    this.wanderAngle = wanderNoise * (0.34 + config.wanderStrength * 0.4);
-    desired.x += Math.cos(this.heading + this.wanderAngle) * (0.24 + config.wanderStrength * 0.7);
-    desired.y += Math.sin(this.heading + this.wanderAngle) * (0.24 + config.wanderStrength * 0.7);
+    const driftNoiseY = perlin1D(
+      this.motionTime * 0.33 + this.seed * 7.1,
+      this.seed * 23.4,
+    );
+    const weaveNoise = perlin1D(
+      this.motionTime * 0.17 + this.seed * 5.7,
+      this.seed * 31.2,
+    );
+    this.wanderAngle = normalizeAngle(
+      this.wanderAngle + weaveNoise * dt * (0.9 + config.wanderStrength * 1.1),
+    );
+    desired.x += driftNoiseX * (0.52 + config.wanderStrength * 0.85);
+    desired.y += driftNoiseY * (0.52 + config.wanderStrength * 0.85);
+    desired.x += Math.cos(this.wanderAngle) * 0.18;
+    desired.y += Math.sin(this.wanderAngle) * 0.18;
 
     const neighbors = ctx.getNeighbors(this, config.separationRadius);
     const separation = this.getNeighborSeparation(
@@ -331,13 +430,56 @@ export class BugEntity extends Entity {
     desired.x += separation.x;
     desired.y += separation.y;
 
+    if (isAlly) {
+      this.state = "patrol";
+      this.fleeTimer = null;
+      const interceptCandidates = ctx
+        .getNeighbors(this, Math.max(ALLY_INTERCEPT_RADIUS, config.separationRadius * 3))
+        .filter((neighbor): neighbor is BugEntity => neighbor instanceof BugEntity)
+        .filter((neighbor) => !neighbor.isAllyActive(now) && !isTerminalEntityState(neighbor.state));
+
+      let nearestHostile: BugEntity | null = null;
+      let nearestDistance = Infinity;
+
+      for (const hostile of interceptCandidates) {
+        const distance = getLength(hostile.x - this.x, hostile.y - this.y);
+        if (distance < nearestDistance) {
+          nearestDistance = distance;
+          nearestHostile = hostile;
+        }
+      }
+
+      if (nearestHostile) {
+        const towardHostile = normalizeVector(
+          nearestHostile.x - this.x,
+          nearestHostile.y - this.y,
+        );
+        const interceptForce = this.ally?.interceptForce ?? 2.5;
+        desired.x += towardHostile.x * interceptForce;
+        desired.y += towardHostile.y * interceptForce;
+
+        const contactRadius = Math.max(this.size, nearestHostile.size) * 1.18 + 6;
+        if (
+          nearestDistance <= contactRadius &&
+          now >= this.allyContactReadyAt
+        ) {
+          this.allyContactReadyAt = now + ALLY_CONTACT_COOLDOWN_MS;
+          nearestHostile.applyIncidentalDamage(ALLY_CONTACT_DAMAGE, "ally");
+          nearestHostile.state = "flee";
+          nearestHostile.fleeTimer = Math.max(nearestHostile.fleeTimer ?? 0, 0.28);
+        }
+      } else {
+        desired.x += Math.cos(this.heading + this.wanderAngle * 0.5) * 0.38;
+        desired.y += Math.sin(this.heading + this.wanderAngle * 0.5) * 0.38;
+      }
+    }
+
     if (this.state === "flee" && targetX != null && targetY != null) {
       const away = normalizeVector(this.x - targetX, this.y - targetY);
       desired.x += away.x * 2.2;
       desired.y += away.y * 2.2;
     }
 
-    const now = performance.now();
     const isBurnPanicking = this.burn !== null && now < this.burn.expiresAt && this.burn.dps > 0.3;
     if (isBurnPanicking) {
       desired.x += (Math.random() - 0.5) * 1.6;
@@ -369,7 +511,31 @@ export class BugEntity extends Entity {
     if (this.marked && now >= this.marked.expiresAt) this.marked = null;
     if (this.unstable && now >= this.unstable.expiresAt) this.unstable = null;
     if (this.looped && now >= this.looped.expiresAt) this.looped = null;
-    if (this.ally && now >= this.ally.expiresAt) this.ally = null;
+    if (this.ally && now >= this.ally.expiresAt) {
+      const expireBurstRadius = this.ally.expireBurstRadius;
+      const expireBurstDamage = this.ally.expireBurstDamage;
+      if (expireBurstRadius > 0 && expireBurstDamage > 0) {
+        const burstTargets = ctx
+          .getNeighbors(this, Math.max(expireBurstRadius, config.separationRadius * 2))
+          .filter((neighbor): neighbor is BugEntity => neighbor instanceof BugEntity)
+          .filter((neighbor) => !neighbor.isAllyActive(now) && !isTerminalEntityState(neighbor.state));
+
+        for (const hostile of burstTargets) {
+          const distance = getLength(hostile.x - this.x, hostile.y - this.y);
+          if (distance > expireBurstRadius) {
+            continue;
+          }
+
+          hostile.applyIncidentalDamage(expireBurstDamage, "ally");
+          hostile.state = "flee";
+          hostile.fleeTimer = Math.max(hostile.fleeTimer ?? 0, 0.32);
+        }
+      }
+
+      this.ally = null;
+      this.state = "flee";
+      this.fleeTimer = 0.36;
+    }
 
     // Tick poison DOT damage
     if (this.poison && !isTerminalEntityState(this.state)) {
@@ -377,15 +543,7 @@ export class BugEntity extends Entity {
       if (this.poison.accumulatedDmg >= 1) {
         const dmgToApply = Math.floor(this.poison.accumulatedDmg);
         this.poison.accumulatedDmg -= dmgToApply;
-        this.lastHitTime = performance.now();
-        this.hp = Math.max(0, this.hp - dmgToApply);
-        if (this.hp === 0) {
-          this.state = EntityState.Dying;
-          this.deathProgress = 0;
-          this.vx = 0;
-          this.vy = 0;
-          this.deathCredited = false;
-        }
+        this.applyIncidentalDamage(dmgToApply, "poison");
       }
     }
 
@@ -396,15 +554,7 @@ export class BugEntity extends Entity {
       if (this.burn.accumulatedDmg >= 1) {
         const dmgToApply = Math.floor(this.burn.accumulatedDmg);
         this.burn.accumulatedDmg -= dmgToApply;
-        this.lastHitTime = performance.now();
-        this.hp = Math.max(0, this.hp - dmgToApply);
-        if (this.hp === 0) {
-          this.state = EntityState.Dying;
-          this.deathProgress = 0;
-          this.vx = 0;
-          this.vy = 0;
-          this.deathCredited = false;
-        }
+        this.applyIncidentalDamage(dmgToApply, "burn");
       }
       if (this.burn && this.burn.dps < 0.05) {
         this.burn = null;
@@ -417,15 +567,7 @@ export class BugEntity extends Entity {
       if (this.looped.accumulatedDmg >= 1) {
         const dmgToApply = Math.floor(this.looped.accumulatedDmg);
         this.looped.accumulatedDmg -= dmgToApply;
-        this.lastHitTime = performance.now();
-        this.hp = Math.max(0, this.hp - dmgToApply);
-        if (this.hp === 0) {
-          this.state = EntityState.Dying;
-          this.deathProgress = 0;
-          this.vx = 0;
-          this.vy = 0;
-          this.deathCredited = false;
-        }
+        this.applyIncidentalDamage(dmgToApply, "looped");
       }
     }
 
@@ -464,7 +606,8 @@ export class BugEntity extends Entity {
     const poisoned = this.poison !== null && now < this.poison.expiresAt;
     const burning = this.burn !== null && now < this.burn.expiresAt;
     const ensnared = this.ensnare !== null && now < this.ensnare.expiresAt;
-    const pointValue = this.typeSpec?.pointValue ?? 1;
+    const pointValue = this.getBasePointValue();
+    const supportStatuses = this.getActiveSupportStatuses(now, ensnared ? "ensnare" : null);
 
     this.lastHitTime = performance.now();
 
@@ -482,19 +625,51 @@ export class BugEntity extends Entity {
     const effectiveDamage = ensnared ? this.maxHp : Math.round(damage * multiplier);
     this.hp = Math.max(0, this.hp - effectiveDamage);
     if (this.hp === 0) {
-      this.state = EntityState.Dying;
-      this.deathProgress = 0;
-      this.vx = 0;
-      this.vy = 0;
+      this.enterDyingState(ensnared ? "ensnare" : null, supportStatuses);
       this.ensnare = null;
-      return { defeated: true, remainingHp: 0, pointValue, frozen, poisoned, burning, ensnared };
+      return {
+        defeated: true,
+        remainingHp: 0,
+        pointValue,
+        frozen,
+        poisoned,
+        burning,
+        ensnared,
+        finisherStatus: ensnared ? "ensnare" : null,
+        supportStatuses,
+      };
     }
 
     this.state = "flee";
     this.fleeTimer = 0.9 + Math.random() * 0.5;
     this.syncTypeSpec();
     const comboEvents = this.handleStatusInteractions();
-    return { defeated: false, remainingHp: this.hp, pointValue: 0, frozen, poisoned, burning, ensnared, comboEvents };
+    if (isTerminalEntityState(this.state)) {
+      return {
+        defeated: true,
+        remainingHp: 0,
+        pointValue,
+        frozen,
+        poisoned,
+        burning,
+        ensnared,
+        comboEvents,
+        finisherStatus: null,
+        supportStatuses,
+      };
+    }
+    return {
+      defeated: false,
+      remainingHp: this.hp,
+      pointValue: 0,
+      frozen,
+      poisoned,
+      burning,
+      ensnared,
+      comboEvents,
+      finisherStatus: null,
+      supportStatuses,
+    };
   }
 
   /** Handle status combo interactions after a hit. */
@@ -511,11 +686,7 @@ export class BugEntity extends Entity {
       this.charged = null;
       comboEvents.push("detonate");
       if (this.hp === 0 && !isTerminalEntityState(this.state)) {
-        this.state = EntityState.Dying;
-        this.deathProgress = 0;
-        this.vx = 0;
-        this.vy = 0;
-        this.deathCredited = false;
+        this.enterDyingState(null, this.getActiveSupportStatuses(now));
       }
     }
 
@@ -525,11 +696,7 @@ export class BugEntity extends Entity {
       this.hp = Math.max(0, this.hp - 2);
       comboEvents.push("quench");
       if (this.hp === 0 && !isTerminalEntityState(this.state)) {
-        this.state = EntityState.Dying;
-        this.deathProgress = 0;
-        this.vx = 0;
-        this.vy = 0;
-        this.deathCredited = false;
+        this.enterDyingState(null, this.getActiveSupportStatuses(now));
       }
     }
 
@@ -632,10 +799,16 @@ export class BugEntity extends Entity {
   }
 
   /** Apply ally state — bug stops targeting the player base. */
-  applyAlly(durationMs: number) {
+  applyAlly(config: AllyConversionConfig) {
     const now = performance.now();
-    this.ally = { expiresAt: now + durationMs };
-    // Stop movement, enter a neutral state
+    this.ally = {
+      expiresAt: now + config.durationMs,
+      expireBurstDamage: config.expireBurstDamage ?? 0,
+      expireBurstRadius: config.expireBurstRadius ?? 0,
+      interceptForce: config.interceptForce ?? 2.5,
+    };
+    this.allyContactReadyAt = now + 180;
+    this.dotSourceWeaponId = null;
     this.state = "patrol";
     this.fleeTimer = null;
   }
@@ -683,8 +856,12 @@ export class BugEntity extends Entity {
     this.unstable = null;
     this.looped = null;
     this.ally = null;
+    this.allyContactReadyAt = 0;
     this.dotSourceWeaponId = null;
     this.deathCredited = false;
+    this.finalBlowStatus = null;
+    this.supportStatusesAtDeath = [];
+    this.deathPointValue = this.getBasePointValue();
     this.motionTime = Math.random() * 100;
     this.opacity = 1;
     this.size = this.baseSize;

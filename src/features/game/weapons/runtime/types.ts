@@ -6,6 +6,7 @@
  */
 
 import type { SiegeWeaponId, WeaponTier } from "@game/types";
+import type { SiegeStatusId } from "@game/status/statusCatalog";
 import type { WeaponMatchupState } from "@game/types";
 import type { ResolvedWeaponConfig, WeaponDef } from "@game/weapons/types";
 
@@ -34,9 +35,11 @@ export interface BugSnapshot {
 export interface HitResult {
   comboEvents?: Array<"detonate" | "quench">;
   defeated: boolean;
+  finisherStatus?: SiegeStatusId | null;
   matchup: WeaponMatchupState;
   remainingHp: number;
   pointValue: number;
+  supportStatuses?: SiegeStatusId[];
   frozen: boolean;
   variant: string;
 }
@@ -46,6 +49,14 @@ export interface BlackHoleState {
   x: number;
   y: number;
   radius: number;
+}
+
+export interface AllyConversionConfig {
+  durationMs: number;
+  expireBurstDamage?: number;
+  expireBurstRadius?: number;
+  interceptForce?: number;
+  maxActiveAllies?: number;
 }
 
 export interface GameEngine {
@@ -115,6 +126,8 @@ export interface GameEngine {
     durationMs: number,
     collapseDamage: number,
     weaponId?: SiegeWeaponId,
+    eventHorizonRadius?: number,
+    eventHorizonDurationMs?: number,
   ): boolean;
   getBlackHole(): BlackHoleState | null;
   // ── Evolution-era additions ──────────────────────────────────────────────
@@ -123,7 +136,7 @@ export interface GameEngine {
   applyUnstableInRadius(cx: number, cy: number, radius: number, durationMs: number): void;
   propagateChargedNetwork(sourceIndex: number, damage: number, falloff: number, weaponId?: SiegeWeaponId): void;
   splitBug(index: number): void;
-  allyBug(index: number, durationMs: number): void;
+  allyBug(index: number, config: AllyConversionConfig): void;
   startEventHorizon(x: number, y: number, radius: number, durationMs: number, weaponId?: SiegeWeaponId): void;
   triggerKernelPanicExplosion(index: number, splashRadius: number, damage: number, weaponId?: SiegeWeaponId): void;
   triggerAutoScalerPulse(hpThreshold: number, weaponId?: SiegeWeaponId): void;
@@ -240,8 +253,15 @@ export type WeaponEffectDescriptor =
       extras?: {
         angle?: number;
         chainNodes?: Array<{ x: number; y: number }>;
+        targetPoints?: Array<{ x: number; y: number }>;
         targetX?: number;
         targetY?: number;
+        beamWidth?: number;
+        beamGlowWidth?: number;
+        impactRadius?: number;
+        reticleRadius?: number;
+        shockwaveRadius?: number;
+        chaosScale?: number;
         segments?: ViewportSegment[];
         color?: string;
       };
@@ -321,6 +341,8 @@ export type WeaponCommand =
       coreRadius: number;
       durationMs: number;
       collapseDamage: number;
+      eventHorizonRadius?: number;
+      eventHorizonDurationMs?: number;
     }
   | { kind: "applyCharged"; targetIndex: number; durationMs: number }
   | { kind: "applyMarked"; targetIndex: number; durationMs: number }
@@ -331,7 +353,7 @@ export type WeaponCommand =
   | { kind: "unstableRadius"; cx: number; cy: number; radius: number; durationMs: number }
   | { kind: "propagateChargedNetwork"; sourceIndex: number; damage: number; falloff: number }
   | { kind: "splitBug"; targetIndex: number }
-  | { kind: "allyBug"; targetIndex: number; durationMs: number }
+  | { kind: "allyBug"; targetIndex: number; config: AllyConversionConfig }
   | { kind: "startEventHorizon"; x: number; y: number; radius: number; durationMs: number }
   | { kind: "triggerKernelPanic"; targetIndex: number; splashRadius: number; damage: number }
   | { kind: "autoScalerPulse"; hpThreshold: number }
@@ -437,8 +459,15 @@ export interface ExecutionContext {
 export type OverlayExtras = {
   angle?: number;
   chainNodes?: Array<{ x: number; y: number }>;
+  targetPoints?: Array<{ x: number; y: number }>;
   targetX?: number;
   targetY?: number;
   color?: string;
+  beamWidth?: number;
+  beamGlowWidth?: number;
+  impactRadius?: number;
+  reticleRadius?: number;
+  shockwaveRadius?: number;
+  chaosScale?: number;
   segments?: Array<{ x1: number; y1: number; x2: number; y2: number }>;
 };

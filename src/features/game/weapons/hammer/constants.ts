@@ -18,13 +18,21 @@ export const CURSOR = {
 
 export const DAMAGE = 2;
 export const SEARCH_RADIUS = 48;
-export const T3_ALLY_DURATION_MS = 8000;
+export const T3_ALLY_DURATION_MS = 6500;
+export const T3_ALLY_CAP = 5;
+export const T3_ALLY_INTERCEPT_FORCE = 2.5;
+export const T3_ALLY_EXPIRE_BURST_RADIUS = 54;
+export const T3_ALLY_EXPIRE_BURST_DAMAGE = 1;
 
 export const BASE_TOGGLES = {
   damage: DAMAGE,
   hitRadius: SEARCH_RADIUS,
   cooldownMs: 300,
-  allyDurationMs: T3_ALLY_DURATION_MS,
+  allyDurationMs: 0,
+  allyCap: 0,
+  allyInterceptForce: 0,
+  allyExpireBurstRadius: 0,
+  allyExpireBurstDamage: 0,
 } as const;
 
 export const def: WeaponDef = {

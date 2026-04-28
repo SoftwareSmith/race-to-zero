@@ -9,6 +9,11 @@ export const HEALTHBAR_SHOW_DURATION = 1500;
 /** Fade starts at this elapsed ms — bar is fully opaque before this. */
 const FADE_START_MS = 800;
 
+interface DrawHealthBarOptions {
+  persistent?: boolean;
+  projectedHp?: number;
+}
+
 /**
  * Draw a health bar above a bug on the game canvas.
  *
@@ -28,18 +33,23 @@ export function drawHealthBar(
   maxHp: number,
   scaledSize: number,
   elapsed: number,
+  options: DrawHealthBarOptions = {},
 ): void {
   // Single-HP bugs don't need a health bar — defeat is immediate
   if (maxHp <= 1 || elapsed >= HEALTHBAR_SHOW_DURATION) return;
 
-  const fadeAlpha =
-    elapsed < FADE_START_MS
+  const fadeAlpha = options.persistent
+    ? 0.96
+    : elapsed < FADE_START_MS
       ? 1.0
       : 1.0 - (elapsed - FADE_START_MS) / (HEALTHBAR_SHOW_DURATION - FADE_START_MS);
 
   if (fadeAlpha <= 0) return;
 
   const ratio = Math.max(0, Math.min(1, hp / maxHp));
+  const projectedRatio = typeof options.projectedHp === "number"
+    ? Math.max(0, Math.min(1, options.projectedHp / maxHp))
+    : ratio;
   const barWidth = Math.max(scaledSize * 1.5, 20);
   const barHeight = 4;
   const barX = x - barWidth / 2;
@@ -66,6 +76,19 @@ export function drawHealthBar(
   if (ratio > 0) {
     ctx.beginPath();
     ctx.roundRect(barX, barY, barWidth * ratio, barHeight, 2);
+    ctx.fill();
+  }
+
+  if (projectedRatio < ratio) {
+    ctx.fillStyle = "rgba(74, 222, 128, 0.55)";
+    ctx.beginPath();
+    ctx.roundRect(
+      barX + barWidth * projectedRatio,
+      barY,
+      barWidth * (ratio - projectedRatio),
+      barHeight,
+      2,
+    );
     ctx.fill();
   }
 

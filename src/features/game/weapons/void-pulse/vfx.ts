@@ -2,7 +2,7 @@ import type { WeaponTierVfxDefinition } from "@game/weapons/types";
 
 export const OVERLAY_EFFECT_DURATION_MS = 2500;
 
-export const VOID_PULSE_TIER_VFX: Record<"base" | "tierOne" | "tierTwo", WeaponTierVfxDefinition> = {
+export const VOID_PULSE_TIER_VFX: Record<"base" | "tierOne" | "tierTwo" | "tierThree" | "tierFour", WeaponTierVfxDefinition> = {
   base: {
     intensity: "basic",
     summary: "Compact singularity with a clean collapse ring.",
@@ -14,5 +14,13 @@ export const VOID_PULSE_TIER_VFX: Record<"base" | "tierOne" | "tierTwo", WeaponT
   tierTwo: {
     intensity: "catastrophic",
     summary: "Leaves an exaggerated event-horizon trap after collapse.",
+  },
+  tierThree: {
+    intensity: "catastrophic",
+    summary: "Double-ring lensing clarifies inner kill pressure and outer drag pressure.",
+  },
+  tierFour: {
+    intensity: "catastrophic",
+    summary: "Collapse-cathedral overdrive compresses the lane into a sustained singularity detonation.",
   },
 };

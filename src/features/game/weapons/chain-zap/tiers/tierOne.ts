@@ -12,6 +12,9 @@ export const tierOneTier: WeaponTierDefinition = {
   evolveAtKills: 75,
   toggles: {
     chainMaxBounces: 6,
+    beamWidth: 3.2,
+    beamGlowWidth: 8.6,
+    chaosScale: 1.18,
   },
   vfx: CHAIN_ZAP_TIER_VFX.tierOne,
   behavior: {

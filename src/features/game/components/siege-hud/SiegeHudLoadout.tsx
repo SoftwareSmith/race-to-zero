@@ -1,11 +1,10 @@
 import { memo } from "react";
-import { STRUCTURE_DEFS } from "@config/structureConfig";
 import type {
   SiegeWeaponId,
-  StructureId,
   WeaponProgressSnapshot,
 } from "@game/types";
 import {
+  getWeaponTierNodeCount,
   getTierBarCoreClassName,
   getTierCopy,
   getTierNodeClassName,
@@ -13,74 +12,45 @@ import {
   getTierNodeFillWidth,
   getTierNodeOffsetClassName,
   getTierProgressCompact,
-  WEAPON_TIER_NODE_COUNT,
 } from "../siegeHud.helpers";
 import { cn } from "@shared/utils/cn";
 import { HudShell } from "./shared";
-import StructureRailSlot from "./StructureRailSlot";
 import WeaponRailSlot from "./WeaponRailSlot";
 
 interface SiegeHudLoadoutProps {
   justEvolvedWeaponId?: SiegeWeaponId | null;
-  justUnlockedStructureIds: StructureId[];
   justUnlockedWeaponIds: SiegeWeaponId[];
   lastFireTimes?: Partial<Record<SiegeWeaponId, number>>;
-  onArmStructure?: (id: StructureId) => void;
   onSelectWeapon: (id: SiegeWeaponId) => void;
-  placedCountByType?: Partial<Record<StructureId, number>>;
-  placingStructureId?: StructureId | null;
   progressExpanded: boolean;
   selectedSnapshot?: WeaponProgressSnapshot;
   selectedWeaponId: SiegeWeaponId;
   setProgressExpanded: (
     value: boolean | ((currentValue: boolean) => boolean),
   ) => void;
-  unlockedStructures?: StructureId[];
   weaponSnapshots: WeaponProgressSnapshot[];
 }
 
 const SiegeHudLoadout = memo(function SiegeHudLoadout({
   justEvolvedWeaponId,
-  justUnlockedStructureIds,
   justUnlockedWeaponIds,
   lastFireTimes,
-  onArmStructure,
   onSelectWeapon,
-  placedCountByType,
-  placingStructureId,
   progressExpanded,
   selectedSnapshot,
   selectedWeaponId,
   setProgressExpanded,
-  unlockedStructures,
   weaponSnapshots,
 }: SiegeHudLoadoutProps) {
-  const visibleStructureIds = unlockedStructures ?? [];
   const visibleWeaponSnapshots = weaponSnapshots.filter(
     (snapshot) => !snapshot.locked,
   );
   const weaponCount = visibleWeaponSnapshots.length;
-  const structureCount = visibleStructureIds.length;
   const weaponSlotRem = 2.35;
-  const structureSlotRem = 2;
   const railGapRem = 0.25;
-  const sectionGapRem = 0.5;
-  const dividerRem = structureCount > 0 ? 0.75 : 0;
   const weaponRailWidthRem =
     weaponCount * weaponSlotRem + Math.max(0, weaponCount - 1) * railGapRem;
-  const structureRailWidthRem =
-    structureCount > 0
-      ? structureCount * structureSlotRem +
-        Math.max(0, structureCount - 1) * railGapRem
-      : 0;
-  const toolbeltWidthRem = Math.max(
-    26,
-    weaponRailWidthRem +
-      structureRailWidthRem +
-      dividerRem +
-      sectionGapRem +
-      1.5,
-  );
+  const toolbeltWidthRem = Math.max(26, weaponRailWidthRem + 1.5);
 
   return (
     <div className="pointer-events-none fixed inset-x-0 bottom-3 z-[220] flex justify-center px-3 sm:bottom-4">
@@ -117,9 +87,14 @@ const SiegeHudLoadout = memo(function SiegeHudLoadout({
                     </div>
                   </div>
                   <div className="flex shrink-0 items-center gap-2">
-                    <div className="grid shrink-0 grid-cols-2 items-center gap-1">
+                    <div
+                      className="grid shrink-0 items-center gap-1"
+                      style={{
+                        gridTemplateColumns: `repeat(${getWeaponTierNodeCount(selectedSnapshot)}, minmax(0, 1fr))`,
+                      }}
+                    >
                       {Array.from(
-                        { length: WEAPON_TIER_NODE_COUNT },
+                        { length: getWeaponTierNodeCount(selectedSnapshot) },
                         (_, index) => (
                           <span
                             key={`selected-tier-node-${index + 1}`}
@@ -210,39 +185,6 @@ const SiegeHudLoadout = memo(function SiegeHudLoadout({
                   );
                 })}
               </div>
-
-              {visibleStructureIds.length > 0 ? (
-                <>
-                  <div className="h-8 w-px shrink-0 bg-white/8" />
-                  <div
-                    data-no-hammer
-                    className="flex shrink-0 items-center gap-1"
-                    style={{ width: `${structureRailWidthRem}rem` }}
-                  >
-                    {STRUCTURE_DEFS.filter((structure) =>
-                      visibleStructureIds.includes(structure.id),
-                    ).map((structure) => {
-                      const isArming = placingStructureId === structure.id;
-                      const isJustUnlocked = justUnlockedStructureIds.includes(
-                        structure.id,
-                      );
-                      const placedCount =
-                        placedCountByType?.[structure.id] ?? 0;
-
-                      return onArmStructure ? (
-                        <StructureRailSlot
-                          key={structure.id}
-                          isArming={isArming}
-                          isJustUnlocked={isJustUnlocked}
-                          onArm={onArmStructure}
-                          placedCount={placedCount}
-                          structure={structure}
-                        />
-                      ) : null;
-                    })}
-                  </div>
-                </>
-              ) : null}
             </div>
           </div>
         </HudShell>

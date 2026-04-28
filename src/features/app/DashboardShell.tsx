@@ -1,4 +1,11 @@
-import { memo, useEffect, useRef, useState, type RefObject } from "react";
+import {
+  memo,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type RefObject,
+} from "react";
 import CommandCenter from "@dashboard/components/CommandCenter";
 import SettingsMenu from "@dashboard/components/SettingsMenu";
 import TopNav from "@dashboard/components/TopNav";
@@ -47,7 +54,45 @@ const DashboardShell = memo(function DashboardShell({
     ? ui.handleChartFocusChange
     : undefined;
   const bugFieldMenuRef = useRef<HTMLDivElement | null>(null);
+  const shellFrameRef = useRef<HTMLDivElement | null>(null);
   const [bugFieldMenuOpen, setBugFieldMenuOpen] = useState(false);
+  const [autoFitScale, setAutoFitScale] = useState(1);
+
+  useLayoutEffect(() => {
+    const frame = shellFrameRef.current;
+    const content = dashboardRef.current;
+    if (!frame || !content) {
+      return undefined;
+    }
+
+    const measure = () => {
+      const frameRect = frame.getBoundingClientRect();
+      const nextScale = Math.min(
+        1,
+        frameRect.width / Math.max(1, content.scrollWidth),
+        frameRect.height / Math.max(1, content.scrollHeight),
+      );
+
+      setAutoFitScale((current) =>
+        Math.abs(current - nextScale) < 0.01 ? current : nextScale,
+      );
+    };
+
+    measure();
+
+    const resizeObserver = new ResizeObserver(() => {
+      measure();
+    });
+
+    resizeObserver.observe(frame);
+    resizeObserver.observe(content);
+    window.addEventListener("resize", measure);
+
+    return () => {
+      resizeObserver.disconnect();
+      window.removeEventListener("resize", measure);
+    };
+  }, [dashboardRef, ui.activeTab]);
 
   useEffect(() => {
     if (!bugFieldMenuOpen) {
@@ -79,186 +124,201 @@ const DashboardShell = memo(function DashboardShell({
 
   return (
     <div
-      ref={dashboardRef}
-      className={cn(
-        "relative z-10 mx-auto grid w-full max-w-[1360px] content-start gap-1.5 px-1.5 py-1.5 sm:gap-2 sm:px-2.5 sm:py-2.5 lg:px-3 lg:py-3",
-        interactiveMode ? "pointer-events-none select-none" : "",
-      )}
-      style={{
-        opacity: siegePhase === "entering" ? 0 : 1,
-        filter:
-          siegePhase === "entering" ? "blur(3px) saturate(0.68)" : undefined,
-        transform: siegePhase === "entering" ? "scale(0.98)" : undefined,
-        transition:
-          "opacity 260ms ease-out, filter 340ms ease-out, transform 340ms ease-out",
-      }}
+      ref={shellFrameRef}
+      className="relative z-10 flex h-screen w-full items-start justify-center overflow-hidden px-1.5 py-1.5 sm:px-2.5 sm:py-2.5 lg:px-3 lg:py-3"
     >
-      <header
-        className={cn(
-          "relative z-20 grid grid-cols-1 gap-2.5 md:grid-cols-[minmax(0,1fr)_auto] md:items-start md:gap-3",
-          CHROME_TRANSITION_CLASSNAME,
-          chromeHidden
-            ? "-translate-y-5 opacity-0 blur-sm"
-            : "translate-y-0 opacity-100 blur-0",
-        )}
+      <div
+        style={{
+          transform: `scale(${autoFitScale})`,
+          transformOrigin: "top center",
+          width: autoFitScale < 1 ? `${100 / autoFitScale}%` : "100%",
+        }}
       >
-        <div className="min-w-0 max-w-3xl">
-          <p className="text-[0.72rem] font-semibold uppercase tracking-[0.28em] text-stone-500">
-            {metrics.headerEyebrow}
-          </p>
-          <h1 className="mt-1 font-display text-[2.2rem] leading-[0.92] tracking-[-0.06em] text-stone-50 sm:mt-1.5 sm:text-[2.6rem] xl:text-[3.1rem]">
-            Race to Zero Bugs
-          </h1>
-          <p className="mt-1.5 max-w-2xl text-[0.78rem] leading-5 text-stone-400 sm:mt-2 sm:text-sm">
-            {metrics.headerSubtitle}
-          </p>
-        </div>
+        <div
+          ref={dashboardRef}
+          className={cn(
+            "relative z-10 mx-auto grid w-full max-w-[1360px] content-start gap-1.5 px-0 py-0 sm:gap-2",
+            interactiveMode ? "pointer-events-none select-none" : "",
+          )}
+          style={{
+            opacity: siegePhase === "entering" ? 0 : 1,
+            filter:
+              siegePhase === "entering"
+                ? "blur(3px) saturate(0.68)"
+                : undefined,
+            transform: siegePhase === "entering" ? "scale(0.98)" : undefined,
+            transition:
+              "opacity 260ms ease-out, filter 340ms ease-out, transform 340ms ease-out",
+          }}
+        >
+          <header
+            className={cn(
+              "relative z-20 grid grid-cols-1 gap-2.5 md:grid-cols-[minmax(0,1fr)_auto] md:items-start md:gap-3",
+              CHROME_TRANSITION_CLASSNAME,
+              chromeHidden
+                ? "-translate-y-5 opacity-0 blur-sm"
+                : "translate-y-0 opacity-100 blur-0",
+            )}
+          >
+            <div className="min-w-0 max-w-3xl">
+              <p className="text-[0.72rem] font-semibold uppercase tracking-[0.28em] text-stone-500">
+                {metrics.headerEyebrow}
+              </p>
+              <h1 className="mt-1 font-display text-[2.2rem] leading-[0.92] tracking-[-0.06em] text-stone-50 sm:mt-1.5 sm:text-[2.6rem] xl:text-[3.1rem]">
+                Race to Zero Bugs
+              </h1>
+              <p className="mt-1.5 max-w-2xl text-[0.78rem] leading-5 text-stone-400 sm:mt-2 sm:text-sm">
+                {metrics.headerSubtitle}
+              </p>
+            </div>
 
-        <div className="flex flex-wrap items-start justify-start gap-1.5 self-start md:justify-end md:gap-2">
-          <SettingsMenu
-            containerRef={ui.settingsMenuRef}
-            onMenuToggle={() => ui.handleTopMenuToggle("settings")}
-            onToggle={settings.handleToggleSetting}
-            open={!interactiveMode && ui.openTopMenu === "settings"}
-            settings={settings.settings}
-          />
-          <div className="relative" ref={bugFieldMenuRef}>
-            <MenuIconButton
-              ariaLabel="Open bug field settings"
-              onClick={() =>
-                setBugFieldMenuOpen((currentValue) => !currentValue)
-              }
-              open={bugFieldMenuOpen}
-              tooltip="Bug field overlay controls."
-            >
-              <svg
-                aria-hidden="true"
-                className="h-4 w-4"
-                fill="none"
-                stroke="currentColor"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth="1.8"
-                viewBox="0 0 24 24"
-              >
-                <path d="M4 12h16" />
-                <path d="M12 4v16" />
-                <circle cx="12" cy="12" r="7" />
-              </svg>
-            </MenuIconButton>
-
-            {bugFieldMenuOpen ? (
-              <MenuPanel title="Bug Field">
-                <ToggleField
-                  checked={settings.showBugParticleCount}
-                  description="Show the rendered bug particle count overlay on the dashboard background."
-                  label="Show bug particle count"
-                  onChange={settings.toggleShowBugParticleCount}
-                />
-              </MenuPanel>
-            ) : null}
-          </div>
-          {!interactiveMode ? (
-            <Tooltip content="Start the interactive bug game.">
-              <button
-                aria-label="Open interactive bug game"
-                className="inline-flex min-h-12 min-w-12 items-center justify-center rounded-[16px] border border-white/10 bg-zinc-950/86 px-3 text-stone-300 shadow-[0_10px_24px_rgba(0,0,0,0.24)] transition duration-200 hover:-translate-y-0.5 hover:bg-zinc-900 hover:text-stone-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300/40"
-                onClick={onEnterInteractiveMode}
-                onFocus={onPrefetchSiege}
-                onMouseEnter={onPrefetchSiege}
-                onTouchStart={onPrefetchSiege}
-                type="button"
-              >
-                <svg
-                  aria-hidden="true"
-                  className="h-4 w-4"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth="1.8"
-                  viewBox="0 0 24 24"
+            <div className="flex flex-wrap items-start justify-start gap-1.5 self-start md:justify-end md:gap-2">
+              <SettingsMenu
+                containerRef={ui.settingsMenuRef}
+                onMenuToggle={() => ui.handleTopMenuToggle("settings")}
+                onToggle={settings.handleToggleSetting}
+                open={!interactiveMode && ui.openTopMenu === "settings"}
+                settings={settings.settings}
+              />
+              <div className="relative" ref={bugFieldMenuRef}>
+                <MenuIconButton
+                  ariaLabel="Open bug field settings"
+                  onClick={() =>
+                    setBugFieldMenuOpen((currentValue) => !currentValue)
+                  }
+                  open={bugFieldMenuOpen}
+                  tooltip="Bug field overlay controls."
                 >
-                  <path d="M6 9.5h12a3 3 0 0 1 3 3v2a3 3 0 0 1-3 3h-1.6l-2.2 2.2a.9.9 0 0 1-1.54-.63V17.5h-1.3v1.59a.9.9 0 0 1-1.54.63l-2.2-2.2H6a3 3 0 0 1-3-3v-2a3 3 0 0 1 3-3Z" />
-                  <path d="M8.2 7.4 10.4 5m5.4 2.4L13.6 5M9 12.8h.01M15 12.8h.01" />
-                </svg>
-              </button>
-            </Tooltip>
-          ) : null}
-        </div>
-      </header>
+                  <svg
+                    aria-hidden="true"
+                    className="h-4 w-4"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth="1.8"
+                    viewBox="0 0 24 24"
+                  >
+                    <path d="M4 12h16" />
+                    <path d="M12 4v16" />
+                    <circle cx="12" cy="12" r="7" />
+                  </svg>
+                </MenuIconButton>
 
-      <div
-        className={cn(
-          "relative z-10 mt-1 rounded-[22px] px-1.5 py-1 sm:mt-2 sm:px-2.5 sm:py-1.5",
-          CHROME_TRANSITION_CLASSNAME,
-          chromeHidden
-            ? "translate-y-[-12px] opacity-0 blur-sm"
-            : "translate-y-0 opacity-100 blur-0",
-        )}
-        data-siege-panel="top-nav"
-      >
-        <TopNav
-          activeTab={ui.activeTab}
-          compareRangeKey={ui.compareRangeKey}
-          customFromDate={ui.customFromDate}
-          customToDate={ui.customToDate}
-          deadlineDate={ui.deadlineDate}
-          deadlineFromDate={ui.deadlineFromDate}
-          onCompareRangeChange={ui.handleCompareRangeChange}
-          onCustomFromDateChange={ui.handleCustomFromDateChange}
-          onCustomToDateChange={ui.handleCustomToDateChange}
-          onDeadlineDateChange={ui.handleDeadlineDateChange}
-          onDeadlineFromDateChange={ui.handleDeadlineFromDateChange}
-          onInteract={ui.handleTopNavInteract}
-          onTabChange={ui.handleTabChange}
-          todayDate={ui.todayDate}
-        />
-      </div>
+                {bugFieldMenuOpen ? (
+                  <MenuPanel title="Bug Field">
+                    <ToggleField
+                      checked={settings.showBugParticleCount}
+                      description="Show the rendered bug particle count overlay on the dashboard background."
+                      label="Show bug particle count"
+                      onChange={settings.toggleShowBugParticleCount}
+                    />
+                  </MenuPanel>
+                ) : null}
+              </div>
+              {!interactiveMode ? (
+                <Tooltip content="Start the interactive bug game.">
+                  <button
+                    aria-label="Open interactive bug game"
+                    className="inline-flex min-h-12 min-w-12 items-center justify-center rounded-[16px] border border-white/10 bg-zinc-950/86 px-3 text-stone-300 shadow-[0_10px_24px_rgba(0,0,0,0.24)] transition duration-200 hover:-translate-y-0.5 hover:bg-zinc-900 hover:text-stone-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300/40"
+                    onClick={onEnterInteractiveMode}
+                    onFocus={onPrefetchSiege}
+                    onMouseEnter={onPrefetchSiege}
+                    onTouchStart={onPrefetchSiege}
+                    type="button"
+                  >
+                    <svg
+                      aria-hidden="true"
+                      className="h-4 w-4"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth="1.8"
+                      viewBox="0 0 24 24"
+                    >
+                      <path d="M6 9.5h12a3 3 0 0 1 3 3v2a3 3 0 0 1-3 3h-1.6l-2.2 2.2a.9.9 0 0 1-1.54-.63V17.5h-1.3v1.59a.9.9 0 0 1-1.54.63l-2.2-2.2H6a3 3 0 0 1-3-3v-2a3 3 0 0 1 3-3Z" />
+                      <path d="M8.2 7.4 10.4 5m5.4 2.4L13.6 5M9 12.8h.01M15 12.8h.01" />
+                    </svg>
+                  </button>
+                </Tooltip>
+              ) : null}
+            </div>
+          </header>
 
-      <div
-        className={cn(
-          "relative z-10",
-          CHROME_TRANSITION_CLASSNAME,
-          chromeHidden
-            ? "translate-y-[-14px] opacity-0 blur-sm"
-            : "translate-y-0 opacity-100 blur-0",
-        )}
-      >
-        <CommandCenter
-          activeTab={ui.activeTab}
-          comparisonMetrics={metrics.comparisonMetrics}
-          deadlineMetrics={metrics.deadlineMetrics}
-          siegeMode={interactiveMode}
-          summary={metrics.summary}
-        />
-      </div>
+          <div
+            className={cn(
+              "relative z-10 mt-1 rounded-[22px] px-1.5 py-1 sm:mt-2 sm:px-2.5 sm:py-1.5",
+              CHROME_TRANSITION_CLASSNAME,
+              chromeHidden
+                ? "translate-y-[-12px] opacity-0 blur-sm"
+                : "translate-y-0 opacity-100 blur-0",
+            )}
+            data-siege-panel="top-nav"
+          >
+            <TopNav
+              activeTab={ui.activeTab}
+              compareRangeKey={ui.compareRangeKey}
+              customFromDate={ui.customFromDate}
+              customToDate={ui.customToDate}
+              deadlineDate={ui.deadlineDate}
+              deadlineFromDate={ui.deadlineFromDate}
+              onCompareRangeChange={ui.handleCompareRangeChange}
+              onCustomFromDateChange={ui.handleCustomFromDateChange}
+              onCustomToDateChange={ui.handleCustomToDateChange}
+              onDeadlineDateChange={ui.handleDeadlineDateChange}
+              onDeadlineFromDateChange={ui.handleDeadlineFromDateChange}
+              onInteract={ui.handleTopNavInteract}
+              onTabChange={ui.handleTabChange}
+              todayDate={ui.todayDate}
+            />
+          </div>
 
-      <main className="grid content-start gap-1.5 self-start sm:gap-2">
-        <div>
-          {ui.activeTab === "overview" ? (
-            <OverviewView
+          <div
+            className={cn(
+              "relative z-10",
+              CHROME_TRANSITION_CLASSNAME,
+              chromeHidden
+                ? "translate-y-[-14px] opacity-0 blur-sm"
+                : "translate-y-0 opacity-100 blur-0",
+            )}
+          >
+            <CommandCenter
+              activeTab={ui.activeTab}
+              comparisonMetrics={metrics.comparisonMetrics}
               deadlineMetrics={metrics.deadlineMetrics}
-              onChartFocusChange={chartFocusHandler}
               siegeMode={interactiveMode}
               summary={metrics.summary}
-              workdaySettings={settings.workdaySettings}
             />
-          ) : null}
+          </div>
 
-          {ui.activeTab === "periods" ? (
-            <PeriodsView
-              comparisonMetrics={metrics.comparisonMetrics}
-              onChartFocusChange={chartFocusHandler}
-              siegeMode={interactiveMode}
-            />
-          ) : null}
+          <main className="grid content-start gap-1.5 self-start sm:gap-2">
+            <div>
+              {ui.activeTab === "overview" ? (
+                <OverviewView
+                  deadlineMetrics={metrics.deadlineMetrics}
+                  onChartFocusChange={chartFocusHandler}
+                  siegeMode={interactiveMode}
+                  summary={metrics.summary}
+                  workdaySettings={settings.workdaySettings}
+                />
+              ) : null}
+
+              {ui.activeTab === "periods" ? (
+                <PeriodsView
+                  comparisonMetrics={metrics.comparisonMetrics}
+                  onChartFocusChange={chartFocusHandler}
+                  siegeMode={interactiveMode}
+                />
+              ) : null}
+            </div>
+
+            {metrics.error ? (
+              <StatusBanner kind="error">{metrics.error}</StatusBanner>
+            ) : null}
+          </main>
         </div>
-
-        {metrics.error ? (
-          <StatusBanner kind="error">{metrics.error}</StatusBanner>
-        ) : null}
-      </main>
+      </div>
     </div>
   );
 });

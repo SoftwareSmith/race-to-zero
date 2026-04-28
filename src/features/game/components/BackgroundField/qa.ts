@@ -68,12 +68,25 @@ export function updateQaBugPositions(
     metrics.firstBugPositionsAtMs = performance.now();
   }
 
-  qaState.bugPositions = bugPositions.map((position) => ({
-    index: position.index,
-    radius: position.radius,
-    x: position.x + bounds.left,
-    y: position.y + bounds.top,
-  }));
+  const qaBugPositions = qaState.bugPositions ?? (qaState.bugPositions = []);
+
+  for (let index = 0; index < bugPositions.length; index += 1) {
+    const position = bugPositions[index];
+    const qaPosition = qaBugPositions[index] ?? {
+      index: 0,
+      radius: 0,
+      x: 0,
+      y: 0,
+    };
+
+    qaPosition.index = position.index;
+    qaPosition.radius = position.radius;
+    qaPosition.x = position.x + bounds.left;
+    qaPosition.y = position.y + bounds.top;
+    qaBugPositions[index] = qaPosition;
+  }
+
+  qaBugPositions.length = bugPositions.length;
 }
 
 export function syncQaBugPositionsFromEngine(

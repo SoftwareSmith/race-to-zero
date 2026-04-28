@@ -16,6 +16,10 @@ import { getBugWeaponMatchup, getMatchupFeedbackTone } from "@game/combat/weapon
 import { WeaponMatchup } from "@game/types";
 import type { BugVariant } from "../../../../types/dashboard";
 
+function getVisibleSupportStatus(statuses: string[] | undefined) {
+  return statuses?.find((status) => status !== "marked") ?? null;
+}
+
 function maybeSpawnImmuneFeedback(ctx: ExecutionContext, targetIndex: number) {
   const bug = ctx.engine.getAllBugs()[targetIndex];
   if (!bug) return true;
@@ -80,6 +84,24 @@ export function executeCommands(
             );
             for (const comboEvent of result.comboEvents ?? []) {
               (ctx.vfx as any)?.spawnComboBurst?.(vx, vy, comboEvent);
+            }
+            if (result.defeated && result.finisherStatus) {
+              (ctx.vfx as any)?.spawnStatusResolution?.(
+                vx,
+                vy,
+                result.finisherStatus,
+                "finisher",
+              );
+            } else if (result.defeated) {
+              const supportStatus = getVisibleSupportStatus(result.supportStatuses);
+              if (supportStatus) {
+                (ctx.vfx as any)?.spawnStatusResolution?.(
+                  vx,
+                  vy,
+                  supportStatus,
+                  "support",
+                );
+              }
             }
           }
           ctx.updateQaLastHit({
@@ -248,6 +270,8 @@ export function executeCommands(
           cmd.durationMs,
           cmd.collapseDamage,
           ctx.weaponId,
+          cmd.eventHorizonRadius,
+          cmd.eventHorizonDurationMs,
         );
         if (started) {
           void started;
@@ -276,11 +300,6 @@ export function executeCommands(
         const bug = ctx.engine.getAllBugs()[cmd.targetIndex] as any;
         if (bug && typeof bug.applyMarked === "function") {
           bug.applyMarked(cmd.durationMs);
-          (ctx.vfx as any)?.spawnStatusApply?.(
-            Math.round(bug.x + ctx.bounds.left),
-            Math.round(bug.y + ctx.bounds.top),
-            "marked",
-          );
         }
         break;
       }
@@ -336,10 +355,19 @@ export function executeCommands(
 
       case "splitBug":
         ctx.engine.splitBug(cmd.targetIndex);
+        {
+          const bug = ctx.engine.getAllBugs()[cmd.targetIndex] as any;
+          if (bug) {
+            (ctx.vfx as any)?.spawnSplitCallout?.(
+              Math.round(bug.x + ctx.bounds.left),
+              Math.round(bug.y + ctx.bounds.top),
+            );
+          }
+        }
         break;
 
       case "allyBug":
-        ctx.engine.allyBug(cmd.targetIndex, cmd.durationMs);
+        ctx.engine.allyBug(cmd.targetIndex, cmd.config);
         {
           const bug = ctx.engine.getAllBugs()[cmd.targetIndex] as any;
           if (bug) {

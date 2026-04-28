@@ -128,6 +128,16 @@ function steadyMatchups(
       state: "steady",
       ...overrides.void,
     },
+    beacon: {
+      note: "Creates a controllable choke point, but needs follow-up to finish the pack.",
+      state: "steady",
+      ...overrides.beacon,
+    },
+    daemon: {
+      note: "Best used on priority bodies; wasted if fired into disposable trash.",
+      state: "steady",
+      ...overrides.daemon,
+    },
   };
 }
 

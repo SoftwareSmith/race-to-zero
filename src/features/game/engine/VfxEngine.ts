@@ -94,12 +94,13 @@ type StatusLabel =
   | "unstable";
 
 type ComboLabel = "detonate" | "quench";
+type StatusResolutionKind = "finisher" | "support";
 
 const STATUS_APPLY_SPECS: Record<
   StatusLabel,
   { color: number; text: string }
 > = {
-  ally: { color: 0x34d399, text: "ALLY" },
+  ally: { color: 0x38bdf8, text: "ALLY" },
   burn: { color: 0xf97316, text: "FIRE" },
   charged: { color: 0x22d3ee, text: "CHARGED" },
   ensnare: { color: 0xfacc15, text: "SNARED" },
@@ -113,6 +114,14 @@ const STATUS_APPLY_SPECS: Record<
 const COMBO_SPECS: Record<ComboLabel, { color: number; text: string }> = {
   detonate: { color: 0xfb7185, text: "DETONATE" },
   quench: { color: 0x93c5fd, text: "QUENCH" },
+};
+
+const STATUS_RESOLUTION_COPY: Record<
+  StatusResolutionKind,
+  (text: string) => string
+> = {
+  finisher: (text) => `${text} FINISH`,
+  support: (text) => `${text} SETUP`,
 };
 
 // ── Noise helper ──────────────────────────────────────────────────────────────
@@ -1197,9 +1206,32 @@ export class VfxEngine {
     }
   }
 
+  spawnSplitCallout(x: number, y: number): void {
+    this.addFloatingLabel(x, y - 10, "SPLIT x2", 0xfbbf24, 0.9, 860, 28);
+    this.spawnSparkCrown(x, y, 0xfbbf24);
+  }
+
   spawnStatusApply(x: number, y: number, status: StatusLabel): void {
     const spec = STATUS_APPLY_SPECS[status];
     this.addFloatingLabel(x, y, spec.text, spec.color, 0.78, 780, 24);
+  }
+
+  spawnStatusResolution(
+    x: number,
+    y: number,
+    status: StatusLabel,
+    kind: StatusResolutionKind,
+  ): void {
+    const spec = STATUS_APPLY_SPECS[status];
+    this.addFloatingLabel(
+      x,
+      y - 10,
+      STATUS_RESOLUTION_COPY[kind](spec.text),
+      spec.color,
+      kind === "finisher" ? 0.98 : 0.68,
+      kind === "finisher" ? 980 : 760,
+      kind === "finisher" ? 30 : 22,
+    );
   }
 
   spawnPoisonBurst(x: number, y: number, radius = 26): void {

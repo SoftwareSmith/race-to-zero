@@ -15,6 +15,9 @@ export const baseTier: WeaponTierDefinition = {
     damage: 2,
     chainMaxBounces: 3,
     chainRadius: 90,
+    beamWidth: 2.4,
+    beamGlowWidth: 7.2,
+    chaosScale: 1,
   },
   vfx: CHAIN_ZAP_TIER_VFX.base,
   behavior: {

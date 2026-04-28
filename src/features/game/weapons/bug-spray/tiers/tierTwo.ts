@@ -9,6 +9,7 @@ export const tierTwoTier: WeaponTierDefinition = {
     "Expands the poison footprint into a much larger rolling wave that blankets the lane in lingering damage.",
   hint: "T3: Expanding ring — poison spreads across the whole field",
   effectColor: "#fde047",
+  evolveAtKills: 102,
   toggles: {
     hitRadius: 144,
     cloudRadius: 144,

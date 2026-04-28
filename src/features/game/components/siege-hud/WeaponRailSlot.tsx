@@ -4,6 +4,7 @@ import WeaponGlyph from "@shared/components/icons/WeaponGlyph";
 import { cn } from "@shared/utils/cn";
 import type { SiegeWeaponId, WeaponProgressSnapshot } from "@game/types";
 import {
+  getWeaponTierNodeCount,
   getSlotClassName,
   getTierBarCoreClassName,
   getTierNodeClassName,
@@ -13,7 +14,6 @@ import {
   getTierSheenClassName,
   getWeaponButtonClassName,
   isMaxTierSnapshot,
-  WEAPON_TIER_NODE_COUNT,
   weaponTooltip,
 } from "../siegeHud.helpers";
 
@@ -131,8 +131,8 @@ const WeaponRailSlot = memo(function WeaponRailSlot({
         </div>
 
         <div className="mt-0.5 px-1">
-          <div className="grid grid-cols-3 items-center">
-            {Array.from({ length: WEAPON_TIER_NODE_COUNT }, (_, index) => (
+          <div className="grid items-center gap-0.5" style={{ gridTemplateColumns: `repeat(${getWeaponTierNodeCount(snapshot)}, minmax(0, 1fr))` }}>
+            {Array.from({ length: getWeaponTierNodeCount(snapshot) }, (_, index) => (
               <span
                 key={`${snapshot.id}-tier-node-${index + 1}`}
                 className={cn(

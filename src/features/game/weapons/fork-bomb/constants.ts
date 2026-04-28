@@ -20,10 +20,17 @@ export const BASE_TOGGLES = {
   damage: 2,
   hitRadius: 48,
   cooldownMs: 1100,
+  clusterCount: 5,
   burstRadius: 34,
   burstOffsetDistance: 52,
+  implosionRadius: 28,
   secondaryRadius: 36,
+  ringCount: 8,
   ringRadius: 90,
+  impactRadius: 22,
+  reticleRadius: 52,
+  shockwaveRadius: 90,
+  chaosScale: 1,
 } as const;
 
 export const def: WeaponDef = {

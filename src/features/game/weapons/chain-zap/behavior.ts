@@ -23,6 +23,9 @@ export function createSession(ctx: WeaponContext): ClickFireResult {
   const damage = ctx.config?.damage ?? BASE_TOGGLES.damage;
   const chainRadius = ctx.config?.chainRadius ?? BASE_TOGGLES.chainRadius;
   const maxBounces = ctx.config?.chainMaxBounces ?? BASE_TOGGLES.chainMaxBounces;
+  const beamWidth = ctx.config?.beamWidth ?? BASE_TOGGLES.beamWidth;
+  const beamGlowWidth = ctx.config?.beamGlowWidth ?? BASE_TOGGLES.beamGlowWidth;
+  const chaosScale = ctx.config?.chaosScale ?? BASE_TOGGLES.chaosScale;
   const secondaryDamage =
     ctx.config?.secondaryDamage ?? BASE_TOGGLES.secondaryDamage;
 
@@ -42,7 +45,12 @@ export function createSession(ctx: WeaponContext): ClickFireResult {
         weaponId: WeaponId.ChainZap,
         viewportX,
         viewportY,
-        extras: { chainNodes: [] },
+        extras: {
+          beamGlowWidth,
+          beamWidth,
+          chainNodes: [],
+          chaosScale,
+        },
       },
     });
     return { mode: "once", commands };
@@ -102,6 +110,43 @@ export function createSession(ctx: WeaponContext): ClickFireResult {
     });
   }
 
+  if (tier >= WeaponTier.TIER_FOUR) {
+    for (const idx of chainIndexes) {
+      const bug = bugs[idx];
+      if (!bug) {
+        continue;
+      }
+
+      for (const nearbyIndex of engine.radiusHitTest(bug.x, bug.y, Math.max(32, chainRadius * 0.42))) {
+        if (chainIndexes.includes(nearbyIndex)) {
+          continue;
+        }
+        commands.push({
+          kind: "applyCharged",
+          targetIndex: nearbyIndex,
+          durationMs: 3200,
+        });
+        if (tier >= WeaponTier.TIER_FIVE) {
+          commands.push({
+            kind: "damage",
+            targetIndex: nearbyIndex,
+            amount: 1,
+            creditOnDeath: true,
+          });
+        }
+      }
+    }
+  }
+
+  if (tier >= WeaponTier.TIER_FIVE && chainIndexes.length > 1) {
+    commands.push({
+      kind: "propagateChargedNetwork",
+      sourceIndex: chainIndexes[chainIndexes.length - 1],
+      damage: secondaryDamage,
+      falloff: 0.82,
+    });
+  }
+
   // Pixi: multi-node lightning arc
   commands.push({
     kind: "spawnEffect",
@@ -137,7 +182,12 @@ export function createSession(ctx: WeaponContext): ClickFireResult {
       weaponId: WeaponId.ChainZap,
       viewportX,
       viewportY,
-      extras: { chainNodes: viewportChainNodes },
+      extras: {
+        beamGlowWidth,
+        beamWidth,
+        chainNodes: viewportChainNodes,
+        chaosScale,
+      },
     },
   });
 

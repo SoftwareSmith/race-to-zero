@@ -13,6 +13,26 @@ const BUG_CODEX = getCodex();
 const AMBIENT_STRESS_DRAW_THRESHOLD = 1500;
 const AMBIENT_STRESS_TARGET_SPRITES = 1200;
 
+function getStatusStrength(expiresAt: number | undefined, now: number, fullMs: number) {
+  if (!expiresAt || now >= expiresAt) {
+    return 0;
+  }
+
+  return Math.max(0.12, Math.min(1, (expiresAt - now) / fullMs));
+}
+
+function getPoisonProjectedHp(particle: any, now: number) {
+  const poison = particle.poison;
+  if (!poison || now >= poison.expiresAt || poison.dps <= 0) {
+    return undefined;
+  }
+
+  const remainingSeconds = Math.max(0, poison.expiresAt - now) / 1000;
+  const projectedDamage = poison.accumulatedDmg + poison.dps * remainingSeconds;
+
+  return Math.max(0, particle.hp - Math.ceil(projectedDamage));
+}
+
 function clampNumber(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max);
 }
@@ -26,6 +46,7 @@ interface DrawBugFramePassOptions {
   motionProfile: MotionProfile;
   particles: Array<any>;
   qaEnabled?: boolean;
+  reusablePositions?: RenderedBugPosition[];
   sizeMultiplier: number;
   width: number;
 }
@@ -39,12 +60,14 @@ export function drawBugFramePass({
   motionProfile,
   particles,
   qaEnabled = false,
+  reusablePositions,
   sizeMultiplier,
   width,
 }: DrawBugFramePassOptions): RenderedBugPosition[] {
   void _height;
   const focusX = chartFocus?.relativeIndex ?? 0.5;
-  const nextBugPositions: RenderedBugPosition[] = [];
+  const nextBugPositions = reusablePositions ?? [];
+  let nextBugPositionIndex = 0;
   const useSparseAmbientDraw =
     !interactiveMode &&
     !qaEnabled &&
@@ -86,12 +109,18 @@ export function drawBugFramePass({
         ? particle.heading
         : Math.atan2(velY, velX);
 
-    nextBugPositions.push({
-      index,
-      radius: Math.max(size * 0.7, 12),
-      x,
-      y,
-    });
+    const nextPosition = nextBugPositions[nextBugPositionIndex] ?? {
+      index: 0,
+      radius: 0,
+      x: 0,
+      y: 0,
+    };
+    nextPosition.index = index;
+    nextPosition.radius = Math.max(size * 0.7, 12);
+    nextPosition.x = x;
+    nextPosition.y = y;
+    nextBugPositions[nextBugPositionIndex] = nextPosition;
+    nextBugPositionIndex += 1;
 
     if (useSparseAmbientDraw && index % drawStride !== drawOffset) {
       continue;
@@ -102,6 +131,17 @@ export function drawBugFramePass({
       opacity,
       rotation,
       size,
+      statusFlags: {
+        ally: getStatusStrength(particle.ally?.expiresAt, frameNow, 7000),
+        burn: getStatusStrength(particle.burn?.expiresAt, frameNow, 2800),
+        charged: getStatusStrength(particle.charged?.expiresAt, frameNow, 2400),
+        ensnare: getStatusStrength(particle.ensnare?.expiresAt, frameNow, 2200),
+        freeze: getStatusStrength(particle.slow?.expiresAt, frameNow, 2200),
+        marked: getStatusStrength(particle.marked?.expiresAt, frameNow, 2600),
+        poison: getStatusStrength(particle.poison?.expiresAt, frameNow, 3200),
+        unstable: getStatusStrength(particle.unstable?.expiresAt, frameNow, 2600),
+      },
+      timeMs: frameNow,
       variant: particle.variant,
       x,
       y,
@@ -110,13 +150,31 @@ export function drawBugFramePass({
     const lastHitTime: number = particle.lastHitTime ?? 0;
     const bugMaxHp: number = particle.maxHp ?? 1;
     const bugHp: number = particle.hp ?? 1;
-    if (lastHitTime > 0 && bugMaxHp > 1 && bugHp < bugMaxHp) {
-      const elapsed = frameNow - lastHitTime;
-      if (elapsed < HEALTHBAR_SHOW_DURATION) {
-        drawHealthBar(context, x, y, bugHp, bugMaxHp, size, elapsed);
-      }
+    const poisonActive = Boolean(
+      particle.poison && typeof particle.poison.expiresAt === "number" && frameNow < particle.poison.expiresAt,
+    );
+    const elapsed = lastHitTime > 0 ? frameNow - lastHitTime : Number.POSITIVE_INFINITY;
+    if (
+      bugMaxHp > 1 &&
+      (poisonActive || (lastHitTime > 0 && bugHp < bugMaxHp && elapsed < HEALTHBAR_SHOW_DURATION))
+    ) {
+      drawHealthBar(
+        context,
+        x,
+        y,
+        bugHp,
+        bugMaxHp,
+        size,
+        poisonActive ? 0 : elapsed,
+        {
+          persistent: poisonActive,
+          projectedHp: getPoisonProjectedHp(particle, frameNow),
+        },
+      );
     }
   }
+
+  nextBugPositions.length = nextBugPositionIndex;
 
   return nextBugPositions;
 }

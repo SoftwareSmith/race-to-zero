@@ -26,9 +26,16 @@ export function createEffectEvent(
   extras?: {
     angle?: number;
     chainNodes?: Array<{ x: number; y: number }>;
+    targetPoints?: Array<{ x: number; y: number }>;
     targetX?: number;
     targetY?: number;
     color?: string;
+    beamWidth?: number;
+    beamGlowWidth?: number;
+    impactRadius?: number;
+    reticleRadius?: number;
+    shockwaveRadius?: number;
+    chaosScale?: number;
     heatColor?: string;
     heatCore?: string;
     heatScale?: number;

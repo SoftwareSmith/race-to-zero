@@ -7,8 +7,6 @@ import type {
 } from "@game/types";
 import { WeaponTier as WeaponTierEnum } from "@game/types";
 import { WEAPON_DEFS, WEAPON_UNLOCK_THRESHOLDS } from "@config/weaponConfig";
-import { STRUCTURE_DEFS } from "@config/structureConfig";
-import type { StructureId } from "@game/types";
 import { getWeaponMatchupSummary } from "@game/combat/weaponMatchups";
 import {
   getCurrentWeaponTierGoalKills,
@@ -26,6 +24,8 @@ const WEAPON_LABELS: Record<SiegeWeaponId, string> = {
   plasma: "Fork Bomb",
   zapper: "Bug Spray",
   void: "Void Pulse",
+  beacon: "Pulse Beacon",
+  daemon: "Daemon Leash",
 };
 
 export function getSiegeWeaponLabel(weaponId: SiegeWeaponId): string {
@@ -40,15 +40,11 @@ export function getSiegeCombatStats(
     (w) => debugMode || totalFixed >= w.unlockKills,
   ).map((w) => w.id);
 
-  const unlockedStructures: StructureId[] = STRUCTURE_DEFS.filter(
-    (s) => debugMode || totalFixed >= s.unlockKills,
-  ).map((s) => s.id);
-
   const currentToolLabel = getSiegeWeaponLabel(
     unlockedWeapons[unlockedWeapons.length - 1],
   );
 
-  return { unlockedWeapons, currentToolLabel, unlockedStructures };
+  return { unlockedWeapons, currentToolLabel };
 }
 
 export function getNextWeaponUnlock(totalFixed: number, debugMode = false) {
@@ -101,6 +97,9 @@ export function getSiegeWeaponSnapshots(
       locked: !unlocked,
       current: weapon.id === selectedId,
       detail: getWeaponTierDetail(weapon, tier),
+      maxTier:
+        weapon.tiers[weapon.tiers.length - 1]?.tier ??
+        WeaponTierEnum.TIER_ONE,
       nextTierGoalKills,
       unlockKills: weapon.unlockKills,
       matchupSummary: getWeaponMatchupSummary(weapon.id),

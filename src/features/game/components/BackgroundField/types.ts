@@ -1,5 +1,22 @@
 import type { BugVariant } from "../../../../types/dashboard";
 
+export interface BugTransitionSnapshotItem {
+  heading: number;
+  hp: number;
+  maxHp: number;
+  opacity: number;
+  size: number;
+  variant: BugVariant;
+  vx: number;
+  vy: number;
+  x: number;
+  y: number;
+}
+
+export interface BackgroundFieldHandle {
+  captureTransitionSnapshot: () => BugTransitionSnapshotItem[];
+}
+
 export interface BugHitPayload {
   credited?: boolean;
   defeated: boolean;

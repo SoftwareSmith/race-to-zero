@@ -6,15 +6,20 @@ export const tierTwoTier: WeaponTierDefinition = {
   tier: WeaponTier.TIER_THREE,
   title: "Rewrite Engine",
   detail:
-    "Converts the hit bug into an ally for 8 seconds, removing it from the active threat stream.",
-  hint: "T3: Convert the hit bug to an ally for 8 seconds",
+    "Converts the hit bug into a short-lived ally that intercepts nearby threats before reverting.",
+  hint: "T3: Convert the hit bug into a temporary interceptor ally",
   effectColor: "#fbbf24",
+  evolveAtKills: 88,
   toggles: {
     damage: 2,
-    allyDurationMs: 8000,
+    allyDurationMs: 7200,
+    allyCap: 5,
+    allyInterceptForce: 3.4,
+    allyExpireBurstRadius: 68,
+    allyExpireBurstDamage: 2,
   },
   vfx: HAMMER_TIER_VFX.tierTwo,
   behavior: {
-    summary: "Swaps brute-force cleanup for targeted battlefield conversion.",
+    summary: "Swaps brute-force cleanup for short tactical breathing room.",
   },
 };

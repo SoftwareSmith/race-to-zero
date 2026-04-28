@@ -19,6 +19,13 @@ export function createSession(ctx: WeaponContext): ClickFireResult {
   const damage = ctx.config?.damage ?? BASE_TOGGLES.damage;
   const searchRadius = ctx.config?.hitRadius ?? BASE_TOGGLES.hitRadius;
   const allyDurationMs = ctx.config?.allyDurationMs ?? BASE_TOGGLES.allyDurationMs;
+  const allyCap = ctx.config?.allyCap ?? BASE_TOGGLES.allyCap;
+  const allyInterceptForce =
+    ctx.config?.allyInterceptForce ?? BASE_TOGGLES.allyInterceptForce;
+  const allyExpireBurstRadius =
+    ctx.config?.allyExpireBurstRadius ?? BASE_TOGGLES.allyExpireBurstRadius;
+  const allyExpireBurstDamage =
+    ctx.config?.allyExpireBurstDamage ?? BASE_TOGGLES.allyExpireBurstDamage;
   const commands: WeaponCommand[] = [];
 
   // Always emit the crack decal at the aim point
@@ -40,7 +47,75 @@ export function createSession(ctx: WeaponContext): ClickFireResult {
 
   const hit = findNearestBugInRadius(engine, targetX, targetY, searchRadius);
   if (hit) {
-    if (tier >= WeaponTier.TIER_THREE) {
+    if (tier >= WeaponTier.TIER_FIVE) {
+      commands.push({
+        kind: "damage",
+        targetIndex: hit.index,
+        amount: damage + 1,
+        creditOnDeath: true,
+      });
+      commands.push({
+        kind: "allyBug",
+        targetIndex: hit.index,
+        config: {
+          durationMs: allyDurationMs,
+          expireBurstDamage: allyExpireBurstDamage,
+          expireBurstRadius: allyExpireBurstRadius,
+          interceptForce: allyInterceptForce,
+          maxActiveAllies: allyCap,
+        },
+      });
+      for (const nearbyIndex of engine.radiusHitTest(targetX, targetY, allyExpireBurstRadius)) {
+        if (nearbyIndex === hit.index) {
+          continue;
+        }
+        commands.push({
+          kind: "damage",
+          targetIndex: nearbyIndex,
+          amount: Math.max(1, Math.floor(damage * 0.5)),
+          creditOnDeath: true,
+        });
+      }
+      commands.push({
+        kind: "spawnEffect",
+        descriptor: {
+          type: "explosion",
+          x: targetX,
+          y: targetY,
+          radius: allyExpireBurstRadius,
+          colorHex: 0xe5e7eb,
+        },
+      });
+    } else if (tier >= WeaponTier.TIER_FOUR) {
+      commands.push({
+        kind: "damage",
+        targetIndex: hit.index,
+        amount: damage,
+        creditOnDeath: true,
+      });
+      commands.push({
+        kind: "allyBug",
+        targetIndex: hit.index,
+        config: {
+          durationMs: allyDurationMs,
+          expireBurstDamage: allyExpireBurstDamage,
+          expireBurstRadius: allyExpireBurstRadius,
+          interceptForce: allyInterceptForce,
+          maxActiveAllies: allyCap,
+        },
+      });
+      for (const nearbyIndex of engine.radiusHitTest(targetX, targetY, Math.max(42, allyExpireBurstRadius * 0.8))) {
+        if (nearbyIndex === hit.index) {
+          continue;
+        }
+        commands.push({
+          kind: "damage",
+          targetIndex: nearbyIndex,
+          amount: 1,
+          creditOnDeath: true,
+        });
+      }
+    } else if (tier >= WeaponTier.TIER_THREE) {
       // T3: Rewrite Engine keeps the hammer's base hit so progression can
       // continue, then converts surviving bugs into temporary allies.
       commands.push({
@@ -52,7 +127,13 @@ export function createSession(ctx: WeaponContext): ClickFireResult {
       commands.push({
         kind: "allyBug",
         targetIndex: hit.index,
-        durationMs: allyDurationMs,
+        config: {
+          durationMs: allyDurationMs,
+          expireBurstDamage: allyExpireBurstDamage,
+          expireBurstRadius: allyExpireBurstRadius,
+          interceptForce: allyInterceptForce,
+          maxActiveAllies: allyCap,
+        },
       });
     } else if (tier >= WeaponTier.TIER_TWO) {
       // T2: Refactor Tool — split healthy bugs; damage near-dead ones

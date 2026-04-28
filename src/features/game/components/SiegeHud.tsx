@@ -4,7 +4,6 @@ import { cn } from "@shared/utils/cn";
 import type {
   SiegeGameMode,
   SiegeWeaponId,
-  StructureId,
   WeaponProgressSnapshot,
 } from "@game/types";
 import SiegeHudControls from "./siege-hud/SiegeHudControls";
@@ -33,19 +32,15 @@ interface SiegeHudProps {
     weaponId: SiegeWeaponId;
     weaponTitle: string;
   } | null;
-  onArmStructure?: (id: StructureId) => void;
   onChangeGameMode?: (mode: SiegeGameMode) => void;
   onExit: () => void;
   onKillAllBugs?: () => void;
   onToggleCodex?: () => void;
   onSelectWeapon: (id: SiegeWeaponId) => void;
   onToggleDebugMode?: () => void;
-  placedCountByType?: Partial<Record<StructureId, number>>;
-  placingStructureId?: StructureId | null;
   selectedWeaponId: SiegeWeaponId;
   streakMultiplier: number;
   upgradeToast?: string | null;
-  unlockedStructures?: StructureId[];
   weaponSnapshots: WeaponProgressSnapshot[];
 }
 
@@ -62,30 +57,22 @@ export default function SiegeHud({
   justEvolvedWeaponId,
   killStreak,
   lastFireTimes,
-  onArmStructure,
   onChangeGameMode,
   onExit,
   onKillAllBugs,
   onToggleCodex,
   onSelectWeapon,
   onToggleDebugMode,
-  placedCountByType,
-  placingStructureId,
   selectedWeaponId,
   streakMultiplier,
   upgradeToast,
-  unlockedStructures,
   weaponSnapshots,
 }: SiegeHudProps) {
   const [justUnlockedWeaponIds, setJustUnlockedWeaponIds] = useState<
     SiegeWeaponId[]
   >([]);
-  const [justUnlockedStructureIds, setJustUnlockedStructureIds] = useState<
-    StructureId[]
-  >([]);
   const [progressExpanded, setProgressExpanded] = useState(false);
   const previousUnlockedWeaponIdsRef = useRef<Set<SiegeWeaponId>>(new Set());
-  const previousUnlockedStructureIdsRef = useRef<Set<StructureId>>(new Set());
   const selectedSnapshot =
     weaponSnapshots.find((snapshot) => snapshot.id === selectedWeaponId) ??
     weaponSnapshots[0];
@@ -96,10 +83,6 @@ export default function SiegeHud({
         .map((snapshot) => snapshot.id),
     [weaponSnapshots],
   );
-  const visibleStructureIds = useMemo(
-    () => unlockedStructures ?? [],
-    [unlockedStructures],
-  );
   const unlockToast = useMemo(() => {
     if (justUnlockedWeaponIds.length === 0) {
       return null;
@@ -109,28 +92,6 @@ export default function SiegeHud({
       justUnlockedWeaponIds[justUnlockedWeaponIds.length - 1],
     )} weapon unlocked`;
   }, [justUnlockedWeaponIds]);
-  const weaponCount = weaponSnapshots.length;
-  const structureCount = visibleStructureIds.length;
-  const weaponSlotRem = 2.35;
-  const structureSlotRem = 2;
-  const railGapRem = 0.25;
-  const sectionGapRem = 0.5;
-  const dividerRem = structureCount > 0 ? 0.75 : 0;
-  const weaponRailWidthRem =
-    weaponCount * weaponSlotRem + Math.max(0, weaponCount - 1) * railGapRem;
-  const structureRailWidthRem =
-    structureCount > 0
-      ? structureCount * structureSlotRem +
-        Math.max(0, structureCount - 1) * railGapRem
-      : 0;
-  const _toolbeltWidthRem = Math.max(
-    26,
-    weaponRailWidthRem +
-      structureRailWidthRem +
-      dividerRem +
-      sectionGapRem +
-      1.5,
-  );
   const timerValue = formatElapsedTime(elapsedMs);
   const bugsLabel = gameMode === "outbreak" ? "Infection" : "Bugs";
 
@@ -165,25 +126,6 @@ export default function SiegeHud({
 
     previousUnlockedWeaponIdsRef.current = currentUnlockedWeaponIds;
   }, [unlockedWeaponIds]);
-
-  useEffect(() => {
-    const currentUnlockedStructureIds = new Set(visibleStructureIds);
-    const previousUnlockedStructureIds =
-      previousUnlockedStructureIdsRef.current;
-    const newlyUnlockedStructureIds = visibleStructureIds.filter(
-      (structureId) => !previousUnlockedStructureIds.has(structureId),
-    );
-
-    if (
-      previousUnlockedStructureIds.size > 0 &&
-      newlyUnlockedStructureIds.length > 0
-    ) {
-      setJustUnlockedStructureIds(newlyUnlockedStructureIds);
-      window.setTimeout(() => setJustUnlockedStructureIds([]), 1400);
-    }
-
-    previousUnlockedStructureIdsRef.current = currentUnlockedStructureIds;
-  }, [visibleStructureIds]);
 
   return (
     <div
@@ -238,18 +180,13 @@ export default function SiegeHud({
 
       <SiegeHudLoadout
         justEvolvedWeaponId={justEvolvedWeaponId}
-        justUnlockedStructureIds={justUnlockedStructureIds}
         justUnlockedWeaponIds={justUnlockedWeaponIds}
         lastFireTimes={lastFireTimes}
-        onArmStructure={onArmStructure}
         onSelectWeapon={onSelectWeapon}
-        placedCountByType={placedCountByType}
-        placingStructureId={placingStructureId}
         progressExpanded={progressExpanded}
         selectedSnapshot={selectedSnapshot}
         selectedWeaponId={selectedWeaponId}
         setProgressExpanded={setProgressExpanded}
-        unlockedStructures={unlockedStructures}
         weaponSnapshots={weaponSnapshots}
       />
     </div>

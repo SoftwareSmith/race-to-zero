@@ -24,6 +24,9 @@ export const BASE_TOGGLES = {
   cooldownMs: 950,
   chainRadius: 90,
   chainMaxBounces: 3,
+  beamWidth: 2.4,
+  beamGlowWidth: 7.2,
+  chaosScale: 1,
   secondaryDamage: 1,
 } as const;
 

@@ -23,11 +23,16 @@ export const BASE_TOGGLES = {
   blackHoleRadius: 300,
   blackHoleCoreRadius: 80,
   blackHoleDurationMs: 2000,
-  burnDps: 1.5,
+  impactRadius: 300,
+  reticleRadius: 90,
+  shockwaveRadius: 66,
+  secondaryRadius: 160,
+  burnDps: 1.15,
   burnDurationMs: 3000,
-  burnDecayPerSecond: 0.5,
+  burnDecayPerSecond: 0.72,
   eventHorizonRadius: 200,
   eventHorizonDurationMs: 5000,
+  chaosScale: 1,
 } as const;
 
 export const def: WeaponDef = {

@@ -38,6 +38,17 @@ const STATUS_TINTS = {
   unstable: "rgba(150, 0, 255, 0.50)",
 } as const;
 
+const STATUS_PRIORITY: Array<keyof typeof STATUS_TINTS> = [
+  "ally",
+  "ensnare",
+  "charged",
+  "burn",
+  "freeze",
+  "poison",
+  "marked",
+  "unstable",
+];
+
 const BUG_RAW_SVGS: Record<BugVariant, string> = {
   high: highRaw,
   low: lowRaw,
@@ -55,6 +66,122 @@ function getStatusStrength(value: boolean | number | undefined) {
   return value ? 1 : 0;
 }
 
+function getPrimaryStatus(
+  statusFlags: NonNullable<BugSpriteOptions["statusFlags"]>,
+) {
+  return STATUS_PRIORITY.find(
+    (status) => getStatusStrength(statusFlags[status]) > 0,
+  );
+}
+
+function drawPrimaryStatusShell(
+  ctx: CanvasRenderingContext2D,
+  size: number,
+  timeMs: number,
+  status: keyof typeof STATUS_TINTS,
+  strength: number,
+) {
+  const radius = size * 0.54;
+
+  ctx.save();
+  ctx.globalCompositeOperation = "lighter";
+
+  if (status === "ally") {
+    ctx.strokeStyle = `rgba(56, 189, 248, ${0.22 + strength * 0.4})`;
+    ctx.lineWidth = Math.max(1.4, size * 0.045);
+    ctx.beginPath();
+    ctx.arc(0, 0, radius * (0.98 + Math.sin(timeMs * 0.005) * 0.04), 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.strokeStyle = `rgba(125, 211, 252, ${0.18 + strength * 0.26})`;
+    ctx.lineWidth = Math.max(1, size * 0.03);
+    ctx.beginPath();
+    ctx.arc(0, 0, radius * 1.18, Math.PI * 0.14, Math.PI * 0.86);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(0, 0, radius * 1.18, Math.PI * 1.14, Math.PI * 1.86);
+    ctx.stroke();
+    ctx.fillStyle = `rgba(186, 230, 253, ${0.22 + strength * 0.22})`;
+    ctx.beginPath();
+    ctx.arc(0, -radius * 0.82, Math.max(1.6, size * 0.09), 0, Math.PI * 2);
+    ctx.fill();
+  } else if (status === "freeze") {
+    ctx.strokeStyle = `rgba(147, 197, 253, ${0.18 + strength * 0.24})`;
+    ctx.lineWidth = Math.max(1.3, size * 0.04);
+    ctx.beginPath();
+    ctx.arc(0, 0, radius, 0, Math.PI * 2);
+    ctx.stroke();
+  } else if (status === "ensnare") {
+    ctx.strokeStyle = `rgba(250, 204, 21, ${0.18 + strength * 0.24})`;
+    ctx.lineWidth = Math.max(1.2, size * 0.035);
+    for (let index = 0; index < 3; index += 1) {
+      const bandY = -radius * 0.45 + index * radius * 0.45;
+      ctx.beginPath();
+      ctx.moveTo(-radius * 0.84, bandY + Math.sin(timeMs * 0.004 + index) * 1.4);
+      ctx.lineTo(radius * 0.84, bandY - radius * 0.16);
+      ctx.stroke();
+    }
+  } else if (status === "marked") {
+    const crosshairRadius = radius * (1.08 + Math.sin(timeMs * 0.006) * 0.03);
+    ctx.strokeStyle = `rgba(244, 114, 182, ${0.2 + strength * 0.34})`;
+    ctx.lineWidth = Math.max(1.2, size * 0.038);
+    ctx.beginPath();
+    ctx.arc(0, 0, crosshairRadius, 0, Math.PI * 2);
+    ctx.stroke();
+
+    const gap = radius * 0.34;
+    const arm = radius * 0.42;
+    ctx.beginPath();
+    ctx.moveTo(-crosshairRadius, 0);
+    ctx.lineTo(-gap, 0);
+    ctx.moveTo(crosshairRadius, 0);
+    ctx.lineTo(gap, 0);
+    ctx.moveTo(0, -crosshairRadius);
+    ctx.lineTo(0, -gap);
+    ctx.moveTo(0, crosshairRadius);
+    ctx.lineTo(0, gap);
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.moveTo(-arm, -arm);
+    ctx.lineTo(-gap * 0.6, -gap * 0.6);
+    ctx.moveTo(arm, -arm);
+    ctx.lineTo(gap * 0.6, -gap * 0.6);
+    ctx.moveTo(-arm, arm);
+    ctx.lineTo(-gap * 0.6, gap * 0.6);
+    ctx.moveTo(arm, arm);
+    ctx.lineTo(gap * 0.6, gap * 0.6);
+    ctx.stroke();
+
+    const bracketInset = radius * 0.54;
+    const bracketLength = radius * 0.26;
+    ctx.beginPath();
+    ctx.moveTo(-bracketInset, -crosshairRadius);
+    ctx.lineTo(-bracketInset + bracketLength, -crosshairRadius);
+    ctx.moveTo(-crosshairRadius, -bracketInset);
+    ctx.lineTo(-crosshairRadius, -bracketInset + bracketLength);
+    ctx.moveTo(bracketInset, -crosshairRadius);
+    ctx.lineTo(bracketInset - bracketLength, -crosshairRadius);
+    ctx.moveTo(crosshairRadius, -bracketInset);
+    ctx.lineTo(crosshairRadius, -bracketInset + bracketLength);
+    ctx.moveTo(-bracketInset, crosshairRadius);
+    ctx.lineTo(-bracketInset + bracketLength, crosshairRadius);
+    ctx.moveTo(-crosshairRadius, bracketInset);
+    ctx.lineTo(-crosshairRadius, bracketInset - bracketLength);
+    ctx.moveTo(bracketInset, crosshairRadius);
+    ctx.lineTo(bracketInset - bracketLength, crosshairRadius);
+    ctx.moveTo(crosshairRadius, bracketInset);
+    ctx.lineTo(crosshairRadius, bracketInset - bracketLength);
+    ctx.stroke();
+
+    ctx.fillStyle = `rgba(251, 207, 232, ${0.14 + strength * 0.12})`;
+    ctx.beginPath();
+    ctx.arc(0, 0, Math.max(1.4, size * 0.065), 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  ctx.restore();
+}
+
 function drawStatusAura(
   ctx: CanvasRenderingContext2D,
   size: number,
@@ -62,10 +189,21 @@ function drawStatusAura(
   statusFlags: NonNullable<BugSpriteOptions["statusFlags"]>,
 ) {
   const radius = size * 0.56;
+  const primaryStatus = getPrimaryStatus(statusFlags);
   const poisonStrength = getStatusStrength(statusFlags.poison);
   const markedStrength = getStatusStrength(statusFlags.marked);
   const ensnareStrength = getStatusStrength(statusFlags.ensnare);
   const chargedStrength = getStatusStrength(statusFlags.charged);
+
+  if (primaryStatus) {
+    drawPrimaryStatusShell(
+      ctx,
+      size,
+      timeMs,
+      primaryStatus,
+      getStatusStrength(statusFlags[primaryStatus]),
+    );
+  }
 
   if (poisonStrength > 0) {
     const pulse = 0.82 + Math.sin(timeMs * 0.01) * 0.12;
@@ -98,10 +236,20 @@ function drawStatusAura(
 
   if (markedStrength > 0) {
     ctx.save();
-    ctx.strokeStyle = `rgba(244, 114, 182, ${0.14 + markedStrength * 0.26})`;
-    ctx.lineWidth = Math.max(1, size * (0.025 + markedStrength * 0.015));
+    ctx.strokeStyle = `rgba(244, 114, 182, ${0.18 + markedStrength * 0.3})`;
+    ctx.lineWidth = Math.max(1.1, size * (0.03 + markedStrength * 0.02));
     ctx.beginPath();
     ctx.arc(0, 0, radius * 0.92, Math.PI * 0.12, Math.PI * 1.88);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(-radius * 0.96, 0);
+    ctx.lineTo(-radius * 0.46, 0);
+    ctx.moveTo(radius * 0.96, 0);
+    ctx.lineTo(radius * 0.46, 0);
+    ctx.moveTo(0, -radius * 0.96);
+    ctx.lineTo(0, -radius * 0.46);
+    ctx.moveTo(0, radius * 0.96);
+    ctx.lineTo(0, radius * 0.46);
     ctx.stroke();
     ctx.restore();
   }
@@ -280,6 +428,7 @@ export function drawBugSprite(
   const finalSize = size * config.baseScale * burnScale;
 
   const img = getCachedImage(variant, baseColor);
+  const primaryStatus = statusFlags ? getPrimaryStatus(statusFlags) : undefined;
 
   const draw = () => {
     ctx.save();
@@ -311,7 +460,14 @@ export function drawBugSprite(
 
         ctx.save();
         ctx.globalCompositeOperation = "source-atop";
-        ctx.globalAlpha = Math.max(0.14, strength);
+        const alpha = key === primaryStatus
+          ? key === "poison"
+            ? Math.max(0.06, strength * 0.86)
+            : Math.max(0.2, strength * 0.94)
+          : key === "poison"
+            ? Math.max(0.04, strength * 0.38)
+            : Math.max(0.08, strength * 0.34);
+        ctx.globalAlpha = alpha;
         ctx.fillStyle = tint;
         ctx.fillRect(-finalSize / 2, -finalSize / 2, finalSize, finalSize);
         ctx.restore();
@@ -345,7 +501,13 @@ export function drawBugSprite(
         if (strength <= 0) {
           continue;
         }
-        ctx.globalAlpha = Math.max(0.14, strength);
+        ctx.globalAlpha = key === primaryStatus
+          ? key === "poison"
+            ? Math.max(0.06, strength * 0.86)
+            : Math.max(0.2, strength * 0.94)
+          : key === "poison"
+            ? Math.max(0.04, strength * 0.38)
+            : Math.max(0.08, strength * 0.34);
         ctx.globalCompositeOperation = "source-atop";
         ctx.fillStyle = tint;
         ctx.fillRect(-12, -12, 24, 24);

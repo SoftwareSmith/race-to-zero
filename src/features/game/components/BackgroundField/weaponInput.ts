@@ -11,7 +11,7 @@ import type {
 import { updateQaLastHit } from "./qa";
 import type { CanvasBounds } from "./canvasState";
 import type { VfxEngine } from "@game/engine/VfxEngine";
-import type { SiegeWeaponId, StructureId } from "@game/types";
+import type { SiegeWeaponId } from "@game/types";
 
 interface PointerDownHandlerOptions {
   blackHoleVfxIdRef: MutableRefObject<string | null>;
@@ -23,16 +23,6 @@ interface PointerDownHandlerOptions {
   hammerPositionRef?: { current: { x: number; y: number } };
   isFiringRef: MutableRefObject<boolean>;
   onHit: (payload: unknown) => void;
-  getOnStructurePlace: () =>
-    | ((
-        structureType: StructureId,
-        viewportX: number,
-        viewportY: number,
-        canvasX: number,
-        canvasY: number,
-        structureId?: string,
-      ) => void)
-    | undefined;
   getOnWeaponFire: () =>
     | ((
         weapon: SiegeWeaponId,
@@ -42,14 +32,20 @@ interface PointerDownHandlerOptions {
           angle?: number;
           chainNodes?: Array<{ x: number; y: number }>;
           jagOffsets?: number[];
+          targetPoints?: Array<{ x: number; y: number }>;
           targetX?: number;
           targetY?: number;
           color?: string;
+          beamWidth?: number;
+          beamGlowWidth?: number;
+          impactRadius?: number;
+          reticleRadius?: number;
+          shockwaveRadius?: number;
+          chaosScale?: number;
           segments?: Array<{ x1: number; y1: number; x2: number; y2: number }>;
         },
       ) => void)
     | undefined;
-  getPlacingStructureId: () => StructureId | null;
   getSelectedWeaponId: () => SiegeWeaponId;
   streakMultiplier: number;
   getSwarm: () => any;
@@ -271,36 +267,6 @@ function startHoldSession(
   return true;
 }
 
-function placeStructure(
-  event: MouseEvent,
-  bounds: CanvasBounds,
-  options: PointerDownHandlerOptions,
-) {
-  const placingStructureId = options.getPlacingStructureId();
-  if (!placingStructureId) {
-    return false;
-  }
-
-  const clickX = event.clientX - bounds.left;
-  const clickY = event.clientY - bounds.top;
-  const placedStructureId = `${placingStructureId}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
-  options.getSwarm()?.addStructure(
-    clickX,
-    clickY,
-    placingStructureId,
-    placedStructureId,
-  );
-  options.getOnStructurePlace()?.(
-    placingStructureId,
-    event.clientX,
-    event.clientY,
-    clickX,
-    clickY,
-    placedStructureId,
-  );
-  return true;
-}
-
 export function createPointerDownHandler(
   options: PointerDownHandlerOptions,
   lastFireTimeRef: MutableRefObject<Record<string, number>>,
@@ -328,10 +294,6 @@ export function createPointerDownHandler(
       }
 
       startHoldSession(event, selectedWeapon, options, bounds, lastFireTimeRef);
-      return;
-    }
-
-    if (placeStructure(event, bounds, options)) {
       return;
     }
 

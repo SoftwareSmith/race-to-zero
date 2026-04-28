@@ -11,7 +11,15 @@ export const tierOneTier: WeaponTierDefinition = {
   effectColor: "#38bdf8",
   evolveAtKills: 60,
   toggles: {
+    clusterCount: 7,
+    burstRadius: 38,
+    burstOffsetDistance: 58,
+    implosionRadius: 34,
     secondaryRadius: 36,
+    impactRadius: 24,
+    reticleRadius: 58,
+    shockwaveRadius: 106,
+    chaosScale: 1.16,
   },
   vfx: FORK_BOMB_TIER_VFX.tierOne,
   behavior: {

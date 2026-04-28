@@ -25,7 +25,7 @@ describe("drawBugFramePass", () => {
       frameNow: 0,
       height: 600,
       interactiveMode: true,
-      motionProfile: { opacityMultiplier: 1, scale: 1 },
+      motionProfile: { durationMultiplier: 1, opacityMultiplier: 1, scale: 1 },
       particles: [
         {
           opacity: 1,
@@ -55,5 +55,41 @@ describe("drawBugFramePass", () => {
 
     expect(positions).toHaveLength(1);
     expect(positions[0]).toMatchObject({ x: 100, y: 100 });
+  });
+
+  it("reuses and truncates a provided position buffer", () => {
+    const reusablePositions = [
+      { index: 99, radius: 99, x: 99, y: 99 },
+      { index: 88, radius: 88, x: 88, y: 88 },
+    ];
+
+    const positions = drawBugFramePass({
+      chartFocus: null,
+      context: createContext(),
+      frameNow: 0,
+      height: 600,
+      interactiveMode: true,
+      motionProfile: { durationMultiplier: 1, opacityMultiplier: 1, scale: 1 },
+      particles: [
+        {
+          opacity: 1,
+          size: 12,
+          state: "alive",
+          variant: "low",
+          vx: 0,
+          vy: 0,
+          x: 100,
+          y: 100,
+        },
+      ],
+      qaEnabled: false,
+      reusablePositions,
+      sizeMultiplier: 1,
+      width: 800,
+    });
+
+    expect(positions).toBe(reusablePositions);
+    expect(positions).toHaveLength(1);
+    expect(positions[0]).toMatchObject({ index: 0, x: 100, y: 100 });
   });
 });

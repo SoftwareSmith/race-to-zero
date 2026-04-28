@@ -8,11 +8,9 @@ import {
 import { WEAPON_DEFS } from "@config/weaponConfig";
 import { useSiegeGameDebug } from "./useSiegeGameDebug";
 import { useSiegeGameLifecycle } from "./useSiegeGameLifecycle";
-import { useSiegeGameStructures } from "./useSiegeGameStructures";
 import { useSiegeGameTimer } from "./useSiegeGameTimer";
 import { useSiegeRunCompletion } from "./useSiegeRunCompletion";
 import type {
-  AgentCaptureState,
   SiegeGameMode,
   SiegePhase,
   SiegeWeaponId,
@@ -89,11 +87,6 @@ interface UseSiegeGameOptions {
   currentBugCounts: BugCounts;
   evolutionStates?: Partial<Record<SiegeWeaponId, WeaponEvolutionState>>;
   onEscape?: () => boolean;
-  onStructureTierUp?: (payload: {
-    structureId: string;
-    structureType: import("@game/types").StructureId;
-    tier: import("@game/types").WeaponTier;
-  }) => void;
   pauseTimer?: boolean;
 }
 
@@ -141,7 +134,6 @@ export function useSiegeGame({
   currentBugCounts,
   evolutionStates,
   onEscape,
-  onStructureTierUp,
   pauseTimer = false,
 }: UseSiegeGameOptions) {
   void _currentBugCount;
@@ -155,7 +147,6 @@ export function useSiegeGame({
   >(null);
   const [selectedWeaponId, setSelectedWeaponId] =
     useState<SiegeWeaponId>("hammer");
-  const [agentCaptures, setAgentCaptures] = useState<Record<string, AgentCaptureState>>({});
   const [runtimeSnapshot, setRuntimeSnapshot] = useState<SiegeRuntimeSnapshot>(
     () => createRuntimeSnapshot(),
   );
@@ -261,21 +252,6 @@ export function useSiegeGame({
     updateRuntimeSnapshot,
   });
 
-  const {
-    armStructure,
-    cancelStructurePlacement,
-    handleStructureKill,
-    placeStructure,
-    placedCountByType,
-    placedStructures,
-    placingStructureId,
-    placingStructureIdRef,
-    resetStructures,
-  } = useSiegeGameStructures({
-    interactiveMode,
-    onStructureTierUp,
-  });
-
   const enterInteractiveMode = useCallback((
     nextMode: SiegeGameMode = gameMode,
     options?: { baseBugCounts?: BugCounts; bugMultiplier?: number },
@@ -297,14 +273,12 @@ export function useSiegeGame({
     lastKillAtRef.current = null;
     resetCompletion();
     setSelectedWeaponId("hammer");
-    resetStructures();
-    setAgentCaptures({});
     setSiegePhase("entering");
     phaseTimerRef.current = scheduleTimeout(() => {
       phaseTimerRef.current = null;
       setSiegePhase("active");
     }, SIEGE_ENTER_DURATION_MS);
-  }, [currentBugCounts, flushRuntimeSnapshot, gameMode, resetCompletion, resetStructures]);
+  }, [currentBugCounts, flushRuntimeSnapshot, gameMode, resetCompletion]);
 
   const exitInteractiveMode = useCallback(() => {
     cancelTimeout(phaseTimerRef.current);
@@ -322,13 +296,8 @@ export function useSiegeGame({
       return;
     }
 
-    if (placingStructureIdRef.current !== null) {
-      cancelStructurePlacement();
-      return;
-    }
-
     exitInteractiveMode();
-  }, [cancelStructurePlacement, exitInteractiveMode, onEscape, placingStructureIdRef]);
+  }, [exitInteractiveMode, onEscape]);
 
   const handleLifecycleSlotSelect = useCallback((slotIndex: number) => {
     const stats = getSiegeCombatStats(runtimeSnapshotRef.current.kills, debugMode);
@@ -349,10 +318,9 @@ export function useSiegeGame({
       if (siegePhase === "idle") return;
       const stats = getSiegeCombatStats(runtimeSnapshotRef.current.kills, debugMode);
       if (!stats.unlockedWeapons.includes(id)) return;
-      cancelStructurePlacement();
       setSelectedWeaponId(id);
     },
-    [cancelStructurePlacement, debugMode, siegePhase],
+    [debugMode, siegePhase],
   );
 
   const handleInteractiveHit = useCallback(
@@ -388,45 +356,6 @@ export function useSiegeGame({
       );
     },
     [updateRuntimeSnapshot],
-  );
-
-  const handleAgentAbsorb = useCallback(
-    (data: {
-      structureId: string;
-      phase: "absorbing" | "done" | "failed" | "pulling";
-      variant: string;
-      bugX: number;
-      bugY: number;
-      srcX?: number;
-      srcY?: number;
-      processingMs?: number;
-    }) => {
-      const { phase } = data;
-      if (phase !== "pulling") {
-        setAgentCaptures((prev) => ({
-          ...prev,
-          [data.structureId]: {
-            structureId: data.structureId,
-            phase,
-            startedAt: Date.now(),
-            processingMs: data.processingMs ?? 1500,
-            variant: data.variant,
-            bugX: data.bugX,
-            bugY: data.bugY,
-          },
-        }));
-      }
-      if (phase === "done" || phase === "failed") {
-        scheduleTimeout(() => {
-          setAgentCaptures((prev) => {
-            const next = { ...prev };
-            delete next[data.structureId];
-            return next;
-          });
-        }, 1200);
-      }
-    },
-    [],
   );
 
   useEffect(() => {
@@ -517,9 +446,6 @@ export function useSiegeGame({
   );
 
   return {
-    agentCaptures,
-    armStructure,
-    cancelStructurePlacement,
     combatStats,
     changeGameMode,
     clearSwarmRequestId,
@@ -528,9 +454,7 @@ export function useSiegeGame({
     enterInteractiveMode,
     exitInteractiveMode,
     gameMode,
-    handleAgentAbsorb,
     handleInteractiveHit,
-    handleStructureKill,
     handleWeaponFired,
     interactiveInitialBugCounts,
     interactiveElapsedMs,
@@ -545,10 +469,6 @@ export function useSiegeGame({
     lastFireTimes,
     leaderboard,
     nextWeaponUnlock,
-    placedCountByType,
-    placedStructures,
-    placingStructureId,
-    placeStructure,
     completionSummary,
     selectedWeaponId,
     selectWeapon,

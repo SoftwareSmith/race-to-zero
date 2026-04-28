@@ -18,7 +18,9 @@ import { BASE_TOGGLES } from "./constants";
 function buildTickCommands(ctx: WeaponContext): WeaponCommand[] {
   const { targetX, targetY, centerX, centerY } = ctx;
   const sprayAngle = coneAngleAway(targetX, targetY, centerX, centerY);
+  const sprayRadians = (sprayAngle * Math.PI) / 180;
   const commands: WeaponCommand[] = [];
+  const tier = ctx.tier ?? WeaponTier.TIER_ONE;
   const poisonDps = ctx.config?.poisonDps ?? BASE_TOGGLES.poisonDps;
   const poisonDurationMs =
     ctx.config?.poisonDurationMs ?? BASE_TOGGLES.poisonDurationMs;
@@ -48,8 +50,85 @@ function buildTickCommands(ctx: WeaponContext): WeaponCommand[] {
     totalMs: cloudMs,
   });
 
+  if (tier >= WeaponTier.TIER_FOUR) {
+    const frontDistance = Math.max(cloudRadius * 0.55, 78);
+    const frontX = targetX + Math.cos(sprayRadians) * frontDistance;
+    const frontY = targetY + Math.sin(sprayRadians) * frontDistance;
+
+    commands.push({
+      kind: "repeatPoisonRadius",
+      cx: frontX,
+      cy: frontY,
+      radius: Math.max(cloudRadius * 0.88, 144),
+      dps: poisonDps,
+      durationMs: poisonDurationMs + 120,
+      intervalMs: Math.max(180, cloudIntervalMs - 60),
+      totalMs: cloudMs,
+    });
+    commands.push({
+      kind: "ensnareRadius",
+      cx: frontX,
+      cy: frontY,
+      radius: Math.max(cloudRadius * 0.72, 112),
+      durationMs: Math.max(1500, secondaryDurationMs * 2),
+    });
+    commands.push({
+      kind: "spawnEffect",
+      descriptor: {
+        type: "toxicCloud",
+        x: frontX,
+        y: frontY,
+        radius: Math.max(cloudRadius * 0.82, 140),
+        durationMs: cloudMs,
+      },
+    });
+  }
+
+  if (tier >= WeaponTier.TIER_FIVE) {
+    const lateralAngle = sprayRadians + Math.PI / 2;
+    const frontDistance = Math.max(cloudRadius * 0.68, 104);
+    const frontX = targetX + Math.cos(sprayRadians) * frontDistance;
+    const frontY = targetY + Math.sin(sprayRadians) * frontDistance;
+    const lateralOffset = Math.max(cloudRadius * 0.5, 90);
+    const flankClouds = [-1, 1].map((direction) => ({
+      x: frontX + Math.cos(lateralAngle) * lateralOffset * direction,
+      y: frontY + Math.sin(lateralAngle) * lateralOffset * direction,
+    }));
+
+    for (const cloud of flankClouds) {
+      commands.push({
+        kind: "repeatPoisonRadius",
+        cx: cloud.x,
+        cy: cloud.y,
+        radius: Math.max(cloudRadius * 0.92, 156),
+        dps: poisonDps + 0.08,
+        durationMs: poisonDurationMs + 200,
+        intervalMs: Math.max(160, cloudIntervalMs - 90),
+        totalMs: cloudMs + 300,
+      });
+      commands.push({
+        kind: "poisonRadius",
+        cx: cloud.x,
+        cy: cloud.y,
+        radius: Math.max(secondaryRadius * 1.45, 112),
+        dps: poisonDps + 0.08,
+        durationMs: Math.max(secondaryDurationMs * 2, 1600),
+      });
+      commands.push({
+        kind: "spawnEffect",
+        descriptor: {
+          type: "toxicCloud",
+          x: cloud.x,
+          y: cloud.y,
+          radius: Math.max(cloudRadius * 0.88, 148),
+          durationMs: cloudMs + 300,
+        },
+      });
+    }
+  }
+
   // T2+: secondary poison cloud around each bug caught in the main spray
-  if ((ctx.tier ?? WeaponTier.TIER_ONE) >= WeaponTier.TIER_TWO) {
+  if (tier >= WeaponTier.TIER_TWO) {
     const bugs = ctx.engine.getAllBugs();
     for (const idx of ctx.engine.radiusHitTest(targetX, targetY, cloudRadius)) {
       const bug = bugs[idx];

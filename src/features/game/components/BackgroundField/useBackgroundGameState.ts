@@ -37,17 +37,13 @@ function appendSplat(
 interface UseBackgroundGameStateOptions {
   gameSessionKey: string;
   onBugHit?: (payload: BugHitPayload) => void;
-  onStructureKill?: (structureId: string) => void;
   totalBugCount: number;
-  triggerHammerSwing: () => void;
 }
 
 export function useBackgroundGameState({
   gameSessionKey,
   onBugHit,
-  onStructureKill,
   totalBugCount,
-  triggerHammerSwing,
 }: UseBackgroundGameStateOptions) {
   const [gameState, setGameState] = useState<GameState>(() =>
     createSessionState(gameSessionKey, totalBugCount),
@@ -89,7 +85,6 @@ export function useBackgroundGameState({
 
   const handleBugHit = useCallback(
     (payload: BugHitPayload) => {
-      triggerHammerSwing();
       if (!payload.defeated || payload.credited !== false) {
         onBugHit?.(payload);
       }
@@ -115,33 +110,7 @@ export function useBackgroundGameState({
         );
       });
     },
-    [gameSessionKey, onBugHit, totalBugCount, triggerHammerSwing],
-  );
-
-  const handleStructureKill = useCallback(
-    (structureId: string, x: number, y: number, variant: string) => {
-      const bugVariant = variant as BugVariant;
-      onBugHit?.({
-        credited: true,
-        defeated: true,
-        remainingHp: 0,
-        variant: bugVariant,
-        x,
-        y,
-        pointValue: 1,
-      });
-
-      setGameState((currentValue) => {
-        const nextState =
-          currentValue.sessionKey === gameSessionKey
-            ? currentValue
-            : createSessionState(gameSessionKey, totalBugCount);
-
-        return appendSplat(nextState, bugVariant, x, y);
-      });
-      onStructureKill?.(structureId);
-    },
-    [gameSessionKey, onBugHit, onStructureKill, totalBugCount],
+    [gameSessionKey, onBugHit, totalBugCount],
   );
 
   const handleEntityDeath = useCallback(
@@ -149,7 +118,13 @@ export function useBackgroundGameState({
       x: number,
       y: number,
       variant: string,
-      meta: { credited: boolean; frozen: boolean; pointValue: number },
+      meta: {
+        credited: boolean;
+        finisherStatus?: import("@game/status/statusCatalog").SiegeStatusId | null;
+        frozen: boolean;
+        pointValue: number;
+        supportStatuses?: import("@game/status/statusCatalog").SiegeStatusId[];
+      },
     ) => {
       if (meta.credited) {
         return;
@@ -183,6 +158,5 @@ export function useBackgroundGameState({
     activeGameState,
     handleBugHit,
     handleEntityDeath,
-    handleStructureKill,
   };
 }

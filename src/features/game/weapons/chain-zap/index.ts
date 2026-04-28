@@ -21,9 +21,12 @@ register(entry);
 registerOverlay(def.id, (effect) =>
   createElement(ChainOverlay, {
     key: effect.id,
+    beamGlowWidth: effect.beamGlowWidth,
+    beamWidth: effect.beamWidth,
     x: effect.x,
     y: effect.y,
     chainNodes: effect.chainNodes,
+    chaosScale: effect.chaosScale,
     jagOffsets: effect.jagOffsets,
   }),
 );

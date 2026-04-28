@@ -1,4 +1,4 @@
-import { Suspense, lazy, memo, type RefObject } from "react";
+import { Suspense, lazy, memo, type ReactNode, type RefObject } from "react";
 import Tooltip from "@shared/components/Tooltip";
 import type { SiegeGameMode } from "@game/types";
 import { SIEGE_GAME_MODE_META } from "@game/types";
@@ -24,7 +24,7 @@ interface SiegeHudControlsProps {
 interface HudControlAction {
   active?: boolean;
   ariaLabel: string;
-  icon: JSX.Element;
+  icon: ReactNode;
   key: string;
   onClick: () => void;
   tone: "default" | "danger" | "info";
@@ -93,7 +93,7 @@ const SiegeHudControls = memo(function SiegeHudControls({
             ),
             key: "debug",
             onClick: onToggleDebugMode,
-            tone: "info",
+            tone: "info" as const,
             tooltip: "Toggle debug overlay",
           },
         ]
@@ -121,7 +121,7 @@ const SiegeHudControls = memo(function SiegeHudControls({
             ),
             key: "kill-all",
             onClick: onKillAllBugs,
-            tone: "danger",
+            tone: "danger" as const,
             tooltip: "Clear the current swarm and trigger completion state",
           },
         ]
@@ -145,7 +145,7 @@ const SiegeHudControls = memo(function SiegeHudControls({
       ),
       key: "exit",
       onClick: onExit,
-      tone: "danger",
+      tone: "danger" as const,
       tooltip: "Exit siege",
     },
   ];

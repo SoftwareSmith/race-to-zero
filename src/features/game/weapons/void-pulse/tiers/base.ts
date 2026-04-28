@@ -16,6 +16,10 @@ export const baseTier: WeaponTierDefinition = {
     blackHoleDurationMs: 2000,
     blackHoleRadius: 300,
     blackHoleCoreRadius: 80,
+    impactRadius: 300,
+    reticleRadius: 90,
+    shockwaveRadius: 66,
+    chaosScale: 1,
   },
   vfx: VOID_PULSE_TIER_VFX.base,
   behavior: {

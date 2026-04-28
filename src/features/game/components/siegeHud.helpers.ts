@@ -1,8 +1,10 @@
 import { cn } from "@shared/utils/cn";
-import type { StructureId, WeaponProgressSnapshot } from "@game/types";
+import type { WeaponProgressSnapshot } from "@game/types";
 import { getWeaponHeatProfile } from "@game/utils/weaponHeat";
 
-export const WEAPON_TIER_NODE_COUNT = 2;
+export function getWeaponTierNodeCount(snapshot: WeaponProgressSnapshot) {
+  return Math.max(1, snapshot.maxTier - 1);
+}
 
 export function isMaxTierSnapshot(snapshot: WeaponProgressSnapshot) {
   return snapshot.killsToNextTier == null;
@@ -20,7 +22,7 @@ export function getTierNodeState(
     return "active" as const;
   }
 
-  const currentNodeIndex = Math.min(WEAPON_TIER_NODE_COUNT, snapshot.tier);
+  const currentNodeIndex = Math.min(getWeaponTierNodeCount(snapshot), snapshot.tier);
 
   if (tierIndex < currentNodeIndex) {
     return "active" as const;
@@ -179,7 +181,7 @@ export function weaponTooltip(
   const progress =
     snapshot.killsToNextTier != null
       ? ` · ${snapshot.killsToNextTier} kills → tier ${snapshot.tier + 1}`
-      : " · MAX TIER";
+      : ` · MAX TIER (${snapshot.maxTier})`;
 
   return `${snapshot.title} [${mode}]${selected}${progress} — ${snapshot.hint}`;
 }
@@ -406,12 +408,4 @@ export function getTierProgressCompact(snapshot: WeaponProgressSnapshot) {
 
   const tierGoal = snapshot.nextTierGoalKills ?? snapshot.weaponKills;
   return `${snapshot.weaponKills}/${tierGoal}`;
-}
-
-export function getStructureGlyph(structureId: StructureId) {
-  if (structureId === "lantern") {
-    return "🔦";
-  }
-
-  return "🤖";
 }

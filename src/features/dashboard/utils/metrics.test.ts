@@ -14,13 +14,13 @@ function withFrozenDate<T>(isoString: string, callback: () => T): T {
   const frozenTime = new RealDate(isoString).valueOf();
 
   class MockDate extends RealDate {
-    constructor(...args: ConstructorParameters<typeof Date>) {
-      if (args.length === 0) {
+    constructor(value?: string | number | Date) {
+      if (value == null) {
         super(frozenTime);
         return;
       }
 
-      super(...args);
+      super(value);
     }
 
     static now() {

@@ -3,10 +3,9 @@
  */
 
 import { useEffect, useRef } from "react";
-import type React from "react";
 import { WEAPON_DEFS } from "@config/weaponConfig";
 import { WeaponId } from "@game/types";
-import type { SiegeWeaponId, StructureId } from "@game/types";
+import type { SiegeWeaponId } from "@game/types";
 import { cn } from "@shared/utils/cn";
 import WeaponGlyph from "@shared/components/icons/WeaponGlyph";
 import { getWeaponHeatProfile } from "@game/utils/weaponHeat";
@@ -14,7 +13,7 @@ import { getWeaponHeatProfile } from "@game/utils/weaponHeat";
 interface WeaponCursorProps {
   hideSystemCursor?: boolean;
   lastFiredAt?: number;
-  structureId?: StructureId;
+  positionRef?: { current: { x: number; y: number } };
   weaponTier?: number;
   weaponId: SiegeWeaponId;
   swinging?: boolean;
@@ -22,60 +21,13 @@ interface WeaponCursorProps {
 
 function CursorReticle({
   lastFiredAt,
-  structureId,
   weaponTier = 1,
   weaponId,
 }: {
   lastFiredAt?: number;
-  structureId?: StructureId;
   weaponTier?: number;
   weaponId: SiegeWeaponId;
 }) {
-  if (structureId) {
-    const structureTheme: Record<
-      StructureId,
-      { accent: string; aura: string; icon: React.ReactElement; size: number }
-    > = {
-      lantern: {
-        accent: "#fbbf24",
-        aura: "0 0 24px rgba(251,191,36,0.35)",
-        icon: <span className="text-xl leading-none">🔦</span>,
-        size: 48,
-      },
-      agent: {
-        accent: "#34d399",
-        aura: "0 0 24px rgba(52,211,153,0.35)",
-        icon: <span className="text-xl leading-none">🤖</span>,
-        size: 48,
-      },
-    };
-    const active = structureTheme[structureId];
-
-    return (
-      <div
-        className="relative"
-        style={{
-          width: active.size,
-          height: active.size,
-          filter: `drop-shadow(${active.aura})`,
-          transform: "translate(-50%, -50%)",
-        }}
-      >
-        <div
-          className="absolute inset-0 rounded-full border"
-          style={{
-            borderColor: `${active.accent}66`,
-            background:
-              "radial-gradient(circle at 38% 36%, rgba(255,255,255,0.18), rgba(2,6,23,0.6))",
-          }}
-        />
-        <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
-          {active.icon}
-        </div>
-      </div>
-    );
-  }
-
   const weaponDef = WEAPON_DEFS.find((weapon) => weapon.id === weaponId);
   if (!weaponDef) return null;
   const theme = weaponDef.cursor;
@@ -214,37 +166,41 @@ function CursorReticle({
 export default function WeaponCursor({
   hideSystemCursor = false,
   lastFiredAt,
-  structureId,
+  positionRef,
   weaponTier = 1,
   weaponId,
   swinging = false,
 }: WeaponCursorProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
-  const posRef = useRef({ x: -200, y: -200 });
   const rafRef = useRef<number | null>(null);
 
   useEffect(() => {
-    const handleMove = (e: MouseEvent) => {
-      posRef.current = { x: e.clientX, y: e.clientY };
-      if (rafRef.current == null) {
-        rafRef.current = window.requestAnimationFrame(() => {
-          rafRef.current = null;
-          if (containerRef.current) {
-            containerRef.current.style.transform = `translate3d(${posRef.current.x}px, ${posRef.current.y}px, 0)`;
-          }
-        });
+    const syncPosition = () => {
+      const position = positionRef?.current;
+      if (containerRef.current) {
+        const hasLiveCursor =
+          position != null &&
+          Number.isFinite(position.x) &&
+          Number.isFinite(position.y) &&
+          (position.x !== 0 || position.y !== 0);
+
+        containerRef.current.style.transform = hasLiveCursor
+          ? `translate3d(${position.x}px, ${position.y}px, 0)`
+          : "translate3d(-200px, -200px, 0)";
       }
+
+      rafRef.current = window.requestAnimationFrame(syncPosition);
     };
 
-    window.addEventListener("mousemove", handleMove);
+    rafRef.current = window.requestAnimationFrame(syncPosition);
+
     return () => {
-      window.removeEventListener("mousemove", handleMove);
       if (rafRef.current != null) {
         window.cancelAnimationFrame(rafRef.current);
         rafRef.current = null;
       }
     };
-  }, []);
+  }, [positionRef]);
 
   useEffect(() => {
     document.body.classList.toggle("wrench-cursor-active", hideSystemCursor);
@@ -259,7 +215,7 @@ export default function WeaponCursor({
       ref={containerRef}
       aria-hidden="true"
       className="weapon-cursor-layer pointer-events-none fixed left-0 top-0 z-[110] transition-opacity duration-100"
-      style={{ transform: "translate3d(-200px, -200px, 0)" }}
+      style={{ transform: "translate3d(-200px, -200px, 0)", willChange: "transform" }}
     >
       <div
         className={
@@ -268,21 +224,16 @@ export default function WeaponCursor({
             : undefined
         }
         style={{
-          transformOrigin:
-            weaponId === "hammer" && !structureId ? "18% 18%" : "50% 50%",
+          transformOrigin: weaponId === "hammer" ? "34% 32%" : "50% 50%",
         }}
       >
         <div
           style={{
-            transform:
-              weaponId === "hammer" && !structureId
-                ? "translate(-30%, -28%)"
-                : undefined,
+            transform: weaponId === "hammer" ? "translate(-18%, -16%)" : undefined,
           }}
         >
           <CursorReticle
             lastFiredAt={lastFiredAt}
-            structureId={structureId}
             weaponTier={weaponTier}
             weaponId={weaponId}
           />
