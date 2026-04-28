@@ -215,7 +215,10 @@ export default function WeaponCursor({
       ref={containerRef}
       aria-hidden="true"
       className="weapon-cursor-layer pointer-events-none fixed left-0 top-0 z-[110] transition-opacity duration-100"
-      style={{ transform: "translate3d(-200px, -200px, 0)", willChange: "transform" }}
+      style={{
+        transform: "translate3d(-200px, -200px, 0)",
+        willChange: "transform",
+      }}
     >
       <div
         className={
@@ -229,7 +232,8 @@ export default function WeaponCursor({
       >
         <div
           style={{
-            transform: weaponId === "hammer" ? "translate(-18%, -16%)" : undefined,
+            transform:
+              weaponId === "hammer" ? "translate(-18%, -16%)" : undefined,
           }}
         >
           <CursorReticle

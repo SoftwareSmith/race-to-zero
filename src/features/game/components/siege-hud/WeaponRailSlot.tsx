@@ -131,35 +131,43 @@ const WeaponRailSlot = memo(function WeaponRailSlot({
         </div>
 
         <div className="mt-0.5 px-1">
-          <div className="grid items-center gap-0.5" style={{ gridTemplateColumns: `repeat(${getWeaponTierNodeCount(snapshot)}, minmax(0, 1fr))` }}>
-            {Array.from({ length: getWeaponTierNodeCount(snapshot) }, (_, index) => (
-              <span
-                key={`${snapshot.id}-tier-node-${index + 1}`}
-                className={cn(
-                  getTierNodeOffsetClassName(snapshot, index + 1),
-                  getTierNodeClassName(snapshot, index + 1),
-                )}
-              >
+          <div
+            className="grid items-center gap-0.5"
+            style={{
+              gridTemplateColumns: `repeat(${getWeaponTierNodeCount(snapshot)}, minmax(0, 1fr))`,
+            }}
+          >
+            {Array.from(
+              { length: getWeaponTierNodeCount(snapshot) },
+              (_, index) => (
                 <span
+                  key={`${snapshot.id}-tier-node-${index + 1}`}
                   className={cn(
-                    "absolute inset-y-0 left-0 rounded-full transition-[width] duration-300",
-                    getTierNodeFillClassName(snapshot),
-                    isSelected ||
-                      (index + 1 === snapshot.tier && !snapshot.locked)
-                      ? undefined
-                      : "opacity-84",
+                    getTierNodeOffsetClassName(snapshot, index + 1),
+                    getTierNodeClassName(snapshot, index + 1),
                   )}
-                  style={{ width: getTierNodeFillWidth(snapshot, index + 1) }}
                 >
                   <span
                     className={cn(
-                      "absolute inset-y-0 left-0 right-0 rounded-full",
-                      getTierBarCoreClassName(snapshot),
+                      "absolute inset-y-0 left-0 rounded-full transition-[width] duration-300",
+                      getTierNodeFillClassName(snapshot),
+                      isSelected ||
+                        (index + 1 === snapshot.tier && !snapshot.locked)
+                        ? undefined
+                        : "opacity-84",
                     )}
-                  />
+                    style={{ width: getTierNodeFillWidth(snapshot, index + 1) }}
+                  >
+                    <span
+                      className={cn(
+                        "absolute inset-y-0 left-0 right-0 rounded-full",
+                        getTierBarCoreClassName(snapshot),
+                      )}
+                    />
+                  </span>
                 </span>
-              </span>
-            ))}
+              ),
+            )}
           </div>
         </div>
 

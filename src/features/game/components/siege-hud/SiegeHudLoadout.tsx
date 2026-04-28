@@ -1,8 +1,5 @@
 import { memo } from "react";
-import type {
-  SiegeWeaponId,
-  WeaponProgressSnapshot,
-} from "@game/types";
+import type { SiegeWeaponId, WeaponProgressSnapshot } from "@game/types";
 import {
   getWeaponTierNodeCount,
   getTierBarCoreClassName,
