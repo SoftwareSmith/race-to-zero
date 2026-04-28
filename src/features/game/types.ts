@@ -109,20 +109,32 @@ export const SIEGE_GAME_MODE_META: Record<
     description: string;
     label: string;
     maxWeaponTier: WeaponTier;
+    objective: string;
+    primaryActionLabel: string;
+    scoringLabel: string;
     shortLabel: string;
+    switchActionLabel: string;
   }
 > = {
   purge: {
     description: "Fastest time to clear the current bug loadout.",
-    label: "Purge Mode",
+    label: "Time Attack",
     maxWeaponTier: WeaponTier.TIER_THREE,
+    objective: "Clear every bug as quickly as possible.",
+    primaryActionLabel: "Play Time Attack",
+    scoringLabel: "Fastest clear",
     shortLabel: "Time Attack",
+    switchActionLabel: "Try Time Attack",
   },
   outbreak: {
-    description: "Survive a shifting outbreak with bugs spawning and changing over time.",
-    label: "Outbreak",
+    description: "Survive rolling waves as spawn pressure keeps climbing.",
+    label: "Survival",
     maxWeaponTier: WeaponTier.TIER_FIVE,
+    objective: "Last as many waves as possible before the site goes offline.",
+    primaryActionLabel: "Play Survival",
+    scoringLabel: "Best wave survived",
     shortLabel: "Survival",
+    switchActionLabel: "Try Survival",
   },
 };
 

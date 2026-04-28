@@ -74,6 +74,8 @@ export interface EngineOptions {
   onWeaponEvolution?: (weaponId: SiegeWeaponId, newTier: WeaponTier) => void;
   /** Initial evolution states loaded from localStorage */
   initialEvolutionStates?: Partial<Record<SiegeWeaponId, WeaponEvolutionState>>;
+  /** Highest weapon tier allowed for the active game mode. */
+  maxWeaponTier?: WeaponTier;
 }
 
 export class Engine {
@@ -112,6 +114,7 @@ export class Engine {
   /** Per-weapon kill counts and tiers for the evolution system. */
   weaponEvolutionStates: Map<SiegeWeaponId, WeaponEvolutionState>;
   onWeaponEvolution?: (weaponId: SiegeWeaponId, newTier: WeaponTier) => void;
+  private maxWeaponTier: WeaponTier;
   /** Active event horizons: consume unstable bugs on contact. */
   private eventHorizons: Array<{
     x: number;
@@ -156,10 +159,17 @@ export class Engine {
     this.onStructureKill = opts.onStructureKill;
     this.onAgentAbsorb = opts.onAgentAbsorb;
     this.onWeaponEvolution = opts.onWeaponEvolution;
+    this.maxWeaponTier = opts.maxWeaponTier ?? WeaponTier.TIER_THREE;
     this.weaponEvolutionStates = new Map(
       ALL_WEAPON_IDS.map((id) => [
         id,
-        opts.initialEvolutionStates?.[id] ?? { tier: WeaponTier.TIER_ONE, kills: 0 },
+        {
+          kills: opts.initialEvolutionStates?.[id]?.kills ?? 0,
+          tier: Math.min(
+            opts.initialEvolutionStates?.[id]?.tier ?? WeaponTier.TIER_ONE,
+            this.maxWeaponTier,
+          ) as WeaponTier,
+        },
       ]),
     );
   }
@@ -171,7 +181,7 @@ export class Engine {
     if (!state) return;
     state.kills++;
 
-    if (state.tier >= WeaponTier.TIER_THREE) {
+    if (state.tier >= this.maxWeaponTier) {
       return;
     }
 
@@ -181,13 +191,15 @@ export class Engine {
   private checkEvolution(weaponId: SiegeWeaponId): void {
     const state = this.weaponEvolutionStates.get(weaponId);
     if (!state) return;
-    const [t1Threshold, t2Threshold] = WEAPON_EVOLVE_THRESHOLDS[weaponId];
-    if (state.tier === WeaponTier.TIER_ONE && state.kills >= t1Threshold) {
-      state.tier = WeaponTier.TIER_TWO;
-      this.onWeaponEvolution?.(weaponId, WeaponTier.TIER_TWO);
-    } else if (state.tier === WeaponTier.TIER_TWO && state.kills >= t2Threshold) {
-      state.tier = WeaponTier.TIER_THREE;
-      this.onWeaponEvolution?.(weaponId, WeaponTier.TIER_THREE);
+    if (state.tier >= this.maxWeaponTier) return;
+
+    const nextTier = (state.tier + 1) as WeaponTier;
+    if (nextTier > this.maxWeaponTier) return;
+
+    const threshold = WEAPON_EVOLVE_THRESHOLDS[weaponId][state.tier - 1];
+    if (threshold != null && state.kills >= threshold) {
+      state.tier = nextTier;
+      this.onWeaponEvolution?.(weaponId, nextTier);
     }
   }
 

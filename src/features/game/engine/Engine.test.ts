@@ -258,4 +258,40 @@ describe("engine death attribution", () => {
     expect(onWeaponEvolution).toHaveBeenCalledTimes(2);
     },
   );
+
+  it("respects the active mode weapon tier cap", () => {
+    const cappedEvolution = vi.fn();
+    const cappedEngine = new Engine(createCanvas(), {
+      height: 200,
+      onWeaponEvolution: cappedEvolution,
+      width: 200,
+    });
+    const survivalEvolution = vi.fn();
+    const survivalEngine = new Engine(createCanvas(), {
+      height: 200,
+      maxWeaponTier: WeaponTier.TIER_FIVE,
+      onWeaponEvolution: survivalEvolution,
+      width: 200,
+    });
+    const thresholds = WEAPON_EVOLVE_THRESHOLDS.hammer;
+    const tierFourThreshold = thresholds[2];
+
+    expect(tierFourThreshold).toBeGreaterThan(0);
+
+    for (let kills = 0; kills < tierFourThreshold; kills += 1) {
+      cappedEngine.recordWeaponKill("hammer");
+      survivalEngine.recordWeaponKill("hammer");
+    }
+
+    expect(cappedEngine.getWeaponEvolutionStates().get("hammer")).toMatchObject({
+      kills: tierFourThreshold,
+      tier: WeaponTier.TIER_THREE,
+    });
+    expect(cappedEvolution).toHaveBeenCalledTimes(2);
+    expect(survivalEngine.getWeaponEvolutionStates().get("hammer")).toMatchObject({
+      kills: tierFourThreshold,
+      tier: WeaponTier.TIER_FOUR,
+    });
+    expect(survivalEvolution).toHaveBeenCalledWith("hammer", WeaponTier.TIER_FOUR);
+  });
 });

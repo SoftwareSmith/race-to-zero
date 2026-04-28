@@ -16,6 +16,7 @@ import type {
   SiegeWeaponId,
   WeaponEvolutionState,
 } from "@game/types";
+import { SIEGE_GAME_MODE_META } from "@game/types";
 
 const SIEGE_ENTER_DURATION_MS = 520;
 const SIEGE_EXIT_DURATION_MS = 220;
@@ -395,6 +396,7 @@ export function useSiegeGame({
     () => getSiegeCombatStats(interactiveKills, debugMode),
     [debugMode, interactiveKills],
   );
+  const maxWeaponTier = SIEGE_GAME_MODE_META[gameMode].maxWeaponTier;
   const weaponSnapshots = useMemo(
     () =>
       getSiegeWeaponSnapshots(
@@ -402,8 +404,9 @@ export function useSiegeGame({
         selectedWeaponId,
         debugMode,
         evolutionStates,
+        maxWeaponTier,
       ),
-    [debugMode, evolutionStates, interactiveKills, selectedWeaponId],
+    [debugMode, evolutionStates, interactiveKills, maxWeaponTier, selectedWeaponId],
   );
   const nextWeaponUnlock = useMemo(
     () => getNextWeaponUnlock(interactiveKills, debugMode),
@@ -468,6 +471,7 @@ export function useSiegeGame({
     killStreak,
     lastFireTimes,
     leaderboard,
+    maxWeaponTier,
     nextWeaponUnlock,
     completionSummary,
     selectedWeaponId,

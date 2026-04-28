@@ -75,6 +75,11 @@ const SiegeExperience = memo(function SiegeExperience({
     onEscape: handleSiegeEscape,
     pauseTimer: ui.openTopMenu === "codex",
   });
+  const getActiveWeaponTier = useCallback(
+    (weaponId: SiegeWeaponId): WeaponTier =>
+      Math.min(getWeaponTier(weaponId), siegeGame.maxWeaponTier) as WeaponTier,
+    [getWeaponTier, siegeGame.maxWeaponTier],
+  );
 
   const handleEvolution = useCallback(
     (weaponId: SiegeWeaponId, newTier: WeaponTier) => {
@@ -159,7 +164,7 @@ const SiegeExperience = memo(function SiegeExperience({
           className={siegeGame.interactiveMode ? "z-30" : "z-0"}
           combatStats={siegeGame.interactiveMode ? siegeGame.combatStats : null}
           gameConfig={settings.gameConfig}
-          getWeaponTier={getWeaponTier}
+          getWeaponTier={getActiveWeaponTier}
           initialEvolutionStates={evolutionStates}
           interactiveMode={siegeGame.interactiveMode}
           interactiveSessionKey={
@@ -178,6 +183,7 @@ const SiegeExperience = memo(function SiegeExperience({
           }
           onWeaponEvolution={handleEvolution}
           onWeaponEvolutionStatesChange={syncFromEngine}
+          maxWeaponTier={siegeGame.maxWeaponTier}
           onWeaponFired={
             siegeGame.interactiveMode ? siegeGame.handleWeaponFired : undefined
           }

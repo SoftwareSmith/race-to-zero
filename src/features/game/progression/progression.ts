@@ -12,6 +12,7 @@ import {
   getCurrentWeaponTierGoalKills,
   getCurrentWeaponTierStartKills,
   getKillsToNextTier,
+  getWeaponMaxTier,
   getWeaponTierDetail,
   getWeaponTierHint,
   getWeaponTierTitle,
@@ -71,6 +72,7 @@ export function getSiegeWeaponSnapshots(
   selectedId: SiegeWeaponId,
   debugMode = false,
   evolutionStates?: Partial<Record<SiegeWeaponId, WeaponEvolutionState>>,
+  maxWeaponTier = WeaponTierEnum.TIER_THREE,
 ): WeaponProgressSnapshot[] {
   const stats = getSiegeCombatStats(totalFixed, debugMode);
   const unlockedSet = new Set(stats.unlockedWeapons);
@@ -79,11 +81,14 @@ export function getSiegeWeaponSnapshots(
     const unlocked = unlockedSet.has(weapon.id);
     const remaining = Math.max(0, weapon.unlockKills - totalFixed);
     const evo = evolutionStates?.[weapon.id];
-    const tier: WeaponTier = evo?.tier ?? WeaponTierEnum.TIER_ONE;
+    const maxTier = Math.min(getWeaponMaxTier(weapon), maxWeaponTier) as WeaponTier;
+    const tier = Math.min(evo?.tier ?? WeaponTierEnum.TIER_ONE, maxTier) as WeaponTier;
     const weaponKills = evo?.kills ?? 0;
-    const killsToNextTier = getKillsToNextTier(weapon, evo);
+    const cappedEvolutionState: WeaponEvolutionState = { kills: weaponKills, tier };
+    const killsToNextTier = getKillsToNextTier(weapon, cappedEvolutionState, maxTier);
     const currentTierStartKills = getCurrentWeaponTierStartKills(weapon, tier);
-    const nextTierGoalKills = getCurrentWeaponTierGoalKills(weapon, tier);
+    const nextTierGoalKills =
+      tier >= maxTier ? null : getCurrentWeaponTierGoalKills(weapon, tier);
 
     return {
       id: weapon.id,
@@ -97,9 +102,7 @@ export function getSiegeWeaponSnapshots(
       locked: !unlocked,
       current: weapon.id === selectedId,
       detail: getWeaponTierDetail(weapon, tier),
-      maxTier:
-        weapon.tiers[weapon.tiers.length - 1]?.tier ??
-        WeaponTierEnum.TIER_ONE,
+      maxTier,
       nextTierGoalKills,
       unlockKills: weapon.unlockKills,
       matchupSummary: getWeaponMatchupSummary(weapon.id),

@@ -435,6 +435,7 @@ const BugCanvas = memo(
           width: w,
           height: h,
           config: (gameConfigRef.current as any) ?? undefined,
+          maxWeaponTier,
           onEntityDeath: (x, y, variant, meta) => {
             try {
               const viewportX = Math.round(x + (boundsRef.current.left || 0));

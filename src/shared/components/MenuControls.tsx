@@ -46,7 +46,11 @@ interface MenuPanelProps {
   title: string;
 }
 
-export function MenuPanel({ children, title, size = "default" }: MenuPanelProps) {
+export function MenuPanel({
+  children,
+  title,
+  size = "default",
+}: MenuPanelProps) {
   return (
     <div
       className={

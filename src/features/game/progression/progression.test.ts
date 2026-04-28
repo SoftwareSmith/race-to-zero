@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { WEAPON_REGISTRY } from "@game/weapons";
-import { WeaponTier } from "@game/types";
+import { SIEGE_GAME_MODE_META, WeaponTier } from "@game/types";
 import {
   getSiegeCombatStats,
   getSiegeWeaponSnapshots,
@@ -130,5 +130,37 @@ describe("siege progression", () => {
         weaponKills: tierThreeThreshold,
       });
     }
+  });
+
+  it("caps weapon snapshots to the active mode tier limit", () => {
+    const hammer = WEAPON_REGISTRY.find((weapon) => weapon.id === "hammer");
+    const tierFourThreshold = hammer?.tiers[2]?.evolveAtKills ?? 0;
+
+    const timeAttackHammer = getSiegeWeaponSnapshots(
+      999,
+      "hammer",
+      false,
+      { hammer: { kills: tierFourThreshold, tier: WeaponTier.TIER_FOUR } },
+      SIEGE_GAME_MODE_META.purge.maxWeaponTier,
+    ).find((snapshot) => snapshot.id === "hammer");
+
+    const survivalHammer = getSiegeWeaponSnapshots(
+      999,
+      "hammer",
+      false,
+      { hammer: { kills: tierFourThreshold, tier: WeaponTier.TIER_FOUR } },
+      SIEGE_GAME_MODE_META.outbreak.maxWeaponTier,
+    ).find((snapshot) => snapshot.id === "hammer");
+
+    expect(timeAttackHammer).toMatchObject({
+      killsToNextTier: null,
+      maxTier: WeaponTier.TIER_THREE,
+      tier: WeaponTier.TIER_THREE,
+    });
+    expect(survivalHammer).toMatchObject({
+      maxTier: WeaponTier.TIER_FIVE,
+      tier: WeaponTier.TIER_FOUR,
+    });
+    expect(survivalHammer?.killsToNextTier).not.toBeNull();
   });
 });

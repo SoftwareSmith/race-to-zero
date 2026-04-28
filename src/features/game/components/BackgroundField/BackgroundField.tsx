@@ -64,6 +64,8 @@ interface BackgroundFieldProps {
   gameConfig?: GameConfig;
   /** Returns the current evolution tier for a given weapon. Defaults to T1 when not provided. */
   getWeaponTier?: (id: SiegeWeaponId) => import("@game/types").WeaponTier;
+  /** Highest weapon tier allowed for the active game mode. */
+  maxWeaponTier?: import("@game/types").WeaponTier;
   onWeaponEvolutionStatesChange?: (
     states: Map<SiegeWeaponId, import("@game/types").WeaponEvolutionState>,
   ) => void;
@@ -102,6 +104,7 @@ const BackgroundField = memo(
         gameConfig,
         tone,
         getWeaponTier = () => 1 as import("@game/types").WeaponTier,
+        maxWeaponTier,
         onWeaponEvolutionStatesChange,
         onWeaponEvolution,
         clearSwarmRequestId = 0,
@@ -287,6 +290,7 @@ const BackgroundField = memo(
             onWeaponFire={interactiveMode ? handleWeaponFire : undefined}
             hammerPositionRef={hammerPositionRef}
             getWeaponTier={getWeaponTier}
+            maxWeaponTier={maxWeaponTier}
             clearSwarmRequestId={interactiveMode ? clearSwarmRequestId : 0}
             onLiveBugCountChange={
               interactiveMode ? onLiveBugCountChange : undefined

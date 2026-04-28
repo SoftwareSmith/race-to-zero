@@ -125,7 +125,12 @@ export function getWeaponEvolutionThresholds(def: WeaponDef): number[] {
 export function getKillsToNextTier(
   def: WeaponDef,
   state: WeaponEvolutionState | undefined,
+  maxTier = getWeaponMaxTier(def),
 ): number | null {
+  if ((state?.tier ?? WeaponTier.TIER_ONE) >= maxTier) {
+    return null;
+  }
+
   const currentTier = getWeaponTierDefinition(
     def,
     state?.tier ?? WeaponTier.TIER_ONE,

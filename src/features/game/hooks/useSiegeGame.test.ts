@@ -55,6 +55,43 @@ describe("useSiegeGame", () => {
     });
 
     expect(result.current.gameMode).toBe("outbreak");
+    expect(result.current.maxWeaponTier).toBe(5);
+  });
+
+  it("starts a clean runtime snapshot when switching modes", () => {
+    const { result } = renderHook(() =>
+      useSiegeGame({
+        currentBugCount: 20,
+        currentBugCounts: { high: 0, low: 20, medium: 0, urgent: 0 },
+        evolutionStates: {},
+      }),
+    );
+
+    act(() => {
+      result.current.enterInteractiveMode("purge");
+      for (let i = 0; i < 18; i += 1) {
+        result.current.handleInteractiveHit({ defeated: true, pointValue: 1 });
+      }
+    });
+
+    act(() => {
+      result.current.selectWeapon("nullpointer");
+    });
+
+    expect(result.current.interactiveKills).toBe(18);
+    expect(result.current.selectedWeaponId).toBe("nullpointer");
+
+    act(() => {
+      result.current.enterInteractiveMode("outbreak");
+    });
+
+    expect(result.current.gameMode).toBe("outbreak");
+    expect(result.current.completionSummary).toBeNull();
+    expect(result.current.interactiveKills).toBe(0);
+    expect(result.current.interactivePoints).toBe(0);
+    expect(result.current.interactiveRemainingBugs).toBe(20);
+    expect(result.current.killStreak).toBe(0);
+    expect(result.current.selectedWeaponId).toBe("hammer");
   });
 
   it("freezes the run and stores a leaderboard entry when bugs run out", async () => {
