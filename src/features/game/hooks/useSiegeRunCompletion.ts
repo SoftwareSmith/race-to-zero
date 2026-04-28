@@ -2,6 +2,7 @@ import { useEffect, useState, type MutableRefObject } from "react";
 import { STORAGE_KEYS } from "../../../constants/storageKeys";
 import {
   createStoredJsonParser,
+  isStoredRecord,
   readStorageValue,
   setStorageValue,
 } from "@shared/utils/storage";
@@ -14,6 +15,7 @@ import type {
 } from "@game/types";
 
 const MAX_LEADERBOARD_ENTRIES = 8;
+const SIEGE_GAME_MODES: SiegeGameMode[] = ["purge", "outbreak"];
 
 export interface SiegeRuntimeSnapshotLike {
   elapsedMs: number;
@@ -32,14 +34,22 @@ export interface SiegeLeaderboardEntry {
   completedAt: string;
   elapsedMs: number;
   mode: SiegeGameMode;
+  offlineReason?: string;
+  survivedMs: number;
   topWeaponId: SiegeWeaponId;
   topWeaponLabel: string;
+  waveReached: number;
 }
 
 export interface SiegeCompletionSummary extends SiegeLeaderboardEntry {
   isNewBest: boolean;
   rank: number;
 }
+
+export type SiegeLeaderboardsByMode = Record<
+  SiegeGameMode,
+  SiegeLeaderboardEntry[]
+>;
 
 interface UseSiegeRunCompletionOptions {
   evolutionStates?: Partial<Record<SiegeWeaponId, WeaponEvolutionState>>;
@@ -75,15 +85,94 @@ function getTopWeapon(
   };
 }
 
-function buildLeaderboard(entries: SiegeLeaderboardEntry[]) {
+function isSiegeGameMode(value: unknown): value is SiegeGameMode {
+  return value === "purge" || value === "outbreak";
+}
+
+function isFiniteNumber(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(value);
+}
+
+function normalizeLeaderboardEntry(
+  value: unknown,
+): SiegeLeaderboardEntry | null {
+  if (!isStoredRecord(value) || !isSiegeGameMode(value.mode)) {
+    return null;
+  }
+
+  if (
+    typeof value.id !== "string" ||
+    typeof value.completedAt !== "string" ||
+    typeof value.topWeaponId !== "string" ||
+    typeof value.topWeaponLabel !== "string" ||
+    !isFiniteNumber(value.bugCount) ||
+    !isFiniteNumber(value.bugsPerSecond) ||
+    !isFiniteNumber(value.elapsedMs)
+  ) {
+    return null;
+  }
+
+  return {
+    id: value.id,
+    bugCount: Math.max(0, Math.floor(value.bugCount)),
+    bugsPerSecond: Math.max(0, value.bugsPerSecond),
+    completedAt: value.completedAt,
+    elapsedMs: Math.max(0, Math.floor(value.elapsedMs)),
+    mode: value.mode,
+    offlineReason:
+      typeof value.offlineReason === "string" ? value.offlineReason : undefined,
+    survivedMs: isFiniteNumber(value.survivedMs)
+      ? Math.max(0, Math.floor(value.survivedMs))
+      : Math.max(0, Math.floor(value.elapsedMs)),
+    topWeaponId: value.topWeaponId as SiegeWeaponId,
+    topWeaponLabel: value.topWeaponLabel,
+    waveReached: isFiniteNumber(value.waveReached)
+      ? Math.max(0, Math.floor(value.waveReached))
+      : value.mode === "outbreak"
+        ? 1
+        : 0,
+  };
+}
+
+function normalizeLeaderboardEntries(value: unknown): SiegeLeaderboardEntry[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .map((entry) => normalizeLeaderboardEntry(entry))
+    .filter((entry): entry is SiegeLeaderboardEntry => entry != null);
+}
+
+export function buildSiegeLeaderboard(
+  entries: SiegeLeaderboardEntry[],
+  mode: SiegeGameMode,
+): SiegeLeaderboardEntry[] {
   return [...entries]
+    .filter((entry) => entry.mode === mode)
     .sort((left, right) => {
-      if (right.bugCount !== left.bugCount) {
-        return right.bugCount - left.bugCount;
+      if (mode === "outbreak") {
+        if (right.waveReached !== left.waveReached) {
+          return right.waveReached - left.waveReached;
+        }
+
+        if (right.survivedMs !== left.survivedMs) {
+          return right.survivedMs - left.survivedMs;
+        }
+
+        if (right.bugCount !== left.bugCount) {
+          return right.bugCount - left.bugCount;
+        }
+
+        return right.completedAt.localeCompare(left.completedAt);
       }
 
       if (left.elapsedMs !== right.elapsedMs) {
         return left.elapsedMs - right.elapsedMs;
+      }
+
+      if (right.bugCount !== left.bugCount) {
+        return right.bugCount - left.bugCount;
       }
 
       if (right.bugsPerSecond !== left.bugsPerSecond) {
@@ -95,10 +184,47 @@ function buildLeaderboard(entries: SiegeLeaderboardEntry[]) {
     .slice(0, MAX_LEADERBOARD_ENTRIES);
 }
 
-function isSiegeLeaderboardEntryList(
+export function buildSiegeLeaderboards(
+  entries: SiegeLeaderboardEntry[],
+): SiegeLeaderboardsByMode {
+  return {
+    outbreak: buildSiegeLeaderboard(entries, "outbreak"),
+    purge: buildSiegeLeaderboard(entries, "purge"),
+  };
+}
+
+function isSiegeLeaderboardsByMode(
   value: unknown,
-): value is SiegeLeaderboardEntry[] {
-  return Array.isArray(value);
+): value is SiegeLeaderboardsByMode {
+  if (!isStoredRecord(value)) {
+    return false;
+  }
+
+  return SIEGE_GAME_MODES.every((mode) => Array.isArray(value[mode]));
+}
+
+function getStoredLeaderboards(): SiegeLeaderboardsByMode {
+  const storedV2 = readStorageValue(
+    STORAGE_KEYS.siegeRunLeaderboardsV2,
+    null,
+    createStoredJsonParser<unknown>(),
+  );
+  if (isSiegeLeaderboardsByMode(storedV2)) {
+    return buildSiegeLeaderboards([
+      ...normalizeLeaderboardEntries(storedV2.purge),
+      ...normalizeLeaderboardEntries(storedV2.outbreak),
+    ]);
+  }
+
+  const legacyEntries = readStorageValue(
+    STORAGE_KEYS.siegeRunLeaderboard,
+    [],
+    createStoredJsonParser<unknown[]>((value): value is unknown[] =>
+      Array.isArray(value),
+    ),
+  );
+
+  return buildSiegeLeaderboards(normalizeLeaderboardEntries(legacyEntries));
 }
 
 export function useSiegeRunCompletion({
@@ -113,17 +239,12 @@ export function useSiegeRunCompletion({
   siegePhase,
   updateRuntimeSnapshot,
 }: UseSiegeRunCompletionOptions) {
-  const [leaderboard, setLeaderboard] = useState<SiegeLeaderboardEntry[]>(() =>
-    readStorageValue(
-      STORAGE_KEYS.siegeRunLeaderboard,
-      [],
-      createStoredJsonParser<SiegeLeaderboardEntry[]>(
-        isSiegeLeaderboardEntryList,
-      ),
-    ),
+  const [leaderboards, setLeaderboards] = useState<SiegeLeaderboardsByMode>(
+    getStoredLeaderboards,
   );
   const [completionSummary, setCompletionSummary] =
     useState<SiegeCompletionSummary | null>(null);
+  const leaderboard = leaderboards[gameMode];
 
   useEffect(() => {
     if (
@@ -155,16 +276,25 @@ export function useSiegeRunCompletion({
       completedAt: new Date().toISOString(),
       elapsedMs: finalElapsedMs,
       mode: gameMode,
+      offlineReason:
+        gameMode === "outbreak" ? "Site stabilized before offline" : undefined,
+      survivedMs: finalElapsedMs,
       topWeaponId: topWeapon.id,
       topWeaponLabel: topWeapon.label,
+      waveReached: gameMode === "outbreak" ? 1 : 0,
     };
-    const nextLeaderboard = buildLeaderboard([...leaderboard, entry]);
+    const nextLeaderboards = buildSiegeLeaderboards([
+      ...leaderboards.purge,
+      ...leaderboards.outbreak,
+      entry,
+    ]);
+    const nextLeaderboard = nextLeaderboards[gameMode];
     const rank = nextLeaderboard.findIndex((item) => item.id === entry.id) + 1;
 
-    setLeaderboard(nextLeaderboard);
+    setLeaderboards(nextLeaderboards);
     setStorageValue(
-      STORAGE_KEYS.siegeRunLeaderboard,
-      nextLeaderboard,
+      STORAGE_KEYS.siegeRunLeaderboardsV2,
+      nextLeaderboards,
       (value) => JSON.stringify(value),
     );
     setCompletionSummary({
@@ -189,7 +319,7 @@ export function useSiegeRunCompletion({
     interactiveMode,
     interactiveRemainingBugs,
     interactiveRunningSinceRef,
-    leaderboard,
+    leaderboards,
     selectedWeaponId,
     siegePhase,
     updateRuntimeSnapshot,

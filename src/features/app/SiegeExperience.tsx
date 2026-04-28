@@ -131,13 +131,12 @@ const SiegeExperience = memo(function SiegeExperience({
     siegeGame.exitInteractiveMode();
   }, [siegeGame, ui]);
 
-  const handleDoubleBugCount = useCallback(() => {
+  const handleReplayMode = useCallback(() => {
     ui.closeMenus();
     ui.setChartFocus(null);
     resetEvolution();
     siegeGame.enterInteractiveMode(siegeGame.gameMode, {
       baseBugCounts: siegeGame.interactiveInitialBugCounts,
-      bugMultiplier: 2,
     });
   }, [resetEvolution, siegeGame, ui]);
 
@@ -239,8 +238,8 @@ const SiegeExperience = memo(function SiegeExperience({
         <SiegeRunCompleteOverlay
           completionSummary={siegeGame.completionSummary}
           leaderboard={siegeGame.leaderboard}
-          onDoubleBugCount={handleDoubleBugCount}
           onExit={handleExitInteractiveMode}
+          onReplayMode={handleReplayMode}
           onSwitchMode={handleSwitchMode}
         />
       ) : null}

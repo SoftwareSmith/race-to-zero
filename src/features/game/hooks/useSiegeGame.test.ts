@@ -118,7 +118,7 @@ describe("useSiegeGame", () => {
     expect(result.current.leaderboard).toHaveLength(1);
     expect(result.current.completionSummary?.topWeaponLabel).toBe("Hammer");
     expect(window.localStorage.setItem).toHaveBeenCalledWith(
-      STORAGE_KEYS.siegeRunLeaderboard,
+      STORAGE_KEYS.siegeRunLeaderboardsV2,
       expect.any(String),
     );
   });

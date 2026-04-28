@@ -9,8 +9,8 @@ import { SIEGE_GAME_MODE_META, type SiegeGameMode } from "@game/types";
 interface SiegeRunCompleteOverlayProps {
   completionSummary: SiegeCompletionSummary;
   leaderboard: SiegeLeaderboardEntry[];
-  onDoubleBugCount: () => void;
   onExit: () => void;
+  onReplayMode: () => void;
   onSwitchMode: () => void;
 }
 
@@ -18,6 +18,7 @@ interface CompletionActionCardProps {
   description: string;
   label: string;
   onClick: () => void;
+  testId: string;
   title: string;
   tone: "default" | "sky" | "emerald";
 }
@@ -35,6 +36,7 @@ function CompletionActionCard({
   description,
   label,
   onClick,
+  testId,
   title,
   tone,
 }: CompletionActionCardProps) {
@@ -54,6 +56,7 @@ function CompletionActionCard({
   return (
     <button
       className={`rounded-2xl border px-4 py-4 text-left transition ${className}`}
+      data-testid={testId}
       onClick={onClick}
       type="button"
     >
@@ -71,34 +74,37 @@ function CompletionActionCard({
 const SiegeRunCompleteOverlay = memo(function SiegeRunCompleteOverlay({
   completionSummary,
   leaderboard,
-  onDoubleBugCount,
   onExit,
+  onReplayMode,
   onSwitchMode,
 }: SiegeRunCompleteOverlayProps) {
   const alternateMode =
     completionSummary.mode === "purge" ? "outbreak" : "purge";
   const alternateModeMeta = SIEGE_GAME_MODE_META[alternateMode];
   const modeMeta = SIEGE_GAME_MODE_META[completionSummary.mode];
+  const isSurvival = completionSummary.mode === "outbreak";
   const actionCards: CompletionActionCardProps[] = [
     {
-      description:
-        "Relaunch this mode with a doubled swarm and keep climbing the board.",
-      label: "Next challenge",
-      onClick: onDoubleBugCount,
-      title: "Double bug count",
+      description: `Restart ${modeMeta.shortLabel} and chase a better local rank.`,
+      label: "Play again",
+      onClick: onReplayMode,
+      testId: "siege-complete-replay",
+      title: `Play ${modeMeta.shortLabel} Again`,
       tone: "sky",
     },
     {
       description: alternateModeMeta.description,
       label: "Mode swap",
       onClick: onSwitchMode,
-      title: `Switch to ${alternateModeMeta.label}`,
+      testId: "siege-complete-switch-mode",
+      title: alternateModeMeta.switchActionLabel,
       tone: "emerald",
     },
     {
       description: "Leave the arena and return to the reporting view.",
       label: "Wrap up",
       onClick: onExit,
+      testId: "siege-complete-back-dashboard",
       title: "Back to dashboard",
       tone: "default",
     },
@@ -127,7 +133,11 @@ const SiegeRunCompleteOverlay = memo(function SiegeRunCompleteOverlay({
       </div>
 
       <div className="absolute inset-0 flex items-center justify-center p-4 sm:p-8">
-        <section className="w-full max-w-5xl rounded-[2rem] border border-white/12 bg-[linear-gradient(155deg,rgba(15,23,42,0.98),rgba(10,15,28,0.94))] p-5 text-stone-100 shadow-[0_32px_120px_rgba(15,23,42,0.48)] [animation:siege-complete-pop_420ms_cubic-bezier(0.22,1,0.36,1)_forwards] sm:p-7">
+        <section
+          aria-modal="true"
+          className="w-full max-w-5xl rounded-[2rem] border border-white/12 bg-[linear-gradient(155deg,rgba(15,23,42,0.98),rgba(10,15,28,0.94))] p-5 text-stone-100 shadow-[0_32px_120px_rgba(15,23,42,0.48)] [animation:siege-complete-pop_420ms_cubic-bezier(0.22,1,0.36,1)_forwards] sm:p-7"
+          role="dialog"
+        >
           <div className="grid gap-6 lg:grid-cols-[1.3fr_0.9fr]">
             <div className="space-y-5">
               <div className="inline-flex items-center gap-2 rounded-full border border-emerald-400/24 bg-emerald-300/10 px-3 py-1 text-[0.72rem] font-semibold uppercase tracking-[0.22em] text-emerald-100">
@@ -141,38 +151,56 @@ const SiegeRunCompleteOverlay = memo(function SiegeRunCompleteOverlay({
                   Run complete • {modeMeta.shortLabel}
                 </p>
                 <h2 className="max-w-xl text-3xl font-semibold tracking-[-0.04em] text-white sm:text-5xl">
-                  Swarm cleared. The lane is stable.
+                  {isSurvival
+                    ? "Run logged. Survival score saved."
+                    : "Swarm cleared. Time recorded."}
                 </h2>
                 <p className="max-w-2xl text-sm leading-6 text-stone-300 sm:text-[0.95rem]">
-                  {completionSummary.bugCount.toLocaleString()} bugs cleared in{" "}
-                  {formatElapsedTime(completionSummary.elapsedMs)} with{" "}
-                  {completionSummary.topWeaponLabel} leading the run.
+                  {isSurvival ? (
+                    <>
+                      Reached wave {completionSummary.waveReached.toLocaleString()} and
+                      survived {formatElapsedTime(completionSummary.survivedMs)} with{" "}
+                      {completionSummary.topWeaponLabel} leading the run.
+                    </>
+                  ) : (
+                    <>
+                      {completionSummary.bugCount.toLocaleString()} bugs cleared in{" "}
+                      {formatElapsedTime(completionSummary.elapsedMs)} with{" "}
+                      {completionSummary.topWeaponLabel} leading the run.
+                    </>
+                  )}
                 </p>
               </div>
 
               <div className="grid gap-3 sm:grid-cols-3">
                 <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
                   <div className="text-[0.7rem] uppercase tracking-[0.2em] text-stone-400">
-                    Bug count
+                    {isSurvival ? "Wave reached" : "Clear time"}
                   </div>
                   <div className="mt-2 text-3xl font-semibold tracking-[-0.04em] text-white">
-                    {completionSummary.bugCount.toLocaleString()}
+                    {isSurvival
+                      ? completionSummary.waveReached.toLocaleString()
+                      : formatElapsedTime(completionSummary.elapsedMs)}
                   </div>
                 </div>
                 <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
                   <div className="text-[0.7rem] uppercase tracking-[0.2em] text-stone-400">
-                    Final time
+                    {isSurvival ? "Survival time" : "Bugs cleared"}
                   </div>
                   <div className="mt-2 text-3xl font-semibold tracking-[-0.04em] text-white">
-                    {formatElapsedTime(completionSummary.elapsedMs)}
+                    {isSurvival
+                      ? formatElapsedTime(completionSummary.survivedMs)
+                      : completionSummary.bugCount.toLocaleString()}
                   </div>
                 </div>
                 <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
                   <div className="text-[0.7rem] uppercase tracking-[0.2em] text-stone-400">
-                    Bugs per second
+                    {isSurvival ? "Offline status" : "Bugs per second"}
                   </div>
                   <div className="mt-2 text-3xl font-semibold tracking-[-0.04em] text-white">
-                    {completionSummary.bugsPerSecond.toFixed(2)}
+                    {isSurvival
+                      ? completionSummary.offlineReason ?? "Site offline"
+                      : completionSummary.bugsPerSecond.toFixed(2)}
                   </div>
                 </div>
               </div>
@@ -191,8 +219,9 @@ const SiegeRunCompleteOverlay = memo(function SiegeRunCompleteOverlay({
                     Local leaderboard
                   </p>
                   <p className="mt-1 text-sm text-stone-300">
-                    Best clears are ranked by bug count first, then by fastest
-                    finish.
+                    {isSurvival
+                      ? "Survival runs are ranked by wave reached, then survival time."
+                      : "Time Attack clears are ranked by fastest finish, then bug count."}
                   </p>
                 </div>
                 <div className="rounded-full border border-white/10 bg-white/6 px-2.5 py-1 text-[0.68rem] font-semibold uppercase tracking-[0.18em] text-stone-300">
@@ -204,15 +233,17 @@ const SiegeRunCompleteOverlay = memo(function SiegeRunCompleteOverlay({
                 {leaderboard.map((entry, index) => (
                   <div
                     key={entry.id}
-                    className="grid grid-cols-[auto_1fr_auto] items-center gap-3 rounded-2xl border border-white/8 bg-black/18 px-3 py-3"
+                    className={`grid grid-cols-[auto_1fr_auto] items-center gap-3 rounded-2xl border px-3 py-3 ${entry.id === completionSummary.id ? "border-emerald-300/32 bg-emerald-300/10" : "border-white/8 bg-black/18"}`}
+                    data-current-run={entry.id === completionSummary.id ? "true" : "false"}
                   >
                     <div className="flex h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-white/6 text-sm font-semibold text-white">
                       {index + 1}
                     </div>
                     <div>
                       <div className="text-sm font-semibold text-white">
-                        {entry.bugCount.toLocaleString()} bugs •{" "}
-                        {formatElapsedTime(entry.elapsedMs)}
+                        {entry.mode === "outbreak"
+                          ? `Wave ${entry.waveReached.toLocaleString()} • ${formatElapsedTime(entry.survivedMs)}`
+                          : `${formatElapsedTime(entry.elapsedMs)} • ${entry.bugCount.toLocaleString()} bugs`}
                       </div>
                       <div className="mt-1 text-xs uppercase tracking-[0.16em] text-stone-400">
                         {SIEGE_GAME_MODE_META[entry.mode].shortLabel} •{" "}
@@ -221,7 +252,11 @@ const SiegeRunCompleteOverlay = memo(function SiegeRunCompleteOverlay({
                       </div>
                     </div>
                     <div className="text-right text-[0.68rem] uppercase tracking-[0.14em] text-stone-500">
-                      {index === 0 ? "Best" : "Run"}
+                      {entry.id === completionSummary.id
+                        ? "Current"
+                        : index === 0
+                          ? "Best"
+                          : "Run"}
                     </div>
                   </div>
                 ))}
