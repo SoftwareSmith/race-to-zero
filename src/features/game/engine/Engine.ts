@@ -605,6 +605,8 @@ export class Engine {
 
   update(dt: number, targetX?: number | null, targetY?: number | null) {
     // simple fixed-step update called by the host render loop
+    this.elapsedMs += dt * 1000;
+
     for (const ent of this.entities) {
       ent.beginStep();
     }

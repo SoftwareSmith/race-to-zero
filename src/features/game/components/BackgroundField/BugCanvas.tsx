@@ -403,6 +403,7 @@ const BugCanvas = memo(
       // In interactive play, live bug counts can change on every kill and must
       // not rebuild the entire swarm or the canvas will visibly flicker.
       const canvas = canvasRef.current;
+      const currentVfx = vfxRef.current;
       const w = canvas?.clientWidth || boundsRef.current.width || 800;
       const h = canvas?.clientHeight || boundsRef.current.height || 600;
       let cancelled = false;
@@ -516,6 +517,10 @@ const BugCanvas = memo(
       void setupEngine();
 
       return () => {
+        if (blackHoleVfxIdRef.current && currentVfx) {
+          currentVfx.destroyBlackHole(blackHoleVfxIdRef.current);
+          blackHoleVfxIdRef.current = null;
+        }
         cancelled = true;
         // if effect re-runs or component unmounts, clear engine reference
         if (
@@ -549,6 +554,7 @@ const BugCanvas = memo(
       if (!canvas) {
         return undefined;
       }
+      const currentVfx = vfxRef.current;
 
       const context = canvas.getContext("2d", { alpha: true });
       if (!context) {
@@ -801,6 +807,10 @@ const BugCanvas = memo(
         window.removeEventListener("focus", updateActivity);
         window.removeEventListener("blur", updateActivity);
         window.removeEventListener("mousedown", handleInteractivePointerDown);
+        if (blackHoleVfxIdRef.current && currentVfx) {
+          currentVfx.destroyBlackHole(blackHoleVfxIdRef.current);
+          blackHoleVfxIdRef.current = null;
+        }
         if (animationFrameId) {
           window.cancelAnimationFrame(animationFrameId);
         }

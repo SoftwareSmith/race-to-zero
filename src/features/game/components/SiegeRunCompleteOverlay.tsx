@@ -113,7 +113,10 @@ const SiegeRunCompleteOverlay = memo(function SiegeRunCompleteOverlay({
   ];
 
   useEffect(() => {
-    if (typeof window === "undefined" || typeof window.matchMedia !== "function") {
+    if (
+      typeof window === "undefined" ||
+      typeof window.matchMedia !== "function"
+    ) {
       return undefined;
     }
 
@@ -187,7 +190,10 @@ const SiegeRunCompleteOverlay = memo(function SiegeRunCompleteOverlay({
       data-testid="siege-complete-overlay"
     >
       {!prefersReducedMotion ? (
-        <div className="pointer-events-none absolute inset-0" aria-hidden="true">
+        <div
+          className="pointer-events-none absolute inset-0"
+          aria-hidden="true"
+        >
           {CONFETTI.map((piece) => (
             <span
               key={`${piece.left}-${piece.delay}`}

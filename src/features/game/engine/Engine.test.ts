@@ -166,6 +166,51 @@ describe("engine death attribution", () => {
     expect(engine.getWeaponEvolutionStates().get("void")?.kills).toBe(1);
   });
 
+  it("collapses black holes after their duration expires", () => {
+    const engine = new Engine(createCanvas(), {
+      height: 200,
+      width: 200,
+    });
+    const onCollapse = vi.fn();
+
+    engine.startBlackHole(100, 100, 80, 24, 1000, 1, "void");
+
+    for (let frame = 0; frame < 90; frame += 1) {
+      engine.update(1 / 60);
+      engine.tickBlackHole(1000 / 60, onCollapse);
+      if (engine.getBlackHole() == null) {
+        break;
+      }
+    }
+
+    expect(onCollapse).toHaveBeenCalledTimes(1);
+    expect(engine.getBlackHole()).toBeNull();
+  });
+
+  it("steers patrol bugs back toward the center before they settle on the edges", () => {
+    const engine = new Engine(createCanvas(), {
+      height: 200,
+      width: 200,
+    });
+    const bug = new BugEntity({
+      heading: 0,
+      size: 10,
+      variant: "low",
+      vx: 0,
+      vy: 0,
+      x: 170,
+      y: 100,
+    });
+
+    engine.entities = [bug];
+
+    for (let frame = 0; frame < 120; frame += 1) {
+      engine.update(1 / 60, null, null);
+    }
+
+    expect(bug.x).toBeLessThan(170);
+  });
+
   it("caps temporary allies so conversion stays readable", () => {
     const engine = new Engine(createCanvas(), {
       height: 200,

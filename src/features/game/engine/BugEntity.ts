@@ -430,6 +430,27 @@ export class BugEntity extends Entity {
     desired.x += separation.x;
     desired.y += separation.y;
 
+    if (!isAlly && this.state !== "flee") {
+      const centerX = bounds.width * 0.5;
+      const centerY = bounds.height * 0.5;
+      const toCenterX = centerX - this.x;
+      const toCenterY = centerY - this.y;
+      const centerDistance = getLength(toCenterX, toCenterY);
+
+      if (centerDistance > config.targetReachRadius) {
+        const towardCenter = normalizeVector(toCenterX, toCenterY);
+        const centerRamp = clamp(
+          centerDistance / Math.max(config.roamTargetMinDistance, 1),
+          0,
+          1,
+        );
+        const centerPullStrength =
+          config.followStrength * (0.9 + centerRamp * 2.2);
+        desired.x += towardCenter.x * centerPullStrength;
+        desired.y += towardCenter.y * centerPullStrength;
+      }
+    }
+
     if (isAlly) {
       this.state = "patrol";
       this.fleeTimer = null;

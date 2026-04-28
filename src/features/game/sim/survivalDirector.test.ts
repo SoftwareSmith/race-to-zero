@@ -46,6 +46,7 @@ describe("survival director", () => {
     expect(wave25.spawnBudget).toBeGreaterThan(wave1.spawnBudget);
     expect(wave50.spawnBudget).toBeGreaterThan(wave25.spawnBudget);
     expect(wave50.activeBugLimit).toBeGreaterThan(wave1.activeBugLimit);
+    expect(wave1.waveDurationMs).toBe(30_000);
   });
 
   it("creates burst counts from the active wave weights", () => {

@@ -16,6 +16,7 @@ export interface SurvivalSpawnPlan {
   tacticLabel?: string;
   variantFocus?: string;
   variantWeights: SurvivalVariantWeights;
+  waveDurationMs: number;
   wave: number;
 }
 
@@ -97,11 +98,12 @@ export function buildCountsFromWeights(
 export function getSurvivalWavePlan(wave: number): SurvivalSpawnPlan {
   const safeWave = Math.max(1, Math.floor(wave));
   const variantWeights = getSurvivalVariantWeights(safeWave);
-  const spawnBudget = Math.round(
-    clamp(7 + safeWave * 1.8 + Math.pow(safeWave, 1.32) * 0.58, 8, 360),
-  );
+  const waveDurationMs = 30_000;
   const spawnRatePerSecond = Number(
     clamp(0.65 + Math.pow(safeWave, 1.18) * 0.12, 0.65, 18).toFixed(2),
+  );
+  const spawnBudget = Math.round(
+    clamp(spawnRatePerSecond * (waveDurationMs / 1000), 8, 540),
   );
   const burstSize = Math.max(1, Math.ceil(spawnRatePerSecond));
   const pressureThreshold = Math.round(clamp(14 + safeWave * 1.15, 12, 95));
@@ -134,6 +136,7 @@ export function getSurvivalWavePlan(wave: number): SurvivalSpawnPlan {
             : "Opening wave",
     variantFocus: urgentIsFocus ? "urgent" : highIsFocus ? "high" : "low",
     variantWeights,
+    waveDurationMs,
     wave: safeWave,
   };
 }

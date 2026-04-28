@@ -43,6 +43,7 @@ interface SiegeHudProps {
     focusLabel: string;
     pressurePercent: number;
     runtimeSpeedMultiplier: number;
+    secondsUntilNextWave: number | null;
     secondsUntilOffline: number | null;
     siteIntegrity: number;
     spawnRatePerSecond: number;
@@ -103,9 +104,13 @@ export default function SiegeHud({
   }, [justUnlockedWeaponIds]);
   const timerValue = formatElapsedTime(elapsedMs);
   const bugsPerSecond =
-    elapsedMs > 0 ? Number(((interactiveKills * 1000) / elapsedMs).toFixed(1)) : 0;
+    elapsedMs > 0
+      ? Number(((interactiveKills * 1000) / elapsedMs).toFixed(1))
+      : 0;
   const isSurvival = gameMode === "outbreak";
-  const [survivalWaveToast, setSurvivalWaveToast] = useState<string | null>(null);
+  const [survivalWaveToast, setSurvivalWaveToast] = useState<string | null>(
+    null,
+  );
   const survivalIntegrityPercent = Math.max(
     0,
     Math.min(100, Math.round(survivalStatus?.siteIntegrity ?? 100)),
@@ -185,7 +190,12 @@ export default function SiegeHud({
       window.clearTimeout(showTimeoutId);
       window.clearTimeout(timeoutId);
     };
-  }, [isSurvival, survivalStatus?.focusLabel, survivalStatus?.tacticLabel, survivalStatus?.wave]);
+  }, [
+    isSurvival,
+    survivalStatus?.focusLabel,
+    survivalStatus?.tacticLabel,
+    survivalStatus?.wave,
+  ]);
 
   return (
     <div
@@ -196,53 +206,53 @@ export default function SiegeHud({
       {isSurvival ? (
         <div className="pointer-events-none fixed inset-x-0 top-3 z-[220] flex justify-start px-3 sm:top-4">
           <HudShell className="pointer-events-auto border-transparent bg-[linear-gradient(180deg,rgba(8,11,16,0.88),rgba(9,12,16,0.68))] overflow-visible px-1.5 py-1.5 shadow-[0_18px_42px_rgba(0,0,0,0.34)] [animation:hud-notch-arrive_320ms_cubic-bezier(0.22,1,0.36,1)_forwards]">
-              <div className="grid min-w-0 grid-cols-[4.2rem_4.8rem_minmax(0,7.8rem)] gap-1">
-                <div
-                  className="rounded-full border border-emerald-300/12 bg-emerald-400/[0.08] px-2 py-1.5"
-                  data-testid="siege-wave-stat"
-                >
-                  <span className="block text-[0.48rem] font-semibold uppercase tracking-[0.14em] text-emerald-100/65">
-                    Wave
+            <div className="grid min-w-0 grid-cols-[4.2rem_4.8rem_minmax(0,7.8rem)] gap-1">
+              <div
+                className="rounded-full border border-emerald-300/12 bg-emerald-400/[0.08] px-2 py-1.5"
+                data-testid="siege-wave-stat"
+              >
+                <span className="block text-[0.48rem] font-semibold uppercase tracking-[0.14em] text-emerald-100/65">
+                  Wave
+                </span>
+                <strong className="mt-1 block font-display text-[0.88rem] leading-none tracking-[-0.04em] text-stone-50">
+                  {waveLabel}
+                </strong>
+              </div>
+
+              <div
+                className="rounded-full border border-amber-300/12 bg-amber-400/[0.08] px-2 py-1.5"
+                data-testid="siege-spawn-rate-stat"
+              >
+                <span className="block text-[0.48rem] font-semibold uppercase tracking-[0.14em] text-amber-100/65">
+                  Rate
+                </span>
+                <strong className="mt-1 block font-display text-[0.88rem] leading-none tracking-[-0.04em] text-stone-50">
+                  {spawnRateLabel}
+                </strong>
+              </div>
+
+              <div
+                className="rounded-full border border-white/10 bg-black/22 px-2 py-1.5"
+                data-testid="siege-offline-pressure"
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-[0.48rem] font-semibold uppercase tracking-[0.14em] text-stone-400">
+                    Site online
                   </span>
-                  <strong className="mt-1 block font-display text-[0.88rem] leading-none tracking-[-0.04em] text-stone-50">
-                    {waveLabel}
+                  <strong className="font-display text-[0.76rem] leading-none tracking-[-0.04em] text-stone-50">
+                    {survivalStatus?.secondsUntilOffline != null
+                      ? `${survivalStatus.secondsUntilOffline}s`
+                      : `${survivalIntegrityPercent}%`}
                   </strong>
                 </div>
-
-                <div
-                  className="rounded-full border border-amber-300/12 bg-amber-400/[0.08] px-2 py-1.5"
-                  data-testid="siege-spawn-rate-stat"
-                >
-                  <span className="block text-[0.48rem] font-semibold uppercase tracking-[0.14em] text-amber-100/65">
-                    Rate
-                  </span>
-                  <strong className="mt-1 block font-display text-[0.88rem] leading-none tracking-[-0.04em] text-stone-50">
-                    {spawnRateLabel}
-                  </strong>
-                </div>
-
-                <div
-                  className="rounded-full border border-white/10 bg-black/22 px-2 py-1.5"
-                  data-testid="siege-offline-pressure"
-                >
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="text-[0.48rem] font-semibold uppercase tracking-[0.14em] text-stone-400">
-                      Site online
-                    </span>
-                    <strong className="font-display text-[0.76rem] leading-none tracking-[-0.04em] text-stone-50">
-                      {survivalStatus?.secondsUntilOffline != null
-                        ? `${survivalStatus.secondsUntilOffline}s`
-                        : `${survivalIntegrityPercent}%`}
-                    </strong>
-                  </div>
-                  <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-red-950/60">
-                    <div
-                      className="h-full rounded-full bg-[linear-gradient(90deg,#34d399,#7dd3fc)] transition-[width] duration-300"
-                      style={{ width: `${survivalIntegrityPercent}%` }}
-                    />
-                  </div>
+                <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-red-950/60">
+                  <div
+                    className="h-full rounded-full bg-[linear-gradient(90deg,#34d399,#7dd3fc)] transition-[width] duration-300"
+                    style={{ width: `${survivalIntegrityPercent}%` }}
+                  />
                 </div>
               </div>
+            </div>
           </HudShell>
         </div>
       ) : null}
@@ -345,7 +355,11 @@ export default function SiegeHud({
         </HudShell>
       </div>
 
-      {killStreak >= 3 || unlockToast || upgradeToast || survivalWaveToast || survivalWarningLabel ? (
+      {killStreak >= 3 ||
+      unlockToast ||
+      upgradeToast ||
+      survivalWaveToast ||
+      survivalWarningLabel ? (
         <div className="pointer-events-none fixed inset-x-0 top-[7.15rem] z-[220] flex justify-center px-3 sm:top-[5.95rem]">
           <div className="mt-0.5 flex flex-wrap items-center justify-center gap-1 text-center">
             {killStreak >= 3 ? (
@@ -370,7 +384,9 @@ export default function SiegeHud({
             ) : null}
             {survivalWarningLabel ? (
               <HudEventPill className="border-red-300/24 bg-red-500/10 text-red-100 [animation:heat-tier-pulse_1400ms_ease-in-out_infinite]">
-                <span data-testid="siege-offline-warning">{survivalWarningLabel}</span>
+                <span data-testid="siege-offline-warning">
+                  {survivalWarningLabel}
+                </span>
               </HudEventPill>
             ) : null}
           </div>

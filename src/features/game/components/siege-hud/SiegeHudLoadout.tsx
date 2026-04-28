@@ -49,7 +49,11 @@ const SiegeHudLoadout = memo(function SiegeHudLoadout({
     weaponCount * weaponSlotRem + Math.max(0, weaponCount - 1) * railGapRem;
   const toolbeltWidthRem = Math.max(26, weaponRailWidthRem + 1.5);
   const loadoutContent = (
-    <div className={inline ? "flex min-w-0 items-center gap-2" : "relative space-y-2"}>
+    <div
+      className={
+        inline ? "flex min-w-0 items-center gap-2" : "relative space-y-2"
+      }
+    >
       {selectedSnapshot ? (
         <button
           aria-expanded={progressExpanded}
@@ -60,7 +64,9 @@ const SiegeHudLoadout = memo(function SiegeHudLoadout({
           }
           className={cn(
             "relative rounded-[14px] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.08),rgba(255,255,255,0.04))] text-left shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] transition duration-200 hover:border-white/16 hover:bg-[linear-gradient(180deg,rgba(255,255,255,0.11),rgba(255,255,255,0.05))] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300/40",
-            inline ? "min-w-[8.5rem] max-w-[11rem] px-2.5 py-1.5" : "w-full px-3 py-2",
+            inline
+              ? "min-w-[8.5rem] max-w-[11rem] px-2.5 py-1.5"
+              : "w-full px-3 py-2",
           )}
           data-no-hammer
           data-testid="siege-current-weapon"
@@ -90,8 +96,15 @@ const SiegeHudLoadout = memo(function SiegeHudLoadout({
                       <span
                         key={`selected-tier-node-${index + 1}`}
                         className={cn(
-                          getTierNodeOffsetClassName(selectedSnapshot, index + 1),
-                          getTierNodeClassName(selectedSnapshot, index + 1, "panel"),
+                          getTierNodeOffsetClassName(
+                            selectedSnapshot,
+                            index + 1,
+                          ),
+                          getTierNodeClassName(
+                            selectedSnapshot,
+                            index + 1,
+                            "panel",
+                          ),
                         )}
                       >
                         <span
@@ -100,7 +113,10 @@ const SiegeHudLoadout = memo(function SiegeHudLoadout({
                             getTierNodeFillClassName(selectedSnapshot),
                           )}
                           style={{
-                            width: getTierNodeFillWidth(selectedSnapshot, index + 1),
+                            width: getTierNodeFillWidth(
+                              selectedSnapshot,
+                              index + 1,
+                            ),
                           }}
                         >
                           <span
@@ -122,7 +138,9 @@ const SiegeHudLoadout = memo(function SiegeHudLoadout({
                 aria-hidden="true"
                 className="text-[0.72rem] text-stone-400 transition-transform duration-200"
                 style={{
-                  transform: progressExpanded ? "rotate(180deg)" : "rotate(0deg)",
+                  transform: progressExpanded
+                    ? "rotate(180deg)"
+                    : "rotate(0deg)",
                 }}
               >
                 ▾

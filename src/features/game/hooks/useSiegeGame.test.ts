@@ -1,5 +1,5 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { STORAGE_KEYS } from "../../../constants/storageKeys";
 import { useSiegeGame } from "./useSiegeGame";
@@ -13,6 +13,10 @@ describe("useSiegeGame", () => {
         setItem: vi.fn(),
       },
     });
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   it("does not auto-switch to a newly unlocked weapon", () => {
@@ -208,6 +212,33 @@ describe("useSiegeGame", () => {
     });
 
     expect(result.current.interactiveRemainingBugs).toBe(17);
+  });
+
+  it("rolls survival waves forward when the timer expires", async () => {
+    vi.useFakeTimers();
+
+    const { result } = renderHook(() =>
+      useSiegeGame({
+        currentBugCount: 20,
+        currentBugCounts: { high: 0, low: 20, medium: 0, urgent: 0 },
+        evolutionStates: {},
+      }),
+    );
+
+    act(() => {
+      result.current.enterInteractiveMode("outbreak");
+      vi.advanceTimersByTime(520);
+    });
+
+    expect(result.current.siegePhase).toBe("active");
+
+    act(() => {
+      vi.advanceTimersByTime(30_500);
+    });
+
+    expect(result.current.survivalStatus.wave).toBe(2);
+
+    expect(result.current.survivalStatus.secondsUntilNextWave).toBeGreaterThan(0);
   });
 
   it("advances the timer during an active run", async () => {
