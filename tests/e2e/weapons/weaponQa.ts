@@ -15,7 +15,7 @@ import {
 export { getQaLastHit, waitForQaBugPositions };
 
 async function getHudKillCount(page: Page) {
-  const text = await page.getByTestId("siege-hud").locator("strong").nth(1).textContent();
+  const text = await page.getByTestId("siege-kills-stat").locator("strong").textContent();
   return Number.parseInt(text ?? "0", 10);
 }
 

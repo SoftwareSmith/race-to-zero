@@ -40,6 +40,13 @@ const DEFAULT_MAX_ACTIVE_ALLIES = 5;
 
 type SpatialCell = Entity[];
 
+interface SpawnZone {
+  height: number;
+  left: number;
+  top: number;
+  width: number;
+}
+
 export interface EngineOptions {
   width: number;
   height: number;
@@ -261,12 +268,7 @@ export class Engine {
 
   spawnFromCounts(
     counts: Record<string, number>,
-    spawnZones: Array<{
-      height: number;
-      left: number;
-      top: number;
-      width: number;
-    }> = [],
+    spawnZones: SpawnZone[] = [],
   ) {
     const usableZones = spawnZones.filter(
       (zone) => zone.width > 24 && zone.height > 24,
@@ -353,6 +355,73 @@ export class Engine {
           be.hp = be.maxHp;
         }
         this.entities.push(be);
+      }
+    }
+  }
+
+  private getEdgeSpawnPoint() {
+    const padding = 18;
+    const edge = Math.floor(Math.random() * 4);
+    const x = padding + Math.random() * Math.max(1, this.width - padding * 2);
+    const y = padding + Math.random() * Math.max(1, this.height - padding * 2);
+
+    if (edge === 0) {
+      return { heading: Math.PI / 2, x, y: -padding };
+    }
+
+    if (edge === 1) {
+      return { heading: Math.PI, x: this.width + padding, y };
+    }
+
+    if (edge === 2) {
+      return { heading: -Math.PI / 2, x, y: this.height + padding };
+    }
+
+    return { heading: 0, x: -padding, y };
+  }
+
+  spawnBurst(counts: Record<string, number>, spawnZones: SpawnZone[] = []) {
+    void spawnZones;
+    const variants = Object.keys(counts);
+
+    for (const variant of variants) {
+      const count = counts[variant] ?? 0;
+      for (let index = 0; index < count; index += 1) {
+        const spawnPoint = this.getEdgeSpawnPoint();
+        const heading = spawnPoint.heading + (Math.random() - 0.5) * 0.7;
+        const speed = this.config.baseSpeed * (0.95 + Math.random() * 0.7);
+        let bug: BugEntity;
+
+        if (this.pool.length > 0) {
+          bug = this.pool.pop()!;
+          bug.revive(this.width, this.height);
+          bug.variant = (variant as any) || "low";
+          bug.size = (6 + Math.random() * 2) * this.config.sizeMultiplier;
+          bug.baseSize = bug.size;
+          bug.maxHp = getBugVariantMaxHp(bug.variant as any);
+          bug.hp = bug.maxHp;
+          bug.x = spawnPoint.x;
+          bug.y = spawnPoint.y;
+          bug.vx = Math.cos(heading) * speed;
+          bug.vy = Math.sin(heading) * speed;
+          bug.heading = heading;
+        } else {
+          bug = new BugEntity({
+            heading,
+            opacity: 1,
+            size: (6 + Math.random() * 2) * this.config.sizeMultiplier,
+            variant: (variant as any) || "low",
+            vx: Math.cos(heading) * speed,
+            vy: Math.sin(heading) * speed,
+            x: spawnPoint.x,
+            y: spawnPoint.y,
+          } as any);
+          bug.baseSize = bug.size;
+          bug.maxHp = getBugVariantMaxHp(bug.variant as any);
+          bug.hp = bug.maxHp;
+        }
+
+        this.entities.push(bug);
       }
     }
   }

@@ -8,6 +8,7 @@ import { HudActionButton } from "./shared";
 const CodexPanel = lazy(() => import("@game/components/CodexPanel"));
 
 interface SiegeHudControlsProps {
+  className?: string;
   codexMenuRef?: RefObject<HTMLDivElement | null>;
   codexOpen: boolean;
   debugMode: boolean;
@@ -32,6 +33,7 @@ interface HudControlAction {
 }
 
 const SiegeHudControls = memo(function SiegeHudControls({
+  className,
   codexMenuRef,
   codexOpen,
   debugMode,
@@ -151,11 +153,11 @@ const SiegeHudControls = memo(function SiegeHudControls({
   ];
 
   return (
-    <div className="pointer-events-none fixed left-3 top-3 z-[220] sm:left-4 sm:top-4">
+    <div className={cn("pointer-events-auto shrink-0", className)}>
       <div
         data-testid="siege-hud-controls"
         data-hud-cursor="default"
-        className="pointer-events-auto w-full max-w-[26rem] select-none !cursor-default [animation:hud-notch-arrive_320ms_cubic-bezier(0.22,1,0.36,1)_forwards]"
+        className="select-none !cursor-default"
       >
         <div className="flex flex-wrap items-center gap-2">
           <div

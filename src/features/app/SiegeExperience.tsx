@@ -162,6 +162,7 @@ const SiegeExperience = memo(function SiegeExperience({
           chartFocus={backgroundChartFocus}
           className={siegeGame.interactiveMode ? "z-30" : "z-0"}
           combatStats={siegeGame.interactiveMode ? siegeGame.combatStats : null}
+          gameMode={siegeGame.gameMode}
           gameConfig={settings.gameConfig}
           getWeaponTier={getActiveWeaponTier}
           initialEvolutionStates={evolutionStates}
@@ -183,6 +184,11 @@ const SiegeExperience = memo(function SiegeExperience({
           onWeaponEvolution={handleEvolution}
           onWeaponEvolutionStatesChange={syncFromEngine}
           maxWeaponTier={siegeGame.maxWeaponTier}
+          runtimeSpeedMultiplier={
+            siegeGame.interactiveMode
+              ? siegeGame.survivalStatus.runtimeSpeedMultiplier
+              : 1
+          }
           onWeaponFired={
             siegeGame.interactiveMode ? siegeGame.handleWeaponFired : undefined
           }
@@ -197,6 +203,9 @@ const SiegeExperience = memo(function SiegeExperience({
           siegeZones={siegeZones}
           streakMultiplier={
             siegeGame.interactiveMode ? siegeGame.streakMultiplier : 1
+          }
+          survivalSpawnPlan={
+            siegeGame.interactiveMode ? siegeGame.survivalSpawnPlan : null
           }
           tone={metrics.deadlineMetrics.statusTone}
           transitionSnapshot={transitionSnapshot}
@@ -229,6 +238,7 @@ const SiegeExperience = memo(function SiegeExperience({
           onToggleDebugMode={siegeGame.toggleDebugMode}
           selectedWeaponId={siegeGame.selectedWeaponId}
           streakMultiplier={siegeGame.streakMultiplier}
+          survivalStatus={siegeGame.survivalStatus}
           upgradeToast={upgradeToast}
           weaponSnapshots={siegeGame.weaponSnapshots}
         />

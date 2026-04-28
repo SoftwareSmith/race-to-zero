@@ -59,12 +59,15 @@ interface UseSiegeRunCompletionOptions {
   interactiveRemainingBugs: number;
   interactiveBaseElapsedMsRef: MutableRefObject<number>;
   interactiveRunningSinceRef: MutableRefObject<number | null>;
+  offlineReason?: string | null;
   selectedWeaponId: SiegeWeaponId;
   siegePhase: SiegePhase;
+  siteOffline: boolean;
   updateRuntimeSnapshot: (
     updater: (current: SiegeRuntimeSnapshotLike) => SiegeRuntimeSnapshotLike,
     force?: boolean,
   ) => void;
+  waveReached?: number;
 }
 
 function getTopWeapon(
@@ -235,9 +238,12 @@ export function useSiegeRunCompletion({
   interactiveRemainingBugs,
   interactiveBaseElapsedMsRef,
   interactiveRunningSinceRef,
+  offlineReason,
   selectedWeaponId,
   siegePhase,
+  siteOffline,
   updateRuntimeSnapshot,
+  waveReached = 0,
 }: UseSiegeRunCompletionOptions) {
   const [leaderboards, setLeaderboards] = useState<SiegeLeaderboardsByMode>(
     getStoredLeaderboards,
@@ -250,7 +256,8 @@ export function useSiegeRunCompletion({
     if (
       !interactiveMode ||
       siegePhase !== "active" ||
-      interactiveRemainingBugs > 0 ||
+      (gameMode === "purge" && interactiveRemainingBugs > 0) ||
+      (gameMode === "outbreak" && !siteOffline) ||
       completionSummary != null
     ) {
       return;
@@ -277,11 +284,13 @@ export function useSiegeRunCompletion({
       elapsedMs: finalElapsedMs,
       mode: gameMode,
       offlineReason:
-        gameMode === "outbreak" ? "Site stabilized before offline" : undefined,
+        gameMode === "outbreak"
+          ? offlineReason ?? "Site offline under swarm pressure"
+          : undefined,
       survivedMs: finalElapsedMs,
       topWeaponId: topWeapon.id,
       topWeaponLabel: topWeapon.label,
-      waveReached: gameMode === "outbreak" ? 1 : 0,
+      waveReached: gameMode === "outbreak" ? Math.max(1, waveReached) : 0,
     };
     const nextLeaderboards = buildSiegeLeaderboards([
       ...leaderboards.purge,
@@ -320,9 +329,12 @@ export function useSiegeRunCompletion({
     interactiveRemainingBugs,
     interactiveRunningSinceRef,
     leaderboards,
+    offlineReason,
     selectedWeaponId,
     siegePhase,
+    siteOffline,
     updateRuntimeSnapshot,
+    waveReached,
   ]);
 
   return {

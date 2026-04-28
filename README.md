@@ -15,10 +15,28 @@ The app now has one primary surface:
 - Dark-themed dashboard with deadline picker and time-range drill-down controls
 - Siege-mode gameplay layered over the dashboard itself
 - Progression-based reclaim tools with automatic zone clearing
+- Two playable game modes:
+	- Time Attack: clear the current bug board as fast as possible
+	- Survival: hold the site through escalating waves until the swarm forces it offline
+- Local completion modal with replay, mode switching, and local leaderboard ranking
 - Charts powered by Chart.js through `react-chartjs-2`
 - Date handling with `date-fns`
 - Frontend-derived deadline, pace, and time-window calculations
 - GitHub Pages-ready Vite base path at `/race-to-zero/`
+
+## Siege Mode Rules
+
+- Time Attack starts from the current dashboard bug loadout and ranks runs by fastest clear time.
+- Survival starts at Wave 1 and scales difficulty through higher spawn rates, larger spawn budgets, and more critical bugs.
+- Survival can fail before the board is empty if swarm pressure drives site integrity to zero.
+- Every completed run opens a local summary modal with replay, mode swap, and dashboard exit actions.
+
+## Siege Controls
+
+- `Esc`: leave the current siege run.
+- Mouse / primary input: attack bugs with the selected weapon.
+- HUD mode tabs: swap between Time Attack and Survival.
+- Codex: inspect bug and weapon details without leaving the battlefield.
 
 ## Architecture
 

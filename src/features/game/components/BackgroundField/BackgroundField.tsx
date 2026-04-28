@@ -28,6 +28,7 @@ import WeaponCursor from "@game/components/WeaponCursor";
 import { createEffectEvent, isEffectAlive } from "@game/utils/weaponEffects";
 import { getWeaponHeatProfile } from "@game/utils/weaponHeat";
 import type { GameConfig } from "@game/engine/types";
+import type { SurvivalSpawnPlan } from "@game/sim/survivalDirector";
 import { getOverlayRenderer } from "@game/weapons/runtime/registry";
 import BugCanvas from "./BugCanvas";
 import type {
@@ -58,10 +59,13 @@ interface BackgroundFieldProps {
   openBugCount?: number;
   selectedWeaponId?: SiegeWeaponId;
   streakMultiplier?: number;
+  survivalSpawnPlan?: (SurvivalSpawnPlan & { sequenceId: number }) | null;
+  runtimeSpeedMultiplier?: number;
   siegeZones?: SiegeZoneRect[];
   interactiveMode: boolean;
   tone: Tone;
   gameConfig?: GameConfig;
+  gameMode?: import("@game/types").SiegeGameMode;
   /** Returns the current evolution tier for a given weapon. Defaults to T1 when not provided. */
   getWeaponTier?: (id: SiegeWeaponId) => import("@game/types").WeaponTier;
   /** Highest weapon tier allowed for the active game mode. */
@@ -99,9 +103,12 @@ const BackgroundField = memo(
         openBugCount,
         selectedWeaponId = "hammer",
         streakMultiplier = 1,
+        survivalSpawnPlan = null,
+        runtimeSpeedMultiplier = 1,
         siegeZones = [],
         interactiveMode,
         gameConfig,
+        gameMode = "purge",
         tone,
         getWeaponTier = () => 1 as import("@game/types").WeaponTier,
         maxWeaponTier,
@@ -276,6 +283,7 @@ const BackgroundField = memo(
             bugVisualSettings={bugVisualSettings}
             chartFocus={chartFocus}
             combatStats={combatStats}
+            gameMode={gameMode}
             motionProfile={motionProfile}
             onHit={handleBugHit}
             bugCounts={normalizedBugCounts}
@@ -287,6 +295,8 @@ const BackgroundField = memo(
             onEntityDeath={handleEntityDeath}
             selectedWeaponId={selectedWeaponId}
             streakMultiplier={streakMultiplier}
+            survivalSpawnPlan={survivalSpawnPlan}
+            runtimeSpeedMultiplier={runtimeSpeedMultiplier}
             onWeaponFire={interactiveMode ? handleWeaponFire : undefined}
             hammerPositionRef={hammerPositionRef}
             getWeaponTier={getWeaponTier}

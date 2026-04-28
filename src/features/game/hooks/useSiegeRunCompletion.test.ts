@@ -101,6 +101,7 @@ describe("siege run completion leaderboards", () => {
         interactiveRunningSinceRef: { current: null },
         selectedWeaponId: "hammer",
         siegePhase: "idle",
+        siteOffline: false,
         updateRuntimeSnapshot: vi.fn(),
       }),
     );
@@ -143,6 +144,7 @@ describe("siege run completion leaderboards", () => {
         interactiveRunningSinceRef: { current: null },
         selectedWeaponId: "hammer",
         siegePhase: "idle",
+        siteOffline: false,
         updateRuntimeSnapshot: vi.fn(),
       }),
     );

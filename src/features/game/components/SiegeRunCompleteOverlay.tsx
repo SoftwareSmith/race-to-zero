@@ -1,4 +1,4 @@
-import { memo } from "react";
+import { memo, useEffect, useRef, useState, type KeyboardEvent } from "react";
 import { formatElapsedTime } from "@game/components/siege-hud/formatElapsedTime";
 import type {
   SiegeCompletionSummary,
@@ -78,6 +78,8 @@ const SiegeRunCompleteOverlay = memo(function SiegeRunCompleteOverlay({
   onReplayMode,
   onSwitchMode,
 }: SiegeRunCompleteOverlayProps) {
+  const dialogRef = useRef<HTMLElement | null>(null);
+  const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
   const alternateMode =
     completionSummary.mode === "purge" ? "outbreak" : "purge";
   const alternateModeMeta = SIEGE_GAME_MODE_META[alternateMode];
@@ -110,33 +112,109 @@ const SiegeRunCompleteOverlay = memo(function SiegeRunCompleteOverlay({
     },
   ];
 
+  useEffect(() => {
+    if (typeof window === "undefined" || typeof window.matchMedia !== "function") {
+      return undefined;
+    }
+
+    const mediaQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const updatePreference = () => {
+      setPrefersReducedMotion(mediaQuery.matches);
+    };
+
+    updatePreference();
+    mediaQuery.addEventListener("change", updatePreference);
+    return () => {
+      mediaQuery.removeEventListener("change", updatePreference);
+    };
+  }, []);
+
+  useEffect(() => {
+    const previousActiveElement =
+      typeof document !== "undefined"
+        ? (document.activeElement as HTMLElement | null)
+        : null;
+    const focusTarget = dialogRef.current?.querySelector<HTMLElement>(
+      '[data-testid="siege-complete-replay"]',
+    );
+
+    focusTarget?.focus();
+
+    return () => {
+      previousActiveElement?.focus?.();
+    };
+  }, []);
+
+  const handleDialogKeyDown = (event: KeyboardEvent<HTMLElement>) => {
+    if (event.key === "Escape") {
+      event.preventDefault();
+      onExit();
+      return;
+    }
+
+    if (event.key !== "Tab") {
+      return;
+    }
+
+    const focusableElements = Array.from(
+      dialogRef.current?.querySelectorAll<HTMLElement>(
+        'button:not([disabled]), [href], [tabindex]:not([tabindex="-1"])',
+      ) ?? [],
+    ).filter((element) => element.offsetParent !== null);
+
+    if (focusableElements.length === 0) {
+      return;
+    }
+
+    const firstElement = focusableElements[0];
+    const lastElement = focusableElements[focusableElements.length - 1];
+
+    if (event.shiftKey && document.activeElement === firstElement) {
+      event.preventDefault();
+      lastElement.focus();
+      return;
+    }
+
+    if (!event.shiftKey && document.activeElement === lastElement) {
+      event.preventDefault();
+      firstElement.focus();
+    }
+  };
+
   return (
     <div
       className="pointer-events-auto fixed inset-0 z-[260] overflow-hidden bg-[radial-gradient(circle_at_top,rgba(125,211,252,0.2),transparent_36%),radial-gradient(circle_at_20%_20%,rgba(251,191,36,0.18),transparent_28%),rgba(2,6,23,0.72)] backdrop-blur-[3px]"
       data-testid="siege-complete-overlay"
     >
-      <div className="pointer-events-none absolute inset-0">
-        {CONFETTI.map((piece) => (
-          <span
-            key={`${piece.left}-${piece.delay}`}
-            className="absolute top-[-10%] block rounded-sm opacity-90"
-            style={{
-              left: piece.left,
-              width: piece.size,
-              height: piece.size * 1.8,
-              background: piece.color,
-              transform: `rotate(${piece.rotate})`,
-              animation: `siege-confetti-fall ${piece.duration} linear ${piece.delay} infinite`,
-            }}
-          />
-        ))}
-      </div>
+      {!prefersReducedMotion ? (
+        <div className="pointer-events-none absolute inset-0" aria-hidden="true">
+          {CONFETTI.map((piece) => (
+            <span
+              key={`${piece.left}-${piece.delay}`}
+              className="absolute top-[-10%] block rounded-sm opacity-90"
+              style={{
+                left: piece.left,
+                width: piece.size,
+                height: piece.size * 1.8,
+                background: piece.color,
+                transform: `rotate(${piece.rotate})`,
+                animation: `siege-confetti-fall ${piece.duration} linear ${piece.delay} infinite`,
+              }}
+            />
+          ))}
+        </div>
+      ) : null}
 
       <div className="absolute inset-0 flex items-center justify-center p-4 sm:p-8">
         <section
           aria-modal="true"
-          className="w-full max-w-5xl rounded-[2rem] border border-white/12 bg-[linear-gradient(155deg,rgba(15,23,42,0.98),rgba(10,15,28,0.94))] p-5 text-stone-100 shadow-[0_32px_120px_rgba(15,23,42,0.48)] [animation:siege-complete-pop_420ms_cubic-bezier(0.22,1,0.36,1)_forwards] sm:p-7"
+          aria-describedby="siege-complete-summary"
+          aria-labelledby="siege-complete-title"
+          className={`w-full max-w-5xl rounded-[2rem] border border-white/12 bg-[linear-gradient(155deg,rgba(15,23,42,0.98),rgba(10,15,28,0.94))] p-5 text-stone-100 shadow-[0_32px_120px_rgba(15,23,42,0.48)] sm:p-7 ${prefersReducedMotion ? "" : "[animation:siege-complete-pop_420ms_cubic-bezier(0.22,1,0.36,1)_forwards]"}`}
+          onKeyDown={handleDialogKeyDown}
+          ref={dialogRef}
           role="dialog"
+          tabIndex={-1}
         >
           <div className="grid gap-6 lg:grid-cols-[1.3fr_0.9fr]">
             <div className="space-y-5">
@@ -150,22 +228,29 @@ const SiegeRunCompleteOverlay = memo(function SiegeRunCompleteOverlay({
                 <p className="text-[0.74rem] font-semibold uppercase tracking-[0.28em] text-sky-100/72">
                   Run complete • {modeMeta.shortLabel}
                 </p>
-                <h2 className="max-w-xl text-3xl font-semibold tracking-[-0.04em] text-white sm:text-5xl">
+                <h2
+                  className="max-w-xl text-3xl font-semibold tracking-[-0.04em] text-white sm:text-5xl"
+                  id="siege-complete-title"
+                >
                   {isSurvival
                     ? "Run logged. Survival score saved."
                     : "Swarm cleared. Time recorded."}
                 </h2>
-                <p className="max-w-2xl text-sm leading-6 text-stone-300 sm:text-[0.95rem]">
+                <p
+                  className="max-w-2xl text-sm leading-6 text-stone-300 sm:text-[0.95rem]"
+                  id="siege-complete-summary"
+                >
                   {isSurvival ? (
                     <>
-                      Reached wave {completionSummary.waveReached.toLocaleString()} and
-                      survived {formatElapsedTime(completionSummary.survivedMs)} with{" "}
-                      {completionSummary.topWeaponLabel} leading the run.
+                      Reached wave{" "}
+                      {completionSummary.waveReached.toLocaleString()} and
+                      survived {formatElapsedTime(completionSummary.survivedMs)}{" "}
+                      with {completionSummary.topWeaponLabel} leading the run.
                     </>
                   ) : (
                     <>
-                      {completionSummary.bugCount.toLocaleString()} bugs cleared in{" "}
-                      {formatElapsedTime(completionSummary.elapsedMs)} with{" "}
+                      {completionSummary.bugCount.toLocaleString()} bugs cleared
+                      in {formatElapsedTime(completionSummary.elapsedMs)} with{" "}
                       {completionSummary.topWeaponLabel} leading the run.
                     </>
                   )}
@@ -199,7 +284,7 @@ const SiegeRunCompleteOverlay = memo(function SiegeRunCompleteOverlay({
                   </div>
                   <div className="mt-2 text-3xl font-semibold tracking-[-0.04em] text-white">
                     {isSurvival
-                      ? completionSummary.offlineReason ?? "Site offline"
+                      ? (completionSummary.offlineReason ?? "Site offline")
                       : completionSummary.bugsPerSecond.toFixed(2)}
                   </div>
                 </div>
@@ -234,7 +319,9 @@ const SiegeRunCompleteOverlay = memo(function SiegeRunCompleteOverlay({
                   <div
                     key={entry.id}
                     className={`grid grid-cols-[auto_1fr_auto] items-center gap-3 rounded-2xl border px-3 py-3 ${entry.id === completionSummary.id ? "border-emerald-300/32 bg-emerald-300/10" : "border-white/8 bg-black/18"}`}
-                    data-current-run={entry.id === completionSummary.id ? "true" : "false"}
+                    data-current-run={
+                      entry.id === completionSummary.id ? "true" : "false"
+                    }
                   >
                     <div className="flex h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-white/6 text-sm font-semibold text-white">
                       {index + 1}

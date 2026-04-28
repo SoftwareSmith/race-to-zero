@@ -41,8 +41,8 @@ test.describe("siege combat QA", () => {
 
     const hud = page.getByTestId("siege-hud");
     await expect(hud).toBeVisible();
-    await expect(hud.locator("strong").nth(0)).toHaveText("1");
-    await expect(hud.locator("strong").nth(1)).toHaveText("0");
+    await expect(page.getByTestId("siege-remaining-stat").locator("strong")).toHaveText("1");
+    await expect(page.getByTestId("siege-kills-stat").locator("strong")).toHaveText("0");
 
     await waitForQaBugPositions(page);
     const [bug] = await getQaBugPositions(page);
@@ -61,8 +61,8 @@ test.describe("siege combat QA", () => {
     expect(firstHit).toBeTruthy();
     expect(firstHit?.variant).toBe("low");
     expect(firstHit?.defeated).toBe(true);
-    await expect(hud.locator("strong").nth(0)).toHaveText("0");
-    await expect(hud.locator("strong").nth(1)).toHaveText("1");
+    await expect(page.getByTestId("siege-remaining-stat").locator("strong")).toHaveText("0");
+    await expect(page.getByTestId("siege-kills-stat").locator("strong")).toHaveText("1");
 
     await clientErrors.expectNoClientErrors();
   });
@@ -80,7 +80,7 @@ test.describe("siege combat QA", () => {
 
     const hud = page.getByTestId("siege-hud");
     await expect(hud).toBeVisible();
-    await expect(hud.locator("strong").nth(0)).toHaveText("1");
+    await expect(page.getByTestId("siege-remaining-stat").locator("strong")).toHaveText("1");
 
     await waitForQaBugPositions(page);
     const [bug] = await getQaBugPositions(page);
@@ -97,7 +97,7 @@ test.describe("siege combat QA", () => {
       },
     });
 
-    await expect(hud.locator("strong").nth(0)).toHaveText("0");
+    await expect(page.getByTestId("siege-remaining-stat").locator("strong")).toHaveText("0");
     await expect(page.getByTestId("siege-complete-overlay")).toBeVisible();
   });
 });

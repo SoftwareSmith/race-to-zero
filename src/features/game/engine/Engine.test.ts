@@ -202,6 +202,38 @@ describe("engine death attribution", () => {
     expect(activeAllies).toBe(3);
   });
 
+  it("spawns survival bursts off-screen and sends them inward", () => {
+    const randomSpy = vi.spyOn(Math, "random");
+    [
+      0, 0.5, 0.5, 0.5, 0.3, 0.4,
+      0.25, 0.5, 0.5, 0.5, 0.3, 0.4,
+      0.55, 0.5, 0.5, 0.5, 0.3, 0.4,
+      0.8, 0.5, 0.5, 0.5, 0.3, 0.4,
+    ].forEach((value) => {
+      randomSpy.mockReturnValueOnce(value);
+    });
+
+    const engine = new Engine(createCanvas(), {
+      height: 200,
+      width: 200,
+    });
+
+    engine.spawnBurst({ high: 1, low: 1, medium: 1, urgent: 1 });
+
+    const bugs = engine.getAllBugs() as BugEntity[];
+
+    expect(bugs).toHaveLength(4);
+    expect(
+      bugs.every(
+        (bug) =>
+          (bug.y < 0 && bug.vy > 0) ||
+          (bug.x > 200 && bug.vx < 0) ||
+          (bug.y > 200 && bug.vy < 0) ||
+          (bug.x < 0 && bug.vx > 0),
+      ),
+    ).toBe(true);
+  });
+
   it.each(WEAPON_REGISTRY.map((weapon) => weapon.id))(
     "promotes %s through all three tiers at its kill thresholds",
     (weaponId) => {

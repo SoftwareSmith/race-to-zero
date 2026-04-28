@@ -51,6 +51,13 @@ interface QaSiegeProgress {
   remainingBugs?: number;
 }
 
+interface QaSurvivalState {
+  completeWave?: boolean;
+  siteIntegrity?: number;
+  spawnNow?: boolean;
+  wave?: number;
+}
+
 interface QaPerformanceMetrics {
   firstBugPositionsAtMs?: number;
   firstFrameAtMs?: number;
@@ -428,6 +435,23 @@ export async function setQaSiegeProgress(page: Page, progress: QaSiegeProgress) 
   }, progress);
 }
 
+export async function setQaSurvivalState(page: Page, state: QaSurvivalState) {
+  await page.evaluate((nextState) => {
+    const qaState = (window as Window & {
+      __RTZ_QA__?: {
+        enabled?: boolean;
+        setSurvivalState?: (state: QaSurvivalState) => void;
+      };
+    }).__RTZ_QA__;
+
+    if (!qaState?.enabled || !qaState.setSurvivalState) {
+      throw new Error("QA survival state setter is unavailable");
+    }
+
+    qaState.setSurvivalState(nextState);
+  }, state);
+}
+
 export function getStaticSiegeGameConfig(): GameConfig {
   return {
     ...DEFAULT_GAME_CONFIG,
@@ -442,7 +466,7 @@ export async function clickQaBug(page: Page, repeatCount = 1) {
   expect(canvasBox, "expected bug canvas bounding box").toBeTruthy();
 
   const getKillCount = async () => {
-    const text = await page.getByTestId("siege-hud").locator("strong").nth(1).textContent();
+    const text = await page.getByTestId("siege-kills-stat").locator("strong").textContent();
     return Number.parseInt(text ?? "0", 10);
   };
 

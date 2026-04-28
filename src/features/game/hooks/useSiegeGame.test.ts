@@ -56,6 +56,8 @@ describe("useSiegeGame", () => {
 
     expect(result.current.gameMode).toBe("outbreak");
     expect(result.current.maxWeaponTier).toBe(5);
+    expect(result.current.survivalStatus.tacticLabel).toBe("Opening wave");
+    expect(result.current.survivalStatus.focusLabel).toBeTruthy();
   });
 
   it("starts a clean runtime snapshot when switching modes", () => {
@@ -89,9 +91,11 @@ describe("useSiegeGame", () => {
     expect(result.current.completionSummary).toBeNull();
     expect(result.current.interactiveKills).toBe(0);
     expect(result.current.interactivePoints).toBe(0);
-    expect(result.current.interactiveRemainingBugs).toBe(20);
+    expect(result.current.interactiveRemainingBugs).toBeGreaterThan(0);
+    expect(result.current.interactiveRemainingBugs).toBeLessThan(20);
     expect(result.current.killStreak).toBe(0);
     expect(result.current.selectedWeaponId).toBe("hammer");
+    expect(result.current.survivalStatus.wave).toBe(1);
   });
 
   it("freezes the run and stores a leaderboard entry when bugs run out", async () => {

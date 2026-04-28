@@ -58,8 +58,8 @@ test.describe("siege progression QA", () => {
 
     await setQaSiegeProgress(page, { kills: 18, remainingBugs: 72 });
 
-    await expect(hud.locator("strong").nth(0)).toHaveText("72");
-    await expect(hud.locator("strong").nth(1)).toHaveText("18");
+    await expect(page.getByTestId("siege-remaining-stat").locator("strong")).toHaveText("72");
+    await expect(page.getByTestId("siege-kills-stat").locator("strong")).toHaveText("18");
     await expect(page.getByText("New Garbage Collector weapon unlocked")).toBeVisible();
     await expect(page.getByTestId("weapon-nullpointer")).toHaveAttribute(
       "data-locked",
@@ -76,8 +76,8 @@ test.describe("siege progression QA", () => {
 
     await setQaSiegeProgress(page, { kills: 42, remainingBugs: 48 });
 
-    await expect(hud.locator("strong").nth(0)).toHaveText("48");
-    await expect(hud.locator("strong").nth(1)).toHaveText("42");
+    await expect(page.getByTestId("siege-remaining-stat").locator("strong")).toHaveText("48");
+    await expect(page.getByTestId("siege-kills-stat").locator("strong")).toHaveText("42");
     await expect(page.getByText("New Lightning weapon unlocked")).toBeVisible();
     await expect(page.getByTestId("weapon-chain")).toHaveAttribute(
       "data-locked",
