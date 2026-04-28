@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-04-27T00:19:09.694Z",
-  "lastUpdated": "2026-04-27T00:19:09.694Z",
+  "generatedAt": "2026-04-28T00:22:33.269Z",
+  "lastUpdated": "2026-04-28T00:22:33.269Z",
   "bugs": [
     {
       "createdAt": "2023-09-18",
@@ -12574,8 +12574,8 @@
       "createdAt": "2026-04-23",
       "completedAt": null,
       "priority": 2,
-      "stateName": "Todo",
-      "stateType": "unstarted",
+      "stateName": "In Review",
+      "stateType": "started",
       "teamKey": "TA"
     },
     {
@@ -12590,8 +12590,8 @@
       "createdAt": "2026-04-24",
       "completedAt": null,
       "priority": 4,
-      "stateName": "Backlog",
-      "stateType": "backlog",
+      "stateName": "In Review",
+      "stateType": "started",
       "teamKey": "TA"
     },
     {
@@ -12670,8 +12670,8 @@
       "createdAt": "2026-04-24",
       "completedAt": null,
       "priority": 4,
-      "stateName": "Backlog",
-      "stateType": "backlog",
+      "stateName": "In Review",
+      "stateType": "started",
       "teamKey": "TA"
     }
   ]
