@@ -153,7 +153,7 @@ const DashboardShell = memo(function DashboardShell({
         >
           <header
             className={cn(
-              "relative z-20 grid grid-cols-1 gap-2.5 md:grid-cols-[minmax(0,1fr)_auto] md:items-start md:gap-3",
+              "relative z-20 grid grid-cols-1 gap-2 md:grid-cols-[minmax(0,1fr)_auto] md:items-start md:gap-2.5",
               CHROME_TRANSITION_CLASSNAME,
               chromeHidden
                 ? "-translate-y-5 opacity-0 blur-sm"
@@ -161,18 +161,18 @@ const DashboardShell = memo(function DashboardShell({
             )}
           >
             <div className="min-w-0 max-w-3xl">
-              <p className="text-[0.72rem] font-semibold uppercase tracking-[0.28em] text-stone-500">
+              <p className="text-[0.65rem] font-semibold uppercase tracking-[0.24em] text-stone-500">
                 {metrics.headerEyebrow}
               </p>
-              <h1 className="mt-1 font-display text-[2.2rem] leading-[0.92] tracking-[-0.06em] text-stone-50 sm:mt-1.5 sm:text-[2.6rem] xl:text-[3.1rem]">
+              <h1 className="mt-1 font-display text-[1.8rem] leading-[0.94] tracking-[-0.055em] text-stone-50 sm:mt-1.5 sm:text-[2.15rem] xl:text-[2.55rem]">
                 Race to Zero Bugs
               </h1>
-              <p className="mt-1.5 max-w-2xl text-[0.78rem] leading-5 text-stone-400 sm:mt-2 sm:text-sm">
+              <p className="mt-1.5 max-w-2xl text-[0.72rem] leading-[1.15rem] text-stone-400 sm:mt-2 sm:text-[0.82rem] sm:leading-5">
                 {metrics.headerSubtitle}
               </p>
             </div>
 
-            <div className="flex flex-wrap items-start justify-start gap-1.5 self-start md:justify-end md:gap-2">
+            <div className="flex flex-wrap items-start justify-start gap-[0.3125rem] self-start md:justify-end md:gap-1.5">
               <SettingsMenu
                 containerRef={ui.settingsMenuRef}
                 onMenuToggle={() => ui.handleTopMenuToggle("settings")}
@@ -187,6 +187,7 @@ const DashboardShell = memo(function DashboardShell({
                     setBugFieldMenuOpen((currentValue) => !currentValue)
                   }
                   open={bugFieldMenuOpen}
+                  size="compact"
                   tooltip="Bug field overlay controls."
                 >
                   <svg
@@ -206,12 +207,13 @@ const DashboardShell = memo(function DashboardShell({
                 </MenuIconButton>
 
                 {bugFieldMenuOpen ? (
-                  <MenuPanel title="Bug Field">
+                  <MenuPanel size="compact" title="Bug Field">
                     <ToggleField
                       checked={settings.showBugParticleCount}
                       description="Show the rendered bug particle count overlay on the dashboard background."
                       label="Show bug particle count"
                       onChange={settings.toggleShowBugParticleCount}
+                      size="compact"
                     />
                   </MenuPanel>
                 ) : null}
@@ -220,7 +222,7 @@ const DashboardShell = memo(function DashboardShell({
                 <Tooltip content="Start the interactive bug game.">
                   <button
                     aria-label="Open interactive bug game"
-                    className="inline-flex min-h-12 min-w-12 items-center justify-center rounded-[16px] border border-white/10 bg-zinc-950/86 px-3 text-stone-300 shadow-[0_10px_24px_rgba(0,0,0,0.24)] transition duration-200 hover:-translate-y-0.5 hover:bg-zinc-900 hover:text-stone-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300/40"
+                    className="inline-flex min-h-10 min-w-10 items-center justify-center rounded-[14px] border border-white/10 bg-zinc-950/86 px-2.5 text-stone-300 shadow-[0_8px_18px_rgba(0,0,0,0.22)] transition duration-200 hover:-translate-y-0.5 hover:bg-zinc-900 hover:text-stone-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300/40"
                     onClick={onEnterInteractiveMode}
                     onFocus={onPrefetchSiege}
                     onMouseEnter={onPrefetchSiege}
@@ -229,7 +231,7 @@ const DashboardShell = memo(function DashboardShell({
                   >
                     <svg
                       aria-hidden="true"
-                      className="h-4 w-4"
+                      className="h-3.5 w-3.5"
                       fill="none"
                       stroke="currentColor"
                       strokeLinecap="round"
@@ -248,7 +250,7 @@ const DashboardShell = memo(function DashboardShell({
 
           <div
             className={cn(
-              "relative z-10 mt-1 rounded-[22px] px-1.5 py-1 sm:mt-2 sm:px-2.5 sm:py-1.5",
+              "relative z-10 mt-1 rounded-[20px] px-[0.3125rem] py-[0.1875rem] sm:mt-1.5 sm:px-2 sm:py-[0.3125rem]",
               CHROME_TRANSITION_CLASSNAME,
               chromeHidden
                 ? "translate-y-[-12px] opacity-0 blur-sm"

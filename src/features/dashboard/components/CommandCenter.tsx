@@ -68,36 +68,36 @@ const CommandCenter = memo(function CommandCenter({
     <Surface
       data-siege-panel="command-center"
       className={cn(
-        "relative overflow-hidden border-0 px-3 py-2 before:pointer-events-none before:absolute before:inset-0 before:rounded-[24px] before:opacity-100 after:pointer-events-none after:absolute after:inset-0 after:rounded-[24px] after:opacity-100 sm:px-3.5 sm:py-2.5 sm:before:rounded-[28px] sm:after:rounded-[28px]",
+        "relative overflow-hidden border-0 px-2.5 py-[0.4375rem] before:pointer-events-none before:absolute before:inset-0 before:rounded-[20px] before:opacity-100 after:pointer-events-none after:absolute after:inset-0 after:rounded-[20px] after:opacity-100 sm:px-3 sm:py-2 sm:before:rounded-[24px] sm:after:rounded-[24px]",
         statusGlowClassName,
       )}
       tone="strong"
     >
       <div className="relative">
-        <div className="flex flex-col gap-2 xl:flex-row xl:items-center xl:justify-between">
+        <div className="flex flex-col gap-1.5 xl:flex-row xl:items-center xl:justify-between">
           <div className="w-full">
-            <div className="flex flex-wrap items-center gap-2.5">
-              <p className="text-[0.58rem] font-semibold uppercase tracking-[0.24em] text-stone-500 sm:text-[0.62rem]">
+            <div className="flex flex-wrap items-center gap-2">
+              <p className="text-[0.52rem] font-semibold uppercase tracking-[0.2em] text-stone-500 sm:text-[0.56rem]">
                 {title}
               </p>
-              <StatusTag tone={statusTone}>
+              <StatusTag size="compact" tone={statusTone}>
                 {getStatusTagText(statusTone)}
               </StatusTag>
             </div>
           </div>
 
-          <div className="grid gap-2 sm:grid-cols-3 xl:min-w-[33rem]">
+          <div className="grid gap-1.5 sm:grid-cols-3 xl:min-w-[29rem]">
             <div
               data-siege-panel="fix-velocity"
               className={cn(
-                "rounded-[16px] border px-3 py-2 sm:rounded-[18px] sm:py-2.5",
+                "rounded-[14px] border px-2.5 py-1.75 sm:rounded-[16px] sm:py-2",
                 metricShellClassName,
               )}
             >
-              <div className="text-[0.54rem] font-semibold uppercase tracking-[0.14em] text-stone-400 sm:text-[0.58rem]">
+              <div className="text-[0.5rem] font-semibold uppercase tracking-[0.12em] text-stone-400 sm:text-[0.54rem]">
                 Fix velocity
               </div>
-              <strong className="mt-1 block font-display text-[1.28rem] leading-none tracking-[-0.04em] sm:text-[1.45rem]">
+              <strong className="mt-[0.1875rem] block font-display text-[1.12rem] leading-none tracking-[-0.035em] sm:text-[1.28rem]">
                 {isPeriods
                   ? `${formatNumber(periodWindow!.fixRate, 2)}/day`
                   : `${formatNumber(summary.currentFixRate, 2)}/day`}
@@ -105,12 +105,12 @@ const CommandCenter = memo(function CommandCenter({
             </div>
             <div
               data-siege-panel="required-pace"
-              className="rounded-[16px] border border-white/10 bg-white/[0.03] px-3 py-2 text-stone-100 sm:rounded-[18px] sm:py-2.5"
+              className="rounded-[14px] border border-white/10 bg-white/[0.03] px-2.5 py-1.75 text-stone-100 sm:rounded-[16px] sm:py-2"
             >
-              <div className="text-[0.54rem] font-semibold uppercase tracking-[0.14em] text-stone-400 sm:text-[0.58rem]">
+              <div className="text-[0.5rem] font-semibold uppercase tracking-[0.12em] text-stone-400 sm:text-[0.54rem]">
                 Required pace
               </div>
-              <strong className="mt-1 block font-display text-[1.28rem] leading-none tracking-[-0.04em] sm:text-[1.45rem]">
+              <strong className="mt-[0.1875rem] block font-display text-[1.12rem] leading-none tracking-[-0.035em] sm:text-[1.28rem]">
                 {isPeriods
                   ? `${formatNumber(periodWindow!.addRate, 2)}/day`
                   : `${formatNumber(summary.bugsPerDayRequired, 2)}/day`}
@@ -119,14 +119,14 @@ const CommandCenter = memo(function CommandCenter({
             <div
               data-siege-panel="net-difference"
               className={cn(
-                "rounded-[16px] border px-3 py-2 sm:rounded-[18px] sm:py-2.5",
+                "rounded-[14px] border px-2.5 py-1.75 sm:rounded-[16px] sm:py-2",
                 metricShellClassName,
               )}
             >
-              <div className="text-[0.54rem] font-semibold uppercase tracking-[0.14em] text-stone-400 sm:text-[0.58rem]">
+              <div className="text-[0.5rem] font-semibold uppercase tracking-[0.12em] text-stone-400 sm:text-[0.54rem]">
                 Net difference
               </div>
-              <strong className="mt-1 block font-display text-[1.28rem] leading-none tracking-[-0.04em] sm:text-[1.45rem]">
+              <strong className="mt-[0.1875rem] block font-display text-[1.12rem] leading-none tracking-[-0.035em] sm:text-[1.28rem]">
                 {isPeriods
                   ? `${formatSignedNumber(periodWindow!.netBurnRate, 2)}/day`
                   : `${formatSignedNumber(paceGap, 2)}/day`}

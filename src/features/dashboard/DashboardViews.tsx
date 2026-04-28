@@ -242,7 +242,7 @@ function ChartFallback({ className = "" }: { className?: string }) {
   return (
     <div
       className={cn(
-        "flex min-h-[180px] items-center rounded-[24px] border border-white/10 bg-[linear-gradient(180deg,rgba(10,12,18,0.96),rgba(19,23,32,0.96))] p-3.5 text-sm text-stone-400",
+        "flex min-h-[156px] items-center rounded-[20px] border border-white/10 bg-[linear-gradient(180deg,rgba(10,12,18,0.96),rgba(19,23,32,0.96))] p-3 text-[0.82rem] text-stone-400",
         className,
       )}
     >
@@ -308,8 +308,8 @@ export const OverviewView = memo(function OverviewView({
   );
 
   return (
-    <div className="grid content-start gap-2">
-      <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
+    <div className="grid content-start gap-1.5 sm:gap-2">
+      <div className="grid gap-1.5 sm:grid-cols-2 sm:gap-2 xl:grid-cols-5">
         {metricCards.map((metricCard) => (
           <MetricCard
             key={metricCard.label}
@@ -322,7 +322,7 @@ export const OverviewView = memo(function OverviewView({
         ))}
       </div>
 
-      <div className="grid items-stretch gap-2 md:grid-cols-2">
+      <div className="grid items-stretch gap-1.5 md:grid-cols-2 sm:gap-2">
         <Suspense fallback={<ChartFallback />}>
           <ChartCard
             chartKey="bug-burndown"
@@ -441,8 +441,8 @@ export const PeriodsView = memo(function PeriodsView({
   );
 
   return (
-    <div className="grid content-start gap-2">
-      <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+    <div className="grid content-start gap-1.5 sm:gap-2">
+      <div className="grid gap-1.5 sm:grid-cols-2 sm:gap-2 xl:grid-cols-4">
         {metricCards.map((metricCard) => (
           <MetricCard
             key={metricCard.label}
@@ -455,7 +455,7 @@ export const PeriodsView = memo(function PeriodsView({
         ))}
       </div>
 
-      <div className="grid items-stretch gap-2 md:grid-cols-2">
+      <div className="grid items-stretch gap-1.5 md:grid-cols-2 sm:gap-2">
         <Suspense fallback={<ChartFallback />}>
           <ChartCard
             chartKey="comparison-timeline"

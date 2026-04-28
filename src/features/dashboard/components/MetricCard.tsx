@@ -33,16 +33,16 @@ function MetricCard({
     <article
       data-siege-panel={label.toLowerCase().replace(/[^a-z0-9]+/g, "-")}
       className={cn(
-        "group relative flex h-full min-h-[78px] flex-col overflow-hidden rounded-[18px] border px-3 py-2 shadow-[0_10px_20px_rgba(0,0,0,0.16)] transition duration-200 hover:-translate-y-0.5 hover:shadow-[0_14px_28px_rgba(0,0,0,0.2)] sm:min-h-[86px] sm:rounded-[20px] sm:py-2.5",
+        "group relative flex h-full min-h-[68px] flex-col overflow-hidden rounded-[16px] border px-2.5 py-[0.4375rem] shadow-[0_8px_18px_rgba(0,0,0,0.16)] transition duration-200 hover:-translate-y-0.5 hover:shadow-[0_12px_24px_rgba(0,0,0,0.2)] sm:min-h-[76px] sm:rounded-[18px] sm:py-2",
         styles.card,
         className,
       )}
     >
-      <div className="pointer-events-none absolute inset-0 overflow-hidden rounded-[22px] opacity-0 transition duration-200 group-hover:opacity-100">
-        <div className="absolute inset-x-4 top-3 h-14 rounded-full bg-white/8 blur-2xl" />
+      <div className="pointer-events-none absolute inset-0 overflow-hidden rounded-[20px] opacity-0 transition duration-200 group-hover:opacity-100">
+        <div className="absolute inset-x-4 top-3 h-12 rounded-full bg-white/8 blur-2xl" />
         <div
           className={cn(
-            "absolute inset-x-6 bottom-1 h-12 rounded-full blur-2xl",
+            "absolute inset-x-6 bottom-1 h-10 rounded-full blur-2xl",
             getGlowClassName(tone),
           )}
         />
@@ -51,7 +51,7 @@ function MetricCard({
       <div className="relative flex items-start gap-3">
         <span
           className={cn(
-            "text-[0.54rem] font-semibold uppercase tracking-[0.2em] sm:text-[0.58rem]",
+            "text-[0.48rem] font-semibold uppercase tracking-[0.16em] sm:text-[0.52rem]",
             styles.eyebrow,
           )}
         >
@@ -60,7 +60,7 @@ function MetricCard({
       </div>
       <strong
         className={cn(
-          "relative mt-2 flex-1 font-display text-[1.45rem] leading-none tracking-[-0.05em] sm:mt-2.5 sm:text-[1.92rem]",
+          "relative mt-1.5 flex-1 font-display text-[1.22rem] leading-none tracking-[-0.045em] sm:mt-2 sm:text-[1.62rem]",
           styles.value,
         )}
       >

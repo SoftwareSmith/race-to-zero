@@ -30,6 +30,7 @@ const SettingsMenu = memo(function SettingsMenu({
         ariaLabel="Open settings"
         onClick={onMenuToggle}
         open={open}
+        size="compact"
         tooltip="Deadline and workday assumptions for the pace math."
       >
         <svg
@@ -48,18 +49,20 @@ const SettingsMenu = memo(function SettingsMenu({
       </MenuIconButton>
 
       {open ? (
-        <MenuPanel title="Settings">
+        <MenuPanel size="compact" title="Settings">
           <ToggleField
             checked={settings.excludeWeekends}
             description="Use weekdays only when calculating days left and required pace."
             label="Exclude weekends"
             onChange={() => onToggle("excludeWeekends")}
+            size="compact"
           />
           <ToggleField
             checked={settings.excludePublicHolidays}
             description="Exclude Western Australia public holidays from workday calculations."
             label="Exclude public holidays (AWST)"
             onChange={() => onToggle("excludePublicHolidays")}
+            size="compact"
           />
         </MenuPanel>
       ) : null}

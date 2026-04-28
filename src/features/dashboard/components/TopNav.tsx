@@ -41,29 +41,36 @@ const TopNav = memo(function TopNav({
 }: TopNavProps) {
   return (
     <div
-      className="flex flex-col gap-1.5 lg:flex-row lg:items-center lg:justify-between"
+      className="flex flex-col gap-[0.3125rem] lg:flex-row lg:items-center lg:justify-between"
       onMouseDownCapture={() => onInteract()}
       onTouchStartCapture={() => onInteract()}
     >
-      <Tabs activeTab={activeTab} onChange={onTabChange} tabs={TAB_ITEMS} />
+      <Tabs
+        activeTab={activeTab}
+        onChange={onTabChange}
+        size="compact"
+        tabs={TAB_ITEMS}
+      />
 
       {activeTab === "overview" ? (
-        <div className="flex w-full flex-wrap gap-1.5 lg:w-auto lg:justify-end">
+        <div className="flex w-full flex-wrap gap-[0.3125rem] lg:w-auto lg:justify-end">
           <CompactDateField
             label="From"
             max={deadlineDate}
             onChange={onDeadlineFromDateChange}
+            size="compact"
             value={deadlineFromDate}
           />
           <CompactDateField
             label="Deadline"
             min={todayDate}
             onChange={onDeadlineDateChange}
+            size="compact"
             value={deadlineDate}
           />
         </div>
       ) : (
-        <div className="flex w-full flex-wrap items-center gap-1.5 lg:w-auto lg:justify-end">
+        <div className="flex w-full flex-wrap items-center gap-[0.3125rem] lg:w-auto lg:justify-end">
           <CompareRangePicker
             compareRangeKey={compareRangeKey}
             onChange={onCompareRangeChange}
@@ -74,12 +81,14 @@ const TopNav = memo(function TopNav({
                 label="From"
                 max={customToDate}
                 onChange={onCustomFromDateChange}
+                size="compact"
                 value={customFromDate}
               />
               <CompactDateField
                 label="To"
                 min={customFromDate}
                 onChange={onCustomToDateChange}
+                size="compact"
                 value={customToDate}
               />
             </>
