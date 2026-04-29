@@ -279,7 +279,7 @@ export class Engine {
     );
     const getSpawnPoint = () => {
       const padding = 18;
-      if (!usableZones.length || Math.random() > 0.84 || totalZoneArea <= 0) {
+      if (!usableZones.length || Math.random() > 0.38 || totalZoneArea <= 0) {
         return {
           x: padding + Math.random() * Math.max(1, this.width - padding * 2),
           y: padding + Math.random() * Math.max(1, this.height - padding * 2),

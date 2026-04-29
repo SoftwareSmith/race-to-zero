@@ -75,6 +75,12 @@ function isStatusActive(
 }
 
 interface BugUpdateContext {
+  getCrowdingAt?: (
+    x: number,
+    y: number,
+    r: number,
+    exclude?: BugEntity,
+  ) => { centerX: number; centerY: number; count: number; score: number };
   getNeighbors: (e: BugEntity, r: number) => BugEntity[];
   targetX?: number | null;
   targetY?: number | null;
@@ -101,6 +107,12 @@ export class BugEntity extends Entity {
   cruiseSpeed: number;
   turnRate: number;
   motionTime: number;
+  roamTargetX: number | null;
+  roamTargetY: number | null;
+  nextRoamTargetAt: number;
+  roamTargetGeneration: number;
+  orbitBias: -1 | 1;
+  packAffinity: number;
   typeSpec: BugType | null;
   /** Speed-slow status effect applied by Freeze Cone. */
   slow: { multiplier: number; expiresAt: number } | null;
@@ -156,6 +168,12 @@ export class BugEntity extends Entity {
     this.turnRate = 0.94 + Math.random() * 0.18;
     this.heading = opts.heading ?? Math.atan2(this.vy || 0, this.vx || 1);
     this.motionTime = Math.random() * 100;
+    this.roamTargetX = null;
+    this.roamTargetY = null;
+    this.nextRoamTargetAt = 0;
+    this.roamTargetGeneration = 0;
+    this.orbitBias = Math.random() < 0.5 ? -1 : 1;
+    this.packAffinity = 0.7 + Math.random() * 0.55;
     this.typeSpec = null;
     this.slow = null;
     this.poison = null;
@@ -292,6 +310,116 @@ export class BugEntity extends Entity {
     };
   }
 
+  private resetRoamState() {
+    this.roamTargetX = null;
+    this.roamTargetY = null;
+    this.nextRoamTargetAt = 0;
+    this.roamTargetGeneration = 0;
+    this.orbitBias = Math.random() < 0.5 ? -1 : 1;
+    this.packAffinity = 0.7 + Math.random() * 0.55;
+  }
+
+  private getUnitNoise(position: number, seed: number) {
+    return clamp(perlin1D(position, seed) * 0.5 + 0.5, 0, 1);
+  }
+
+  private chooseRoamTarget(
+    bounds: { width: number; height: number },
+    now: number,
+    config: typeof DEFAULT_GAME_CONFIG,
+  ) {
+    this.roamTargetGeneration += 1;
+    const margin = Math.max(22, this.size * 3.2, config.wallAvoidDistance * 1.25);
+    const usableWidth = Math.max(1, bounds.width - margin * 2);
+    const usableHeight = Math.max(1, bounds.height - margin * 2);
+    const generation = this.roamTargetGeneration;
+    const driftPhase = this.motionTime * 0.013;
+    const baseX = this.getUnitNoise(
+      this.seed * 31.7 + generation * 0.73 + driftPhase,
+      this.seed * 67.3 + generation * 3.1,
+    );
+    const baseY = this.getUnitNoise(
+      this.seed * 43.9 + generation * 0.61 + driftPhase,
+      this.seed * 71.5 + generation * 2.7,
+    );
+    const laneBias = this.getUnitNoise(
+      this.seed * 17.1 + generation * 1.37,
+      this.seed * 59.9,
+    );
+    const edgeLane = laneBias < 0.26;
+    const targetX = edgeLane
+      ? (laneBias < 0.13 ? 0.04 : 0.96)
+      : lerp(0.04, 0.96, baseX);
+    const targetY = edgeLane
+      ? lerp(0.04, 0.96, baseY)
+      : lerp(0.04, 0.96, baseY);
+
+    this.roamTargetX = clamp(
+      margin + targetX * usableWidth,
+      margin,
+      bounds.width - margin,
+    );
+    this.roamTargetY = clamp(
+      margin + targetY * usableHeight,
+      margin,
+      bounds.height - margin,
+    );
+    this.nextRoamTargetAt =
+      now +
+      1400 +
+      this.getUnitNoise(this.seed * 37.1 + generation * 0.47, this.seed * 83.7) * 3600;
+  }
+
+  private getRoamTarget(
+    bounds: { width: number; height: number },
+    now: number,
+    config: typeof DEFAULT_GAME_CONFIG,
+  ) {
+    const targetMissing = this.roamTargetX == null || this.roamTargetY == null;
+    const targetExpired = now >= this.nextRoamTargetAt;
+    const targetOutOfBounds =
+      !targetMissing &&
+      (this.roamTargetX! < 0 ||
+        this.roamTargetX! > bounds.width ||
+        this.roamTargetY! < 0 ||
+        this.roamTargetY! > bounds.height);
+    const targetReached =
+      !targetMissing &&
+      getLength(this.roamTargetX! - this.x, this.roamTargetY! - this.y) <=
+        Math.max(config.targetReachRadius * 2.4, this.size * 4);
+
+    if (targetMissing || targetExpired || targetOutOfBounds || targetReached) {
+      this.chooseRoamTarget(bounds, now, config);
+    }
+
+    return {
+      x: this.roamTargetX ?? bounds.width * 0.5,
+      y: this.roamTargetY ?? bounds.height * 0.5,
+    };
+  }
+
+  private getBoardBias(
+    bounds: { width: number; height: number },
+    config: typeof DEFAULT_GAME_CONFIG,
+  ) {
+    const softMargin = Math.max(
+      config.wallAvoidDistance * 1.15,
+      Math.min(bounds.width, bounds.height) * 0.07,
+      this.size * 2.5,
+    );
+    const left = clamp((softMargin - this.x) / softMargin, 0, 1);
+    const right = clamp((softMargin - (bounds.width - this.x)) / softMargin, 0, 1);
+    const top = clamp((softMargin - this.y) / softMargin, 0, 1);
+    const bottom = clamp((softMargin - (bounds.height - this.y)) / softMargin, 0, 1);
+    const inward = normalizeVector(left * left - right * right, top * top - bottom * bottom);
+    const pressure = Math.max(left, right, top, bottom);
+
+    return {
+      x: inward.x * config.followStrength * pressure * 0.22,
+      y: inward.y * config.followStrength * pressure * 0.22,
+    };
+  }
+
   private containWithinBounds(
     bounds: { width: number; height: number },
     config: typeof DEFAULT_GAME_CONFIG,
@@ -425,29 +553,62 @@ export class BugEntity extends Entity {
     const separation = this.getNeighborSeparation(
       neighbors,
       config.separationRadius,
-      config.separationStrength * 1.65,
+      config.separationStrength * 1.35,
     );
     desired.x += separation.x;
     desired.y += separation.y;
 
     if (!isAlly && this.state !== "flee") {
-      const centerX = bounds.width * 0.5;
-      const centerY = bounds.height * 0.5;
-      const toCenterX = centerX - this.x;
-      const toCenterY = centerY - this.y;
-      const centerDistance = getLength(toCenterX, toCenterY);
+      const roamTarget = this.getRoamTarget(bounds, now, config);
+      const toTargetX = roamTarget.x - this.x;
+      const toTargetY = roamTarget.y - this.y;
+      const targetDistance = getLength(toTargetX, toTargetY);
+      const targetDirection = normalizeVector(toTargetX, toTargetY);
+      const boardBias = this.getBoardBias(bounds, config);
 
-      if (centerDistance > config.targetReachRadius) {
-        const towardCenter = normalizeVector(toCenterX, toCenterY);
-        const centerRamp = clamp(
-          centerDistance / Math.max(config.roamTargetMinDistance, 1),
+      desired.x += boardBias.x;
+      desired.y += boardBias.y;
+
+      if (targetDistance > config.targetReachRadius * 1.35) {
+        const targetRamp = clamp(
+          targetDistance / Math.max(config.roamTargetMinDistance, 1),
           0,
           1,
         );
-        const centerPullStrength =
-          config.followStrength * (0.9 + centerRamp * 2.2);
-        desired.x += towardCenter.x * centerPullStrength;
-        desired.y += towardCenter.y * centerPullStrength;
+        const roamPullStrength =
+          config.followStrength * (0.38 + targetRamp * 0.95) * this.packAffinity;
+        desired.x += targetDirection.x * roamPullStrength;
+        desired.y += targetDirection.y * roamPullStrength;
+      } else {
+        this.nextRoamTargetAt = Math.min(this.nextRoamTargetAt, now + 180);
+        desired.x += Math.cos(this.heading + this.wanderAngle) * config.followStrength * 0.24;
+        desired.y += Math.sin(this.heading + this.wanderAngle) * config.followStrength * 0.24;
+      }
+
+      const crowding = ctx.getCrowdingAt?.(
+        this.x,
+        this.y,
+        config.crowdAvoidRadius,
+        this,
+      );
+      if (crowding && crowding.score > config.crowdRepathThreshold) {
+        const awayFromCrowd = normalizeVector(
+          this.x - crowding.centerX,
+          this.y - crowding.centerY,
+        );
+        const crowdPressure = clamp(
+          (crowding.score - config.crowdRepathThreshold) /
+            Math.max(1, config.crowdTargetPenalty / 18),
+          0,
+          1,
+        );
+
+        desired.x += awayFromCrowd.x * config.crowdSteerStrength * crowdPressure;
+        desired.y += awayFromCrowd.y * config.crowdSteerStrength * crowdPressure;
+        this.nextRoamTargetAt = Math.min(
+          this.nextRoamTargetAt,
+          now + config.crowdRepathDelay * 1000,
+        );
       }
     }
 
@@ -884,6 +1045,7 @@ export class BugEntity extends Entity {
     this.supportStatusesAtDeath = [];
     this.deathPointValue = this.getBasePointValue();
     this.motionTime = Math.random() * 100;
+    this.resetRoamState();
     this.opacity = 1;
     this.size = this.baseSize;
     this.syncTypeSpec();

@@ -11,6 +11,8 @@ import { useSiegeGameLifecycle } from "./useSiegeGameLifecycle";
 import { useSiegeGameTimer } from "./useSiegeGameTimer";
 import { useSiegeRunCompletion } from "./useSiegeRunCompletion";
 import {
+  calculateSurvivalSpawnRequest,
+  calculateWaveProgress,
   createSurvivalBurstCounts,
   getSurvivalPressure,
   getSurvivalRuntimeSpeedMultiplier,
@@ -109,15 +111,21 @@ interface SiegeRuntimeSnapshot {
 }
 
 interface SurvivalRuntimeStatus {
+  activeBugLimit: number;
   focusLabel: string;
   offlineReason: string | null;
   pressurePercent: number;
+  remainingSpawnBudget: number;
   secondsUntilNextWave: number | null;
   secondsUntilOffline: number | null;
   siteIntegrity: number;
   spawnRatePerSecond: number;
   tacticLabel: string;
   wave: number;
+  waveDurationMs: number;
+  waveEndsAt: number | null;
+  waveProgressPercent: number;
+  waveStartedAt: number | null;
 }
 
 function createRuntimeSnapshot(
@@ -156,6 +164,36 @@ function getSurvivalOpeningCounts(plan: SurvivalSpawnPlan): BugCounts {
   );
 }
 
+function createSurvivalRuntimeStatus(
+  plan: SurvivalSpawnPlan,
+  options: {
+    now?: number | null;
+    remainingSpawnBudget?: number;
+    siteIntegrity?: number;
+  } = {},
+): SurvivalRuntimeStatus {
+  const now = options.now ?? null;
+  const waveEndsAt = now == null ? null : now + plan.waveDurationMs;
+
+  return {
+    activeBugLimit: plan.activeBugLimit,
+    focusLabel: plan.focusLabel ?? "Bug rush",
+    offlineReason: null,
+    pressurePercent: 0,
+    remainingSpawnBudget: Math.max(0, options.remainingSpawnBudget ?? 0),
+    secondsUntilNextWave: Math.ceil(plan.waveDurationMs / 1000),
+    secondsUntilOffline: null,
+    siteIntegrity: options.siteIntegrity ?? 100,
+    spawnRatePerSecond: plan.spawnRatePerSecond,
+    tacticLabel: plan.tacticLabel ?? "Opening wave",
+    wave: plan.wave,
+    waveDurationMs: plan.waveDurationMs,
+    waveEndsAt,
+    waveProgressPercent: 0,
+    waveStartedAt: now,
+  };
+}
+
 export function useSiegeGame({
   currentBugCount: _currentBugCount,
   currentBugCounts,
@@ -179,17 +217,7 @@ export function useSiegeGame({
   );
   const [survivalStatus, setSurvivalStatus] = useState<SurvivalRuntimeStatus>(() => {
     const plan = getSurvivalWavePlan(1);
-    return {
-      focusLabel: plan.focusLabel ?? "Bug rush",
-      offlineReason: null,
-      pressurePercent: 0,
-      secondsUntilNextWave: Math.ceil(plan.waveDurationMs / 1000),
-      secondsUntilOffline: null,
-      siteIntegrity: 100,
-      spawnRatePerSecond: plan.spawnRatePerSecond,
-      tacticLabel: plan.tacticLabel ?? "Opening wave",
-      wave: 1,
-    };
+    return createSurvivalRuntimeStatus(plan);
   });
   const [survivalSpawnPlan, setSurvivalSpawnPlan] = useState<
     (SurvivalSpawnPlan & { sequenceId: number }) | null
@@ -205,6 +233,8 @@ export function useSiegeGame({
   const runtimeSnapshotRef = useRef<SiegeRuntimeSnapshot>(runtimeSnapshot);
   const survivalStatusRef = useRef(survivalStatus);
   const survivalRemainingBudgetRef = useRef(0);
+  const survivalSpawnAccumulatorRef = useRef(0);
+  const survivalLastSpawnTickAtRef = useRef<number | null>(null);
   const survivalSpawnSequenceRef = useRef(0);
 
   const interactiveMode = siegePhase !== "idle";
@@ -248,19 +278,11 @@ export function useSiegeGame({
   const resetSurvivalRuntime = useCallback(() => {
     const plan = getSurvivalWavePlan(1);
     survivalRemainingBudgetRef.current = 0;
+    survivalSpawnAccumulatorRef.current = 0;
+    survivalLastSpawnTickAtRef.current = null;
     survivalSpawnSequenceRef.current += 1;
     setSurvivalSpawnPlan(null);
-    setSurvivalStatus({
-      focusLabel: plan.focusLabel ?? "Bug rush",
-      offlineReason: null,
-      pressurePercent: 0,
-      secondsUntilNextWave: Math.ceil(plan.waveDurationMs / 1000),
-      secondsUntilOffline: null,
-      siteIntegrity: 100,
-      spawnRatePerSecond: plan.spawnRatePerSecond,
-      tacticLabel: plan.tacticLabel ?? "Opening wave",
-      wave: 1,
-    });
+    setSurvivalStatus(createSurvivalRuntimeStatus(plan));
   }, []);
 
   const queueSurvivalSpawn = useCallback(
@@ -282,15 +304,8 @@ export function useSiegeGame({
         counts,
         sequenceId: survivalSpawnSequenceRef.current,
       });
-      updateRuntimeSnapshot(
-        (current) => ({
-          ...current,
-          remainingBugs: current.remainingBugs + spawnedCount,
-        }),
-        true,
-      );
     },
-    [updateRuntimeSnapshot],
+    [],
   );
 
   const startSurvivalWave = useCallback(
@@ -298,23 +313,23 @@ export function useSiegeGame({
       const plan = getSurvivalWavePlan(wave);
       const openingCounts = getSurvivalOpeningCounts(plan);
       const openingCount = getBugCountTotal(openingCounts);
+      const now = performance.now();
 
       survivalRemainingBudgetRef.current = Math.max(
         0,
         plan.spawnBudget - (spawnImmediately ? openingCount : 0),
       );
+      survivalSpawnAccumulatorRef.current = 0;
+      survivalLastSpawnTickAtRef.current = now;
       setSurvivalStatus((current) => ({
-        ...current,
-        focusLabel: plan.focusLabel ?? current.focusLabel,
+        ...createSurvivalRuntimeStatus(plan, {
+          now,
+          remainingSpawnBudget: survivalRemainingBudgetRef.current,
+          siteIntegrity: current.siteIntegrity,
+        }),
         offlineReason: null,
-        pressurePercent: 0,
-        secondsUntilNextWave: Math.ceil(plan.waveDurationMs / 1000),
-        secondsUntilOffline: null,
-        spawnRatePerSecond: plan.spawnRatePerSecond,
-        tacticLabel: plan.tacticLabel ?? current.tacticLabel,
-        wave: plan.wave,
       }));
-      survivalWaveEndsAtRef.current = performance.now() + plan.waveDurationMs;
+      survivalWaveEndsAtRef.current = now + plan.waveDurationMs;
 
       if (spawnImmediately) {
         queueSurvivalSpawn(plan, openingCount);
@@ -337,14 +352,18 @@ export function useSiegeGame({
     [interactiveInitialBugCounts],
   );
   const effectiveInteractiveRemainingBugs =
-    interactiveMode && interactiveKills === 0 && runtimeRemainingBugs === 0
+    interactiveMode &&
+    siegePhase === "entering" &&
+    interactiveKills === 0 &&
+    runtimeRemainingBugs === 0
       ? sessionBugCount
       : runtimeRemainingBugs;
 
-  const { completionSummary, leaderboard, resetCompletion } =
+  const { completionSummary, finalizeRun, leaderboard, resetCompletion } =
     useSiegeRunCompletion({
       evolutionStates,
       gameMode,
+      getRuntimeSnapshot: () => runtimeSnapshotRef.current,
       interactiveKills,
       interactiveMode,
       interactiveRemainingBugs: effectiveInteractiveRemainingBugs,
@@ -414,19 +433,15 @@ export function useSiegeGame({
         0,
         survivalPlan.spawnBudget - totalBugCount,
       );
+      survivalSpawnAccumulatorRef.current = 0;
+      survivalLastSpawnTickAtRef.current = performance.now();
       setSurvivalSpawnPlan(null);
-      setSurvivalStatus({
-        focusLabel: survivalPlan.focusLabel ?? "Bug rush",
-        offlineReason: null,
-        pressurePercent: 0,
-        secondsUntilNextWave: Math.ceil(survivalPlan.waveDurationMs / 1000),
-        secondsUntilOffline: null,
-        siteIntegrity: 100,
-        spawnRatePerSecond: survivalPlan.spawnRatePerSecond,
-        tacticLabel: survivalPlan.tacticLabel ?? "Opening wave",
-        wave: 1,
-      });
-      survivalWaveEndsAtRef.current = performance.now() + survivalPlan.waveDurationMs;
+      const now = performance.now();
+      setSurvivalStatus(createSurvivalRuntimeStatus(survivalPlan, {
+        now,
+        remainingSpawnBudget: survivalRemainingBudgetRef.current,
+      }));
+      survivalWaveEndsAtRef.current = now + survivalPlan.waveDurationMs;
     } else {
       resetSurvivalRuntime();
     }
@@ -495,6 +510,10 @@ export function useSiegeGame({
         lastKillAtRef.current != null && now - lastKillAtRef.current <= 1200
           ? runtimeSnapshotRef.current.killStreak + 1
           : 1;
+      const shouldFinalizeTimeAttack =
+        gameMode === "purge" &&
+        siegePhase === "active" &&
+        runtimeSnapshotRef.current.remainingBugs <= 1;
       lastKillAtRef.current = now;
 
       const earned = payload.pointValue ?? 1;
@@ -505,15 +524,44 @@ export function useSiegeGame({
           killStreak: nextStreak,
           kills: current.kills + 1,
           points: current.points + earned + frozenBonus,
-          remainingBugs: Math.max(0, current.remainingBugs - 1),
+          remainingBugs: shouldFinalizeTimeAttack
+            ? 0
+            : current.remainingBugs,
           streakMultiplier:
             nextStreak >= 10 ? 2 : nextStreak >= 5 ? 1.5 : nextStreak >= 3 ? 1.2 : 1,
         }),
         true,
       );
+
+      if (shouldFinalizeTimeAttack) {
+        finalizeRun({ interactiveRemainingBugs: 0 });
+      }
     },
-    [updateRuntimeSnapshot],
+    [finalizeRun, gameMode, siegePhase, updateRuntimeSnapshot],
   );
+
+  useEffect(() => {
+    if (!interactiveMode || siegePhase !== "active" || completionSummary != null) {
+      return;
+    }
+
+    if (gameMode === "purge" && runtimeRemainingBugs === 0) {
+      finalizeRun({ interactiveRemainingBugs: 0 });
+      return;
+    }
+
+    if (gameMode === "outbreak" && survivalStatus.siteIntegrity <= 0) {
+      finalizeRun({ siteOffline: true });
+    }
+  }, [
+    completionSummary,
+    finalizeRun,
+    gameMode,
+    interactiveMode,
+    runtimeRemainingBugs,
+    siegePhase,
+    survivalStatus.siteIntegrity,
+  ]);
 
   useEffect(() => {
     return () => {
@@ -563,10 +611,12 @@ export function useSiegeGame({
 
     survivalPressureTimerRef.current = scheduleTimeout(function tickPressure() {
       const currentStatus = survivalStatusRef.current;
+      const plan = getSurvivalWavePlan(currentStatus.wave);
+      const now = performance.now();
       const waveEndsAt = survivalWaveEndsAtRef.current;
       const secondsUntilNextWave =
         waveEndsAt != null
-          ? Math.max(0, Math.ceil((waveEndsAt - performance.now()) / 1000))
+          ? Math.max(0, Math.ceil((waveEndsAt - now) / 1000))
           : null;
       const pressure = getSurvivalPressure({
         activeBugCount: runtimeSnapshotRef.current.remainingBugs,
@@ -586,11 +636,21 @@ export function useSiegeGame({
 
       setSurvivalStatus((current) => ({
         ...current,
+        activeBugLimit: plan.activeBugLimit,
         offlineReason,
         pressurePercent: pressure.pressurePercent,
+        remainingSpawnBudget: survivalRemainingBudgetRef.current,
         secondsUntilNextWave,
         secondsUntilOffline: pressure.secondsUntilOffline,
         siteIntegrity: nextIntegrity,
+        spawnRatePerSecond: plan.spawnRatePerSecond,
+        waveDurationMs: plan.waveDurationMs,
+        waveEndsAt,
+        waveProgressPercent: calculateWaveProgress(
+          now,
+          current.waveStartedAt,
+          plan.waveDurationMs,
+        ),
       }));
 
       if (offlineReason) {
@@ -601,10 +661,11 @@ export function useSiegeGame({
           }),
           true,
         );
+        finalizeRun({ siteOffline: true });
         return;
       }
 
-      if (waveEndsAt != null && performance.now() >= waveEndsAt) {
+      if (waveEndsAt != null && now >= waveEndsAt) {
         startSurvivalWave(currentStatus.wave + 1);
         return;
       }
@@ -634,20 +695,41 @@ export function useSiegeGame({
       const activeBugs = runtimeSnapshotRef.current.remainingBugs;
       const remainingBudget = survivalRemainingBudgetRef.current;
       const waveEndsAt = survivalWaveEndsAtRef.current;
+      const now = performance.now();
       const waveExpired =
-        waveEndsAt != null && performance.now() >= waveEndsAt;
+        waveEndsAt != null && now >= waveEndsAt;
 
       if (!waveExpired && remainingBudget > 0 && activeBugs < plan.activeBugLimit) {
-        const requestedCount = Math.min(plan.burstSize, remainingBudget);
-        survivalRemainingBudgetRef.current = Math.max(
-          0,
-          remainingBudget - requestedCount,
-        );
-        queueSurvivalSpawn(plan, requestedCount);
+        const lastSpawnTickAt = survivalLastSpawnTickAtRef.current ?? now;
+        const spawnRequest = calculateSurvivalSpawnRequest({
+          accumulator: survivalSpawnAccumulatorRef.current,
+          activeBugCount: activeBugs,
+          activeBugLimit: plan.activeBugLimit,
+          elapsedSeconds: Math.max(0, (now - lastSpawnTickAt) / 1000),
+          remainingBudget,
+          spawnRatePerSecond: plan.spawnRatePerSecond,
+        });
+        const requestedCount = spawnRequest.requestedCount;
+        survivalSpawnAccumulatorRef.current = spawnRequest.nextAccumulator;
+        survivalLastSpawnTickAtRef.current = now;
+
+        if (requestedCount > 0) {
+          survivalRemainingBudgetRef.current = Math.max(
+            0,
+            remainingBudget - requestedCount,
+          );
+          queueSurvivalSpawn(plan, requestedCount);
+          setSurvivalStatus((current) => ({
+            ...current,
+            remainingSpawnBudget: survivalRemainingBudgetRef.current,
+          }));
+        }
+      } else {
+        survivalLastSpawnTickAtRef.current = now;
       }
 
-      survivalSpawnTimerRef.current = scheduleTimeout(tickSpawn, 1000);
-    }, 1000);
+      survivalSpawnTimerRef.current = scheduleTimeout(tickSpawn, 250);
+    }, 250);
 
     return () => {
       cancelTimeout(survivalSpawnTimerRef.current);
@@ -712,6 +794,7 @@ export function useSiegeGame({
         }));
         if (siteIntegrity <= 0) {
           updateRuntimeSnapshot((current) => ({ ...current, remainingBugs: 0 }), true);
+          finalizeRun({ siteOffline: true });
         }
       }
     };
@@ -769,7 +852,7 @@ export function useSiegeGame({
         normalizedCount === 0;
 
       updateRuntimeSnapshot((current) => {
-        if (current.remainingBugs === normalizedCount) {
+        if (current.remainingBugs === normalizedCount && normalizedCount !== 0) {
           return current;
         }
 
@@ -778,8 +861,17 @@ export function useSiegeGame({
           remainingBugs: normalizedCount,
         };
       }, shouldForceFlush);
+
+      if (
+        normalizedCount === 0 &&
+        interactiveMode &&
+        siegePhase === "active" &&
+        gameMode === "purge"
+      ) {
+        finalizeRun({ interactiveRemainingBugs: 0 });
+      }
     },
-    [updateRuntimeSnapshot],
+    [finalizeRun, gameMode, interactiveMode, siegePhase, updateRuntimeSnapshot],
   );
 
   return {

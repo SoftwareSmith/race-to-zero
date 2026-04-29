@@ -4,6 +4,7 @@ import Surface from "@shared/components/Surface";
 import { cn } from "@shared/utils/cn";
 import {
   formatNumber,
+  formatPercent,
   formatSignedNumber,
   getDeltaTone,
   getStatusTagText,
@@ -13,12 +14,14 @@ import type {
   SummaryMetrics,
   ActiveTab,
   ComparisonMetrics,
+  InsightsMetrics,
 } from "../../../types/dashboard";
 
 interface CommandCenterProps {
   activeTab: ActiveTab;
   comparisonMetrics?: ComparisonMetrics | null;
   deadlineMetrics: DeadlineMetrics;
+  insightsMetrics?: InsightsMetrics | null;
   siegeMode?: boolean;
   summary: SummaryMetrics;
 }
@@ -27,20 +30,26 @@ const CommandCenter = memo(function CommandCenter({
   activeTab,
   comparisonMetrics = null,
   deadlineMetrics,
+  insightsMetrics = null,
   siegeMode = false,
   summary,
 }: CommandCenterProps) {
   void siegeMode;
   const isPeriods = activeTab === "periods" && comparisonMetrics;
+  const isInsights = activeTab === "insights" && insightsMetrics;
 
   // choose period or overview values
   const periodWindow = isPeriods ? comparisonMetrics!.currentWindow : null;
 
-  const paceGap = isPeriods
-    ? periodWindow!.fixRate - periodWindow!.addRate
-    : summary.currentFixRate - summary.bugsPerDayRequired;
+  const paceGap = isInsights
+    ? insightsMetrics!.eligibleCompleted > 0
+      ? insightsMetrics!.slaHitRate - 85
+      : 0
+    : isPeriods
+      ? periodWindow!.fixRate - periodWindow!.addRate
+      : summary.currentFixRate - summary.bugsPerDayRequired;
 
-  const paceTone = getDeltaTone(paceGap);
+  const paceTone = isInsights ? insightsMetrics!.tone : getDeltaTone(paceGap);
   const metricShellClassName =
     {
       positive: "border-emerald-400/18 bg-emerald-500/[0.05] text-emerald-100",
@@ -48,9 +57,11 @@ const CommandCenter = memo(function CommandCenter({
       neutral: "border-sky-400/18 bg-sky-500/[0.05] text-sky-100",
     }[paceTone] ?? "border-sky-400/18 bg-sky-500/[0.05] text-sky-100";
 
-  const statusTone = isPeriods
-    ? comparisonMetrics!.tone
-    : deadlineMetrics.statusTone;
+  const statusTone = isInsights
+    ? insightsMetrics!.tone
+    : isPeriods
+      ? comparisonMetrics!.tone
+      : deadlineMetrics.statusTone;
   const statusGlowClassName =
     {
       positive:
@@ -62,7 +73,29 @@ const CommandCenter = memo(function CommandCenter({
     }[statusTone] ??
     "before:bg-[radial-gradient(circle_at_top_left,rgba(56,189,248,0.14),transparent_42%)] after:bg-[radial-gradient(circle_at_bottom_right,rgba(20,184,166,0.08),transparent_38%)]";
 
-  const title = isPeriods ? "Period Outlook" : "Delivery outlook";
+  const title = isInsights
+    ? "SLA Insights"
+    : isPeriods
+      ? "Period Outlook"
+      : "Delivery outlook";
+  const primaryLabel = isInsights ? "SLA hit rate" : "Fix velocity";
+  const primaryValue = isInsights
+    ? formatPercent(insightsMetrics!.slaHitRate, 1)
+    : isPeriods
+      ? `${formatNumber(periodWindow!.fixRate, 2)}/day`
+      : `${formatNumber(summary.currentFixRate, 2)}/day`;
+  const secondaryLabel = isInsights ? "Breaches" : "Required pace";
+  const secondaryValue = isInsights
+    ? formatNumber(insightsMetrics!.breachedCompleted)
+    : isPeriods
+      ? `${formatNumber(periodWindow!.addRate, 2)}/day`
+      : `${formatNumber(summary.bugsPerDayRequired, 2)}/day`;
+  const tertiaryLabel = isInsights ? "Open overdue" : "Net difference";
+  const tertiaryValue = isInsights
+    ? formatNumber(insightsMetrics!.openOverdue)
+    : isPeriods
+      ? `${formatSignedNumber(periodWindow!.netBurnRate, 2)}/day`
+      : `${formatSignedNumber(paceGap, 2)}/day`;
 
   return (
     <Surface
@@ -95,12 +128,10 @@ const CommandCenter = memo(function CommandCenter({
               )}
             >
               <div className="text-[0.5rem] font-semibold uppercase tracking-[0.12em] text-stone-400 sm:text-[0.54rem]">
-                Fix velocity
+                {primaryLabel}
               </div>
               <strong className="mt-[0.1875rem] block font-display text-[1.12rem] leading-none tracking-[-0.035em] sm:text-[1.28rem]">
-                {isPeriods
-                  ? `${formatNumber(periodWindow!.fixRate, 2)}/day`
-                  : `${formatNumber(summary.currentFixRate, 2)}/day`}
+                {primaryValue}
               </strong>
             </div>
             <div
@@ -108,12 +139,10 @@ const CommandCenter = memo(function CommandCenter({
               className="rounded-[14px] border border-white/10 bg-white/[0.03] px-2.5 py-1.75 text-stone-100 sm:rounded-[16px] sm:py-2"
             >
               <div className="text-[0.5rem] font-semibold uppercase tracking-[0.12em] text-stone-400 sm:text-[0.54rem]">
-                Required pace
+                {secondaryLabel}
               </div>
               <strong className="mt-[0.1875rem] block font-display text-[1.12rem] leading-none tracking-[-0.035em] sm:text-[1.28rem]">
-                {isPeriods
-                  ? `${formatNumber(periodWindow!.addRate, 2)}/day`
-                  : `${formatNumber(summary.bugsPerDayRequired, 2)}/day`}
+                {secondaryValue}
               </strong>
             </div>
             <div
@@ -124,12 +153,10 @@ const CommandCenter = memo(function CommandCenter({
               )}
             >
               <div className="text-[0.5rem] font-semibold uppercase tracking-[0.12em] text-stone-400 sm:text-[0.54rem]">
-                Net difference
+                {tertiaryLabel}
               </div>
               <strong className="mt-[0.1875rem] block font-display text-[1.12rem] leading-none tracking-[-0.035em] sm:text-[1.28rem]">
-                {isPeriods
-                  ? `${formatSignedNumber(periodWindow!.netBurnRate, 2)}/day`
-                  : `${formatSignedNumber(paceGap, 2)}/day`}
+                {tertiaryValue}
               </strong>
             </div>
           </div>

@@ -211,6 +211,56 @@ describe("engine death attribution", () => {
     expect(bug.x).toBeLessThan(170);
   });
 
+  it("reports stable crowding centers and scores", () => {
+    const engine = new Engine(createCanvas(), {
+      height: 200,
+      width: 200,
+    });
+    const subject = new BugEntity({ size: 10, variant: "low", x: 100, y: 100 });
+
+    engine.entities = [
+      subject,
+      new BugEntity({ size: 10, variant: "low", x: 90, y: 100 }),
+      new BugEntity({ size: 10, variant: "low", x: 94, y: 104 }),
+      new BugEntity({ size: 10, variant: "low", x: 150, y: 100 }),
+    ];
+    engine.update(1 / 60, null, null);
+
+    const crowding = engine.getCrowdingAt(100, 100, 32, subject);
+
+    expect(crowding.count).toBe(2);
+    expect(crowding.score).toBeGreaterThan(1);
+    expect(crowding.centerX).toBeLessThan(100);
+  });
+
+  it("keeps simulated swarms distributed across board quadrants", () => {
+    const randomSpy = vi.spyOn(Math, "random");
+    let seed = 0;
+    randomSpy.mockImplementation(() => {
+      seed = (seed + 0.173) % 1;
+      return seed;
+    });
+    const engine = new Engine(createCanvas(), {
+      height: 200,
+      width: 200,
+    });
+
+    engine.spawnFromCounts({ high: 10, low: 30, medium: 10, urgent: 6 });
+
+    for (let frame = 0; frame < 360; frame += 1) {
+      engine.update(1 / 60, null, null);
+    }
+
+    const quadrantCounts = [0, 0, 0, 0];
+    for (const bug of engine.getAllBugs() as BugEntity[]) {
+      const quadrant = (bug.x >= 100 ? 1 : 0) + (bug.y >= 100 ? 2 : 0);
+      quadrantCounts[quadrant] += 1;
+    }
+
+    expect(quadrantCounts.filter((count) => count > 0)).toHaveLength(4);
+    expect(Math.max(...quadrantCounts)).toBeLessThan(engine.getAllBugs().length * 0.55);
+  });
+
   it("caps temporary allies so conversion stays readable", () => {
     const engine = new Engine(createCanvas(), {
       height: 200,

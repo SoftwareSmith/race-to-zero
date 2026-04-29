@@ -150,6 +150,22 @@ const SiegeExperience = memo(function SiegeExperience({
     );
   }, [resetEvolution, siegeGame, ui]);
 
+  const handleChangeGameMode = useCallback(
+    (mode: typeof siegeGame.gameMode) => {
+      if (mode === siegeGame.gameMode) {
+        return;
+      }
+
+      ui.closeMenus();
+      ui.setChartFocus(null);
+      resetEvolution();
+      siegeGame.enterInteractiveMode(mode, {
+        baseBugCounts: siegeGame.interactiveInitialBugCounts,
+      });
+    },
+    [resetEvolution, siegeGame, ui],
+  );
+
   const backgroundChartFocus = siegeGame.interactiveMode ? ui.chartFocus : null;
   const shouldRenderSiegeField = siegeGame.siegePhase !== "idle";
 
@@ -230,7 +246,7 @@ const SiegeExperience = memo(function SiegeExperience({
           killStreak={siegeGame.killStreak}
           lastFireTimes={siegeGame.lastFireTimes}
           nextWeaponUnlock={siegeGame.nextWeaponUnlock}
-          onChangeGameMode={siegeGame.changeGameMode}
+          onChangeGameMode={handleChangeGameMode}
           onExit={handleExitInteractiveMode}
           onKillAllBugs={siegeGame.killAllBugs}
           onSelectWeapon={siegeGame.selectWeapon}

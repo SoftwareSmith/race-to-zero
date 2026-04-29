@@ -5,6 +5,7 @@ import {
   chooseCustomPeriod,
   createConsoleCollectors,
   expectMetricValue,
+  getExpectedInsightsMetrics,
   getExpectedOverviewMetrics,
   getExpectedPeriodsMetrics,
   gotoDashboard,
@@ -15,6 +16,7 @@ test.describe("dashboard navigation QA", () => {
     const clientErrors = createConsoleCollectors(page);
     const overview = getExpectedOverviewMetrics();
     const custom = getExpectedPeriodsMetrics("custom");
+    const insights = getExpectedInsightsMetrics("custom");
 
     await gotoDashboard(page);
     await expectMetricValue(page, "Open bugs", overview.viewMetrics.openBugs);
@@ -44,6 +46,30 @@ test.describe("dashboard navigation QA", () => {
       page,
       "Completion rate",
       custom.viewMetrics.completionRate,
+    );
+
+    await page.getByRole("tab", { name: "Insights" }).click();
+    await expect(page.getByRole("tab", { name: "Insights" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+    await expect(
+      page.getByRole("button", { name: "Custom" }),
+    ).toHaveAttribute("aria-selected", "true");
+    await expectMetricValue(
+      page,
+      "SLA hit rate",
+      insights.viewMetrics.slaHitRate,
+    );
+    await expectMetricValue(
+      page,
+      "SLA breaches",
+      insights.viewMetrics.slaBreaches,
+    );
+    await expectMetricValue(
+      page,
+      "Missing due dates",
+      insights.viewMetrics.missingDueDates,
     );
 
     await page.getByRole("tab", { name: "Overview" }).click();

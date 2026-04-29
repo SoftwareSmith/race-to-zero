@@ -22,6 +22,7 @@ import type {
 import {
   getComparisonMetrics,
   getDeadlineMetrics,
+  getInsightsMetrics,
   getSummaryMetrics,
 } from "@dashboard/utils/metrics";
 
@@ -72,6 +73,15 @@ export function useDashboardController() {
   const comparisonMetrics = useMemo(
     () =>
       getComparisonMetrics(metrics, {
+        rangeKey: compareRangeKey,
+        customFromDate,
+        customToDate,
+      }),
+    [compareRangeKey, customFromDate, customToDate, metrics],
+  );
+  const insightsMetrics = useMemo(
+    () =>
+      getInsightsMetrics(metrics, {
         rangeKey: compareRangeKey,
         customFromDate,
         customToDate,
@@ -283,6 +293,7 @@ export function useDashboardController() {
     toggleShowBugParticleCount,
     headerEyebrow,
     headerSubtitle,
+    insightsMetrics,
     openTopMenu,
     settings,
     settingsMenuRef,

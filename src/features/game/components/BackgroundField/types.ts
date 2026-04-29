@@ -57,6 +57,8 @@ export interface QaPerformanceMetrics {
 export interface QaWindowState {
   enabled?: boolean;
   bugPositions?: Array<{ index: number; x: number; y: number; radius: number }>;
+  clearLiveBugs?: () => number;
+  getLiveBugCount?: () => number;
   lastHit?: {
     defeated: boolean;
     remainingHp: number;

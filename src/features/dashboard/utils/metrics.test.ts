@@ -3,9 +3,12 @@ import {
   buildComparisonWindowHistoryChartData,
   buildOpenAgeChartData,
   buildComparisonRateHistoryChartData,
+  buildSlaHitRateChartData,
+  buildSlaOutcomeChartData,
   buildStatusChartData,
   getComparisonMetrics,
   getDeadlineMetrics,
+  getInsightsMetrics,
   getSummaryMetrics,
 } from "./metrics";
 
@@ -297,5 +300,102 @@ describe("metrics", () => {
     expect(rateChartData.labels?.length).toBe(
       comparisonMetrics.historicalWindows.length,
     );
+  });
+
+  it("calculates SLA insights from due dates and completed dates", () => {
+    const metrics = {
+      bugs: [
+        {
+          completedAt: "2026-04-03",
+          createdAt: "2026-04-01",
+          dueDate: "2026-04-03",
+          priority: 1,
+          stateName: "Done",
+          stateType: "completed",
+        },
+        {
+          completedAt: "2026-04-06",
+          createdAt: "2026-04-01",
+          dueDate: "2026-04-04",
+          priority: 2,
+          stateName: "Done",
+          stateType: "completed",
+        },
+        {
+          completedAt: "2026-04-07",
+          createdAt: "2026-04-05",
+          dueDate: null,
+          priority: 3,
+          stateName: "Done",
+          stateType: "completed",
+        },
+        {
+          completedAt: "2026-03-30",
+          createdAt: "2026-03-25",
+          dueDate: "2026-03-29",
+          priority: 1,
+          stateName: "Done",
+          stateType: "completed",
+        },
+        {
+          completedAt: null,
+          createdAt: "2026-03-20",
+          dueDate: "2026-04-08",
+          priority: 2,
+          stateName: "In progress",
+          stateType: "started",
+        },
+        {
+          completedAt: null,
+          createdAt: "2026-04-01",
+          dueDate: "2026-04-13",
+          priority: 4,
+          stateName: "Backlog",
+          stateType: "backlog",
+        },
+      ],
+    };
+
+    const insightsMetrics = withFrozenDate("2026-04-10T12:00:00.000Z", () =>
+      getInsightsMetrics(metrics, {
+        customFromDate: "2026-04-01",
+        customToDate: "2026-04-10",
+        rangeKey: "custom",
+      }),
+    );
+
+    expect(insightsMetrics.totalCompleted).toBe(3);
+    expect(insightsMetrics.eligibleCompleted).toBe(2);
+    expect(insightsMetrics.onTimeCompleted).toBe(1);
+    expect(insightsMetrics.breachedCompleted).toBe(1);
+    expect(insightsMetrics.missingDueDate).toBe(1);
+    expect(insightsMetrics.slaHitRate).toBe(50);
+    expect(insightsMetrics.averageBreachDays).toBe(2);
+    expect(insightsMetrics.medianResolutionDays).toBe(2);
+    expect(insightsMetrics.openOverdue).toBe(1);
+    expect(insightsMetrics.dueSoonOpen).toBe(1);
+
+    const urgentMetrics = insightsMetrics.priorityMetrics.find(
+      (entry) => entry.label === "Urgent",
+    );
+    const highMetrics = insightsMetrics.priorityMetrics.find(
+      (entry) => entry.label === "High",
+    );
+    const normalMetrics = insightsMetrics.priorityMetrics.find(
+      (entry) => entry.label === "Normal",
+    );
+
+    expect(urgentMetrics?.onTime).toBe(1);
+    expect(highMetrics?.breached).toBe(1);
+    expect(normalMetrics?.missingDueDate).toBe(1);
+
+    const hitRateChart = buildSlaHitRateChartData(insightsMetrics);
+    expect(hitRateChart.datasets[0]?.data.slice(0, 3)).toEqual([100, 0, 0]);
+
+    const outcomeChart = buildSlaOutcomeChartData(insightsMetrics);
+    expect(outcomeChart.datasets).toHaveLength(3);
+    expect(outcomeChart.datasets[0]?.data[0]).toBe(1);
+    expect(outcomeChart.datasets[1]?.data[1]).toBe(1);
+    expect(outcomeChart.datasets[2]?.data[2]).toBe(1);
   });
 });

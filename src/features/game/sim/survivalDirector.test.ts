@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 
 import {
   buildCountsFromWeights,
+  calculateSurvivalSpawnRequest,
+  calculateWaveProgress,
   createSurvivalBurstCounts,
   getSurvivalPressure,
   getSurvivalRuntimeSpeedMultiplier,
@@ -47,6 +49,42 @@ describe("survival director", () => {
     expect(wave50.spawnBudget).toBeGreaterThan(wave25.spawnBudget);
     expect(wave50.activeBugLimit).toBeGreaterThan(wave1.activeBugLimit);
     expect(wave1.waveDurationMs).toBe(30_000);
+    expect(wave25.spawnBudget).toBe(
+      Math.round(wave25.spawnRatePerSecond * (wave25.waveDurationMs / 1000)),
+    );
+  });
+
+  it("calculates wave loader progress from timestamps", () => {
+    expect(calculateWaveProgress(1_500, 1_000, 1_000)).toBe(50);
+    expect(calculateWaveProgress(2_500, 1_000, 1_000)).toBe(100);
+    expect(calculateWaveProgress(500, 1_000, 1_000)).toBe(0);
+    expect(calculateWaveProgress(1_500, null, 1_000)).toBe(0);
+  });
+
+  it("accumulates fractional survival spawns without exceeding budget or active limit", () => {
+    const first = calculateSurvivalSpawnRequest({
+      accumulator: 0,
+      activeBugCount: 5,
+      activeBugLimit: 20,
+      elapsedSeconds: 0.5,
+      remainingBudget: 10,
+      spawnRatePerSecond: 1.5,
+    });
+
+    expect(first.requestedCount).toBe(0);
+    expect(first.nextAccumulator).toBeCloseTo(0.75);
+
+    const second = calculateSurvivalSpawnRequest({
+      accumulator: first.nextAccumulator,
+      activeBugCount: 5,
+      activeBugLimit: 6,
+      elapsedSeconds: 1,
+      remainingBudget: 10,
+      spawnRatePerSecond: 1.5,
+    });
+
+    expect(second.requestedCount).toBe(1);
+    expect(second.nextAccumulator).toBeCloseTo(1.25);
   });
 
   it("creates burst counts from the active wave weights", () => {

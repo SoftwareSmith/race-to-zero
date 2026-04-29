@@ -34,6 +34,20 @@ export interface SurvivalPressureResult {
   secondsUntilOffline: number | null;
 }
 
+export interface SurvivalSpawnAccumulatorInput {
+  accumulator: number;
+  activeBugCount: number;
+  activeBugLimit: number;
+  elapsedSeconds: number;
+  remainingBudget: number;
+  spawnRatePerSecond: number;
+}
+
+export interface SurvivalSpawnAccumulatorResult {
+  nextAccumulator: number;
+  requestedCount: number;
+}
+
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
 }
@@ -100,21 +114,21 @@ export function getSurvivalWavePlan(wave: number): SurvivalSpawnPlan {
   const variantWeights = getSurvivalVariantWeights(safeWave);
   const waveDurationMs = 30_000;
   const spawnRatePerSecond = Number(
-    clamp(0.65 + Math.pow(safeWave, 1.18) * 0.12, 0.65, 18).toFixed(2),
+    clamp(2 + Math.pow(safeWave, 1.22) * 0.85, 2, 72).toFixed(2),
   );
   const spawnBudget = Math.round(
-    clamp(spawnRatePerSecond * (waveDurationMs / 1000), 8, 540),
+    clamp(spawnRatePerSecond * (waveDurationMs / 1000), 24, 2300),
   );
   const burstSize = Math.max(1, Math.ceil(spawnRatePerSecond));
-  const pressureThreshold = Math.round(clamp(14 + safeWave * 1.15, 12, 95));
+  const pressureThreshold = Math.round(clamp(220 + safeWave * 120, 220, 2200));
   const offlineDamagePerSecond = Number(
-    clamp(2.2 + Math.pow(safeWave, 1.12) * 0.36, 2.5, 42).toFixed(2),
+    clamp(0.7 + Math.pow(safeWave, 1.05) * 0.18, 0.7, 18).toFixed(2),
   );
   const urgentIsFocus = variantWeights.urgent >= 0.18;
   const highIsFocus = !urgentIsFocus && variantWeights.high >= 0.18;
 
   return {
-    activeBugLimit: Math.round(clamp(pressureThreshold * 1.55, 24, 150)),
+    activeBugLimit: Math.round(clamp(pressureThreshold * 1.22, 320, 2600)),
     burstSize,
     counts: buildCountsFromWeights(spawnBudget, variantWeights),
     focusLabel: urgentIsFocus
@@ -146,6 +160,44 @@ export function createSurvivalBurstCounts(
   requestedCount = plan.burstSize,
 ): BugCounts {
   return buildCountsFromWeights(requestedCount, plan.variantWeights);
+}
+
+export function calculateWaveProgress(
+  now: number,
+  startedAt: number | null,
+  durationMs: number,
+): number {
+  if (startedAt == null || durationMs <= 0) {
+    return 0;
+  }
+
+  return Math.round(clamp(((now - startedAt) / durationMs) * 100, 0, 100));
+}
+
+export function calculateSurvivalSpawnRequest({
+  accumulator,
+  activeBugCount,
+  activeBugLimit,
+  elapsedSeconds,
+  remainingBudget,
+  spawnRatePerSecond,
+}: SurvivalSpawnAccumulatorInput): SurvivalSpawnAccumulatorResult {
+  const safeBudget = Math.max(0, Math.floor(remainingBudget));
+  const openSlots = Math.max(0, Math.floor(activeBugLimit - activeBugCount));
+  const nextAccumulator = Math.max(
+    0,
+    accumulator + Math.max(0, elapsedSeconds) * Math.max(0, spawnRatePerSecond),
+  );
+  const requestedCount = Math.min(
+    Math.floor(nextAccumulator),
+    safeBudget,
+    openSlots,
+  );
+
+  return {
+    nextAccumulator: nextAccumulator - requestedCount,
+    requestedCount,
+  };
 }
 
 export function getSurvivalRuntimeSpeedMultiplier(wave: number): number {

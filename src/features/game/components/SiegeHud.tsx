@@ -8,6 +8,7 @@ import type {
 } from "@game/types";
 import SiegeHudControls from "./siege-hud/SiegeHudControls";
 import SiegeHudLoadout from "./siege-hud/SiegeHudLoadout";
+import WaveProgressPill from "./siege-hud/WaveProgressPill";
 import { HudEventPill, HudShell } from "./siege-hud/shared";
 import { formatElapsedTime } from "./siege-hud/formatElapsedTime";
 
@@ -40,8 +41,10 @@ interface SiegeHudProps {
   selectedWeaponId: SiegeWeaponId;
   streakMultiplier: number;
   survivalStatus?: {
+    activeBugLimit: number;
     focusLabel: string;
     pressurePercent: number;
+    remainingSpawnBudget: number;
     runtimeSpeedMultiplier: number;
     secondsUntilNextWave: number | null;
     secondsUntilOffline: number | null;
@@ -49,6 +52,10 @@ interface SiegeHudProps {
     spawnRatePerSecond: number;
     tacticLabel: string;
     wave: number;
+    waveDurationMs: number;
+    waveEndsAt: number | null;
+    waveProgressPercent: number;
+    waveStartedAt: number | null;
   };
   upgradeToast?: string | null;
   weaponSnapshots: WeaponProgressSnapshot[];
@@ -206,11 +213,20 @@ export default function SiegeHud({
       {isSurvival ? (
         <div className="pointer-events-none fixed inset-x-0 top-3 z-[220] flex justify-start px-3 sm:top-4">
           <HudShell className="pointer-events-auto border-transparent bg-[linear-gradient(180deg,rgba(8,11,16,0.88),rgba(9,12,16,0.68))] overflow-visible px-1.5 py-1.5 shadow-[0_18px_42px_rgba(0,0,0,0.34)] [animation:hud-notch-arrive_320ms_cubic-bezier(0.22,1,0.36,1)_forwards]">
-            <div className="grid min-w-0 grid-cols-[4.2rem_4.8rem_minmax(0,7.8rem)] gap-1">
-              <div
-                className="rounded-full border border-emerald-300/12 bg-emerald-400/[0.08] px-2 py-1.5"
-                data-testid="siege-wave-stat"
-              >
+            <div className="grid min-w-0 grid-cols-[minmax(12rem,18rem)_minmax(0,7.8rem)] gap-1">
+              <WaveProgressPill
+                activeBugLimit={survivalStatus?.activeBugLimit ?? 0}
+                focusLabel={survivalStatus?.focusLabel ?? "Bug rush"}
+                progressPercent={survivalStatus?.waveProgressPercent ?? 0}
+                remainingSpawnBudget={survivalStatus?.remainingSpawnBudget ?? 0}
+                secondsUntilNextWave={
+                  survivalStatus?.secondsUntilNextWave ?? null
+                }
+                spawnRatePerSecond={survivalStatus?.spawnRatePerSecond ?? 0}
+                tacticLabel={survivalStatus?.tacticLabel ?? "Opening wave"}
+                wave={survivalStatus?.wave ?? 1}
+              />
+              <div className="sr-only" data-testid="siege-wave-stat">
                 <span className="block text-[0.48rem] font-semibold uppercase tracking-[0.14em] text-emerald-100/65">
                   Wave
                 </span>
@@ -219,10 +235,7 @@ export default function SiegeHud({
                 </strong>
               </div>
 
-              <div
-                className="rounded-full border border-amber-300/12 bg-amber-400/[0.08] px-2 py-1.5"
-                data-testid="siege-spawn-rate-stat"
-              >
+              <div className="sr-only" data-testid="siege-spawn-rate-stat">
                 <span className="block text-[0.48rem] font-semibold uppercase tracking-[0.14em] text-amber-100/65">
                   Rate
                 </span>

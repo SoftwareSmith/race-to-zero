@@ -14,6 +14,7 @@ import {
 import {
   getComparisonMetrics,
   getDeadlineMetrics,
+  getInsightsMetrics,
   getSummaryMetrics,
 } from "../../../src/features/dashboard/utils/metrics";
 import type { MetricsSource, WorkdaySettings } from "../../../src/types/dashboard";
@@ -164,6 +165,26 @@ export function getExpectedPeriodsMetrics(rangeKey: "7" | "30" | "90" | "all" | 
         bugsCreated: formatNumber(comparisonMetrics.currentWindow.created),
         completionRate: formatPercent(comparisonMetrics.currentWindow.completionRate, 1),
         netChange: formatSignedNumber(comparisonMetrics.currentWindow.netChange),
+      },
+    };
+  });
+}
+
+export function getExpectedInsightsMetrics(rangeKey: "7" | "30" | "90" | "all" | "custom" = "30") {
+  return withFrozenDate(QA_TODAY_ISO, () => {
+    const insightsMetrics = getInsightsMetrics(qaMetrics, {
+      customFromDate: QA_CUSTOM_FROM,
+      customToDate: QA_CUSTOM_TO,
+      rangeKey,
+    });
+
+    return {
+      insightsMetrics,
+      viewMetrics: {
+        missingDueDates: formatNumber(insightsMetrics.missingDueDate),
+        openSlaRisk: `${formatNumber(insightsMetrics.openOverdue)} overdue / ${formatNumber(insightsMetrics.dueSoonOpen)} soon`,
+        slaBreaches: formatNumber(insightsMetrics.breachedCompleted),
+        slaHitRate: formatPercent(insightsMetrics.slaHitRate, 1),
       },
     };
   });
@@ -398,6 +419,40 @@ export async function getQaBugPositions(page: Page) {
       };
     }).__RTZ_QA__;
     return qaState?.bugPositions ?? [];
+  });
+}
+
+export async function getQaLiveBugCount(page: Page) {
+  return page.evaluate(() => {
+    const qaState = (window as Window & {
+      __RTZ_QA__?: {
+        enabled?: boolean;
+        getLiveBugCount?: () => number;
+      };
+    }).__RTZ_QA__;
+
+    if (!qaState?.enabled || !qaState.getLiveBugCount) {
+      throw new Error("QA live bug counter is unavailable");
+    }
+
+    return qaState.getLiveBugCount();
+  });
+}
+
+export async function clearQaLiveBugs(page: Page) {
+  return page.evaluate(() => {
+    const qaState = (window as Window & {
+      __RTZ_QA__?: {
+        clearLiveBugs?: () => number;
+        enabled?: boolean;
+      };
+    }).__RTZ_QA__;
+
+    if (!qaState?.enabled || !qaState.clearLiveBugs) {
+      throw new Error("QA live bug clearer is unavailable");
+    }
+
+    return qaState.clearLiveBugs();
   });
 }
 

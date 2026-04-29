@@ -1,6 +1,9 @@
 import { expect, test } from "@playwright/test";
 import {
+  clickQaBug,
+  clearQaLiveBugs,
   enableCanvasQa,
+  getQaLiveBugCount,
   getStaticSiegeGameConfig,
   getQaBugPositions,
   mockMetrics,
@@ -18,6 +21,21 @@ const completionMetrics = {
     stateType: "backlog",
     teamKey: "QA",
   })),
+  generatedAt: "2026-04-09T12:00:00.000Z",
+  lastUpdated: "2026-04-09T12:00:00.000Z",
+};
+
+const singleBugMetrics = {
+  bugs: [
+    {
+      completedAt: null,
+      createdAt: "2026-04-01",
+      priority: 4,
+      stateName: "Backlog",
+      stateType: "backlog",
+      teamKey: "QA",
+    },
+  ],
   generatedAt: "2026-04-09T12:00:00.000Z",
   lastUpdated: "2026-04-09T12:00:00.000Z",
 };
@@ -56,6 +74,36 @@ test("keeps siege controls stable during pointer movement and exits cleanly", as
 
   await expect(page.getByRole("button", { name: "Open interactive bug game" })).toBeVisible();
   await expect(page.getByTestId("siege-hud")).toBeHidden();
+});
+
+test("time attack bugs keep a screen-wide organic distribution", async ({ page }) => {
+  await page.setViewportSize({ height: 1200, width: 1440 });
+  await enableCanvasQa(page, { stabilizeEngine: false });
+  await mockMetrics(page, completionMetrics);
+
+  await page.goto("./");
+  await page.getByRole("button", { name: "Open interactive bug game" }).click();
+  await expect(page.getByTestId("siege-hud")).toBeVisible();
+  await page.waitForTimeout(2200);
+
+  const positions = await getQaBugPositions(page);
+  expect(positions.length).toBeGreaterThan(20);
+
+  const quadrants = new Set(
+    positions.map((position) =>
+      `${position.x >= 720 ? "right" : "left"}-${position.y >= 600 ? "bottom" : "top"}`,
+    ),
+  );
+  const centralCount = positions.filter(
+    (position) =>
+      position.x > 1440 * 0.34 &&
+      position.x < 1440 * 0.66 &&
+      position.y > 1200 * 0.28 &&
+      position.y < 1200 * 0.72,
+  ).length;
+
+  expect(quadrants.size).toBe(4);
+  expect(centralCount / positions.length).toBeLessThan(0.55);
 });
 
 test("esc exits siege mode", async ({ page }) => {
@@ -117,11 +165,92 @@ test("survival shows wave pressure and advances after a cleared wave", async ({ 
   await expect(page.getByTestId("siege-wave-toast")).toContainText("Wave 1");
   await expect(page.getByTestId("siege-wave-stat").locator("strong")).toHaveText("1");
   await expect(page.getByTestId("siege-spawn-rate-stat").locator("strong")).toContainText("/s");
+  await expect(page.getByTestId("siege-wave-loader-pill")).toBeVisible();
+  await expect(page.getByTestId("siege-wave-loader-fill")).toBeVisible();
   await expect(page.getByTestId("siege-offline-pressure")).toBeVisible();
+
+  const initialLoaderWidth = await page
+    .getByTestId("siege-wave-loader-fill")
+    .evaluate((element) => element.getBoundingClientRect().width);
+  await page.waitForTimeout(900);
+  await expect
+    .poll(() =>
+      page
+        .getByTestId("siege-wave-loader-fill")
+        .evaluate((element) => element.getBoundingClientRect().width),
+    )
+    .toBeGreaterThan(initialLoaderWidth);
 
   await setQaSurvivalState(page, { completeWave: true });
   await expect(page.getByTestId("siege-wave-stat").locator("strong")).toHaveText("2");
   await expect(page.getByTestId("siege-wave-toast")).toContainText("Wave 2");
+});
+
+test("switching the HUD mode tab starts a fresh Survival run with active spawning", async ({ page }) => {
+  await page.setViewportSize({ height: 1200, width: 1440 });
+  await enableCanvasQa(page);
+  await mockMetrics(page, completionMetrics);
+
+  await page.goto("./");
+  await page.getByRole("button", { name: "Open interactive bug game" }).click();
+  await expect(page.getByTestId("siege-hud")).toBeVisible();
+
+  await setQaSiegeProgress(page, { kills: 12, remainingBugs: 24 });
+  await expect(page.getByTestId("siege-kills-stat").locator("strong")).toHaveText("12");
+
+  await page.getByRole("tab", { name: "Survival" }).click();
+  await expect(page.getByRole("tab", { name: "Survival", selected: true })).toBeVisible();
+  await expect(page.getByTestId("siege-kills-stat").locator("strong")).toHaveText("0");
+  await expect(page.getByTestId("siege-time-stat").locator("strong")).toHaveText("00:00");
+  await expect(page.getByTestId("siege-wave-loader-pill")).toBeVisible();
+
+  const initialAlive = Number.parseInt(
+    (await page.getByTestId("siege-remaining-stat").locator("strong").textContent()) ?? "0",
+    10,
+  );
+  const initialLoaderWidth = await page
+    .getByTestId("siege-wave-loader-fill")
+    .evaluate((element) => element.getBoundingClientRect().width);
+
+  await expect
+    .poll(async () =>
+      page
+        .getByTestId("siege-wave-loader-fill")
+        .evaluate((element) => element.getBoundingClientRect().width),
+    )
+    .toBeGreaterThan(initialLoaderWidth);
+  await expect
+    .poll(async () =>
+      Number.parseInt(
+        (await page.getByTestId("siege-remaining-stat").locator("strong").textContent()) ?? "0",
+        10,
+      ),
+    )
+    .toBeGreaterThan(initialAlive);
+});
+
+test("survival does not collapse in the opening seconds before the player can act", async ({ page }) => {
+  await page.setViewportSize({ height: 1200, width: 1440 });
+  await enableCanvasQa(page);
+  await mockMetrics(page, completionMetrics);
+
+  await page.goto("./");
+  await page.getByRole("button", { name: "Open interactive bug game" }).click();
+  await expect(page.getByTestId("siege-hud")).toBeVisible();
+
+  await page.getByRole("tab", { name: "Survival" }).click();
+  await expect(page.getByRole("tab", { name: "Survival", selected: true })).toBeVisible();
+
+  await page.waitForTimeout(5_000);
+
+  await expect(page.getByTestId("siege-complete-overlay")).toHaveCount(0);
+  await expect
+    .poll(async () => Number.parseInt(
+      (await page.getByTestId("siege-offline-pressure").locator("strong").textContent()) ?? "0",
+      10,
+    ))
+    .toBeGreaterThan(80);
+  await expect.poll(() => getQaLiveBugCount(page)).toBeGreaterThan(0);
 });
 
 test("survival site offline opens the completion overlay", async ({ page }) => {
@@ -145,7 +274,8 @@ test("survival site offline opens the completion overlay", async ({ page }) => {
   await setQaSurvivalState(page, { siteIntegrity: 0 });
 
   await expect(page.getByTestId("siege-complete-overlay")).toBeVisible();
-  await expect(page.getByText("Run logged. Survival score saved.")).toBeVisible();
+  await expect(page.getByTestId("siege-complete-title")).toHaveText("Site overrun. Survival score saved.");
+  await expect(page.getByTestId("siege-complete-outcome")).toBeVisible();
   await expect(page.getByText("Wave reached", { exact: true })).toBeVisible();
 });
 
@@ -298,4 +428,43 @@ test("shows the completion overlay when the live siege progress reaches zero bug
 
   const overlay = page.getByTestId("siege-complete-overlay");
   await expect(overlay).toBeVisible();
+  await expect(page.getByTestId("siege-complete-title")).toHaveText("Swarm cleared. Time recorded.");
+});
+
+test("shows the completion overlay when the live engine swarm is actually cleared", async ({ page }) => {
+  await page.setViewportSize({ height: 1200, width: 1440 });
+  await enableCanvasQa(page);
+  await mockMetrics(page, completionMetrics);
+
+  await page.goto("./");
+  await page.getByRole("button", { name: "Open interactive bug game" }).click();
+  await expect(page.getByTestId("siege-hud")).toBeVisible();
+  await expect.poll(() => getQaLiveBugCount(page)).toBeGreaterThan(0);
+
+  await clearQaLiveBugs(page);
+
+  await expect(page.getByTestId("siege-complete-overlay")).toBeVisible();
+  await expect(page.getByTestId("siege-complete-title")).toHaveText("Swarm cleared. Time recorded.");
+  await expect(page.getByTestId("siege-remaining-stat").locator("strong")).toHaveText("0");
+  await expect.poll(() => getQaLiveBugCount(page)).toBe(0);
+});
+
+test("shows the completion overlay when the final live bug is killed through gameplay", async ({ page }) => {
+  await page.setViewportSize({ height: 1200, width: 1440 });
+  await enableCanvasQa(page);
+  await mockMetrics(page, singleBugMetrics);
+  await seedDashboardState(page, {
+    gameConfig: getStaticSiegeGameConfig(),
+  });
+
+  await page.goto("./");
+  await page.getByRole("button", { name: "Open interactive bug game" }).click();
+  await expect(page.getByTestId("siege-hud")).toBeVisible();
+  await expect(page.getByTestId("siege-remaining-stat").locator("strong")).toHaveText("1");
+
+  await clickQaBug(page, 1);
+
+  await expect(page.getByTestId("siege-complete-overlay")).toBeVisible();
+  await expect(page.getByTestId("siege-complete-title")).toHaveText("Swarm cleared. Time recorded.");
+  await expect(page.getByTestId("siege-remaining-stat").locator("strong")).toHaveText("0");
 });

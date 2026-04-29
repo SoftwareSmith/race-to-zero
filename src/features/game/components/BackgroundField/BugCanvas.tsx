@@ -74,6 +74,16 @@ function clampNumber(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max);
 }
 
+function getActiveBugCount(bugs: Array<any> | undefined | null) {
+  if (!bugs?.length) {
+    return 0;
+  }
+
+  return bugs.reduce((count, bug) => {
+    return isTerminalEntityState(bug?.state) ? count : count + 1;
+  }, 0);
+}
+
 function getSpeedMultiplier(chaosMultiplier?: number) {
   return clampNumber(
     Math.pow(Math.max(0.25, chaosMultiplier ?? 1), 0.32),
@@ -394,7 +404,7 @@ const BugCanvas = memo(
         getLocalSiegeZones(),
       );
       onLiveBugCountChangeRef.current?.(
-        (swarmRef.current.getAllBugs?.() as Array<unknown>)?.length ?? 0,
+        getActiveBugCount(swarmRef.current.getAllBugs?.() as Array<any>),
       );
     }, [getLocalSiegeZones, interactiveMode, survivalSpawnPlan]);
 
@@ -496,6 +506,31 @@ const BugCanvas = memo(
         swarmRef.current = engine;
         syncQaBugPositionsFromEngine(engine, boundsRef.current);
 
+        if (typeof window !== "undefined") {
+          const qaState = (
+            window as Window & {
+              __RTZ_QA__?: {
+                clearLiveBugs?: () => number;
+                enabled?: boolean;
+                getLiveBugCount?: () => number;
+              };
+            }
+          ).__RTZ_QA__;
+
+          if (qaState?.enabled) {
+            qaState.getLiveBugCount = () =>
+              getActiveBugCount(engine.getAllBugs() as Array<any>);
+            qaState.clearLiveBugs = () => {
+              const clearedCount = engine.clearAllBugs();
+              latestBugPositionsRef.current = [];
+              lastReportedLiveBugCountRef.current = 0;
+              onLiveBugCountChangeRef.current?.(0);
+              updateQaBugPositions([], boundsRef.current);
+              return clearedCount;
+            };
+          }
+        }
+
         const maybeBugs = swarmRef.current.getAllBugs() as Array<any>;
         const nextReseedInfo = reseedClusteredBugs(
           maybeBugs,
@@ -534,6 +569,23 @@ const BugCanvas = memo(
           }
         }
         physicsAdapter?.dispose?.();
+        if (typeof window !== "undefined") {
+          const qaState = (
+            window as Window & {
+              __RTZ_QA__?: {
+                clearLiveBugs?: () => number;
+                getLiveBugCount?: () => number;
+              };
+            }
+          ).__RTZ_QA__;
+
+          if (qaState?.clearLiveBugs) {
+            delete qaState.clearLiveBugs;
+          }
+          if (qaState?.getLiveBugCount) {
+            delete qaState.getLiveBugCount;
+          }
+        }
         swarmRef.current = null;
       };
     }, [

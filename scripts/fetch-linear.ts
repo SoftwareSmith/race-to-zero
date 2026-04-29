@@ -21,6 +21,7 @@ interface LinearLabelNode {
 interface LinearIssue {
   completedAt?: string | null;
   createdAt: string;
+  dueDate?: string | null;
   labels?: {
     nodes?: LinearLabelNode[];
   } | null;
@@ -97,6 +98,7 @@ async function fetchBugIssues(): Promise<LinearIssue[]> {
         nodes {
           createdAt
           completedAt
+          dueDate
           priority
           team {
             key
@@ -176,6 +178,7 @@ function buildMetrics(issues: LinearIssue[]): MetricsSource {
       (issue): MetricsBug => ({
         createdAt: toDay(issue.createdAt),
         completedAt: issue.completedAt ? toDay(issue.completedAt) : null,
+        dueDate: issue.dueDate ? toDay(issue.dueDate) : null,
         priority: issue.priority ?? 0,
         stateName: issue.state?.name ?? null,
         stateType: issue.state?.type ?? null,

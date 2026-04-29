@@ -62,6 +62,9 @@ describe("useSiegeGame", () => {
     expect(result.current.maxWeaponTier).toBe(5);
     expect(result.current.survivalStatus.tacticLabel).toBe("Opening wave");
     expect(result.current.survivalStatus.focusLabel).toBeTruthy();
+    expect(result.current.survivalStatus.waveDurationMs).toBe(30_000);
+    expect(result.current.survivalStatus.waveProgressPercent).toBe(0);
+    expect(result.current.survivalStatus.remainingSpawnBudget).toBeGreaterThanOrEqual(0);
   });
 
   it("starts a clean runtime snapshot when switching modes", () => {
@@ -116,6 +119,7 @@ describe("useSiegeGame", () => {
     act(() => {
       result.current.enterInteractiveMode();
       result.current.handleInteractiveHit({ defeated: true, pointValue: 1 });
+      result.current.syncRemainingBugs(0);
     });
 
     await waitFor(() => {
@@ -125,10 +129,43 @@ describe("useSiegeGame", () => {
     expect(result.current.interactiveRemainingBugs).toBe(0);
     expect(result.current.leaderboard).toHaveLength(1);
     expect(result.current.completionSummary?.topWeaponLabel).toBe("Hammer");
+    expect(result.current.completionSummary?.outcome).toBe("timeAttackCleared");
     expect(window.localStorage.setItem).toHaveBeenCalledWith(
       STORAGE_KEYS.siegeRunLeaderboardsV2,
       expect.any(String),
     );
+  });
+
+  it("finalizes after kill-all is triggered before the run reaches active phase", async () => {
+    const { result } = renderHook(() =>
+      useSiegeGame({
+        currentBugCount: 5,
+        currentBugCounts: { high: 0, low: 5, medium: 0, urgent: 0 },
+        evolutionStates: {},
+      }),
+    );
+
+    act(() => {
+      result.current.enterInteractiveMode();
+    });
+
+    await waitFor(() => {
+      expect(result.current.siegePhase).toBe("entering");
+    });
+
+    act(() => {
+      result.current.killAllBugs();
+    });
+
+    await waitFor(() => {
+      expect(result.current.siegePhase).toBe("active");
+    });
+
+    await waitFor(() => {
+      expect(result.current.completionSummary?.outcome).toBe("timeAttackCleared");
+    });
+
+    expect(result.current.interactiveRemainingBugs).toBe(0);
   });
 
   it("does not count uncredited immediate defeats until the actual death event is reported", () => {
@@ -161,6 +198,12 @@ describe("useSiegeGame", () => {
     });
 
     expect(result.current.interactiveKills).toBe(1);
+    expect(result.current.interactiveRemainingBugs).toBe(3);
+
+    act(() => {
+      result.current.syncRemainingBugs(2);
+    });
+
     expect(result.current.interactiveRemainingBugs).toBe(2);
   });
 
@@ -214,6 +257,49 @@ describe("useSiegeGame", () => {
     expect(result.current.interactiveRemainingBugs).toBe(17);
   });
 
+  it("does not transiently clear the run before the live engine reports zero bugs", async () => {
+    const { result } = renderHook(() =>
+      useSiegeGame({
+        currentBugCount: 3,
+        currentBugCounts: { high: 0, low: 3, medium: 0, urgent: 0 },
+        evolutionStates: {},
+      }),
+    );
+
+    act(() => {
+      result.current.enterInteractiveMode();
+    });
+
+    await waitFor(() => {
+      expect(result.current.siegePhase).toBe("active");
+    });
+
+    act(() => {
+      result.current.handleInteractiveHit({ defeated: true, pointValue: 1 });
+      result.current.handleInteractiveHit({ defeated: true, pointValue: 1 });
+      result.current.handleInteractiveHit({ defeated: true, pointValue: 1 });
+    });
+
+    expect(result.current.interactiveKills).toBe(3);
+    expect(result.current.interactiveRemainingBugs).toBe(3);
+    expect(result.current.completionSummary).toBeNull();
+
+    act(() => {
+      result.current.syncRemainingBugs(1);
+    });
+
+    expect(result.current.interactiveRemainingBugs).toBe(1);
+    expect(result.current.completionSummary).toBeNull();
+
+    act(() => {
+      result.current.syncRemainingBugs(0);
+    });
+
+    await waitFor(() => {
+      expect(result.current.completionSummary?.outcome).toBe("timeAttackCleared");
+    });
+  });
+
   it("rolls survival waves forward when the timer expires", async () => {
     vi.useFakeTimers();
 
@@ -239,6 +325,32 @@ describe("useSiegeGame", () => {
     expect(result.current.survivalStatus.wave).toBe(2);
 
     expect(result.current.survivalStatus.secondsUntilNextWave).toBeGreaterThan(0);
+  });
+
+  it("updates survival wave loader progress while spawning from the wave budget", async () => {
+    vi.useFakeTimers();
+
+    const { result } = renderHook(() =>
+      useSiegeGame({
+        currentBugCount: 20,
+        currentBugCounts: { high: 0, low: 20, medium: 0, urgent: 0 },
+        evolutionStates: {},
+      }),
+    );
+
+    act(() => {
+      result.current.enterInteractiveMode("outbreak");
+      vi.advanceTimersByTime(520);
+    });
+
+    const initialBudget = result.current.survivalStatus.remainingSpawnBudget;
+
+    act(() => {
+      vi.advanceTimersByTime(1_500);
+    });
+
+    expect(result.current.survivalStatus.waveProgressPercent).toBeGreaterThan(0);
+    expect(result.current.survivalStatus.remainingSpawnBudget).toBeLessThanOrEqual(initialBudget);
   });
 
   it("advances the timer during an active run", async () => {
@@ -299,5 +411,129 @@ describe("useSiegeGame", () => {
     });
 
     expect(result.current.interactiveRemainingBugs).toBe(0);
+  });
+
+  it("finalizes Time Attack on the last credited hit when one live bug remains", async () => {
+    const { result } = renderHook(() =>
+      useSiegeGame({
+        currentBugCount: 1,
+        currentBugCounts: { high: 0, low: 1, medium: 0, urgent: 0 },
+        evolutionStates: {},
+      }),
+    );
+
+    act(() => {
+      result.current.enterInteractiveMode();
+    });
+
+    await waitFor(() => {
+      expect(result.current.siegePhase).toBe("active");
+    });
+
+    act(() => {
+      result.current.handleInteractiveHit({ defeated: true, pointValue: 1 });
+    });
+
+    await waitFor(() => {
+      expect(result.current.completionSummary?.outcome).toBe("timeAttackCleared");
+    });
+
+    expect(result.current.interactiveRemainingBugs).toBe(0);
+  });
+
+  it("trusts active zero-bug sync even before the first kill", async () => {
+    const { result } = renderHook(() =>
+      useSiegeGame({
+        currentBugCount: 3,
+        currentBugCounts: { high: 0, low: 3, medium: 0, urgent: 0 },
+        evolutionStates: {},
+      }),
+    );
+
+    act(() => {
+      result.current.enterInteractiveMode();
+    });
+
+    await waitFor(() => {
+      expect(result.current.siegePhase).toBe("active");
+    });
+
+    act(() => {
+      result.current.syncRemainingBugs(0);
+    });
+
+    await waitFor(() => {
+      expect(result.current.completionSummary).not.toBeNull();
+    });
+
+    expect(result.current.interactiveRemainingBugs).toBe(0);
+  });
+
+  it("finalizes Time Attack even if the zero-bug callback comes from a stale pre-active closure", async () => {
+    const { result } = renderHook(() =>
+      useSiegeGame({
+        currentBugCount: 3,
+        currentBugCounts: { high: 0, low: 3, medium: 0, urgent: 0 },
+        evolutionStates: {},
+      }),
+    );
+
+    const staleSyncRemainingBugs = result.current.syncRemainingBugs;
+
+    act(() => {
+      result.current.enterInteractiveMode();
+    });
+
+    await waitFor(() => {
+      expect(result.current.siegePhase).toBe("active");
+    });
+
+    act(() => {
+      staleSyncRemainingBugs(0);
+    });
+
+    await waitFor(() => {
+      expect(result.current.completionSummary?.outcome).toBe("timeAttackCleared");
+    });
+  });
+
+  it("creates a survival overrun completion summary when the site goes offline", async () => {
+    const qaWindow = window as Window & {
+      __RTZ_QA__?: {
+        enabled?: boolean;
+        setSurvivalState?: (state: { siteIntegrity?: number }) => void;
+      };
+    };
+    qaWindow.__RTZ_QA__ = { enabled: true };
+
+    const { result } = renderHook(() =>
+      useSiegeGame({
+        currentBugCount: 20,
+        currentBugCounts: { high: 0, low: 20, medium: 0, urgent: 0 },
+        evolutionStates: {},
+      }),
+    );
+
+    act(() => {
+      result.current.enterInteractiveMode("outbreak");
+    });
+
+    await waitFor(() => {
+      expect(result.current.siegePhase).toBe("active");
+    });
+
+    await waitFor(() => {
+      expect(qaWindow.__RTZ_QA__?.setSurvivalState).toEqual(expect.any(Function));
+    });
+
+    act(() => {
+      qaWindow.__RTZ_QA__?.setSurvivalState?.({ siteIntegrity: 0 });
+    });
+
+    await waitFor(() => {
+      expect(result.current.completionSummary?.outcome).toBe("survivalOverrun");
+    });
+
+    delete qaWindow.__RTZ_QA__;
   });
 });

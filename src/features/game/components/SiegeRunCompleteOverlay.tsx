@@ -85,6 +85,16 @@ const SiegeRunCompleteOverlay = memo(function SiegeRunCompleteOverlay({
   const alternateModeMeta = SIEGE_GAME_MODE_META[alternateMode];
   const modeMeta = SIEGE_GAME_MODE_META[completionSummary.mode];
   const isSurvival = completionSummary.mode === "outbreak";
+  const isSurvivalOverrun = completionSummary.outcome === "survivalOverrun";
+  const backdropClassName = isSurvivalOverrun
+    ? "bg-[radial-gradient(circle_at_top,rgba(248,113,113,0.22),transparent_34%),radial-gradient(circle_at_20%_20%,rgba(251,191,36,0.16),transparent_28%),rgba(2,6,23,0.76)]"
+    : "bg-[radial-gradient(circle_at_top,rgba(125,211,252,0.2),transparent_36%),radial-gradient(circle_at_20%_20%,rgba(251,191,36,0.18),transparent_28%),rgba(2,6,23,0.72)]";
+  const outcomeBadgeClassName = isSurvivalOverrun
+    ? "border-red-300/28 bg-red-400/12 text-red-100"
+    : "border-emerald-400/24 bg-emerald-300/10 text-emerald-100";
+  const title = isSurvivalOverrun
+    ? "Site overrun. Survival score saved."
+    : "Swarm cleared. Time recorded.";
   const actionCards: CompletionActionCardProps[] = [
     {
       description: `Restart ${modeMeta.shortLabel} and chase a better local rank.`,
@@ -186,10 +196,10 @@ const SiegeRunCompleteOverlay = memo(function SiegeRunCompleteOverlay({
 
   return (
     <div
-      className="pointer-events-auto fixed inset-0 z-[260] overflow-hidden bg-[radial-gradient(circle_at_top,rgba(125,211,252,0.2),transparent_36%),radial-gradient(circle_at_20%_20%,rgba(251,191,36,0.18),transparent_28%),rgba(2,6,23,0.72)] backdrop-blur-[3px]"
+      className={`pointer-events-auto fixed inset-0 z-[260] overflow-hidden ${backdropClassName} backdrop-blur-[3px]`}
       data-testid="siege-complete-overlay"
     >
-      {!prefersReducedMotion ? (
+      {!prefersReducedMotion && !isSurvivalOverrun ? (
         <div
           className="pointer-events-none absolute inset-0"
           aria-hidden="true"
@@ -224,10 +234,15 @@ const SiegeRunCompleteOverlay = memo(function SiegeRunCompleteOverlay({
         >
           <div className="grid gap-6 lg:grid-cols-[1.3fr_0.9fr]">
             <div className="space-y-5">
-              <div className="inline-flex items-center gap-2 rounded-full border border-emerald-400/24 bg-emerald-300/10 px-3 py-1 text-[0.72rem] font-semibold uppercase tracking-[0.22em] text-emerald-100">
+              <div
+                className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 text-[0.72rem] font-semibold uppercase tracking-[0.22em] ${outcomeBadgeClassName}`}
+                data-testid="siege-complete-outcome"
+              >
                 {completionSummary.isNewBest
                   ? "New local best"
-                  : `Leaderboard rank ${completionSummary.rank}`}
+                  : completionSummary.rank == null
+                    ? "Run saved"
+                    : `Leaderboard rank ${completionSummary.rank}`}
               </div>
 
               <div className="space-y-2">
@@ -237,10 +252,9 @@ const SiegeRunCompleteOverlay = memo(function SiegeRunCompleteOverlay({
                 <h2
                   className="max-w-xl text-3xl font-semibold tracking-[-0.04em] text-white sm:text-5xl"
                   id="siege-complete-title"
+                  data-testid="siege-complete-title"
                 >
-                  {isSurvival
-                    ? "Run logged. Survival score saved."
-                    : "Swarm cleared. Time recorded."}
+                  {title}
                 </h2>
                 <p
                   className="max-w-2xl text-sm leading-6 text-stone-300 sm:text-[0.95rem]"
@@ -248,10 +262,11 @@ const SiegeRunCompleteOverlay = memo(function SiegeRunCompleteOverlay({
                 >
                   {isSurvival ? (
                     <>
-                      Reached wave{" "}
-                      {completionSummary.waveReached.toLocaleString()} and
-                      survived {formatElapsedTime(completionSummary.survivedMs)}{" "}
-                      with {completionSummary.topWeaponLabel} leading the run.
+                      Bugs overwhelmed the site at wave{" "}
+                      {completionSummary.waveReached.toLocaleString()} and the
+                      run survived{" "}
+                      {formatElapsedTime(completionSummary.survivedMs)} with{" "}
+                      {completionSummary.topWeaponLabel} leading the run.
                     </>
                   ) : (
                     <>

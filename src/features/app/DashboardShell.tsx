@@ -15,6 +15,7 @@ import {
   useDashboardUi,
 } from "@dashboard/context/DashboardContext";
 import {
+  InsightsView,
   OverviewView,
   PeriodsView,
   StatusBanner,
@@ -289,6 +290,7 @@ const DashboardShell = memo(function DashboardShell({
               activeTab={ui.activeTab}
               comparisonMetrics={metrics.comparisonMetrics}
               deadlineMetrics={metrics.deadlineMetrics}
+              insightsMetrics={metrics.insightsMetrics}
               siegeMode={interactiveMode}
               summary={metrics.summary}
             />
@@ -309,6 +311,14 @@ const DashboardShell = memo(function DashboardShell({
               {ui.activeTab === "periods" ? (
                 <PeriodsView
                   comparisonMetrics={metrics.comparisonMetrics}
+                  onChartFocusChange={chartFocusHandler}
+                  siegeMode={interactiveMode}
+                />
+              ) : null}
+
+              {ui.activeTab === "insights" ? (
+                <InsightsView
+                  insightsMetrics={metrics.insightsMetrics}
                   onChartFocusChange={chartFocusHandler}
                   siegeMode={interactiveMode}
                 />

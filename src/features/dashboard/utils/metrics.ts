@@ -18,6 +18,9 @@ import type {
   ComparisonWindowMetrics,
   DailyCountEntry,
   DeadlineMetrics,
+  InsightsMetrics,
+  InsightsPriorityMetrics,
+  InsightsTrendEntry,
   MetricsBug,
   MetricsSource,
   PriorityDistributionEntry,
@@ -87,6 +90,7 @@ function normalizeBugRecords(
     .map((entry) => ({
       completedAt: entry.completedAt || null,
       createdAt: entry.createdAt,
+      dueDate: entry.dueDate || null,
       priority: Number(entry.priority ?? 0),
       stateName: entry.stateName ?? null,
       stateType: entry.stateType ?? null,
@@ -534,6 +538,161 @@ function buildHistoricalWindows(
   }
 
   return windows.reverse();
+}
+
+function getSelectedRangeDates(
+  preparedSource: PreparedMetricsSource,
+  {
+    customFromDate,
+    customToDate,
+    rangeKey = "30",
+  }: {
+    customFromDate?: string;
+    customToDate?: string;
+    rangeKey?: CompareRangeKey;
+  },
+) {
+  const today = startOfDay(new Date());
+  const earliestDate = preparedSource.firstBugDate ?? today;
+  const isAllTime = rangeKey === "all";
+  const isCustom = rangeKey === "custom";
+
+  if (isCustom) {
+    const customDates = getCustomRangeDates(
+      customFromDate,
+      customToDate,
+      today,
+    );
+
+    return {
+      ...customDates,
+      isAllTime,
+      isCustom,
+      rangeLabel: `Custom: ${getDisplayRangeLabel(customDates.startDate, customDates.endDate)}`,
+      today,
+    };
+  }
+
+  if (isAllTime) {
+    return {
+      startDate: earliestDate,
+      endDate: today,
+      isAllTime,
+      isCustom,
+      rangeLabel: "All time",
+      today,
+    };
+  }
+
+  return {
+    startDate: subDays(today, getNumericRangeDays(rangeKey, 30) - 1),
+    endDate: today,
+    isAllTime,
+    isCustom,
+    rangeLabel: `Last ${rangeKey} days`,
+    today,
+  };
+}
+
+function isDateInRange(
+  dateValue: string | null | undefined,
+  startDate: Date,
+  endDate: Date,
+) {
+  if (!dateValue) {
+    return false;
+  }
+
+  const dateKey = dateValue.slice(0, 10);
+  return (
+    dateKey >= format(startDate, "yyyy-MM-dd") &&
+    dateKey <= format(endDate, "yyyy-MM-dd")
+  );
+}
+
+function getAverage(values: number[]) {
+  if (!values.length) {
+    return 0;
+  }
+
+  return values.reduce((sum, value) => sum + value, 0) / values.length;
+}
+
+function getMedian(values: number[]) {
+  if (!values.length) {
+    return 0;
+  }
+
+  const sortedValues = [...values].sort((left, right) => left - right);
+  const middleIndex = Math.floor(sortedValues.length / 2);
+
+  if (sortedValues.length % 2 === 1) {
+    return sortedValues[middleIndex] ?? 0;
+  }
+
+  return (
+    ((sortedValues[middleIndex - 1] ?? 0) + (sortedValues[middleIndex] ?? 0)) /
+    2
+  );
+}
+
+function getResolutionDays(bug: MetricsBug) {
+  if (!bug.completedAt) {
+    return 0;
+  }
+
+  return Math.max(
+    differenceInCalendarDays(parseISO(bug.completedAt), parseISO(bug.createdAt)),
+    0,
+  );
+}
+
+function createEmptyInsightsPriorityMetrics(
+  label: string,
+): InsightsPriorityMetrics {
+  return {
+    averageBreachDays: 0,
+    averageResolutionDays: 0,
+    breached: 0,
+    eligible: 0,
+    label,
+    medianResolutionDays: 0,
+    missingDueDate: 0,
+    onTime: 0,
+    slaHitRate: 0,
+    totalCompleted: 0,
+  };
+}
+
+function finalizeInsightsPriorityMetrics(
+  metrics: InsightsPriorityMetrics,
+  resolutionDays: number[],
+  breachDays: number[],
+) {
+  return {
+    ...metrics,
+    averageBreachDays: getAverage(breachDays),
+    averageResolutionDays: getAverage(resolutionDays),
+    medianResolutionDays: getMedian(resolutionDays),
+    slaHitRate:
+      metrics.eligible > 0 ? (metrics.onTime / metrics.eligible) * 100 : 0,
+  };
+}
+
+function getInsightsTone(slaHitRate: number, eligibleCompleted: number): Tone {
+  if (eligibleCompleted === 0) {
+    return "neutral";
+  }
+
+  if (slaHitRate >= 85) {
+    return "positive";
+  }
+
+  if (slaHitRate >= 70) {
+    return "neutral";
+  }
+
+  return "negative";
 }
 
 function getDeadlineStatus({
@@ -1035,6 +1194,295 @@ export function getComparisonMetrics(
       : isCustom
         ? `Custom: ${getDisplayRangeLabel(currentStartDate, currentEndDate)}`
         : `Last ${rangeKey} days`,
+  };
+}
+
+export function getInsightsMetrics(
+  source: MetricsSource | null,
+  {
+    rangeKey = "30",
+    customFromDate,
+    customToDate,
+  }: {
+    customFromDate?: string;
+    customToDate?: string;
+    rangeKey?: CompareRangeKey;
+  } = {},
+): InsightsMetrics {
+  const preparedSource = prepareMetricsSource(source);
+  const { startDate, endDate, rangeLabel, today } = getSelectedRangeDates(
+    preparedSource,
+    { rangeKey, customFromDate, customToDate },
+  );
+  const currentWindow = getWindowStats(preparedSource, startDate, endDate);
+  const completedInRange = preparedSource.bugs.filter((bug) =>
+    isDateInRange(bug.completedAt, startDate, endDate),
+  );
+  const priorityBuckets = new Map(
+    PRIORITY_ORDER.map((label) => [
+      label,
+      {
+        metrics: createEmptyInsightsPriorityMetrics(label),
+        breachDays: [] as number[],
+        resolutionDays: [] as number[],
+      },
+    ]),
+  );
+  const trendCounts = new Map<string, InsightsTrendEntry>();
+  const resolutionDays: number[] = [];
+  const breachDays: number[] = [];
+  let onTimeCompleted = 0;
+  let breachedCompleted = 0;
+  let missingDueDate = 0;
+
+  for (const bug of completedInRange) {
+    const priorityLabel = getPriorityLabel(bug.priority);
+    const bucket = priorityBuckets.get(priorityLabel);
+    const completedAt = bug.completedAt as string;
+    const resolutionDayCount = getResolutionDays(bug);
+    const trendEntry = trendCounts.get(completedAt) ?? {
+      breached: 0,
+      completed: 0,
+      date: completedAt,
+      onTime: 0,
+    };
+
+    trendEntry.completed += 1;
+    resolutionDays.push(resolutionDayCount);
+
+    if (bucket) {
+      bucket.metrics.totalCompleted += 1;
+      bucket.resolutionDays.push(resolutionDayCount);
+    }
+
+    if (!bug.dueDate) {
+      missingDueDate += 1;
+      if (bucket) {
+        bucket.metrics.missingDueDate += 1;
+      }
+      trendCounts.set(completedAt, trendEntry);
+      continue;
+    }
+
+    if (bucket) {
+      bucket.metrics.eligible += 1;
+    }
+
+    if (completedAt <= bug.dueDate) {
+      onTimeCompleted += 1;
+      trendEntry.onTime += 1;
+      if (bucket) {
+        bucket.metrics.onTime += 1;
+      }
+    } else {
+      const breachDayCount = Math.max(
+        differenceInCalendarDays(parseISO(completedAt), parseISO(bug.dueDate)),
+        0,
+      );
+
+      breachedCompleted += 1;
+      trendEntry.breached += 1;
+      breachDays.push(breachDayCount);
+      if (bucket) {
+        bucket.metrics.breached += 1;
+        bucket.breachDays.push(breachDayCount);
+      }
+    }
+
+    trendCounts.set(completedAt, trendEntry);
+  }
+
+  let openOverdue = 0;
+  let dueSoonOpen = 0;
+  for (const bug of preparedSource.bugs) {
+    if (bug.completedAt || !bug.dueDate) {
+      continue;
+    }
+
+    const daysUntilDue = differenceInCalendarDays(parseISO(bug.dueDate), today);
+    if (daysUntilDue < 0) {
+      openOverdue += 1;
+    } else if (daysUntilDue <= 7) {
+      dueSoonOpen += 1;
+    }
+  }
+
+  const eligibleCompleted = onTimeCompleted + breachedCompleted;
+  const slaHitRate =
+    eligibleCompleted > 0 ? (onTimeCompleted / eligibleCompleted) * 100 : 0;
+  const tone = getInsightsTone(slaHitRate, eligibleCompleted);
+  const priorityMetrics = PRIORITY_ORDER.map((label) => {
+    const bucket = priorityBuckets.get(label);
+    return bucket
+      ? finalizeInsightsPriorityMetrics(
+          bucket.metrics,
+          bucket.resolutionDays,
+          bucket.breachDays,
+        )
+      : createEmptyInsightsPriorityMetrics(label);
+  });
+  const headline =
+    eligibleCompleted === 0
+      ? "SLA due dates need more coverage"
+      : tone === "positive"
+        ? "SLA delivery is holding strong"
+        : tone === "neutral"
+          ? "SLA delivery is close to target"
+          : "SLA delivery needs attention";
+  const body =
+    eligibleCompleted === 0
+      ? `No completed bugs in ${rangeLabel} have a due date, so SLA hit rate cannot be calculated yet.`
+      : `${onTimeCompleted} of ${eligibleCompleted} completed bugs with due dates landed on or before SLA in ${rangeLabel}. ${breachedCompleted} breached and ${missingDueDate} completed bugs were missing due dates.`;
+
+  return {
+    averageBreachDays: getAverage(breachDays),
+    averageResolutionDays: getAverage(resolutionDays),
+    body,
+    breachedCompleted,
+    currentWindow,
+    dueSoonOpen,
+    eligibleCompleted,
+    headline,
+    medianResolutionDays: getMedian(resolutionDays),
+    missingDueDate,
+    onTimeCompleted,
+    openOverdue,
+    priorityMetrics,
+    rangeLabel,
+    slaHitRate,
+    tone,
+    totalCompleted: completedInRange.length,
+    trendSeries: [...trendCounts.values()].sort((left, right) =>
+      left.date.localeCompare(right.date),
+    ),
+  };
+}
+
+export function buildSlaHitRateChartData(
+  insightsMetrics: InsightsMetrics,
+): ChartData<"bar", number[], string> {
+  return {
+    labels: insightsMetrics.priorityMetrics.map((entry) => entry.label),
+    datasets: [
+      {
+        label: "SLA hit rate %",
+        data: insightsMetrics.priorityMetrics.map((entry) =>
+          Number(entry.slaHitRate.toFixed(1)),
+        ),
+        backgroundColor: [
+          "rgba(248, 113, 113, 0.72)",
+          "rgba(125, 211, 252, 0.72)",
+          "rgba(94, 234, 212, 0.72)",
+          "rgba(148, 163, 184, 0.7)",
+          "rgba(120, 113, 108, 0.66)",
+        ],
+        borderColor: ["#f87171", "#7dd3fc", "#5eead4", "#94a3b8", "#78716c"],
+        borderWidth: 1,
+        borderRadius: 8,
+      },
+    ],
+  };
+}
+
+export function buildSlaOutcomeChartData(
+  insightsMetrics: InsightsMetrics,
+): ChartData<"bar", number[], string> {
+  return {
+    labels: insightsMetrics.priorityMetrics.map((entry) => entry.label),
+    datasets: [
+      {
+        label: "On time",
+        data: insightsMetrics.priorityMetrics.map((entry) => entry.onTime),
+        backgroundColor: "rgba(45, 212, 191, 0.72)",
+        borderColor: "#2dd4bf",
+        borderWidth: 1,
+        borderRadius: 8,
+      },
+      {
+        label: "Breached",
+        data: insightsMetrics.priorityMetrics.map((entry) => entry.breached),
+        backgroundColor: "rgba(248, 113, 113, 0.72)",
+        borderColor: "#f87171",
+        borderWidth: 1,
+        borderRadius: 8,
+      },
+      {
+        label: "Missing due date",
+        data: insightsMetrics.priorityMetrics.map(
+          (entry) => entry.missingDueDate,
+        ),
+        backgroundColor: "rgba(148, 163, 184, 0.64)",
+        borderColor: "#94a3b8",
+        borderWidth: 1,
+        borderRadius: 8,
+      },
+    ],
+  };
+}
+
+export function buildSlaTrendChartData(
+  insightsMetrics: InsightsMetrics,
+): ChartData<"line", number[], string> {
+  const trendSeries = insightsMetrics.trendSeries.length
+    ? insightsMetrics.trendSeries
+    : [{ breached: 0, completed: 0, date: "", onTime: 0 }];
+
+  return {
+    labels: trendSeries.map((entry) =>
+      entry.date ? formatLabel(entry.date) : "No completions",
+    ),
+    datasets: [
+      {
+        label: "On time",
+        data: trendSeries.map((entry) => entry.onTime),
+        borderColor: "#5eead4",
+        backgroundColor: "rgba(94, 234, 212, 0.14)",
+        tension: 0.25,
+        borderWidth: 3,
+        pointRadius: 2,
+        pointHoverRadius: 4,
+      },
+      {
+        label: "Breached",
+        data: trendSeries.map((entry) => entry.breached),
+        borderColor: "#f87171",
+        backgroundColor: "rgba(248, 113, 113, 0.14)",
+        tension: 0.25,
+        borderWidth: 3,
+        pointRadius: 2,
+        pointHoverRadius: 4,
+      },
+    ],
+  };
+}
+
+export function buildResolutionTimeChartData(
+  insightsMetrics: InsightsMetrics,
+): ChartData<"bar", number[], string> {
+  return {
+    labels: insightsMetrics.priorityMetrics.map((entry) => entry.label),
+    datasets: [
+      {
+        label: "Avg resolution days",
+        data: insightsMetrics.priorityMetrics.map((entry) =>
+          Number(entry.averageResolutionDays.toFixed(1)),
+        ),
+        backgroundColor: "rgba(125, 211, 252, 0.72)",
+        borderColor: "#7dd3fc",
+        borderWidth: 1,
+        borderRadius: 8,
+      },
+      {
+        label: "Avg breach days",
+        data: insightsMetrics.priorityMetrics.map((entry) =>
+          Number(entry.averageBreachDays.toFixed(1)),
+        ),
+        backgroundColor: "rgba(251, 191, 36, 0.7)",
+        borderColor: "#fbbf24",
+        borderWidth: 1,
+        borderRadius: 8,
+      },
+    ],
   };
 }
 

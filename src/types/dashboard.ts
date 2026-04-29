@@ -3,7 +3,7 @@ export type StatusBannerKind = "error" | "info";
 export type TopMenuKey = "codex" | "settings" | null;
 export type SettingToggleKey = "excludePublicHolidays" | "excludeWeekends";
 export type BugVisualSettingKey = "chaosMultiplier" | "sizeMultiplier";
-export type ActiveTab = "overview" | "periods";
+export type ActiveTab = "overview" | "periods" | "insights";
 export type CompareRangeKey = "7" | "30" | "90" | "all" | "custom";
 
 export interface TabItem {
@@ -24,10 +24,52 @@ export interface WorkdaySettings {
 export interface MetricsBug {
   createdAt: string;
   completedAt: string | null;
+  dueDate?: string | null;
   priority: number;
   stateName: string | null;
   stateType: string | null;
   teamKey?: string | null;
+}
+
+export interface InsightsPriorityMetrics {
+  averageBreachDays: number;
+  averageResolutionDays: number;
+  breached: number;
+  eligible: number;
+  label: string;
+  medianResolutionDays: number;
+  missingDueDate: number;
+  onTime: number;
+  slaHitRate: number;
+  totalCompleted: number;
+}
+
+export interface InsightsTrendEntry {
+  breached: number;
+  completed: number;
+  date: string;
+  onTime: number;
+}
+
+export interface InsightsMetrics {
+  averageBreachDays: number;
+  averageResolutionDays: number;
+  body: string;
+  breachedCompleted: number;
+  currentWindow: ComparisonWindowMetrics;
+  dueSoonOpen: number;
+  eligibleCompleted: number;
+  headline: string;
+  medianResolutionDays: number;
+  missingDueDate: number;
+  onTimeCompleted: number;
+  openOverdue: number;
+  priorityMetrics: InsightsPriorityMetrics[];
+  rangeLabel: string;
+  slaHitRate: number;
+  tone: Tone;
+  totalCompleted: number;
+  trendSeries: InsightsTrendEntry[];
 }
 
 export interface MetricsSource {

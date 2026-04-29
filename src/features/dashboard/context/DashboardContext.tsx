@@ -44,6 +44,7 @@ type DashboardMetricsValue = Pick<
   | "error"
   | "headerEyebrow"
   | "headerSubtitle"
+  | "insightsMetrics"
   | "summary"
 >;
 type DashboardSettingsValue = Pick<
@@ -127,6 +128,7 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
       error: value.error,
       headerEyebrow: value.headerEyebrow,
       headerSubtitle: value.headerSubtitle,
+      insightsMetrics: value.insightsMetrics,
       summary: value.summary,
     }),
     [
@@ -137,6 +139,7 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
       value.error,
       value.headerEyebrow,
       value.headerSubtitle,
+      value.insightsMetrics,
       value.summary,
     ],
   );

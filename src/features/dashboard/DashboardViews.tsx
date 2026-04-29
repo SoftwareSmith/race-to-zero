@@ -16,12 +16,17 @@ import {
   buildDeadlineBurndownChartData,
   buildOpenAgeChartData,
   buildPriorityChartData,
+  buildResolutionTimeChartData,
+  buildSlaHitRateChartData,
+  buildSlaOutcomeChartData,
+  buildSlaTrendChartData,
   buildStatusChartData,
 } from "@dashboard/utils/metrics";
 import type {
   ChartFocusState,
   ComparisonMetrics,
   DeadlineMetrics,
+  InsightsMetrics,
   SummaryMetrics,
   Tone,
   WorkdaySettings,
@@ -186,6 +191,67 @@ function buildPeriodsMetricCards(
   ];
 }
 
+function getInsightsHitRateTone(insightsMetrics: InsightsMetrics): Tone {
+  return insightsMetrics.tone;
+}
+
+function getInsightsBreachTone(insightsMetrics: InsightsMetrics): Tone {
+  if (insightsMetrics.breachedCompleted === 0) {
+    return insightsMetrics.eligibleCompleted > 0 ? "positive" : "neutral";
+  }
+
+  return "negative";
+}
+
+function getInsightsMissingDueDateTone(insightsMetrics: InsightsMetrics): Tone {
+  if (insightsMetrics.missingDueDate === 0) {
+    return "positive";
+  }
+
+  return insightsMetrics.eligibleCompleted > 0 ? "neutral" : "negative";
+}
+
+function getInsightsOpenRiskTone(insightsMetrics: InsightsMetrics): Tone {
+  return insightsMetrics.openOverdue > 0 ? "negative" : "positive";
+}
+
+function buildInsightsMetricCards(
+  insightsMetrics: InsightsMetrics,
+): MetricCardDefinition[] {
+  return [
+    {
+      hint: "Completed bugs with due dates that closed on or before their Linear due date.",
+      label: "SLA hit rate",
+      tone: getInsightsHitRateTone(insightsMetrics),
+      value: formatPercent(insightsMetrics.slaHitRate, 1),
+    },
+    {
+      hint: "Completed bugs in this period that closed after their Linear due date.",
+      label: "SLA breaches",
+      tone: getInsightsBreachTone(insightsMetrics),
+      value: formatNumber(insightsMetrics.breachedCompleted),
+    },
+    {
+      hint: "Completed bugs in this period without a Linear due date. These are excluded from SLA hit-rate calculations.",
+      label: "Missing due dates",
+      tone: getInsightsMissingDueDateTone(insightsMetrics),
+      value: formatNumber(insightsMetrics.missingDueDate),
+    },
+    {
+      hint: "Open bugs whose due date has already passed, plus bugs due in the next seven days.",
+      label: "Open SLA risk",
+      tone: getInsightsOpenRiskTone(insightsMetrics),
+      value: `${formatNumber(insightsMetrics.openOverdue)} overdue / ${formatNumber(insightsMetrics.dueSoonOpen)} soon`,
+    },
+    {
+      hint: "Median completion time for bugs completed in the selected period.",
+      label: "Median resolve time",
+      tone: "neutral",
+      value: `${formatNumber(insightsMetrics.medianResolutionDays, 1)}d`,
+    },
+  ];
+}
+
 function getStatusDistributionSummary(deadlineMetrics: DeadlineMetrics) {
   const leadingStatus = [...deadlineMetrics.statusDistribution].sort(
     (left, right) => right.count - left.count,
@@ -236,6 +302,30 @@ function buildOpenAgeDistributionSummary(deadlineMetrics: DeadlineMetrics) {
 
 function getRateHistorySummary(comparisonMetrics: ComparisonMetrics) {
   return `This trend compares historical fix velocity with intake velocity over matching ${comparisonMetrics.currentWindow.dayCount}-day windows so it is easier to see when throughput actually overtakes incoming bugs.`;
+}
+
+function getSlaHitRateSummary(insightsMetrics: InsightsMetrics) {
+  if (insightsMetrics.eligibleCompleted === 0) {
+    return "No completed bugs in this period have Linear due dates yet, so SLA hit rate is waiting on more due-date coverage.";
+  }
+
+  return `${formatNumber(insightsMetrics.onTimeCompleted)} of ${formatNumber(insightsMetrics.eligibleCompleted)} completed bugs with due dates landed on time in ${insightsMetrics.rangeLabel}.`;
+}
+
+function getSlaOutcomeSummary(insightsMetrics: InsightsMetrics) {
+  return `${formatNumber(insightsMetrics.totalCompleted)} bugs were completed in ${insightsMetrics.rangeLabel}; ${formatNumber(insightsMetrics.missingDueDate)} were missing due dates and are tracked separately from SLA performance.`;
+}
+
+function getSlaTrendSummary(insightsMetrics: InsightsMetrics) {
+  if (!insightsMetrics.trendSeries.length) {
+    return "No completed bugs were found in the selected period.";
+  }
+
+  return "Daily SLA outcomes show whether breaches are clustered on a few delivery days or spread across the period.";
+}
+
+function getResolutionTimeSummary(insightsMetrics: InsightsMetrics) {
+  return `Average resolution time is ${formatNumber(insightsMetrics.averageResolutionDays, 1)} days, and breached bugs were late by ${formatNumber(insightsMetrics.averageBreachDays, 1)} days on average.`;
 }
 
 function ChartFallback({ className = "" }: { className?: string }) {
@@ -503,6 +593,126 @@ export const PeriodsView = memo(function PeriodsView({
             siegeMode={siegeMode}
             summary={rateHistorySummary}
             title="Fix vs intake trend"
+          />
+        </Suspense>
+      </div>
+    </div>
+  );
+});
+
+interface InsightsViewProps {
+  insightsMetrics: InsightsMetrics;
+  onChartFocusChange?: (nextFocus: ChartFocusState | null) => void;
+  siegeMode?: boolean;
+}
+
+export const InsightsView = memo(function InsightsView({
+  insightsMetrics,
+  onChartFocusChange,
+  siegeMode = false,
+}: InsightsViewProps) {
+  const slaHitRateData = useMemo(
+    () => buildSlaHitRateChartData(insightsMetrics),
+    [insightsMetrics],
+  );
+  const slaOutcomeData = useMemo(
+    () => buildSlaOutcomeChartData(insightsMetrics),
+    [insightsMetrics],
+  );
+  const slaTrendData = useMemo(
+    () => buildSlaTrendChartData(insightsMetrics),
+    [insightsMetrics],
+  );
+  const resolutionTimeData = useMemo(
+    () => buildResolutionTimeChartData(insightsMetrics),
+    [insightsMetrics],
+  );
+  const metricCards = useMemo(
+    () => buildInsightsMetricCards(insightsMetrics),
+    [insightsMetrics],
+  );
+  const slaHitRateSummary = useMemo(
+    () => getSlaHitRateSummary(insightsMetrics),
+    [insightsMetrics],
+  );
+  const slaOutcomeSummary = useMemo(
+    () => getSlaOutcomeSummary(insightsMetrics),
+    [insightsMetrics],
+  );
+  const slaTrendSummary = useMemo(
+    () => getSlaTrendSummary(insightsMetrics),
+    [insightsMetrics],
+  );
+  const resolutionTimeSummary = useMemo(
+    () => getResolutionTimeSummary(insightsMetrics),
+    [insightsMetrics],
+  );
+
+  return (
+    <div className="grid content-start gap-1.5 sm:gap-2">
+      <div className="grid gap-1.5 sm:grid-cols-2 sm:gap-2 xl:grid-cols-5">
+        {metricCards.map((metricCard) => (
+          <MetricCard
+            key={metricCard.label}
+            hint={metricCard.hint}
+            label={metricCard.label}
+            siegeMode={siegeMode}
+            tone={metricCard.tone}
+            value={metricCard.value}
+          />
+        ))}
+      </div>
+
+      <div className="grid items-stretch gap-1.5 md:grid-cols-2 sm:gap-2">
+        <Suspense fallback={<ChartFallback />}>
+          <ChartCard
+            chartKey="sla-hit-rate-by-priority"
+            className="h-full"
+            data={slaHitRateData}
+            description="Completed bugs grouped by Linear priority, using due date as the SLA target."
+            onHoverStateChange={onChartFocusChange}
+            siegeMode={siegeMode}
+            summary={slaHitRateSummary}
+            title="SLA hit rate by severity"
+            variant="bar"
+          />
+        </Suspense>
+        <Suspense fallback={<ChartFallback />}>
+          <ChartCard
+            chartKey="sla-outcomes-by-priority"
+            className="h-full"
+            data={slaOutcomeData}
+            description="Shows on-time completions, breached completions, and missing due dates for each severity group."
+            onHoverStateChange={onChartFocusChange}
+            siegeMode={siegeMode}
+            summary={slaOutcomeSummary}
+            title="SLA outcomes by severity"
+            variant="bar"
+          />
+        </Suspense>
+        <Suspense fallback={<ChartFallback />}>
+          <ChartCard
+            chartKey="sla-outcome-trend"
+            className="h-full"
+            data={slaTrendData}
+            description="Daily completed bugs split by whether they landed before or after the Linear due date."
+            onHoverStateChange={onChartFocusChange}
+            siegeMode={siegeMode}
+            summary={slaTrendSummary}
+            title="SLA outcome trend"
+          />
+        </Suspense>
+        <Suspense fallback={<ChartFallback />}>
+          <ChartCard
+            chartKey="resolution-time-by-priority"
+            className="h-full"
+            data={resolutionTimeData}
+            description="Average completion time and average breach size by severity."
+            onHoverStateChange={onChartFocusChange}
+            siegeMode={siegeMode}
+            summary={resolutionTimeSummary}
+            title="Resolution time by severity"
+            variant="bar"
           />
         </Suspense>
       </div>

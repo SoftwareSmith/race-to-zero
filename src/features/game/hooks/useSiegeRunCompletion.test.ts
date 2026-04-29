@@ -1,4 +1,4 @@
-import { renderHook } from "@testing-library/react";
+import { renderHook, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import { STORAGE_KEYS } from "../../../constants/storageKeys";
@@ -94,6 +94,15 @@ describe("siege run completion leaderboards", () => {
       useSiegeRunCompletion({
         evolutionStates: {},
         gameMode: "purge",
+        getRuntimeSnapshot: () => ({
+          elapsedMs: 0,
+          killStreak: 0,
+          kills: 0,
+          lastFireTimes: {} as Record<any, number>,
+          points: 0,
+          remainingBugs: 1,
+          streakMultiplier: 1,
+        }),
         interactiveBaseElapsedMsRef: { current: 0 },
         interactiveKills: 0,
         interactiveMode: false,
@@ -137,6 +146,15 @@ describe("siege run completion leaderboards", () => {
       useSiegeRunCompletion({
         evolutionStates: {},
         gameMode: "purge",
+        getRuntimeSnapshot: () => ({
+          elapsedMs: 0,
+          killStreak: 0,
+          kills: 0,
+          lastFireTimes: {} as Record<any, number>,
+          points: 0,
+          remainingBugs: 1,
+          streakMultiplier: 1,
+        }),
         interactiveBaseElapsedMsRef: { current: 0 },
         interactiveKills: 0,
         interactiveMode: false,
@@ -150,5 +168,189 @@ describe("siege run completion leaderboards", () => {
     );
 
     expect(result.current.leaderboard).toEqual([legacyEntry]);
+  });
+
+  it("keeps mode data isolated while normalizing stored entries", () => {
+    const purgeWithOfflineReason = createEntry({
+      id: "purge-stale-offline",
+      mode: "purge",
+      offlineReason: "should be removed",
+    });
+    const invalidWeapon = createEntry({
+      id: "invalid-weapon",
+      topWeaponId: "not-a-weapon" as SiegeLeaderboardEntry["topWeaponId"],
+    });
+    const survivalEntry = createEntry({
+      id: "survival-valid",
+      mode: "outbreak",
+      offlineReason: "Site offline at wave 3",
+      waveReached: 3,
+    });
+
+    Object.defineProperty(window, "localStorage", {
+      configurable: true,
+      value: {
+        getItem: vi.fn((key: string) => {
+          if (key === STORAGE_KEYS.siegeRunLeaderboardsV2) {
+            return JSON.stringify({
+              outbreak: [survivalEntry],
+              purge: [purgeWithOfflineReason, invalidWeapon],
+            });
+          }
+
+          return null;
+        }),
+        setItem: vi.fn(),
+      },
+    });
+
+    const { result: purgeResult } = renderHook(() =>
+      useSiegeRunCompletion({
+        evolutionStates: {},
+        gameMode: "purge",
+        getRuntimeSnapshot: () => ({
+          elapsedMs: 0,
+          killStreak: 0,
+          kills: 0,
+          lastFireTimes: {} as Record<any, number>,
+          points: 0,
+          remainingBugs: 1,
+          streakMultiplier: 1,
+        }),
+        interactiveBaseElapsedMsRef: { current: 0 },
+        interactiveKills: 0,
+        interactiveMode: false,
+        interactiveRemainingBugs: 1,
+        interactiveRunningSinceRef: { current: null },
+        selectedWeaponId: "hammer",
+        siegePhase: "idle",
+        siteOffline: false,
+        updateRuntimeSnapshot: vi.fn(),
+      }),
+    );
+
+    const { result: survivalResult } = renderHook(() =>
+      useSiegeRunCompletion({
+        evolutionStates: {},
+        gameMode: "outbreak",
+        getRuntimeSnapshot: () => ({
+          elapsedMs: 0,
+          killStreak: 0,
+          kills: 0,
+          lastFireTimes: {} as Record<any, number>,
+          points: 0,
+          remainingBugs: 1,
+          streakMultiplier: 1,
+        }),
+        interactiveBaseElapsedMsRef: { current: 0 },
+        interactiveKills: 0,
+        interactiveMode: false,
+        interactiveRemainingBugs: 1,
+        interactiveRunningSinceRef: { current: null },
+        selectedWeaponId: "hammer",
+        siegePhase: "idle",
+        siteOffline: false,
+        updateRuntimeSnapshot: vi.fn(),
+      }),
+    );
+
+    expect(purgeResult.current.leaderboard).toHaveLength(1);
+    expect(purgeResult.current.leaderboard[0].offlineReason).toBeUndefined();
+    expect(purgeResult.current.leaderboard.map((entry) => entry.id)).not.toContain("invalid-weapon");
+    expect(survivalResult.current.leaderboard).toHaveLength(1);
+    expect(survivalResult.current.leaderboard[0].offlineReason).toBe("Site offline at wave 3");
+  });
+
+  it("saves completion summaries without rank zero when a run misses the top eight", async () => {
+    const existingEntries = Array.from({ length: 8 }, (_, index) =>
+      createEntry({
+        id: `fast-${index}`,
+        elapsedMs: 1_000 + index,
+        mode: "purge",
+      }),
+    );
+    Object.defineProperty(window, "localStorage", {
+      configurable: true,
+      value: {
+        getItem: vi.fn((key: string) => {
+          if (key === STORAGE_KEYS.siegeRunLeaderboardsV2) {
+            return JSON.stringify({ outbreak: [], purge: existingEntries });
+          }
+
+          return null;
+        }),
+        setItem: vi.fn(),
+      },
+    });
+
+    const { result } = renderHook(() =>
+      useSiegeRunCompletion({
+        evolutionStates: {},
+        gameMode: "purge",
+        getRuntimeSnapshot: () => ({
+          elapsedMs: 50_000,
+          killStreak: 0,
+          kills: 10,
+          lastFireTimes: {} as Record<any, number>,
+          points: 0,
+          remainingBugs: 0,
+          streakMultiplier: 1,
+        }),
+        interactiveBaseElapsedMsRef: { current: 50_000 },
+        interactiveKills: 10,
+        interactiveMode: true,
+        interactiveRemainingBugs: 0,
+        interactiveRunningSinceRef: { current: null },
+        selectedWeaponId: "hammer",
+        siegePhase: "active",
+        siteOffline: false,
+        updateRuntimeSnapshot: vi.fn(),
+      }),
+    );
+
+    await waitFor(() => {
+      expect(result.current.completionSummary).not.toBeNull();
+    });
+
+    expect(result.current.completionSummary?.rank).toBeNull();
+    expect(result.current.completionSummary?.isNewBest).toBe(false);
+    expect(result.current.leaderboard.map((entry) => entry.id)).toEqual(
+      existingEntries.map((entry) => entry.id),
+    );
+  });
+
+  it("uses the live runtime snapshot when finalizing after rendered kills lag behind", async () => {
+    const updateRuntimeSnapshot = vi.fn();
+    const { result } = renderHook(() =>
+      useSiegeRunCompletion({
+        evolutionStates: {},
+        gameMode: "purge",
+        getRuntimeSnapshot: () => ({
+          elapsedMs: 0,
+          killStreak: 0,
+          kills: 36,
+          lastFireTimes: {} as Record<any, number>,
+          points: 36,
+          remainingBugs: 0,
+          streakMultiplier: 1,
+        }),
+        interactiveBaseElapsedMsRef: { current: 0 },
+        interactiveKills: 0,
+        interactiveMode: true,
+        interactiveRemainingBugs: 0,
+        interactiveRunningSinceRef: { current: null },
+        selectedWeaponId: "hammer",
+        siegePhase: "active",
+        siteOffline: false,
+        updateRuntimeSnapshot,
+      }),
+    );
+
+    await waitFor(() => {
+      expect(result.current.completionSummary).not.toBeNull();
+    });
+
+    expect(result.current.completionSummary?.bugCount).toBe(36);
+    expect(updateRuntimeSnapshot).toHaveBeenCalled();
   });
 });

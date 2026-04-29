@@ -1,4 +1,4 @@
-import { useEffect, useState, type MutableRefObject } from "react";
+import { useCallback, useEffect, useRef, useState, type MutableRefObject } from "react";
 import { STORAGE_KEYS } from "../../../constants/storageKeys";
 import {
   createStoredJsonParser,
@@ -13,6 +13,7 @@ import type {
   SiegeWeaponId,
   WeaponEvolutionState,
 } from "@game/types";
+import { ALL_WEAPON_IDS } from "@game/types";
 
 const MAX_LEADERBOARD_ENTRIES = 8;
 const SIEGE_GAME_MODES: SiegeGameMode[] = ["purge", "outbreak"];
@@ -41,9 +42,12 @@ export interface SiegeLeaderboardEntry {
   waveReached: number;
 }
 
+export type SiegeCompletionOutcome = "survivalOverrun" | "timeAttackCleared";
+
 export interface SiegeCompletionSummary extends SiegeLeaderboardEntry {
   isNewBest: boolean;
-  rank: number;
+  outcome: SiegeCompletionOutcome;
+  rank: number | null;
 }
 
 export type SiegeLeaderboardsByMode = Record<
@@ -54,6 +58,7 @@ export type SiegeLeaderboardsByMode = Record<
 interface UseSiegeRunCompletionOptions {
   evolutionStates?: Partial<Record<SiegeWeaponId, WeaponEvolutionState>>;
   gameMode: SiegeGameMode;
+  getRuntimeSnapshot: () => SiegeRuntimeSnapshotLike;
   interactiveKills: number;
   interactiveMode: boolean;
   interactiveRemainingBugs: number;
@@ -68,6 +73,11 @@ interface UseSiegeRunCompletionOptions {
     force?: boolean,
   ) => void;
   waveReached?: number;
+}
+
+interface FinalizeRunOverrides {
+  interactiveRemainingBugs?: number;
+  siteOffline?: boolean;
 }
 
 function getTopWeapon(
@@ -108,6 +118,7 @@ function normalizeLeaderboardEntry(
     typeof value.completedAt !== "string" ||
     typeof value.topWeaponId !== "string" ||
     typeof value.topWeaponLabel !== "string" ||
+    !ALL_WEAPON_IDS.includes(value.topWeaponId as SiegeWeaponId) ||
     !isFiniteNumber(value.bugCount) ||
     !isFiniteNumber(value.bugsPerSecond) ||
     !isFiniteNumber(value.elapsedMs)
@@ -123,7 +134,9 @@ function normalizeLeaderboardEntry(
     elapsedMs: Math.max(0, Math.floor(value.elapsedMs)),
     mode: value.mode,
     offlineReason:
-      typeof value.offlineReason === "string" ? value.offlineReason : undefined,
+      value.mode === "outbreak" && typeof value.offlineReason === "string"
+        ? value.offlineReason
+        : undefined,
     survivedMs: isFiniteNumber(value.survivedMs)
       ? Math.max(0, Math.floor(value.survivedMs))
       : Math.max(0, Math.floor(value.elapsedMs)),
@@ -233,6 +246,7 @@ function getStoredLeaderboards(): SiegeLeaderboardsByMode {
 export function useSiegeRunCompletion({
   evolutionStates,
   gameMode,
+  getRuntimeSnapshot,
   interactiveKills,
   interactiveMode,
   interactiveRemainingBugs,
@@ -251,14 +265,70 @@ export function useSiegeRunCompletion({
   const [completionSummary, setCompletionSummary] =
     useState<SiegeCompletionSummary | null>(null);
   const leaderboard = leaderboards[gameMode];
+  const completionSummaryRef = useRef(completionSummary);
+  const leaderboardsRef = useRef(leaderboards);
+  const latestStateRef = useRef({
+    evolutionStates,
+    gameMode,
+    interactiveKills,
+    interactiveMode,
+    interactiveRemainingBugs,
+    offlineReason,
+    selectedWeaponId,
+    siegePhase,
+    siteOffline,
+    waveReached,
+  });
 
   useEffect(() => {
+    completionSummaryRef.current = completionSummary;
+  }, [completionSummary]);
+
+  useEffect(() => {
+    leaderboardsRef.current = leaderboards;
+  }, [leaderboards]);
+
+  useEffect(() => {
+    latestStateRef.current = {
+      evolutionStates,
+      gameMode,
+      interactiveKills,
+      interactiveMode,
+      interactiveRemainingBugs,
+      offlineReason,
+      selectedWeaponId,
+      siegePhase,
+      siteOffline,
+      waveReached,
+    };
+  }, [
+    evolutionStates,
+    gameMode,
+    interactiveKills,
+    interactiveMode,
+    interactiveRemainingBugs,
+    offlineReason,
+    selectedWeaponId,
+    siegePhase,
+    siteOffline,
+    waveReached,
+  ]);
+
+  const finalizeRun = useCallback((overrides: FinalizeRunOverrides = {}) => {
+    const latestState = latestStateRef.current;
+    const runtimeSnapshot = getRuntimeSnapshot();
+    const liveKills = Math.max(latestState.interactiveKills, runtimeSnapshot.kills);
+    const effectiveRemainingBugs =
+      overrides.interactiveRemainingBugs ??
+      Math.min(latestState.interactiveRemainingBugs, runtimeSnapshot.remainingBugs);
+    const effectiveSiteOffline = overrides.siteOffline ?? latestState.siteOffline;
+
     if (
-      !interactiveMode ||
-      siegePhase !== "active" ||
-      (gameMode === "purge" && interactiveRemainingBugs > 0) ||
-      (gameMode === "outbreak" && !siteOffline) ||
-      completionSummary != null
+      !latestState.interactiveMode ||
+      latestState.siegePhase !== "active" ||
+      (latestState.gameMode === "purge" && effectiveRemainingBugs > 0) ||
+      (latestState.gameMode === "outbreak" && !effectiveSiteOffline) ||
+      completionSummaryRef.current != null
     ) {
       return;
     }
@@ -272,73 +342,85 @@ export function useSiegeRunCompletion({
     interactiveBaseElapsedMsRef.current = finalElapsedMs;
     interactiveRunningSinceRef.current = null;
 
-    const topWeapon = getTopWeapon(evolutionStates, selectedWeaponId);
+    const topWeapon = getTopWeapon(
+      latestState.evolutionStates,
+      latestState.selectedWeaponId,
+    );
     const entry: SiegeLeaderboardEntry = {
       id: `siege-run-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-      bugCount: interactiveKills,
+      bugCount: liveKills,
       bugsPerSecond:
         finalElapsedMs > 0
-          ? Number(((interactiveKills * 1000) / finalElapsedMs).toFixed(2))
-          : interactiveKills,
+          ? Number(((liveKills * 1000) / finalElapsedMs).toFixed(2))
+          : liveKills,
       completedAt: new Date().toISOString(),
       elapsedMs: finalElapsedMs,
-      mode: gameMode,
+      mode: latestState.gameMode,
       offlineReason:
-        gameMode === "outbreak"
-          ? offlineReason ?? "Site offline under swarm pressure"
+        latestState.gameMode === "outbreak"
+          ? latestState.offlineReason ?? "Site offline under swarm pressure"
           : undefined,
       survivedMs: finalElapsedMs,
       topWeaponId: topWeapon.id,
       topWeaponLabel: topWeapon.label,
-      waveReached: gameMode === "outbreak" ? Math.max(1, waveReached) : 0,
+      waveReached:
+        latestState.gameMode === "outbreak"
+          ? Math.max(1, latestState.waveReached)
+          : 0,
     };
     const nextLeaderboards = buildSiegeLeaderboards([
-      ...leaderboards.purge,
-      ...leaderboards.outbreak,
+      ...leaderboardsRef.current.purge,
+      ...leaderboardsRef.current.outbreak,
       entry,
     ]);
-    const nextLeaderboard = nextLeaderboards[gameMode];
-    const rank = nextLeaderboard.findIndex((item) => item.id === entry.id) + 1;
+    const nextLeaderboard = nextLeaderboards[latestState.gameMode];
+    const rankIndex = nextLeaderboard.findIndex((item) => item.id === entry.id);
+    const rank = rankIndex >= 0 ? rankIndex + 1 : null;
 
+    leaderboardsRef.current = nextLeaderboards;
     setLeaderboards(nextLeaderboards);
     setStorageValue(
       STORAGE_KEYS.siegeRunLeaderboardsV2,
       nextLeaderboards,
       (value) => JSON.stringify(value),
     );
-    setCompletionSummary({
+    const nextCompletionSummary = {
       ...entry,
       isNewBest: rank === 1,
+      outcome:
+        latestState.gameMode === "outbreak"
+          ? "survivalOverrun"
+          : "timeAttackCleared",
       rank,
-    });
+    } satisfies SiegeCompletionSummary;
+    completionSummaryRef.current = nextCompletionSummary;
+    setCompletionSummary(nextCompletionSummary);
     updateRuntimeSnapshot(
       (current) => ({
         ...current,
         elapsedMs: finalElapsedMs,
+        kills: Math.max(current.kills, liveKills),
         remainingBugs: 0,
       }),
       true,
     );
+  }, [getRuntimeSnapshot, interactiveBaseElapsedMsRef, interactiveRunningSinceRef, updateRuntimeSnapshot]);
+
+  useEffect(() => {
+    finalizeRun();
   }, [
     completionSummary,
-    evolutionStates,
+    finalizeRun,
     gameMode,
-    interactiveBaseElapsedMsRef,
-    interactiveKills,
     interactiveMode,
     interactiveRemainingBugs,
-    interactiveRunningSinceRef,
-    leaderboards,
-    offlineReason,
-    selectedWeaponId,
     siegePhase,
     siteOffline,
-    updateRuntimeSnapshot,
-    waveReached,
   ]);
 
   return {
     completionSummary,
+    finalizeRun,
     leaderboard,
     resetCompletion: () => setCompletionSummary(null),
   };

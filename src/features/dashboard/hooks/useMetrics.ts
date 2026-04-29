@@ -30,11 +30,12 @@ function isMetricsSource(value: unknown): value is MetricsSource {
       return false;
     }
 
-    const { completedAt, createdAt, priority, stateName, stateType, teamKey } = bug;
+    const { completedAt, createdAt, dueDate, priority, stateName, stateType, teamKey } = bug;
 
     return (
       typeof createdAt === "string" &&
       (completedAt === null || completedAt === undefined || typeof completedAt === "string") &&
+      (dueDate === null || dueDate === undefined || typeof dueDate === "string") &&
       (priority === undefined || typeof priority === "number") &&
       (stateName === null || stateName === undefined || typeof stateName === "string") &&
       (stateType === null || stateType === undefined || typeof stateType === "string") &&
