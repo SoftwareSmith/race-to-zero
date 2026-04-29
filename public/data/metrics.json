@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-04-28T00:22:33.269Z",
-  "lastUpdated": "2026-04-28T00:22:33.269Z",
+  "generatedAt": "2026-04-29T00:23:48.944Z",
+  "lastUpdated": "2026-04-29T00:23:48.944Z",
   "bugs": [
     {
       "createdAt": "2023-09-18",
@@ -5374,8 +5374,8 @@
       "createdAt": "2024-11-04",
       "completedAt": null,
       "priority": 4,
-      "stateName": "Backlog",
-      "stateType": "backlog",
+      "stateName": "In Progress",
+      "stateType": "started",
       "teamKey": "CP"
     },
     {
@@ -9534,7 +9534,7 @@
       "createdAt": "2025-10-30",
       "completedAt": null,
       "priority": 2,
-      "stateName": "In Review",
+      "stateName": "Ready to deploy",
       "stateType": "started",
       "teamKey": "T1"
     },
@@ -12036,10 +12036,10 @@
     },
     {
       "createdAt": "2026-03-23",
-      "completedAt": "2026-03-31",
+      "completedAt": null,
       "priority": 1,
-      "stateName": "Done",
-      "stateType": "completed",
+      "stateName": "Todo",
+      "stateType": "unstarted",
       "teamKey": "TA"
     },
     {
@@ -12380,10 +12380,10 @@
     },
     {
       "createdAt": "2026-04-17",
-      "completedAt": null,
+      "completedAt": "2026-04-28",
       "priority": 3,
-      "stateName": "In Progress",
-      "stateType": "started",
+      "stateName": "Done",
+      "stateType": "completed",
       "teamKey": "TA"
     },
     {
@@ -12502,8 +12502,8 @@
       "createdAt": "2026-04-22",
       "completedAt": null,
       "priority": 3,
-      "stateName": "Todo",
-      "stateType": "unstarted",
+      "stateName": "In Progress",
+      "stateType": "started",
       "teamKey": "T1"
     },
     {
@@ -12590,7 +12590,7 @@
       "createdAt": "2026-04-24",
       "completedAt": null,
       "priority": 4,
-      "stateName": "In Review",
+      "stateName": "Ready to deploy",
       "stateType": "started",
       "teamKey": "TA"
     },
@@ -12646,7 +12646,7 @@
       "createdAt": "2026-04-24",
       "completedAt": null,
       "priority": 2,
-      "stateName": "In Progress",
+      "stateName": "In Review",
       "stateType": "started",
       "teamKey": "T1"
     },
@@ -12654,8 +12654,8 @@
       "createdAt": "2026-04-24",
       "completedAt": null,
       "priority": 3,
-      "stateName": "In Progress",
-      "stateType": "started",
+      "stateName": "Backlog",
+      "stateType": "backlog",
       "teamKey": "CP"
     },
     {
@@ -12670,6 +12670,70 @@
       "createdAt": "2026-04-24",
       "completedAt": null,
       "priority": 4,
+      "stateName": "Ready to deploy",
+      "stateType": "started",
+      "teamKey": "TA"
+    },
+    {
+      "createdAt": "2026-04-28",
+      "completedAt": null,
+      "priority": 3,
+      "stateName": "Backlog",
+      "stateType": "backlog",
+      "teamKey": "TA"
+    },
+    {
+      "createdAt": "2026-04-28",
+      "completedAt": null,
+      "priority": 3,
+      "stateName": "Backlog",
+      "stateType": "backlog",
+      "teamKey": "TA"
+    },
+    {
+      "createdAt": "2026-04-28",
+      "completedAt": null,
+      "priority": 2,
+      "stateName": "Canceled",
+      "stateType": "canceled",
+      "teamKey": "CP"
+    },
+    {
+      "createdAt": "2026-04-28",
+      "completedAt": null,
+      "priority": 2,
+      "stateName": "Triage",
+      "stateType": "triage",
+      "teamKey": "CP"
+    },
+    {
+      "createdAt": "2026-04-28",
+      "completedAt": null,
+      "priority": 3,
+      "stateName": "Todo",
+      "stateType": "unstarted",
+      "teamKey": "T1"
+    },
+    {
+      "createdAt": "2026-04-28",
+      "completedAt": null,
+      "priority": 2,
+      "stateName": "Triage",
+      "stateType": "triage",
+      "teamKey": "CP"
+    },
+    {
+      "createdAt": "2026-04-28",
+      "completedAt": null,
+      "priority": 2,
+      "stateName": "Triage",
+      "stateType": "triage",
+      "teamKey": "CP"
+    },
+    {
+      "createdAt": "2026-04-28",
+      "completedAt": null,
+      "priority": 2,
       "stateName": "In Review",
       "stateType": "started",
       "teamKey": "TA"
