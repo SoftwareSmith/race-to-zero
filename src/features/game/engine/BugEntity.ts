@@ -464,7 +464,7 @@ export class BugEntity extends Entity {
   ) {
     const away = normalizeVector(this.x - targetX, this.y - targetY);
     const distance = getLength(this.x - targetX, this.y - targetY);
-    const radius = config.fleeRadius * (1.32 + cursorHoverRepelMultiplier * 0.88);
+    const radius = config.fleeRadius * (1.46 + cursorHoverRepelMultiplier * 0.94);
 
     if (distance > radius) {
       return {
@@ -479,7 +479,7 @@ export class BugEntity extends Entity {
     const normalized = 1 - clamp(distance / Math.max(radius, 1), 0, 1);
     const pressure =
       normalized * normalized *
-      (0.56 + cursorHoverRepelMultiplier * 0.22 + normalized * (0.42 + cursorHoverRepelMultiplier * 0.38));
+      (0.68 + cursorHoverRepelMultiplier * 0.24 + normalized * (0.5 + cursorHoverRepelMultiplier * 0.46));
     const lateral = {
       x: -away.y * this.orbitBias,
       y: away.x * this.orbitBias,
@@ -488,12 +488,12 @@ export class BugEntity extends Entity {
       this.motionTime * (7.8 + cursorHoverRepelMultiplier * 0.9) + this.seed * 13.7,
     );
     const directForce =
-      (0.08 + cursorHoverRepelMultiplier * 0.8) +
-      pressure * (0.72 + cursorHoverRepelMultiplier * 2.7);
-    const lateralForce = pressure * (0.08 + cursorHoverRepelMultiplier * 0.58);
+      (0.12 + cursorHoverRepelMultiplier * 0.9) +
+      pressure * (0.94 + cursorHoverRepelMultiplier * 3.1);
+    const lateralForce = pressure * (0.12 + cursorHoverRepelMultiplier * 0.68);
     const immediateThreatThreshold = Math.max(
       0.05,
-      0.205 - cursorHoverRepelMultiplier * 0.032,
+      0.19 - cursorHoverRepelMultiplier * 0.034,
     );
 
     return {
@@ -1318,7 +1318,7 @@ export class BugEntity extends Entity {
         ? this.heading
         : Math.atan2(desiredDirection.y, desiredDirection.x);
     const cursorTurnMultiplier = cursorRepel?.active
-      ? 1 + cursorRepel.pressure * (0.22 + cursorHoverRepelMultiplier * 0.72)
+      ? 1 + cursorRepel.pressure * (0.28 + cursorHoverRepelMultiplier * 0.82)
       : 1;
     const panicTurnMultiplier = (isBurnPanicking ? 1.8 : 1) * cursorTurnMultiplier;
     const maxTurn = config.turnSpeed * this.turnRate * turnMultiplier * panicTurnMultiplier * dt;
@@ -1331,7 +1331,7 @@ export class BugEntity extends Entity {
 
     const edgeFactor = 1 - wallSteering.pressure * 0.12;
     const cursorSpeedBoost = cursorRepel?.active
-      ? 1 + cursorRepel.pressure * (0.12 + cursorHoverRepelMultiplier * 0.78)
+      ? 1 + cursorRepel.pressure * (0.16 + cursorHoverRepelMultiplier * 0.9)
       : 1;
     const speedBoost = this.state === "flee"
       ? (1.4 + cursorFleeMultiplier * 0.75) * cursorSpeedBoost

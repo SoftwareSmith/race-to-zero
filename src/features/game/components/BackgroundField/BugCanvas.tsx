@@ -110,6 +110,36 @@ function getSimulationSteps(frameTimeSeconds: number, bugCount: number) {
   return requestedSteps;
 }
 
+function getInteractiveCursorTarget(
+  bounds: CanvasBounds,
+  hammerPositionRef?: { current: { x: number; y: number } },
+) {
+  if (!bounds.width || !bounds.height || !hammerPositionRef) {
+    return null;
+  }
+
+  const { x, y } = hammerPositionRef.current;
+  if (!Number.isFinite(x) || !Number.isFinite(y) || (x === 0 && y === 0)) {
+    return null;
+  }
+
+  const hoverPadding = DEFAULT_GAME_CONFIG.fleeRadius * 3.5;
+  const withinHoverRange =
+    x >= bounds.left - hoverPadding &&
+    x <= bounds.left + bounds.width + hoverPadding &&
+    y >= bounds.top - hoverPadding &&
+    y <= bounds.top + bounds.height + hoverPadding;
+
+  if (!withinHoverRange) {
+    return null;
+  }
+
+  return {
+    targetX: x - bounds.left,
+    targetY: y - bounds.top,
+  };
+}
+
 export interface BugCanvasProps {
   bugVisualSettings: BugVisualSettings;
   chartFocus: ChartFocusState | null;
@@ -697,9 +727,17 @@ const BugCanvas = memo(
             dtSec,
             (swarmRef.current as any).getAllBugs().length,
           );
+          const cursorTarget = getInteractiveCursorTarget(
+            boundsRef.current,
+            hammerPositionRef,
+          );
           for (let s = 0; s < steps; s++) {
             if ((swarmRef.current as any).update.length >= 1) {
-              (swarmRef.current as any).update(1 / 60, null, null);
+              (swarmRef.current as any).update(
+                1 / 60,
+                cursorTarget?.targetX ?? null,
+                cursorTarget?.targetY ?? null,
+              );
             } else {
               (swarmRef.current as any).update();
             }

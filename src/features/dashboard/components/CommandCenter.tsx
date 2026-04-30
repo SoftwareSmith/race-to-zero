@@ -80,7 +80,8 @@ const CommandCenter = memo(function CommandCenter({
       ? insightsMetrics!.slaHitRate - 85
       : 0
     : isPeriods
-      ? comparisonMetrics!.currentWindow.fixRate - comparisonMetrics!.currentWindow.addRate
+      ? comparisonMetrics!.currentWindow.fixRate -
+        comparisonMetrics!.currentWindow.addRate
       : summary.currentFixRate - summary.bugsPerDayRequired;
 
   const statusTone = isInsights

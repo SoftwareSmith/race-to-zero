@@ -30,11 +30,6 @@ export function useWeaponCursorState(interactiveMode: boolean) {
   }, [interactiveMode, setCursorPosition]);
 
   useEffect(() => {
-    if (!interactiveMode) {
-      hammerPositionRef.current = { x: 0, y: 0 };
-      return undefined;
-    }
-
     const handlePointerMove = (event: globalThis.MouseEvent) => {
       setCursorPosition(event.clientX, event.clientY);
     };
@@ -43,7 +38,7 @@ export function useWeaponCursorState(interactiveMode: boolean) {
     return () => {
       window.removeEventListener("mousemove", handlePointerMove);
     };
-  }, [interactiveMode, setCursorPosition]);
+  }, [setCursorPosition]);
 
   useEffect(() => {
     if (!hammerSwing) {

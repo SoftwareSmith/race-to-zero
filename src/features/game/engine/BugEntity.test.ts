@@ -555,11 +555,11 @@ describe("bug movement", () => {
 
     expect(hoverSamples[0].state).toBe("patrol");
     expect(hoverSamples[1].state).toBe("patrol");
-    expect(hoverSamples[2].state).toBe("patrol");
+    expect(hoverSamples[2].state).toBe("flee");
     expect(hoverSamples[3].state).toBe("flee");
     expect(hoverSamples[1].speed).toBeGreaterThan(hoverSamples[0].speed * 1.1);
     expect(hoverSamples[2].speed).toBeGreaterThan(hoverSamples[0].speed * 1.2);
-    expect(hoverSamples[3].speed).toBeGreaterThan(hoverSamples[2].speed * 10);
+    expect(hoverSamples[3].speed).toBeGreaterThan(hoverSamples[2].speed * 3);
     expect(hoverSamples[3].distanceDelta).toBeGreaterThan(8);
   });
 
