@@ -223,6 +223,181 @@ describe("bug movement", () => {
     expect((bug.roamTargetX ?? bug.x) - crowdedCenterX).toBeGreaterThan(bug.x - crowdedCenterX);
   });
 
+  it("keeps edge roam targets close to the perimeter lane", () => {
+    const codex = cloneCodex(BUG_CODEX);
+    codex.medium.profile.regionWeights = { edge: 1, middle: 0, interior: 0 };
+    codex.medium.profile.wideRoamChance = 0;
+    codex.medium.profile.edgePreference = 0.32;
+    setCodex(codex);
+    const bug = new BugEntity({
+      heading: 0,
+      size: 10,
+      variant: "medium",
+      vx: 0,
+      vy: 0,
+      x: 110,
+      y: 80,
+    });
+
+    bug.update(1 / 60, {
+      bounds: { width: 220, height: 160 },
+      config: DEFAULT_GAME_CONFIG,
+      getCrowdingAt: () => ({ centerX: 110, centerY: 80, count: 0, score: 0 }),
+      getNeighbors: () => [],
+    });
+
+    expect(bug.roamTargetX).not.toBeNull();
+    expect(bug.roamTargetY).not.toBeNull();
+    expect(bug.roamTargetRegion).toBe("edge");
+    const targetX = bug.roamTargetX ?? 110;
+    const targetY = bug.roamTargetY ?? 80;
+    const perimeterDistance = Math.min(targetX, 220 - targetX, targetY, 160 - targetY);
+
+    expect(perimeterDistance).toBeLessThan(48);
+  });
+
+  it("keeps middle-lane roam targets out of the tight center box", () => {
+    const bug = new BugEntity({
+      heading: 0,
+      size: 10,
+      variant: "low",
+      vx: 0,
+      vy: 0,
+      x: 110,
+      y: 80,
+    });
+
+    bug.update(1 / 60, {
+      bounds: { width: 220, height: 160 },
+      config: DEFAULT_GAME_CONFIG,
+      getNeighbors: () => [],
+    });
+
+    expect(bug.roamTargetX).not.toBeNull();
+    expect(bug.roamTargetY).not.toBeNull();
+    const targetX = bug.roamTargetX ?? 110;
+    const targetY = bug.roamTargetY ?? 80;
+    const inTightCenter = targetX > 88 && targetX < 132 && targetY > 56 && targetY < 104;
+
+    expect(inTightCenter).toBe(false);
+  });
+
+  it("enters a startled mood after taking a hit", () => {
+    const bug = new BugEntity({
+      heading: 0,
+      size: 10,
+      variant: "medium",
+      vx: 0,
+      vy: 0,
+      x: 100,
+      y: 80,
+    });
+    const baseline = new BugEntity({
+      heading: 0,
+      size: 10,
+      variant: "medium",
+      vx: 0,
+      vy: 0,
+      x: 100,
+      y: 80,
+    });
+    const context = {
+      bounds: { width: 220, height: 160 },
+      config: DEFAULT_GAME_CONFIG,
+      getNeighbors: () => [],
+    };
+
+    bug.maxHp = 2;
+    bug.hp = 2;
+    baseline.maxHp = 2;
+    baseline.hp = 2;
+    baseline.update(1 / 60, context);
+    bug.onHit(1);
+    bug.update(1 / 60, context);
+
+    expect(bug.movementMood).toBe("startled");
+    expect(Math.hypot(bug.vx, bug.vy)).toBeGreaterThan(Math.hypot(baseline.vx, baseline.vy));
+  });
+
+  it("regroups when social bugs have nearby packmates and open space", () => {
+    const bug = new BugEntity({
+      heading: 0,
+      size: 10,
+      variant: "low",
+      vx: 0,
+      vy: 0,
+      x: 80,
+      y: 80,
+    });
+    const neighbors = [
+      new BugEntity({ size: 10, variant: "low", vx: 10, vy: 0, x: 96, y: 78 }),
+      new BugEntity({ size: 10, variant: "low", vx: 10, vy: 0, x: 102, y: 82 }),
+    ];
+
+    bug.update(1 / 60, {
+      bounds: { width: 220, height: 160 },
+      config: DEFAULT_GAME_CONFIG,
+      getCrowdingAt: () => ({ centerX: 80, centerY: 80, count: 1, score: 0.5 }),
+      getNeighbors: () => neighbors,
+    });
+
+    expect(bug.movementMood).toBe("regroup");
+    expect(bug.vx).toBeGreaterThan(0);
+  });
+
+  it("follows lane tangents for edge anchors", () => {
+    const bug = new BugEntity({
+      heading: 0,
+      size: 10,
+      variant: "medium",
+      vx: 0,
+      vy: 0,
+      x: 40,
+      y: 80,
+    });
+    bug.roamTargetX = 24;
+    bug.roamTargetY = 128;
+    bug.roamTargetRegion = "edge";
+    bug.roamTargetWide = false;
+    bug.nextRoamTargetAt = performance.now() + 10_000;
+
+    bug.update(1 / 60, {
+      bounds: { width: 220, height: 160 },
+      config: DEFAULT_GAME_CONFIG,
+      getNeighbors: () => [],
+    });
+
+    expect(bug.movementMood).toBe("lane-follow");
+    expect(Math.abs(bug.vx)).toBeGreaterThan(0.01);
+  });
+
+  it("holds a loiter mood near an active roam anchor", () => {
+    const bug = new BugEntity({
+      heading: 0,
+      size: 10,
+      variant: "low",
+      vx: 0,
+      vy: 0,
+      x: 100,
+      y: 80,
+    });
+    bug.roamTargetX = 102;
+    bug.roamTargetY = 80;
+    bug.roamTargetRegion = "middle";
+    bug.roamTargetWide = false;
+    bug.nextRoamTargetAt = performance.now() + 10_000;
+    bug.roamLoiterUntil = performance.now() + 400;
+
+    bug.update(1 / 60, {
+      bounds: { width: 220, height: 160 },
+      config: DEFAULT_GAME_CONFIG,
+      getNeighbors: () => [],
+    });
+
+    expect(bug.movementMood).toBe("loiter");
+    expect(Math.hypot(bug.vx, bug.vy)).toBeGreaterThan(0);
+  });
+
   it("applies crawl profile speed multipliers", () => {
     const codex = cloneCodex(BUG_CODEX);
     codex.low.profile.speedMultiplier = 2;
@@ -258,6 +433,134 @@ describe("bug movement", () => {
     expect(Math.hypot(fastBug.vx, fastBug.vy)).toBeGreaterThan(
       Math.hypot(slowBug.vx, slowBug.vy) * 2,
     );
+  });
+
+  it("makes urgent bugs flee the cursor faster than low urgency bugs", () => {
+    const lowBug = new BugEntity({
+      heading: 0,
+      size: 10,
+      variant: "low",
+      vx: 0,
+      vy: 0,
+      x: 100,
+      y: 80,
+    });
+    const urgentBug = new BugEntity({
+      heading: 0,
+      size: 10,
+      variant: "urgent",
+      vx: 0,
+      vy: 0,
+      x: 100,
+      y: 80,
+    });
+    const threatContext = {
+      bounds: { width: 220, height: 160 },
+      config: DEFAULT_GAME_CONFIG,
+      getNeighbors: () => [],
+      targetX: 84,
+      targetY: 80,
+    };
+
+    lowBug.update(1 / 60, threatContext);
+    urgentBug.update(1 / 60, threatContext);
+
+    expect(urgentBug.x - 100).toBeGreaterThan((lowBug.x - 100) * 2.4);
+    expect(Math.hypot(urgentBug.vx, urgentBug.vy)).toBeGreaterThan(
+      Math.hypot(lowBug.vx, lowBug.vy) * 2.2,
+    );
+  });
+
+  it("keeps low bugs catchable before entering close flee range", () => {
+    const bug = new BugEntity({
+      heading: 0,
+      size: 10,
+      variant: "low",
+      vx: 0,
+      vy: 0,
+      x: 220,
+      y: 160,
+    });
+    const baseline = new BugEntity({
+      heading: 0,
+      size: 10,
+      variant: "low",
+      vx: 0,
+      vy: 0,
+      x: 220,
+      y: 160,
+    });
+    const cursorX = 395;
+    const cursorY = 160;
+    const beforeUpdate = performance.now();
+
+    for (let frame = 0; frame < 12; frame += 1) {
+      baseline.update(1 / 60, {
+        bounds: { width: 500, height: 320 },
+        config: DEFAULT_GAME_CONFIG,
+        getNeighbors: () => [],
+      });
+      bug.update(1 / 60, {
+        bounds: { width: 500, height: 320 },
+        config: DEFAULT_GAME_CONFIG,
+        getNeighbors: () => [],
+        targetX: cursorX,
+        targetY: cursorY,
+      });
+    }
+
+    expect(Math.hypot(220 - cursorX, 160 - cursorY)).toBeGreaterThan(DEFAULT_GAME_CONFIG.fleeRadius * 1.8);
+    expect(bug.state).toBe("patrol");
+    expect(bug.nextRoamTargetAt).toBeGreaterThan(beforeUpdate + 1000);
+    expect(Math.abs(bug.heading - baseline.heading)).toBeLessThan(0.02);
+    expect(Math.hypot(bug.vx, bug.vy)).toBeLessThanOrEqual(
+      Math.hypot(baseline.vx, baseline.vy) * 1.05,
+    );
+  });
+
+  it("scales mouse-proximity repellant by urgency", () => {
+    const variants = ["low", "medium", "high", "urgent"] as const;
+    const cursorX = 410;
+    const cursorY = 160;
+    const hoverSamples = variants.map((variant) => {
+      const bug = new BugEntity({
+        heading: 0,
+        size: 10,
+        variant,
+        vx: 0,
+        vy: 0,
+        x: 220,
+        y: 160,
+      });
+
+      for (let frame = 0; frame < 18; frame += 1) {
+        bug.update(1 / 60, {
+          bounds: { width: 640, height: 360 },
+          config: DEFAULT_GAME_CONFIG,
+          getNeighbors: () => [],
+          targetX: cursorX,
+          targetY: cursorY,
+        });
+      }
+
+      return {
+        distanceDelta:
+          Math.hypot(bug.x - cursorX, bug.y - cursorY) -
+          Math.hypot(220 - cursorX, 160 - cursorY),
+        speed: Math.hypot(bug.vx, bug.vy),
+        state: bug.state,
+        variant,
+      };
+    });
+
+    expect(hoverSamples[0].state).toBe("patrol");
+    expect(hoverSamples[1].state).toBe("patrol");
+    expect(hoverSamples[2].state).toBe("patrol");
+    expect(hoverSamples[3].state).toBe("flee");
+    expect(hoverSamples[1].speed).toBeGreaterThan(hoverSamples[0].speed * 1.1);
+    expect(hoverSamples[2].speed).toBeGreaterThan(hoverSamples[0].speed * 1.2);
+    expect(hoverSamples[3].speed).toBeGreaterThan(hoverSamples[2].speed * 10);
+    expect(hoverSamples[3].distanceDelta).toBeGreaterThan(8);
   });
 
   it("steers away from local crowding", () => {

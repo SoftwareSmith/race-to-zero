@@ -134,7 +134,8 @@ test("shows the completion overlay and allows a replay", async ({ page }) => {
 
   const overlay = page.getByTestId("siege-complete-overlay");
   await expect(overlay).toBeVisible();
-  await expect(overlay.getByText("Swarm cleared. Time recorded.")).toBeVisible();
+  await expect(overlay.getByTestId("siege-complete-title")).toHaveText("Swarm cleared.");
+  await expect(overlay.getByTestId("siege-complete-quip")).toBeVisible();
   await expect(overlay.getByText(/36 bugs cleared in 00:00/i)).toBeVisible();
 
   await overlay.getByTestId("siege-complete-replay").click();
@@ -274,7 +275,7 @@ test("survival site offline opens the completion overlay", async ({ page }) => {
   await setQaSurvivalState(page, { siteIntegrity: 0 });
 
   await expect(page.getByTestId("siege-complete-overlay")).toBeVisible();
-  await expect(page.getByTestId("siege-complete-title")).toHaveText("Site overrun. Survival score saved.");
+  await expect(page.getByTestId("siege-complete-title")).toHaveText("Site overrun.");
   await expect(page.getByTestId("siege-complete-outcome")).toBeVisible();
   await expect(page.getByText("Wave reached", { exact: true })).toBeVisible();
 });
@@ -428,7 +429,7 @@ test("shows the completion overlay when the live siege progress reaches zero bug
 
   const overlay = page.getByTestId("siege-complete-overlay");
   await expect(overlay).toBeVisible();
-  await expect(page.getByTestId("siege-complete-title")).toHaveText("Swarm cleared. Time recorded.");
+  await expect(page.getByTestId("siege-complete-title")).toHaveText("Swarm cleared.");
 });
 
 test("shows the completion overlay when the live engine swarm is actually cleared", async ({ page }) => {
@@ -444,7 +445,7 @@ test("shows the completion overlay when the live engine swarm is actually cleare
   await clearQaLiveBugs(page);
 
   await expect(page.getByTestId("siege-complete-overlay")).toBeVisible();
-  await expect(page.getByTestId("siege-complete-title")).toHaveText("Swarm cleared. Time recorded.");
+  await expect(page.getByTestId("siege-complete-title")).toHaveText("Swarm cleared.");
   await expect(page.getByTestId("siege-remaining-stat").locator("strong")).toHaveText("0");
   await expect.poll(() => getQaLiveBugCount(page)).toBe(0);
 });
@@ -465,6 +466,6 @@ test("shows the completion overlay when the final live bug is killed through gam
   await clickQaBug(page, 1);
 
   await expect(page.getByTestId("siege-complete-overlay")).toBeVisible();
-  await expect(page.getByTestId("siege-complete-title")).toHaveText("Swarm cleared. Time recorded.");
+  await expect(page.getByTestId("siege-complete-title")).toHaveText("Swarm cleared.");
   await expect(page.getByTestId("siege-remaining-stat").locator("strong")).toHaveText("0");
 });

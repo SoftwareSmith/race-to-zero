@@ -9,11 +9,7 @@ import type {
   BugWeaponMatchup,
 } from "@game/engine/bugCodex";
 import { WEAPON_DEFS } from "@config/weaponConfig";
-import {
-  BUG_VARIANT_CONFIG,
-  getBugVariantColor,
-  getBugVariantMaxHp,
-} from "../../../constants/bugs";
+import { getBugVariantColor } from "../../../constants/bugs";
 import type { BugVariant } from "../../../types/dashboard";
 import {
   WeaponMatchup,
@@ -24,8 +20,6 @@ import {
 import { getColoredSvgUrl } from "@game/utils/bugSprite";
 import { cn } from "@shared/utils/cn";
 import WeaponGlyph from "@shared/components/icons/WeaponGlyph";
-import Tooltip from "@shared/components/Tooltip";
-import MetricInfoCard from "@dashboard/components/MetricInfoCard";
 import Tabs from "@shared/components/Tabs";
 import { getWeaponTiers } from "@game/weapons/progression";
 import {
@@ -39,22 +33,9 @@ import {
 } from "./siegeHud.helpers";
 import type { WeaponDef, WeaponTierDefinition } from "@game/weapons/types";
 import {
-  STATUS_DEFS,
-  STATUS_PRIORITY,
-  getWeaponStatuses,
-  type SiegeStatusId,
-} from "@game/status/statusCatalog";
-import { getWeaponChaosReadouts } from "@game/weapons/chaosReadouts";
-import { getBugSwarmProfile } from "@game/engine/swarmProfile";
-import {
   getBehaviorLabel,
-  getPresenceLabel,
-  getResilienceLabel,
-  getSpeedLabel,
   getThreatLabel,
   getVariantAccent,
-  getWeaponEffectiveness,
-  getWeaponStateClasses,
   type VariantAccent,
 } from "./codexPanel.helpers";
 
@@ -381,8 +362,8 @@ function MatchupWeaponStrip({
   const overflowCount = Math.max(0, weaponEntries.length - preview.length);
 
   return (
-    <div className="px-0.5 py-1">
-      <div className="flex items-center gap-3">
+    <div className="rounded-[16px] border border-white/8 bg-black/18 px-3 py-2.5">
+      <div className="flex items-center justify-between gap-3">
         <p
           className={cn(
             "text-[0.65rem] font-semibold uppercase tracking-[0.18em]",
@@ -391,21 +372,24 @@ function MatchupWeaponStrip({
         >
           {title}
         </p>
+        <span className="text-[0.68rem] text-stone-500">
+          {weaponEntries.length}
+        </span>
       </div>
 
       {preview.length > 0 ? (
-        <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+        <div className="mt-2 flex items-center gap-1.5">
           {preview.map(([weaponId, matchup]) => (
             <div
               key={`${title}-${weaponId}`}
-              className="flex h-9 w-9 items-center justify-center rounded-[12px] bg-white/[0.05] text-stone-100 shadow-[0_10px_18px_rgba(0,0,0,0.18)]"
+              className="flex h-9 w-9 items-center justify-center rounded-[12px] border border-white/10 bg-white/[0.05] text-stone-100 shadow-[0_10px_18px_rgba(0,0,0,0.18)]"
               title={`${weaponId}: ${matchup.note}`}
             >
               <WeaponGlyph className="h-5 w-5" id={weaponId as SiegeWeaponId} />
             </div>
           ))}
           {overflowCount > 0 ? (
-            <span className="text-[0.68rem] font-semibold text-stone-300">
+            <span className="inline-flex h-9 min-w-9 items-center justify-center rounded-[12px] border border-white/10 bg-white/[0.05] px-2 text-[0.68rem] font-semibold text-stone-200">
               +{overflowCount}
             </span>
           ) : null}
@@ -425,12 +409,6 @@ function getTabIconSrc(entry: BugType, id: string) {
     return getColoredSvgUrl(variant, baseColor);
   }
   return getColoredSvgUrl("low", baseColor);
-}
-
-function getAffinityLabel(affinity = 0) {
-  if (affinity >= 0.35) return "Tends to hunt in packs";
-  if (affinity <= -0.2) return "Prefers to hunt alone";
-  return "Flexible hunting style";
 }
 
 function Badge({
@@ -484,73 +462,6 @@ function SectionHeading({
   );
 }
 
-function CompactReadoutCard({
-  accent,
-  metricLabel,
-  signalLabel,
-  signalValue,
-}: {
-  accent: VariantAccent;
-  metricLabel: string;
-  signalLabel: string;
-  signalValue: number;
-}) {
-  return (
-    <MetricInfoCard
-      label={signalLabel}
-      subLabel={metricLabel}
-      value={signalValue}
-      progressClassName={accent.metricFillClass}
-      progressGlow={accent.metricGlowStrong}
-      progressStyle={{
-        background: accent.metricFillGradient,
-      }}
-      valueClassName={accent.metricValueClass}
-      valueAccentClass={accent.metricValueClass}
-      className="min-h-[5.1rem]"
-    />
-  );
-}
-
-function WeaponEffectivenessRow({
-  matchup,
-  weaponId,
-  accent,
-}: {
-  matchup: BugWeaponMatchup;
-  weaponId: BugWeaponId;
-  accent: VariantAccent;
-}) {
-  const tone = getWeaponStateClasses(matchup.state);
-  const effectiveness = getWeaponEffectiveness(matchup.state);
-  const glyphId = weaponId as SiegeWeaponId;
-
-  return (
-    <Tooltip
-      content={
-        <p className="text-sm leading-6 text-stone-200">{matchup.note}</p>
-      }
-      triggerClassName="block w-full"
-    >
-      <MetricInfoCard
-        icon={<WeaponGlyph className="h-5 w-5" id={glyphId} />}
-        iconClassName={cn(tone.tile)}
-        label={weaponId}
-        value={effectiveness}
-        progressClassName={tone.fill}
-        progressGlow={accent.metricGlowStrong}
-        progressStyle={{
-          background: accent.metricFillGradient,
-        }}
-        isHighlighted={matchup.state === WeaponMatchup.Favored}
-        valueClassName={accent.metricValueClass}
-        valueAccentClass={accent.metricValueClass}
-        className={cn("min-h-[5.9rem]", tone.panel)}
-      />
-    </Tooltip>
-  );
-}
-
 function CodexSummaryCard({
   description,
   footer,
@@ -589,7 +500,7 @@ function CodexSummaryCard({
       }}
       role="button"
       tabIndex={0}
-      className="group relative overflow-hidden rounded-[20px] border border-white/10 p-3 text-left transition duration-200 hover:-translate-y-1 hover:border-white/18 hover:bg-white/[0.05]"
+      className="group relative overflow-hidden rounded-[20px] border border-white/10 p-3 text-left transition duration-200 hover:border-white/18 hover:bg-white/[0.05]"
       style={style}
     >
       {overlay ? (
@@ -702,7 +613,6 @@ function WeaponTierCard({
   weapon: WeaponDef;
 }) {
   const snapshot = createTierPreviewSnapshot(weapon, tier);
-  const chaosReadouts = getWeaponChaosReadouts(weapon, tier);
 
   return (
     <div
@@ -713,17 +623,13 @@ function WeaponTierCard({
           : "border-white/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.06),rgba(255,255,255,0.02))]",
       )}
     >
-      <div className="flex items-center justify-between gap-3">
+      <div className="flex items-center justify-between gap-2">
         <p className="text-[0.62rem] font-semibold uppercase tracking-[0.2em] text-stone-500">
           {WEAPON_STAGE_LABELS[tier.tier]}
         </p>
-        {snapshot ? (
-          <span className="rounded-full border border-white/12 bg-black/20 px-2 py-1 text-[0.58rem] font-semibold uppercase tracking-[0.14em] text-stone-100">
-            {snapshot.killsToNextTier == null
-              ? "Max Tier"
-              : `HUD ${snapshot.tier}`}
-          </span>
-        ) : null}
+        <span className="text-[0.62rem] text-stone-500">
+          {tier.evolveAtKills == null ? "Start" : `${tier.evolveAtKills} kills`}
+        </span>
       </div>
       {snapshot ? (
         <div
@@ -761,62 +667,9 @@ function WeaponTierCard({
           )}
         </div>
       ) : null}
-      <h4 className="mt-1 text-[0.9rem] font-semibold tracking-[-0.03em] text-stone-50">
+      <h4 className="mt-1.5 text-[0.9rem] font-semibold tracking-[-0.03em] text-stone-50">
         {tier.title}
       </h4>
-      <p className="mt-1 text-[0.76rem] leading-5 text-stone-300">
-        {tier.detail}
-      </p>
-      <div className="mt-2 space-y-1 text-[0.7rem] leading-5 text-stone-400">
-        <p>
-          <span className="font-semibold uppercase tracking-[0.14em] text-stone-500">
-            Trigger
-          </span>{" "}
-          {tier.evolveAtKills == null
-            ? "Online at run start"
-            : `Reaches this stage by ${tier.evolveAtKills} weapon kills`}
-        </p>
-        <p>
-          <span className="font-semibold uppercase tracking-[0.14em] text-stone-500">
-            Handling
-          </span>{" "}
-          {tier.hint}
-        </p>
-        {tier.behavior?.summary ? (
-          <p>
-            <span className="font-semibold uppercase tracking-[0.14em] text-stone-500">
-              Behavior
-            </span>{" "}
-            {tier.behavior.summary}
-          </p>
-        ) : null}
-        {tier.vfx?.summary ? (
-          <p>
-            <span className="font-semibold uppercase tracking-[0.14em] text-stone-500">
-              VFX
-            </span>{" "}
-            {tier.vfx.summary}
-          </p>
-        ) : null}
-      </div>
-      {chaosReadouts.length > 0 ? (
-        <div className="mt-2.5 rounded-[14px] border border-white/8 bg-black/16 p-2">
-          <p className="text-[0.58rem] font-semibold uppercase tracking-[0.18em] text-stone-500">
-            Chaos Toggles
-          </p>
-          <div className="mt-2 flex flex-wrap gap-1.5">
-            {chaosReadouts.map((readout) => (
-              <span
-                key={`${tier.title}-${readout.label}`}
-                className="rounded-full border border-white/10 bg-white/[0.06] px-2.5 py-1 text-[0.64rem] font-medium tracking-[-0.01em] text-stone-200"
-              >
-                <span className="text-stone-400">{readout.label}</span>{" "}
-                <span className="text-stone-100">{readout.value}</span>
-              </span>
-            ))}
-          </div>
-        </div>
-      ) : null}
     </div>
   );
 }
@@ -832,13 +685,10 @@ function WeaponDetailView({
 }) {
   const tiers = getWeaponTiers(weapon);
   const { favored, risky } = getWeaponMatchupBuckets(bugEntries, weapon.id);
-  const weaponStatuses = getWeaponStatuses(weapon.id).map(
-    (status) => status.id,
-  );
 
   return (
     <div
-      className="mx-auto flex h-full w-full max-w-[50rem] flex-col gap-2.5"
+      className="mx-auto flex w-full max-w-[50rem] flex-col gap-2.5"
       data-testid="codex-weapon-detail-view"
     >
       <section
@@ -885,55 +735,48 @@ function WeaponDetailView({
             </div>
           </div>
 
-          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-2">
-            <div className="rounded-[14px] border border-white/8 bg-black/16 p-2.5">
-              <SectionEyebrow>Pattern</SectionEyebrow>
-              <p className="mt-1.5 text-sm font-semibold text-stone-100">
-                {getHitPatternLabel(weapon.hitPattern)}
-              </p>
-            </div>
-            <div className="rounded-[14px] border border-white/8 bg-black/16 p-2.5">
-              <SectionEyebrow>Input</SectionEyebrow>
-              <p className="mt-1.5 text-sm font-semibold text-stone-100">
-                {getInputModeLabel(weapon.inputMode)}
-              </p>
-            </div>
-            <div className="rounded-[14px] border border-white/8 bg-black/16 p-2.5">
-              <SectionEyebrow>Cooldown</SectionEyebrow>
-              <p className="mt-1.5 text-sm font-semibold text-stone-100">
-                {formatDurationMs(weapon.cooldownMs)}
-              </p>
-            </div>
-            <div className="rounded-[14px] border border-white/8 bg-black/16 p-2.5">
-              <SectionEyebrow>Unlock</SectionEyebrow>
-              <p className="mt-1.5 text-sm font-semibold text-stone-100">
-                {weapon.unlockKills === 0
-                  ? "Run start"
-                  : `${weapon.unlockKills} kills`}
-              </p>
+          <div className="space-y-1.5">
+            <SectionEyebrow>Mechanics</SectionEyebrow>
+            <div className="grid gap-2 sm:grid-cols-2">
+              <div className="rounded-[14px] border border-white/8 bg-black/16 p-2.5">
+                <SectionEyebrow>Pattern</SectionEyebrow>
+                <p className="mt-1.5 text-sm font-semibold text-stone-100">
+                  {getHitPatternLabel(weapon.hitPattern)}
+                </p>
+              </div>
+              <div className="rounded-[14px] border border-white/8 bg-black/16 p-2.5">
+                <SectionEyebrow>Input</SectionEyebrow>
+                <p className="mt-1.5 text-sm font-semibold text-stone-100">
+                  {getInputModeLabel(weapon.inputMode)}
+                </p>
+              </div>
+              <div className="rounded-[14px] border border-white/8 bg-black/16 p-2.5">
+                <SectionEyebrow>Cooldown</SectionEyebrow>
+                <p className="mt-1.5 text-sm font-semibold text-stone-100">
+                  {formatDurationMs(weapon.cooldownMs)}
+                </p>
+              </div>
+              <div className="rounded-[14px] border border-white/8 bg-black/16 p-2.5">
+                <SectionEyebrow>Unlock</SectionEyebrow>
+                <p className="mt-1.5 text-sm font-semibold text-stone-100">
+                  {weapon.unlockKills === 0
+                    ? "Run start"
+                    : `${weapon.unlockKills} kills`}
+                </p>
+              </div>
             </div>
           </div>
         </div>
       </section>
 
-      <section className="space-y-2 rounded-[20px] border border-white/10 bg-white/[0.03] p-3">
-        <SectionHeading
-          eyebrow="Evolution"
-          title="Tier Comparison"
-          subtitle="Compare the base weapon, the mid-tier upgrade, and the final overdrive state side by side, including the exact toggles that got louder, bigger, or faster."
-        />
-        <div className="grid gap-2 md:grid-cols-3">
+      <section className="rounded-[20px] border border-white/10 bg-white/[0.03] p-3">
+        <SectionEyebrow>Progression</SectionEyebrow>
+        <div className="mt-2 grid gap-2 md:grid-cols-3">
           {tiers.map((tier) => (
             <WeaponTierCard key={tier.tier} tier={tier} weapon={weapon} />
           ))}
         </div>
       </section>
-
-      <StatusReferenceSection
-        highlightStatuses={weaponStatuses}
-        subtitle="Highlighted entries are the statuses this weapon applies or cashes in on during combat."
-        title="Status Playbook"
-      />
     </div>
   );
 }
@@ -957,25 +800,12 @@ function BugDetailMotif({ accent }: { accent: VariantAccent }) {
   );
 }
 
-function BugDossierCard({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-[14px] border border-white/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.06),rgba(255,255,255,0.02))] p-2.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
-      <SectionEyebrow>{label}</SectionEyebrow>
-      <p className="mt-1 text-[0.76rem] leading-5 text-stone-200">{value}</p>
-    </div>
-  );
-}
-
 function BugDetailView({
   activeEntry,
-  activeMaxHp,
-  activeVariantConfig,
   accent,
   id,
 }: {
   activeEntry: BugType;
-  activeMaxHp: number;
-  activeVariantConfig: (typeof BUG_VARIANT_CONFIG)[BugVariant] | null;
   accent: VariantAccent;
   id: string;
 }) {
@@ -983,7 +813,7 @@ function BugDetailView({
 
   return (
     <div
-      className="mx-auto flex h-full w-full max-w-[50rem] flex-col gap-2.5"
+      className="mx-auto flex w-full max-w-[50rem] flex-col gap-2.5"
       data-testid="codex-detail-view"
     >
       <section
@@ -993,303 +823,57 @@ function BugDetailView({
         <div className="pointer-events-none absolute inset-0 opacity-[0.08] [background-image:radial-gradient(circle_at_1px_1px,rgba(255,255,255,0.7)_1px,transparent_0)] [background-size:18px_18px]" />
         <BugDetailMotif accent={accent} />
 
-        <div className="relative grid gap-2.5 lg:grid-cols-[minmax(0,1.2fr)_minmax(16.5rem,0.95fr)]">
-          <div>
-            <div className="flex flex-wrap items-start gap-3">
-              <div
-                className={cn(
-                  "flex h-14 w-14 items-center justify-center rounded-[18px] border bg-[linear-gradient(180deg,rgba(255,255,255,0.16),rgba(255,255,255,0.06))] p-2.5 shadow-[0_14px_24px_rgba(0,0,0,0.22)] ring-1 ring-white/14",
-                  accent.iconBorderClass,
-                )}
-              >
-                <img
-                  alt=""
-                  className="h-8 w-8 object-contain"
-                  src={getTabIconSrc(activeEntry, id)}
-                />
-              </div>
-
-              <div className="min-w-0 flex-1">
-                <SectionEyebrow>Bug Dossier</SectionEyebrow>
-                <div className="mt-1 flex flex-wrap items-center gap-2">
-                  <h3 className="text-[1.12rem] font-semibold tracking-[-0.03em] text-stone-50">
-                    {activeEntry.name}
-                  </h3>
-                  <Badge className={accent.badgeClass}>
-                    {getThreatLabel(
-                      (activeEntry.iconVariant ?? id) as BugVariant,
-                    )}
-                  </Badge>
-                  <Badge className={accent.behaviorClass}>
-                    {getBehaviorLabel(activeEntry.profile.behavior)}
-                  </Badge>
-                </div>
-                <p className="mt-1.5 text-[0.82rem] leading-5 text-stone-200">
-                  {activeEntry.description}
-                </p>
-              </div>
-            </div>
-
-            <div className="mt-2.5 grid gap-2 sm:grid-cols-2">
-              <BugDossierCard
-                label="Encounter"
-                value={activeEntry.dossier.encounter}
-              />
-              <BugDossierCard
-                label="Pressure"
-                value={activeEntry.dossier.pressure}
-              />
-            </div>
+        <div className="relative flex flex-wrap items-start gap-3">
+          <div
+            className={cn(
+              "flex h-14 w-14 items-center justify-center rounded-[18px] border bg-[linear-gradient(180deg,rgba(255,255,255,0.16),rgba(255,255,255,0.06))] p-2.5 shadow-[0_14px_24px_rgba(0,0,0,0.22)] ring-1 ring-white/14",
+              accent.iconBorderClass,
+            )}
+          >
+            <img
+              alt=""
+              className="h-8 w-8 object-contain"
+              src={getTabIconSrc(activeEntry, id)}
+            />
           </div>
 
-          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-2">
-            <MatchupWeaponStrip
-              emptyLabel="No weapon weak spots mapped yet."
-              title="Weaknesses"
-              toneClassName="text-emerald-200"
-              weaponEntries={favored}
-            />
-            <MatchupWeaponStrip
-              emptyLabel="No weapon resistances mapped yet."
-              title="Strengths"
-              toneClassName="text-rose-200"
-              weaponEntries={risky}
-            />
-            <BugDossierCard
-              label="Susceptibility"
-              value={activeEntry.dossier.susceptibility}
-            />
-            <BugDossierCard
-              label="Behavior"
-              value={`${getAffinityLabel(activeEntry.socialAffinity)}. ${getSpeedLabel(activeEntry)}.`}
-            />
+          <div className="min-w-0 flex-1">
+            <SectionEyebrow>Bug Dossier</SectionEyebrow>
+            <div className="mt-1 flex flex-wrap items-center gap-2">
+              <h3 className="text-[1.12rem] font-semibold tracking-[-0.03em] text-stone-50">
+                {activeEntry.name}
+              </h3>
+              <Badge className={accent.badgeClass}>
+                {getThreatLabel(
+                  (activeEntry.iconVariant ?? id) as BugVariant,
+                )}
+              </Badge>
+              <Badge className={accent.behaviorClass}>
+                {getBehaviorLabel(activeEntry.profile.behavior)}
+              </Badge>
+            </div>
+            <p className="mt-1.5 text-[0.82rem] leading-5 text-stone-200">
+              {activeEntry.description}
+            </p>
           </div>
         </div>
-      </section>
 
-      <DossierStats
-        accent={accent}
-        activeEntry={activeEntry}
-        activeMaxHp={activeMaxHp}
-        activeVariantConfig={activeVariantConfig}
-      />
-      <StatusReferenceSection
-        subtitle="Use this reference when reading bug silhouettes mid-run: one strong primary read, then smaller secondary accents."
-        title="Status Reads"
-      />
-      <FieldNotes activeEntry={activeEntry} accent={accent} />
-    </div>
-  );
-}
-
-function DossierStats({
-  activeEntry,
-  activeMaxHp,
-  activeVariantConfig,
-  accent,
-}: {
-  activeEntry: BugType;
-  activeMaxHp: number;
-  activeVariantConfig: (typeof BUG_VARIANT_CONFIG)[BugVariant] | null;
-  accent: VariantAccent;
-}) {
-  const visibility = Math.round(
-    (activeVariantConfig?.defaultOpacity ?? 1) * 100,
-  );
-  const swarmProfile = getBugSwarmProfile(activeEntry);
-
-  return (
-    <section className="space-y-2 rounded-[20px] border border-white/10 bg-white/[0.03] p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
-      <SectionHeading eyebrow="Core Readout" title="Tactical Profile" />
-
-      <div className="grid gap-2 sm:grid-cols-2">
-        <CompactReadoutCard
-          accent={accent}
-          metricLabel={getResilienceLabel(activeMaxHp)}
-          signalLabel="Durability"
-          signalValue={(activeMaxHp / 4) * 100}
-        />
-        <CompactReadoutCard
-          accent={accent}
-          metricLabel={getSpeedLabel(activeEntry)}
-          signalLabel="Mobility"
-          signalValue={Math.min(
-            100,
-            Math.max(24, activeEntry.profile.speedMultiplier * 72),
-          )}
-        />
-        <CompactReadoutCard
-          accent={accent}
-          metricLabel={getAffinityLabel(activeEntry.socialAffinity)}
-          signalLabel="Social affinity"
-          signalValue={Math.min(
-            100,
-            Math.max(
-              18,
-              100 - Math.abs(activeEntry.profile.turnMultiplier - 1) * 64,
-            ),
-          )}
-        />
-        <CompactReadoutCard
-          accent={accent}
-          metricLabel={swarmProfile.label}
-          signalLabel="Swarm posture"
-          signalValue={swarmProfile.pressure}
-        />
-        <CompactReadoutCard
-          accent={accent}
-          metricLabel={getPresenceLabel(visibility)}
-          signalLabel="Presence"
-          signalValue={visibility}
-        />
-      </div>
-
-      <div className="rounded-[14px] border border-white/8 bg-black/16 p-2.5">
-        <SectionEyebrow>Coordination Note</SectionEyebrow>
-        <p className="mt-1 text-[0.82rem] leading-5 text-stone-300">
-          <span className="font-medium text-stone-100">
-            {swarmProfile.coordination}.
-          </span>{" "}
-          {swarmProfile.summary}
-        </p>
-      </div>
-    </section>
-  );
-}
-
-function StatusReferenceSection({
-  highlightStatuses = [],
-  subtitle,
-  title,
-}: {
-  highlightStatuses?: SiegeStatusId[];
-  subtitle: string;
-  title: string;
-}) {
-  const highlighted = new Set(highlightStatuses);
-
-  return (
-    <section className="space-y-2 rounded-[20px] border border-white/10 bg-white/[0.03] p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
-      <SectionHeading
-        eyebrow="Status Primer"
-        title={title}
-        subtitle={subtitle}
-      />
-
-      <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
-        {STATUS_PRIORITY.map((statusId) => {
-          const status = STATUS_DEFS[statusId];
-          const isHighlighted = highlighted.has(status.id);
-
-          return (
-            <div
-              key={status.id}
-              className={cn(
-                "rounded-[16px] border p-2.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]",
-                isHighlighted
-                  ? "border-white/16 bg-white/[0.05]"
-                  : "border-white/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.02))]",
-              )}
-              style={
-                isHighlighted
-                  ? {
-                      boxShadow: `inset 0 1px 0 rgba(255,255,255,0.04), 0 16px 36px ${status.color}22`,
-                    }
-                  : undefined
-              }
-            >
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <p className="text-[0.56rem] font-semibold uppercase tracking-[0.18em] text-stone-500">
-                    {status.role}
-                  </p>
-                  <h4 className="mt-1 text-[0.82rem] font-semibold tracking-[-0.03em] text-stone-50">
-                    {status.label}
-                  </h4>
-                </div>
-                {isHighlighted ? (
-                  <Badge className="border-white/16 bg-black/18 text-stone-100">
-                    Applied here
-                  </Badge>
-                ) : null}
-              </div>
-
-              <p className="mt-1.5 text-[0.68rem] leading-4.5 text-stone-200">
-                {status.summary}
-              </p>
-
-              <div className="mt-1.5 space-y-1 text-[0.64rem] leading-4 text-stone-400">
-                <p>
-                  <span className="font-semibold uppercase tracking-[0.12em] text-stone-500">
-                    Read
-                  </span>{" "}
-                  {status.visualRead}
-                </p>
-                <p>
-                  <span className="font-semibold uppercase tracking-[0.12em] text-stone-500">
-                    Support
-                  </span>{" "}
-                  {status.supportCopy}
-                </p>
-                <p>
-                  <span className="font-semibold uppercase tracking-[0.12em] text-stone-500">
-                    Finish
-                  </span>{" "}
-                  {status.finisherCopy}
-                </p>
-              </div>
-
-              <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-                {status.weaponIds.length > 0 ? (
-                  status.weaponIds.map((weaponId) => (
-                    <span
-                      key={`${status.id}-${weaponId}`}
-                      className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-black/18 px-2 py-1 text-[0.58rem] font-semibold uppercase tracking-[0.12em] text-stone-200"
-                    >
-                      <WeaponGlyph className="h-3.5 w-3.5" id={weaponId} />
-                      {weaponId}
-                    </span>
-                  ))
-                ) : (
-                  <span className="inline-flex items-center rounded-full border border-white/10 bg-black/18 px-2 py-1 text-[0.58rem] font-semibold uppercase tracking-[0.12em] text-stone-400">
-                    Contextual
-                  </span>
-                )}
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    </section>
-  );
-}
-
-function FieldNotes({
-  activeEntry,
-  accent,
-}: {
-  activeEntry: BugType;
-  accent: VariantAccent;
-}) {
-  return (
-    <section className="space-y-2 rounded-[20px] border border-white/10 bg-white/[0.03] p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
-      <SectionHeading eyebrow="Field Notes" title="Strengths + Weaknesses" />
-
-      <div className="grid gap-2 sm:grid-cols-2">
-        {(
-          Object.entries(activeEntry.weaponMatchups) as Array<
-            [BugWeaponId, BugWeaponMatchup]
-          >
-        ).map(([weaponId, matchup]) => (
-          <WeaponEffectivenessRow
-            key={weaponId}
-            matchup={matchup}
-            weaponId={weaponId}
-            accent={accent}
+        <div className="relative mt-3 grid gap-2 sm:grid-cols-2">
+          <MatchupWeaponStrip
+            emptyLabel="No weapon weak spots mapped yet."
+            title="Weaknesses"
+            toneClassName="text-emerald-200"
+            weaponEntries={favored}
           />
-        ))}
-      </div>
-    </section>
+          <MatchupWeaponStrip
+            emptyLabel="No weapon resistances mapped yet."
+            title="Strengths"
+            toneClassName="text-rose-200"
+            weaponEntries={risky}
+          />
+        </div>
+      </section>
+    </div>
   );
 }
 
@@ -1351,20 +935,12 @@ function SummaryCard({
         </>
       }
       rightSlot={
-        <>
-          <div className="flex-shrink-0">
-            <Badge className={accent.badgeClass}>
-              {getThreatLabel(variant)}
-            </Badge>
-          </div>
-          <div className="flex-shrink-0">
-            <Badge className={accent.behaviorClass}>
-              {getBehaviorLabel(entry.profile.behavior)}
-            </Badge>
-          </div>
-        </>
+        <Badge className={accent.behaviorClass}>
+          {getBehaviorLabel(entry.profile.behavior)}
+        </Badge>
       }
       style={getBugCardStyle(entry, id)}
+      subtitle={getThreatLabel(variant)}
       testId="codex-summary-card"
       title={entry.name}
     />
@@ -1429,6 +1005,11 @@ export default function CodexPanel({
     setSelectedEntry(null);
   }, []);
 
+  const handleTabChange = useCallback((tabId: string) => {
+    setActiveView(tabId as CodexView);
+    setSelectedEntry(null);
+  }, []);
+
   const backdropVariant = (backdropEntry?.iconVariant ??
     backdropId) as BugVariant;
   const backdropAccent = getVariantAccent(backdropVariant);
@@ -1438,12 +1019,6 @@ export default function CodexPanel({
   const selectedAccent = selectedVariant
     ? getVariantAccent(selectedVariant)
     : backdropAccent;
-  const selectedMaxHp =
-    bugEntry && selectedVariant ? getBugVariantMaxHp(selectedVariant) : 0;
-  const selectedVariantConfig = selectedVariant
-    ? (BUG_VARIANT_CONFIG[selectedVariant] ?? null)
-    : null;
-
   const backdropStyle = useMemo<CSSProperties>(
     () => ({
       background: `radial-gradient(circle at 24% 28%, ${backdropAccent.washA}, transparent 32%), radial-gradient(circle at 74% 30%, ${backdropAccent.washB}, transparent 30%), radial-gradient(circle at 52% 82%, rgba(255,255,255,0.02), transparent 28%), linear-gradient(180deg, rgba(12,14,20,0.985), rgba(16,19,27,0.985))`,
@@ -1571,10 +1146,8 @@ export default function CodexPanel({
                           </h2>
                           <p className="mt-1.5 text-[0.82rem] leading-5 text-stone-300">
                             {activeView === "weapons"
-                              ? "Review each weapon as its own dossier, then compare Tier 1, Tier 2, and Overdrive behavior side by side."
-                              : selectedEntry
-                                ? "Review full encounter details, pressure profile, and field notes for the selected bug."
-                                : "Scout the swarm, a pocket catalog of the midnight bugs that keep engineers up."}
+                              ? "Pattern, matchups, and progression at a glance."
+                              : "Scout the swarm — a pocket reference for every bug type."}
                           </p>
                         </>
                       )}
@@ -1584,10 +1157,22 @@ export default function CodexPanel({
                       {selectedEntry ? (
                         <button
                           data-hud-cursor="pointer"
-                          className="rounded-full border border-white/10 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.14em] text-stone-300 transition hover:border-white/20 hover:text-stone-100"
+                          className="inline-flex items-center gap-1.5 rounded-full border border-white/10 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.14em] text-stone-300 transition hover:border-white/20 hover:text-stone-100"
                           onClick={handleBackToGrid}
                           type="button"
                         >
+                          <svg
+                            aria-hidden="true"
+                            className="h-3.5 w-3.5"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth="2"
+                            viewBox="0 0 24 24"
+                          >
+                            <path d="M15 18l-6-6 6-6" />
+                          </svg>
                           Back
                         </button>
                       ) : null}
@@ -1602,26 +1187,22 @@ export default function CodexPanel({
                     </div>
                   </div>
 
-                  {!selectedEntry ? (
-                    <div
-                      className="relative border-b border-white/8 px-4 py-2.5"
-                      data-testid="codex-tabs"
-                    >
-                      <Tabs
-                        activeTab={activeView as any}
-                        onChange={(tabId) => setActiveView(tabId as CodexView)}
-                        tabs={CODEX_TABS as any}
-                      />
-                    </div>
-                  ) : null}
+                  <div
+                    className="relative border-b border-white/8 px-4 py-2.5"
+                    data-testid="codex-tabs"
+                  >
+                    <Tabs
+                      activeTab={activeView as any}
+                      onChange={handleTabChange}
+                      tabs={CODEX_TABS as any}
+                    />
+                  </div>
 
                   {activeView === "bugs" && bugEntry && selectedVariant ? (
-                    <div className="mb-4 flex-1 overflow-hidden px-4 py-3">
+                    <div className="mb-4 flex-1 overflow-y-auto px-4 py-3">
                       <BugDetailView
                         accent={selectedAccent}
                         activeEntry={bugEntry}
-                        activeMaxHp={selectedMaxHp}
-                        activeVariantConfig={selectedVariantConfig}
                         id={selectedEntry?.id ?? fallbackId}
                       />
                     </div>
@@ -1639,7 +1220,7 @@ export default function CodexPanel({
                       </div>
                     </div>
                   ) : activeView === "weapons" && selectedWeapon ? (
-                    <div className="mb-4 flex-1 overflow-hidden px-4 py-3">
+                    <div className="mb-4 flex-1 overflow-y-auto px-4 py-3">
                       <WeaponDetailView
                         bugEntries={entries}
                         onJumpToBug={handleJumpToBug}

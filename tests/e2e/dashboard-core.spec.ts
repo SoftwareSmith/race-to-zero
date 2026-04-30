@@ -14,11 +14,11 @@ test.describe("dashboard core QA", () => {
 
     await gotoDashboard(page);
 
-    await expect(page.getByRole("tab", { name: "Overview" })).toHaveAttribute(
+    await expect(page.getByRole("tab", { name: "Target" })).toHaveAttribute(
       "aria-selected",
       "true",
     );
-    await expect(page.getByRole("tab", { name: "Periods" })).toHaveAttribute(
+    await expect(page.getByRole("tab", { name: "Trend" })).toHaveAttribute(
       "aria-selected",
       "false",
     );
@@ -37,22 +37,6 @@ test.describe("dashboard core QA", () => {
     );
     await expectMetricValue(page, "Confidence", expected.viewMetrics.confidence);
 
-    await expectMetricValue(
-      page,
-      "Closure velocity",
-      expected.commandCenter.fixVelocity,
-    );
-    await expectMetricValue(
-      page,
-      "Required pace",
-      expected.commandCenter.requiredPace,
-    );
-    await expectMetricValue(
-      page,
-      "Net difference",
-      expected.commandCenter.netDifference,
-    );
-
     await expect(page.getByText(expected.overlayLabel)).toBeVisible();
     await expect(page.getByText("Bug burndown")).toBeVisible();
     await expect(page.getByText("Open bugs by priority")).toBeVisible();
@@ -67,9 +51,9 @@ test.describe("dashboard core QA", () => {
     const expected = getExpectedPeriodsMetrics("30");
 
     await gotoDashboard(page);
-    await page.getByRole("tab", { name: "Periods" }).click();
+    await page.getByRole("tab", { name: "Trend" }).click();
 
-    await expect(page.getByRole("tab", { name: "Periods" })).toHaveAttribute(
+    await expect(page.getByRole("tab", { name: "Trend" })).toHaveAttribute(
       "aria-selected",
       "true",
     );
@@ -104,7 +88,7 @@ test.describe("dashboard core QA", () => {
     await page.setViewportSize({ width: 390, height: 844 });
     await gotoDashboard(page);
 
-    await expect(page.getByRole("tab", { name: "Overview" })).toBeVisible();
+    await expect(page.getByRole("tab", { name: "Target" })).toBeVisible();
     await expect(page.getByLabel("Tracking start date")).toBeVisible();
     await expect(page.getByLabel("Target deadline date")).toBeVisible();
     await expect(page.getByText("Bug burndown")).toBeVisible();

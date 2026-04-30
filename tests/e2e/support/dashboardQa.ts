@@ -598,7 +598,7 @@ export async function gotoDashboard(page: Page) {
   await seedDashboardState(page);
   await page.goto("./");
   await expect(page.getByRole("heading", { level: 1, name: "Race to Zero Bugs" })).toBeVisible();
-  await expect(page.getByText("Delivery outlook")).toBeVisible();
+  await expect(page.getByRole("tab", { name: "Target" })).toBeVisible();
 }
 
 export async function chooseCustomPeriod(page: Page) {

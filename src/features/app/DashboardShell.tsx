@@ -138,7 +138,7 @@ const DashboardShell = memo(function DashboardShell({
         <div
           ref={dashboardRef}
           className={cn(
-            "relative z-10 mx-auto grid w-full max-w-[1360px] content-start gap-1.5 px-0 py-0 sm:gap-2",
+            "relative z-10 mx-auto grid w-full max-w-[1360px] content-start gap-1 px-0 py-0 sm:gap-1.5",
             interactiveMode ? "pointer-events-none select-none" : "",
           )}
           style={{
@@ -251,7 +251,7 @@ const DashboardShell = memo(function DashboardShell({
 
           <div
             className={cn(
-              "relative z-10 mt-1 rounded-[20px] px-[0.3125rem] py-[0.1875rem] sm:mt-1.5 sm:px-2 sm:py-[0.3125rem]",
+              "relative z-10 rounded-[20px] px-[0.3125rem] py-[0.1875rem] sm:px-2 sm:py-[0.3125rem]",
               CHROME_TRANSITION_CLASSNAME,
               chromeHidden
                 ? "translate-y-[-12px] opacity-0 blur-sm"

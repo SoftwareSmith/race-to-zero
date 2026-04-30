@@ -95,7 +95,7 @@ const ChartCard = memo(function ChartCard({
     <article
       data-siege-panel={chartKey}
       className={cn(
-        "group relative flex min-h-0 flex-col overflow-hidden rounded-[18px] border border-white/10 bg-[linear-gradient(180deg,rgba(10,12,18,0.96),rgba(19,23,32,0.96))] p-2.5 text-stone-50 shadow-[0_14px_28px_rgba(0,0,0,0.24)] transition duration-200 hover:-translate-y-0.5 hover:shadow-[0_18px_34px_rgba(0,0,0,0.3)] sm:rounded-[20px] sm:p-3",
+        "group relative flex min-h-0 flex-col overflow-hidden rounded-[18px] border border-white/10 bg-[linear-gradient(180deg,rgba(10,12,18,0.96),rgba(19,23,32,0.96))] p-2.5 text-stone-50 shadow-[0_14px_28px_rgba(0,0,0,0.24)] transition duration-200 hover:border-white/16 hover:shadow-[0_18px_34px_rgba(0,0,0,0.3)] sm:rounded-[20px] sm:p-3",
         className,
       )}
       onMouseLeave={() => onHoverStateChange?.(null)}
@@ -108,7 +108,7 @@ const ChartCard = memo(function ChartCard({
       <div className="absolute inset-x-8 top-0 h-px bg-gradient-to-r from-transparent via-white/35 to-transparent opacity-0 transition duration-200 group-hover:opacity-100" />
       <div className="relative flex h-full flex-col">
         <div className="shrink-0">
-          <h3 className="mt-0.5 font-display text-[1.08rem] leading-tight tracking-[-0.035em] text-stone-50 sm:text-[1.38rem] xl:text-[1.5rem]">
+          <h3 className="mt-0.5 font-display text-[0.95rem] leading-tight tracking-[-0.03em] text-stone-50 sm:text-[1.08rem] xl:text-[1.15rem]">
             {title}
           </h3>
           {description ? (
@@ -131,7 +131,7 @@ const ChartCard = memo(function ChartCard({
           )}
         </div>
 
-        {summary ? (
+        {!description && summary ? (
           <p className="mt-[0.4375rem] shrink-0 max-w-2xl text-[0.64rem] leading-[1.05rem] text-stone-400 sm:text-[0.68rem] sm:leading-[1.1rem]">
             {summary}
           </p>

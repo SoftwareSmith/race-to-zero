@@ -21,7 +21,7 @@ test.describe("dashboard navigation QA", () => {
     await gotoDashboard(page);
     await expectMetricValue(page, "Open bugs", overview.viewMetrics.openBugs);
 
-    await page.getByRole("tab", { name: "Periods" }).click();
+    await page.getByRole("tab", { name: "Trend" }).click();
     await chooseCustomPeriod(page);
 
     const dateInputs = page.locator('input[type="date"]');
@@ -44,8 +44,8 @@ test.describe("dashboard navigation QA", () => {
     await expectMetricValue(page, "Net change", custom.viewMetrics.netChange);
     await expectMetricValue(page, "Closure rate", custom.viewMetrics.completionRate);
 
-    await page.getByRole("tab", { name: "Insights" }).click();
-    await expect(page.getByRole("tab", { name: "Insights" })).toHaveAttribute(
+    await page.getByRole("tab", { name: "Risk" }).click();
+    await expect(page.getByRole("tab", { name: "Risk" })).toHaveAttribute(
       "aria-selected",
       "true",
     );
@@ -64,12 +64,12 @@ test.describe("dashboard navigation QA", () => {
     );
     await expectMetricValue(
       page,
-      "Overdue",
+      "SLA breaches",
       insights.viewMetrics.overdue,
     );
 
-    await page.getByRole("tab", { name: "Overview" }).click();
-    await expect(page.getByRole("tab", { name: "Overview" })).toHaveAttribute(
+    await page.getByRole("tab", { name: "Target" }).click();
+    await expect(page.getByRole("tab", { name: "Target" })).toHaveAttribute(
       "aria-selected",
       "true",
     );

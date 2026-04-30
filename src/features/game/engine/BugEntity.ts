@@ -59,6 +59,7 @@ function perlin1D(position: number, seed: number) {
 }
 
 type BugState = "patrol" | "flee" | EntityState.Dying | EntityState.Dead;
+type BugMovementMood = "patrol" | "loiter" | "lane-follow" | "regroup" | "startled";
 
 const ALLY_CONTACT_DAMAGE = 2;
 const ALLY_CONTACT_COOLDOWN_MS = 260;
@@ -66,9 +67,9 @@ const ALLY_INTERCEPT_RADIUS = 196;
 const DEFAULT_ROAM_INTERVAL: [number, number] = [1.4, 5];
 
 const DEFAULT_REGION_WEIGHTS: Record<CrawlRegion, number> = {
-  edge: 0.14,
-  interior: 0.36,
-  middle: 0.5,
+  edge: 0.32,
+  interior: 0.3,
+  middle: 0.38,
 };
 
 function isStatusActive(
@@ -116,9 +117,12 @@ export class BugEntity extends Entity {
   motionTime: number;
   roamTargetX: number | null;
   roamTargetY: number | null;
+  roamTargetRegion: CrawlRegion | null;
+  roamTargetWide: boolean;
   nextRoamTargetAt: number;
   roamTargetGeneration: number;
   roamLoiterUntil: number;
+  movementMood: BugMovementMood;
   orbitBias: -1 | 1;
   packAffinity: number;
   typeSpec: BugType | null;
@@ -178,9 +182,12 @@ export class BugEntity extends Entity {
     this.motionTime = Math.random() * 100;
     this.roamTargetX = null;
     this.roamTargetY = null;
+    this.roamTargetRegion = null;
+    this.roamTargetWide = false;
     this.nextRoamTargetAt = 0;
     this.roamTargetGeneration = 0;
     this.roamLoiterUntil = 0;
+    this.movementMood = "patrol";
     this.orbitBias = Math.random() < 0.5 ? -1 : 1;
     this.packAffinity = 0.7 + Math.random() * 0.55;
     this.typeSpec = null;
@@ -271,18 +278,18 @@ export class BugEntity extends Entity {
     const edgePreference = profile?.edgePreference ?? 0;
     const edgeWeight =
       regionWeights.edge +
-      Math.max(0, edgePreference) * 1.5 +
-      (anchorBias === "perimeter" ? 0.42 : 0) +
-      (preferredRegion === "edge" ? 0.28 : 0);
+      Math.max(0, edgePreference) * 1.05 +
+      (anchorBias === "perimeter" ? 0.2 : 0) +
+      (preferredRegion === "edge" ? 0.12 : 0);
     const interiorWeight =
       regionWeights.interior +
-      Math.max(0, -edgePreference) * 1.1 +
-      (anchorBias === "interior" ? 0.48 : 0) +
-      (preferredRegion === "interior" ? 0.28 : 0);
+      Math.max(0, -edgePreference) * 0.82 +
+      (anchorBias === "interior" ? 0.22 : 0) +
+      (preferredRegion === "interior" ? 0.14 : 0);
     const middleWeight =
       regionWeights.middle +
-      (anchorBias === "any" ? 0.1 : 0) +
-      (preferredRegion === "middle" ? 0.28 : 0);
+      (anchorBias === "any" ? 0.08 : 0) +
+      (preferredRegion === "middle" ? 0.1 : 0);
     const totalWeight = Math.max(0.01, edgeWeight + interiorWeight + middleWeight);
     const roll =
       this.getUnitNoise(this.seed * 23.3 + generation * 1.11, this.seed * 53.1) *
@@ -308,23 +315,34 @@ export class BugEntity extends Entity {
     if (region === "edge") {
       const side = Math.floor(sideNoise * 4);
       if (side === 0) {
-        return { x: lerp(0.03, 0.14, baseX), y: lerp(0.04, 0.96, baseY) };
+        return { x: lerp(0.03, 0.12, baseX), y: lerp(0.08, 0.92, baseY) };
       }
       if (side === 1) {
-        return { x: lerp(0.86, 0.97, baseX), y: lerp(0.04, 0.96, baseY) };
+        return { x: lerp(0.88, 0.97, baseX), y: lerp(0.08, 0.92, baseY) };
       }
       if (side === 2) {
-        return { x: lerp(0.04, 0.96, baseX), y: lerp(0.03, 0.14, baseY) };
+        return { x: lerp(0.08, 0.92, baseX), y: lerp(0.03, 0.12, baseY) };
       }
 
-      return { x: lerp(0.04, 0.96, baseX), y: lerp(0.86, 0.97, baseY) };
+      return { x: lerp(0.08, 0.92, baseX), y: lerp(0.88, 0.97, baseY) };
     }
 
     if (region === "interior") {
-      return { x: lerp(0.24, 0.76, baseX), y: lerp(0.22, 0.78, baseY) };
+      return { x: lerp(0.36, 0.64, baseX), y: lerp(0.34, 0.66, baseY) };
     }
 
-    return { x: lerp(0.1, 0.9, baseX), y: lerp(0.1, 0.9, baseY) };
+    const side = Math.floor(sideNoise * 4);
+    if (side === 0) {
+      return { x: lerp(0.18, 0.82, baseX), y: lerp(0.16, 0.34, baseY) };
+    }
+    if (side === 1) {
+      return { x: lerp(0.66, 0.84, baseX), y: lerp(0.18, 0.82, baseY) };
+    }
+    if (side === 2) {
+      return { x: lerp(0.18, 0.82, baseX), y: lerp(0.66, 0.84, baseY) };
+    }
+
+    return { x: lerp(0.16, 0.34, baseX), y: lerp(0.18, 0.82, baseY) };
   }
 
   private getSocialCohesion(
@@ -374,9 +392,10 @@ export class BugEntity extends Entity {
     bounds: { width: number; height: number },
     config: typeof DEFAULT_GAME_CONFIG,
   ) {
+    const edgeLaneScale = this.roamTargetRegion === "edge" && this.state !== "flee" ? 0.62 : 1;
     const senseDistance = Math.max(
-      config.wallAvoidDistance * 2.1,
-      this.size * 3.4,
+      config.wallAvoidDistance * (1.15 + edgeLaneScale * 0.95),
+      this.size * (2.25 + edgeLaneScale * 1.15),
       34,
     );
     const left = clamp((senseDistance - this.x) / senseDistance, 0, 1);
@@ -396,8 +415,93 @@ export class BugEntity extends Entity {
 
     return {
       pressure,
-      x: away.x * config.wallAvoidStrength * pressure * 1.5,
-      y: away.y * config.wallAvoidStrength * pressure * 1.5,
+      x: away.x * config.wallAvoidStrength * pressure * (0.88 + edgeLaneScale * 0.62),
+      y: away.y * config.wallAvoidStrength * pressure * (0.88 + edgeLaneScale * 0.62),
+    };
+  }
+
+  private getPerimeterResidencySteering(bounds: { width: number; height: number }) {
+    if (this.roamTargetRegion !== "edge") {
+      return { x: 0, y: 0 };
+    }
+
+    const targetX = this.roamTargetX ?? this.x;
+    const targetY = this.roamTargetY ?? this.y;
+    const minDistances = {
+      left: targetX,
+      right: bounds.width - targetX,
+      top: targetY,
+      bottom: bounds.height - targetY,
+    };
+    const side = Object.entries(minDistances).sort((left, right) => left[1] - right[1])[0]?.[0] as
+      | "left"
+      | "right"
+      | "top"
+      | "bottom";
+    const laneInset = Math.max(16, Math.min(bounds.width, bounds.height) * 0.09);
+    const laneWidth = Math.max(18, Math.min(bounds.width, bounds.height) * 0.075);
+
+    if (side === "left" || side === "right") {
+      const laneCenterX = side === "left" ? laneInset : bounds.width - laneInset;
+      return {
+        x: clamp((laneCenterX - this.x) / laneWidth, -1, 1) * 0.34,
+        y: clamp((targetY - this.y) / Math.max(bounds.height * 0.22, 1), -1, 1) * 0.12,
+      };
+    }
+
+    const laneCenterY = side === "top" ? laneInset : bounds.height - laneInset;
+    return {
+      x: clamp((targetX - this.x) / Math.max(bounds.width * 0.22, 1), -1, 1) * 0.12,
+      y: clamp((laneCenterY - this.y) / laneWidth, -1, 1) * 0.34,
+    };
+  }
+
+  private getCursorRepelResponse(
+    targetX: number,
+    targetY: number,
+    config: typeof DEFAULT_GAME_CONFIG,
+    cursorHoverRepelMultiplier: number,
+  ) {
+    const away = normalizeVector(this.x - targetX, this.y - targetY);
+    const distance = getLength(this.x - targetX, this.y - targetY);
+    const radius = config.fleeRadius * (1.32 + cursorHoverRepelMultiplier * 0.88);
+
+    if (distance > radius) {
+      return {
+        active: false,
+        pressure: 0,
+        steerX: 0,
+        steerY: 0,
+        immediateThreat: false,
+      };
+    }
+
+    const normalized = 1 - clamp(distance / Math.max(radius, 1), 0, 1);
+    const pressure =
+      normalized * normalized *
+      (0.56 + cursorHoverRepelMultiplier * 0.22 + normalized * (0.42 + cursorHoverRepelMultiplier * 0.38));
+    const lateral = {
+      x: -away.y * this.orbitBias,
+      y: away.x * this.orbitBias,
+    };
+    const scatter = Math.sin(
+      this.motionTime * (7.8 + cursorHoverRepelMultiplier * 0.9) + this.seed * 13.7,
+    );
+    const directForce =
+      (0.08 + cursorHoverRepelMultiplier * 0.8) +
+      pressure * (0.72 + cursorHoverRepelMultiplier * 2.7);
+    const lateralForce = pressure * (0.08 + cursorHoverRepelMultiplier * 0.58);
+    const immediateThreatThreshold = Math.max(
+      0.05,
+      0.205 - cursorHoverRepelMultiplier * 0.032,
+    );
+
+    return {
+      active: true,
+      pressure,
+      steerX: away.x * directForce + lateral.x * scatter * lateralForce,
+      steerY: away.y * directForce + lateral.y * scatter * lateralForce,
+      immediateThreat: pressure > immediateThreatThreshold,
     };
   }
 
@@ -432,9 +536,12 @@ export class BugEntity extends Entity {
   private resetRoamState() {
     this.roamTargetX = null;
     this.roamTargetY = null;
+    this.roamTargetRegion = null;
+    this.roamTargetWide = false;
     this.nextRoamTargetAt = 0;
     this.roamTargetGeneration = 0;
     this.roamLoiterUntil = 0;
+    this.movementMood = "patrol";
     this.orbitBias = Math.random() < 0.5 ? -1 : 1;
     this.packAffinity = 0.7 + Math.random() * 0.55;
   }
@@ -463,6 +570,166 @@ export class BugEntity extends Entity {
     return clamp(perlin1D(position, seed) * 0.5 + 0.5, 0, 1);
   }
 
+  private getMovementMood(
+    now: number,
+    targetDistance: number,
+    neighbors: BugEntity[],
+    socialAffinity: number,
+    crowdScore: number,
+    config: typeof DEFAULT_GAME_CONFIG,
+    isBurnPanicking: boolean,
+  ): BugMovementMood {
+    const wasRecentlyHit = this.lastHitTime > 0 && now - this.lastHitTime < 820;
+
+    if (this.state === "flee" || isBurnPanicking || wasRecentlyHit) {
+      return "startled";
+    }
+
+    const loiterRadius = Math.max(config.targetReachRadius * 1.55, this.size * 3.2);
+    if (this.roamLoiterUntil > now && targetDistance <= loiterRadius) {
+      return "loiter";
+    }
+
+    if (
+      socialAffinity >= 0.45 &&
+      neighbors.length >= 2 &&
+      crowdScore < config.crowdRepathThreshold * 0.82
+    ) {
+      return "regroup";
+    }
+
+    if (!this.roamTargetWide && this.roamTargetRegion != null && this.roamTargetRegion !== "interior") {
+      return "lane-follow";
+    }
+
+    return "patrol";
+  }
+
+  private getMoodSpeedMultiplier(mood: BugMovementMood) {
+    if (mood === "loiter") {
+      return 0.84;
+    }
+
+    if (mood === "lane-follow") {
+      return 1.03;
+    }
+
+    if (mood === "regroup") {
+      return 0.96;
+    }
+
+    if (mood === "startled") {
+      return 1.16;
+    }
+
+    return 1;
+  }
+
+  private getLaneFollowSteering(
+    bounds: { width: number; height: number },
+    targetDirection: { x: number; y: number },
+  ) {
+    const targetX = this.roamTargetX ?? this.x;
+    const targetY = this.roamTargetY ?? this.y;
+    const centerX = bounds.width * 0.5;
+    const centerY = bounds.height * 0.5;
+    const radial = normalizeVector(targetX - centerX, targetY - centerY);
+    const tangent = normalizeVector(-radial.y * this.orbitBias, radial.x * this.orbitBias);
+    const tangentStrength = this.roamTargetRegion === "edge" ? 0.16 : 0.12;
+    const laneCorrection = this.roamTargetRegion === "edge" ? 0.12 : 0.08;
+
+    return {
+      x: tangent.x * tangentStrength + targetDirection.x * laneCorrection,
+      y: tangent.y * tangentStrength + targetDirection.y * laneCorrection,
+    };
+  }
+
+  private getRegroupSteering(
+    neighbors: BugEntity[],
+    socialAffinity: number,
+    crowdScore: number,
+    config: typeof DEFAULT_GAME_CONFIG,
+  ) {
+    if (socialAffinity < 0.45 || neighbors.length < 2) {
+      return { x: 0, y: 0 };
+    }
+
+    const crowdRelief = 1 - clamp(crowdScore / Math.max(config.crowdRepathThreshold, 1), 0, 1);
+    if (crowdRelief <= 0) {
+      return { x: 0, y: 0 };
+    }
+
+    let centerX = 0;
+    let centerY = 0;
+    let headingX = 0;
+    let headingY = 0;
+    let totalWeight = 0;
+
+    for (const neighbor of neighbors) {
+      if (!(neighbor instanceof BugEntity) || isTerminalEntityState(neighbor.state)) {
+        continue;
+      }
+
+      const distance = Math.max(1, getLength(neighbor.x - this.x, neighbor.y - this.y));
+      const sameVariantBonus = neighbor.variant === this.variant ? 1.3 : 1;
+      const weight = (1 - clamp(distance / config.crowdAvoidRadius, 0, 1)) * sameVariantBonus;
+      if (weight <= 0) {
+        continue;
+      }
+
+      centerX += neighbor.x * weight;
+      centerY += neighbor.y * weight;
+      const neighborHeading = normalizeVector(neighbor.vx, neighbor.vy);
+      headingX += neighborHeading.x * weight;
+      headingY += neighborHeading.y * weight;
+      totalWeight += weight;
+    }
+
+    if (totalWeight <= 0) {
+      return { x: 0, y: 0 };
+    }
+
+    const towardPack = normalizeVector(centerX / totalWeight - this.x, centerY / totalWeight - this.y);
+    const alignedHeading = normalizeVector(headingX, headingY);
+    const packStrength = clamp(socialAffinity, 0, 1) * 0.14 * crowdRelief;
+    const alignStrength = clamp(socialAffinity, 0, 1) * 0.08 * crowdRelief;
+
+    return {
+      x: towardPack.x * packStrength + alignedHeading.x * alignStrength,
+      y: towardPack.y * packStrength + alignedHeading.y * alignStrength,
+    };
+  }
+
+  private getLoiterSteering(targetDirection: { x: number; y: number }) {
+    const tangent = {
+      x: -targetDirection.y * this.orbitBias,
+      y: targetDirection.x * this.orbitBias,
+    };
+    const weave = Math.sin(this.motionTime * 1.8 + this.seed * 9.3) * 0.03;
+
+    return {
+      x: tangent.x * 0.08 + Math.cos(this.wanderAngle) * weave,
+      y: tangent.y * 0.08 + Math.sin(this.wanderAngle) * weave,
+    };
+  }
+
+  private getStartledSteering() {
+    const forward = {
+      x: Math.cos(this.heading),
+      y: Math.sin(this.heading),
+    };
+    const lateral = {
+      x: -forward.y,
+      y: forward.x,
+    };
+    const weave = Math.sin(this.motionTime * 9.4 + this.seed * 12.7);
+
+    return {
+      x: forward.x * 0.14 + lateral.x * weave * 0.24,
+      y: forward.y * 0.14 + lateral.y * weave * 0.24,
+    };
+  }
+
   private chooseRoamTarget(
     bounds: { width: number; height: number },
     now: number,
@@ -483,9 +750,26 @@ export class BugEntity extends Entity {
       config.crowdAvoidRadius * 2.1,
       this,
     );
+    const currentEdgeCoverage = Math.max(
+      Math.abs(this.x / bounds.width - 0.5),
+      Math.abs(this.y / bounds.height - 0.5),
+    );
+    const currentPerimeterDistance = Math.min(
+      this.x,
+      bounds.width - this.x,
+      this.y,
+      bounds.height - this.y,
+    );
+    const currentPerimeterScore = 1 - clamp(
+      currentPerimeterDistance / Math.max(Math.min(bounds.width, bounds.height) * 0.16, 1),
+      0,
+      1,
+    );
     let bestTargetX = this.x;
     let bestTargetY = this.y;
     let bestScore = -Infinity;
+    let bestRegion: CrawlRegion | null = null;
+    let bestWideRoam = false;
 
     for (let attempt = 0; attempt < 6; attempt += 1) {
       const attemptPhase = generation + attempt * 0.37;
@@ -563,26 +847,46 @@ export class BugEntity extends Entity {
         Math.abs(candidateX / bounds.width - 0.5),
         Math.abs(candidateY / bounds.height - 0.5),
       );
+      const perimeterDistance = Math.min(
+        candidateX,
+        bounds.width - candidateX,
+        candidateY,
+        bounds.height - candidateY,
+      );
+      const perimeterScore = 1 - clamp(
+        perimeterDistance / Math.max(Math.min(bounds.width, bounds.height) * 0.16, 1),
+        0,
+        1,
+      );
+      const perimeterResidency = edgeCoverage >= currentEdgeCoverage ? edgeCoverage - currentEdgeCoverage : 0;
+      const perimeterCatchup = Math.max(0, perimeterScore - currentPerimeterScore);
       const broadEscapeWeight = broadCrowding && broadCrowding.score > config.crowdRepathThreshold
-        ? 0.12
-        : 0.04;
+        ? 0.16
+        : 0.08;
       const score =
-        (1 - crowdPenalty) * 0.42 +
-        (1 - broadPenalty) * 0.24 +
-        distanceScore * 0.18 +
-        edgeCoverage * 0.08 +
+        (1 - crowdPenalty) * 0.28 +
+        (1 - broadPenalty) * 0.16 +
+        distanceScore * 0.1 +
+        edgeCoverage * 0.24 +
+        perimeterScore * 0.16 +
+        perimeterResidency * 0.08 +
+        perimeterCatchup * 0.12 +
         broadEscape * broadEscapeWeight +
-        (region === "edge" ? 0.04 : 0);
+        (region === "edge" ? 0.2 : region === "middle" ? 0.01 : 0);
 
       if (score > bestScore) {
         bestScore = score;
         bestTargetX = candidateX;
         bestTargetY = candidateY;
+        bestRegion = region;
+        bestWideRoam = wideRoam;
       }
     }
 
     this.roamTargetX = bestTargetX;
     this.roamTargetY = bestTargetY;
+    this.roamTargetRegion = bestRegion;
+    this.roamTargetWide = bestWideRoam;
     const [minInterval, maxInterval] = profile?.anchorDriftInterval ?? DEFAULT_ROAM_INTERVAL;
     const minIntervalMs = clamp(Math.min(minInterval, maxInterval) * 1000, 1200, 16_000);
     const maxIntervalMs = clamp(Math.max(minInterval, maxInterval) * 1000, minIntervalMs, 18_000);
@@ -630,8 +934,8 @@ export class BugEntity extends Entity {
     }
 
     return {
-      x: this.roamTargetX ?? bounds.width * 0.5,
-      y: this.roamTargetY ?? bounds.height * 0.5,
+      x: this.roamTargetX ?? this.x,
+      y: this.roamTargetY ?? this.y,
     };
   }
 
@@ -712,6 +1016,9 @@ export class BugEntity extends Entity {
     const profile = typeSpec?.profile ?? null;
     const socialAffinity = typeSpec?.socialAffinity ?? 0;
     const speedMultiplier = profile?.speedMultiplier ?? 1;
+    const cursorFleeMultiplier = profile?.cursorFleeMultiplier ?? 1;
+    const cursorHoverRepelMultiplier =
+      profile?.cursorHoverRepelMultiplier ?? cursorFleeMultiplier;
     const turnMultiplier = profile?.turnMultiplier ?? 1;
     const wanderMultiplier = profile?.wanderMultiplier ?? 1;
     const noiseFrequency = profile?.noiseFrequency ?? 1;
@@ -755,11 +1062,14 @@ export class BugEntity extends Entity {
     const targetX = ctx.targetX ?? null;
     const targetY = ctx.targetY ?? null;
     const isAlly = this.isAllyActive(now);
+    const isBurnPanicking = this.burn !== null && now < this.burn.expiresAt && this.burn.dps > 0.3;
+    const cursorRepel =
+      !isAlly && targetX != null && targetY != null
+        ? this.getCursorRepelResponse(targetX, targetY, config, cursorHoverRepelMultiplier)
+        : null;
     const hasThreat =
       !isAlly &&
-      targetX != null &&
-      targetY != null &&
-      getLength(this.x - targetX, this.y - targetY) <= config.fleeRadius * 1.8;
+      cursorRepel?.immediateThreat === true;
 
     if (hasThreat) {
       this.state = "flee";
@@ -767,6 +1077,10 @@ export class BugEntity extends Entity {
     } else if (!this.fleeTimer) {
       this.state = "patrol";
     }
+
+    this.movementMood = !isAlly && (this.state === "flee" || isBurnPanicking)
+      ? "startled"
+      : "patrol";
 
     const desired = {
       x: Math.cos(this.heading) * 0.28,
@@ -832,9 +1146,24 @@ export class BugEntity extends Entity {
       const targetDistance = getLength(toTargetX, toTargetY);
       const targetDirection = normalizeVector(toTargetX, toTargetY);
       const boardBias = this.getBoardBias(bounds, config);
+      const perimeterResidency = this.getPerimeterResidencySteering(bounds);
+      const mood = this.getMovementMood(
+        now,
+        targetDistance,
+        neighbors,
+        socialAffinity,
+        crowding?.score ?? 0,
+        config,
+        isBurnPanicking,
+      );
 
-      desired.x += boardBias.x;
-      desired.y += boardBias.y;
+      this.movementMood = mood;
+
+  const boardBiasScale = this.roamTargetRegion === "edge" ? 0.18 : 1;
+  desired.x += boardBias.x * boardBiasScale;
+  desired.y += boardBias.y * boardBiasScale;
+  desired.x += perimeterResidency.x;
+  desired.y += perimeterResidency.y;
 
       if (targetDistance > config.targetReachRadius * 1.35) {
         const targetRamp = clamp(
@@ -866,6 +1195,25 @@ export class BugEntity extends Entity {
         desired.y += targetDirection.y * inwardCorrection;
         desired.x += Math.cos(this.wanderAngle) * driftStrength;
         desired.y += Math.sin(this.wanderAngle) * driftStrength;
+      }
+
+      if (mood === "lane-follow") {
+        const laneFollow = this.getLaneFollowSteering(bounds, targetDirection);
+        desired.x += laneFollow.x;
+        desired.y += laneFollow.y;
+      } else if (mood === "regroup") {
+        const regroup = this.getRegroupSteering(
+          neighbors,
+          socialAffinity,
+          crowding?.score ?? 0,
+          config,
+        );
+        desired.x += regroup.x;
+        desired.y += regroup.y;
+      } else if (mood === "loiter") {
+        const loiter = this.getLoiterSteering(targetDirection);
+        desired.x += loiter.x;
+        desired.y += loiter.y;
       }
 
       if (crowding && crowding.score > config.crowdRepathThreshold) {
@@ -935,11 +1283,30 @@ export class BugEntity extends Entity {
 
     if (this.state === "flee" && targetX != null && targetY != null) {
       const away = normalizeVector(this.x - targetX, this.y - targetY);
-      desired.x += away.x * 2.2;
-      desired.y += away.y * 2.2;
+      const fleeForce = 2.6 + cursorFleeMultiplier * 1.45;
+      desired.x += away.x * fleeForce;
+      desired.y += away.y * fleeForce;
     }
 
-    const isBurnPanicking = this.burn !== null && now < this.burn.expiresAt && this.burn.dps > 0.3;
+    if (cursorRepel?.active) {
+      desired.x += cursorRepel.steerX;
+      desired.y += cursorRepel.steerY;
+
+      if (this.nextRoamTargetAt === 0 || this.nextRoamTargetAt > now + 110) {
+        this.nextRoamTargetAt = now + 110;
+      }
+    }
+
+    if (!isAlly && this.movementMood === "startled") {
+      const startled = this.getStartledSteering();
+      desired.x += startled.x;
+      desired.y += startled.y;
+
+      if (this.nextRoamTargetAt === 0 || this.nextRoamTargetAt > now + 260) {
+        this.nextRoamTargetAt = now + 260;
+      }
+    }
+
     if (isBurnPanicking) {
       desired.x += (Math.random() - 0.5) * 1.6;
       desired.y += (Math.random() - 0.5) * 1.6;
@@ -950,7 +1317,10 @@ export class BugEntity extends Entity {
       desiredDirection.x === 0 && desiredDirection.y === 0
         ? this.heading
         : Math.atan2(desiredDirection.y, desiredDirection.x);
-    const panicTurnMultiplier = isBurnPanicking ? 1.8 : 1;
+    const cursorTurnMultiplier = cursorRepel?.active
+      ? 1 + cursorRepel.pressure * (0.22 + cursorHoverRepelMultiplier * 0.72)
+      : 1;
+    const panicTurnMultiplier = (isBurnPanicking ? 1.8 : 1) * cursorTurnMultiplier;
     const maxTurn = config.turnSpeed * this.turnRate * turnMultiplier * panicTurnMultiplier * dt;
     this.heading += clamp(
       getAngleDelta(this.heading, desiredHeading),
@@ -960,7 +1330,12 @@ export class BugEntity extends Entity {
     this.heading = normalizeAngle(this.heading);
 
     const edgeFactor = 1 - wallSteering.pressure * 0.12;
-    const speedBoost = this.state === "flee" ? 1.22 : 1;
+    const cursorSpeedBoost = cursorRepel?.active
+      ? 1 + cursorRepel.pressure * (0.12 + cursorHoverRepelMultiplier * 0.78)
+      : 1;
+    const speedBoost = this.state === "flee"
+      ? (1.4 + cursorFleeMultiplier * 0.75) * cursorSpeedBoost
+      : cursorSpeedBoost;
     // Apply status effects
     if (this.slow && now >= this.slow.expiresAt) this.slow = null;
     if (this.ensnare && now >= this.ensnare.expiresAt) this.ensnare = null;
@@ -1034,6 +1409,7 @@ export class BugEntity extends Entity {
     if (this.ensnare && now < this.ensnare.expiresAt) {
       this.vx = 0;
       this.vy = 0;
+      this.movementMood = "patrol";
       this.opacity = 1;
       this.size = this.baseSize;
       return;
@@ -1041,7 +1417,16 @@ export class BugEntity extends Entity {
 
     const slowMult = this.slow ? this.slow.multiplier : 1;
     const burnSpeedBoost = isBurnPanicking ? 1.18 : 1;
-    const desiredSpeed = config.baseSpeed * this.cruiseSpeed * speedMultiplier * edgeFactor * speedBoost * slowMult * burnSpeedBoost;
+    const moodSpeedMultiplier = this.getMoodSpeedMultiplier(this.movementMood);
+    const desiredSpeed =
+      config.baseSpeed *
+      this.cruiseSpeed *
+      speedMultiplier *
+      edgeFactor *
+      speedBoost *
+      slowMult *
+      burnSpeedBoost *
+      moodSpeedMultiplier;
     const currentSpeed = getLength(this.vx, this.vy);
     const nextSpeed = currentSpeed + (desiredSpeed - currentSpeed) * Math.min(1, dt * 4.2);
     this.vx = Math.cos(this.heading) * nextSpeed;

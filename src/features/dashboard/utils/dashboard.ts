@@ -7,9 +7,9 @@ export {
 } from "@shared/utils/formatters";
 
 export const TAB_ITEMS: TabItem[] = [
-  { id: "overview", label: "Overview" },
-  { id: "periods", label: "Periods" },
-  { id: "insights", label: "Insights" },
+  { id: "overview", label: "Target" },
+  { id: "periods", label: "Trend" },
+  { id: "insights", label: "Risk" },
 ];
 
 export const COMPARE_RANGE_OPTIONS: CompareRangeOption[] = [

@@ -1,6 +1,5 @@
 import { memo } from "react";
 import StatusTag from "@shared/components/StatusTag";
-import Surface from "@shared/components/Surface";
 import { cn } from "@shared/utils/cn";
 import {
   formatNumber,
@@ -26,6 +25,44 @@ interface CommandCenterProps {
   summary: SummaryMetrics;
 }
 
+function buildOutcomeSentence(
+  activeTab: ActiveTab,
+  summary: SummaryMetrics,
+  deadlineMetrics: DeadlineMetrics,
+  comparisonMetrics: ComparisonMetrics | null,
+  insightsMetrics: InsightsMetrics | null,
+): string {
+  if (activeTab === "insights" && insightsMetrics) {
+    const { openOverdue, openPending, eligibleCompleted } = insightsMetrics;
+    if (eligibleCompleted === 0) {
+      return "No due-dated bugs completed yet — SLA coverage is building.";
+    }
+    if (openOverdue > 0) {
+      return `${formatNumber(openOverdue)} overdue and ${formatNumber(openPending)} pending — review open SLA risk.`;
+    }
+    return `${formatNumber(openPending)} bugs pending due dates. No currently overdue open items.`;
+  }
+
+  if (activeTab === "periods" && comparisonMetrics) {
+    const { netChange, completionRate } = comparisonMetrics.currentWindow;
+    if (netChange < 0) {
+      return `Backlog shrank by ${formatNumber(Math.abs(netChange))} this period. Completion rate ${formatPercent(completionRate, 0)}.`;
+    }
+    if (netChange > 0) {
+      return `Backlog grew by ${formatNumber(netChange)} this period. Completion rate ${formatPercent(completionRate, 0)}.`;
+    }
+    return `Backlog held flat this period. Completion rate ${formatPercent(completionRate, 0)}.`;
+  }
+
+  // Overview / Target
+  const gap = summary.currentFixRate - summary.bugsPerDayRequired;
+  const absBugs = formatNumber(deadlineMetrics.remainingBugs);
+  if (gap >= 0) {
+    return `${absBugs} open — current burn is ${formatSignedNumber(gap, 2)}/day ahead of target pace.`;
+  }
+  return `${absBugs} open — ${formatNumber(Math.abs(gap), 2)}/day below target pace to close by deadline.`;
+}
+
 const CommandCenter = memo(function CommandCenter({
   activeTab,
   comparisonMetrics = null,
@@ -38,131 +75,42 @@ const CommandCenter = memo(function CommandCenter({
   const isPeriods = activeTab === "periods" && comparisonMetrics;
   const isInsights = activeTab === "insights" && insightsMetrics;
 
-  // choose period or overview values
-  const periodWindow = isPeriods ? comparisonMetrics!.currentWindow : null;
-
   const paceGap = isInsights
     ? insightsMetrics!.eligibleCompleted > 0
       ? insightsMetrics!.slaHitRate - 85
       : 0
     : isPeriods
-      ? periodWindow!.fixRate - periodWindow!.addRate
+      ? comparisonMetrics!.currentWindow.fixRate - comparisonMetrics!.currentWindow.addRate
       : summary.currentFixRate - summary.bugsPerDayRequired;
-
-  const paceTone = isInsights ? insightsMetrics!.tone : getDeltaTone(paceGap);
-  const metricShellClassName =
-    {
-      positive: "border-emerald-400/18 bg-emerald-500/[0.05] text-emerald-100",
-      negative: "border-red-400/18 bg-red-500/[0.05] text-red-100",
-      neutral: "border-sky-400/18 bg-sky-500/[0.05] text-sky-100",
-    }[paceTone] ?? "border-sky-400/18 bg-sky-500/[0.05] text-sky-100";
 
   const statusTone = isInsights
     ? insightsMetrics!.tone
     : isPeriods
       ? comparisonMetrics!.tone
       : deadlineMetrics.statusTone;
-  const statusGlowClassName =
-    {
-      positive:
-        "before:bg-[radial-gradient(circle_at_top_left,rgba(16,185,129,0.14),transparent_42%)] after:bg-[radial-gradient(circle_at_bottom_right,rgba(56,189,248,0.1),transparent_38%)]",
-      negative:
-        "before:bg-[radial-gradient(circle_at_top_left,rgba(239,68,68,0.14),transparent_42%)] after:bg-[radial-gradient(circle_at_bottom_right,rgba(56,189,248,0.08),transparent_38%)]",
-      neutral:
-        "before:bg-[radial-gradient(circle_at_top_left,rgba(56,189,248,0.14),transparent_42%)] after:bg-[radial-gradient(circle_at_bottom_right,rgba(20,184,166,0.08),transparent_38%)]",
-    }[statusTone] ??
-    "before:bg-[radial-gradient(circle_at_top_left,rgba(56,189,248,0.14),transparent_42%)] after:bg-[radial-gradient(circle_at_bottom_right,rgba(20,184,166,0.08),transparent_38%)]";
 
-  const title = isInsights
-    ? "SLA Insights"
-    : isPeriods
-      ? "Period Outlook"
-      : "Delivery outlook";
-  const primaryLabel = isInsights ? "SLA hit rate" : "Closure velocity";
-  const primaryValue = isInsights
-    ? formatPercent(insightsMetrics!.slaHitRate, 1)
-    : isPeriods
-      ? `${formatNumber(periodWindow!.fixRate, 2)}/day`
-      : `${formatNumber(summary.currentFixRate, 2)}/day`;
-  const secondaryLabel = isInsights ? "On time" : "Required pace";
-  const secondaryValue = isInsights
-    ? formatNumber(insightsMetrics!.onTimeCompleted)
-    : isPeriods
-      ? `${formatNumber(periodWindow!.addRate, 2)}/day`
-      : `${formatNumber(summary.bugsPerDayRequired, 2)}/day`;
-  const tertiaryLabel = isInsights ? "Overdue" : "Net difference";
-  const tertiaryValue = isInsights
-    ? formatNumber(insightsMetrics!.overdueCompleted)
-    : isPeriods
-      ? `${formatSignedNumber(periodWindow!.netBurnRate, 2)}/day`
-      : `${formatSignedNumber(paceGap, 2)}/day`;
+  void getDeltaTone;
+
+  const outcomeSentence = buildOutcomeSentence(
+    activeTab,
+    summary,
+    deadlineMetrics,
+    comparisonMetrics,
+    insightsMetrics,
+  );
 
   return (
-    <Surface
+    <div
       data-siege-panel="command-center"
-      className={cn(
-        "relative overflow-hidden border-0 px-2.5 py-[0.4375rem] before:pointer-events-none before:absolute before:inset-0 before:rounded-[20px] before:opacity-100 after:pointer-events-none after:absolute after:inset-0 after:rounded-[20px] after:opacity-100 sm:px-3 sm:py-2 sm:before:rounded-[24px] sm:after:rounded-[24px]",
-        statusGlowClassName,
-      )}
-      tone="strong"
+      className="flex flex-wrap items-center gap-2 rounded-[16px] border border-white/8 bg-zinc-950/60 px-3 py-2 sm:rounded-[18px] sm:px-3.5 sm:py-2.5"
     >
-      <div className="relative">
-        <div className="flex flex-col gap-1.5 xl:flex-row xl:items-center xl:justify-between">
-          <div className="w-full">
-            <div className="flex flex-wrap items-center gap-2">
-              <p className="text-[0.52rem] font-semibold uppercase tracking-[0.2em] text-stone-500 sm:text-[0.56rem]">
-                {title}
-              </p>
-              <StatusTag size="compact" tone={statusTone}>
-                {getStatusTagText(statusTone)}
-              </StatusTag>
-            </div>
-          </div>
-
-          <div className="grid gap-1.5 sm:grid-cols-3 xl:min-w-[29rem]">
-            <div
-              data-siege-panel="closure-velocity"
-              className={cn(
-                "rounded-[14px] border px-2.5 py-1.75 sm:rounded-[16px] sm:py-2",
-                metricShellClassName,
-              )}
-            >
-              <div className="text-[0.5rem] font-semibold uppercase tracking-[0.12em] text-stone-400 sm:text-[0.54rem]">
-                {primaryLabel}
-              </div>
-              <strong className="mt-[0.1875rem] block font-display text-[1.12rem] leading-none tracking-[-0.035em] sm:text-[1.28rem]">
-                {primaryValue}
-              </strong>
-            </div>
-            <div
-              data-siege-panel="required-pace"
-              className="rounded-[14px] border border-white/10 bg-white/[0.03] px-2.5 py-1.75 text-stone-100 sm:rounded-[16px] sm:py-2"
-            >
-              <div className="text-[0.5rem] font-semibold uppercase tracking-[0.12em] text-stone-400 sm:text-[0.54rem]">
-                {secondaryLabel}
-              </div>
-              <strong className="mt-[0.1875rem] block font-display text-[1.12rem] leading-none tracking-[-0.035em] sm:text-[1.28rem]">
-                {secondaryValue}
-              </strong>
-            </div>
-            <div
-              data-siege-panel="net-difference"
-              className={cn(
-                "rounded-[14px] border px-2.5 py-1.75 sm:rounded-[16px] sm:py-2",
-                metricShellClassName,
-              )}
-            >
-              <div className="text-[0.5rem] font-semibold uppercase tracking-[0.12em] text-stone-400 sm:text-[0.54rem]">
-                {tertiaryLabel}
-              </div>
-              <strong className="mt-[0.1875rem] block font-display text-[1.12rem] leading-none tracking-[-0.035em] sm:text-[1.28rem]">
-                {tertiaryValue}
-              </strong>
-            </div>
-          </div>
-        </div>
-      </div>
-    </Surface>
+      <StatusTag size="compact" tone={statusTone}>
+        {getStatusTagText(statusTone)}
+      </StatusTag>
+      <p className="text-[0.72rem] leading-snug text-stone-300 sm:text-[0.76rem]">
+        {outcomeSentence}
+      </p>
+    </div>
   );
 });
 

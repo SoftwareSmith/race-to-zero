@@ -262,6 +262,57 @@ describe("engine death attribution", () => {
     expect(Math.max(...quadrantCounts)).toBeLessThan(engine.getAllBugs().length * 0.55);
   });
 
+  it("keeps a meaningful share of the swarm outside the center box", () => {
+    const randomSpy = vi.spyOn(Math, "random");
+    let seed = 0;
+    randomSpy.mockImplementation(() => {
+      seed = (seed + 0.173) % 1;
+      return seed;
+    });
+    const engine = new Engine(createCanvas(), {
+      height: 200,
+      width: 200,
+    });
+
+    engine.spawnFromCounts({ high: 10, low: 30, medium: 10, urgent: 6 });
+
+    for (let frame = 0; frame < 360; frame += 1) {
+      engine.update(1 / 60, null, null);
+    }
+
+    const bugs = engine.getAllBugs() as BugEntity[];
+    const outsideCenterBox = bugs.filter(
+      (bug) => bug.x < 70 || bug.x > 130 || bug.y < 56 || bug.y > 144,
+    ).length;
+
+    expect(outsideCenterBox).toBeGreaterThan(engine.getAllBugs().length * 0.42);
+  });
+
+  it("keeps a visible share of the swarm in the outer perimeter bands", () => {
+    const randomSpy = vi.spyOn(Math, "random");
+    let seed = 0;
+    randomSpy.mockImplementation(() => {
+      seed = (seed + 0.173) % 1;
+      return seed;
+    });
+    const engine = new Engine(createCanvas(), {
+      height: 200,
+      width: 200,
+    });
+
+    engine.spawnFromCounts({ high: 10, low: 30, medium: 10, urgent: 6 });
+
+    for (let frame = 0; frame < 360; frame += 1) {
+      engine.update(1 / 60, null, null);
+    }
+
+    const perimeterBandCount = (engine.getAllBugs() as BugEntity[]).filter(
+      (bug) => bug.x < 36 || bug.x > 164 || bug.y < 32 || bug.y > 168,
+    ).length;
+
+    expect(perimeterBandCount).toBeGreaterThan(engine.getAllBugs().length * 0.26);
+  });
+
   it("caps temporary allies so conversion stays readable", () => {
     const engine = new Engine(createCanvas(), {
       height: 200,
