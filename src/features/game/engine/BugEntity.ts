@@ -3,7 +3,7 @@ import { drawBugSprite } from "@game/utils/bugSprite";
 import type { SiegeStatusId } from "@game/status/statusCatalog";
 import { STATUS_PRIORITY } from "@game/status/statusCatalog";
 import { DEFAULT_GAME_CONFIG } from "./types";
-import { getCodex, type CrawlProfile, type BugType } from "./bugCodex";
+import { getCodex, type CrawlProfile, type CrawlRegion, type BugType } from "./bugCodex";
 import { EntityState, isTerminalEntityState } from "../types";
 import type { AllyConversionConfig } from "@game/weapons/runtime/types";
 
@@ -63,6 +63,13 @@ type BugState = "patrol" | "flee" | EntityState.Dying | EntityState.Dead;
 const ALLY_CONTACT_DAMAGE = 2;
 const ALLY_CONTACT_COOLDOWN_MS = 260;
 const ALLY_INTERCEPT_RADIUS = 196;
+const DEFAULT_ROAM_INTERVAL: [number, number] = [1.4, 5];
+
+const DEFAULT_REGION_WEIGHTS: Record<CrawlRegion, number> = {
+  edge: 0.14,
+  interior: 0.36,
+  middle: 0.5,
+};
 
 function isStatusActive(
   status:
@@ -111,6 +118,7 @@ export class BugEntity extends Entity {
   roamTargetY: number | null;
   nextRoamTargetAt: number;
   roamTargetGeneration: number;
+  roamLoiterUntil: number;
   orbitBias: -1 | 1;
   packAffinity: number;
   typeSpec: BugType | null;
@@ -172,6 +180,7 @@ export class BugEntity extends Entity {
     this.roamTargetY = null;
     this.nextRoamTargetAt = 0;
     this.roamTargetGeneration = 0;
+    this.roamLoiterUntil = 0;
     this.orbitBias = Math.random() < 0.5 ? -1 : 1;
     this.packAffinity = 0.7 + Math.random() * 0.55;
     this.typeSpec = null;
@@ -251,6 +260,116 @@ export class BugEntity extends Entity {
     return this.typeSpec;
   }
 
+  private getActiveProfile() {
+    return this.typeSpec?.profile ?? getProfileForVariant(this.variant) ?? null;
+  }
+
+  private pickRoamRegion(profile: CrawlProfile | null, generation: number): CrawlRegion {
+    const regionWeights = profile?.regionWeights ?? DEFAULT_REGION_WEIGHTS;
+    const preferredRegion = this.typeSpec?.preferredRegion;
+    const anchorBias = profile?.anchorBias ?? "any";
+    const edgePreference = profile?.edgePreference ?? 0;
+    const edgeWeight =
+      regionWeights.edge +
+      Math.max(0, edgePreference) * 1.5 +
+      (anchorBias === "perimeter" ? 0.42 : 0) +
+      (preferredRegion === "edge" ? 0.28 : 0);
+    const interiorWeight =
+      regionWeights.interior +
+      Math.max(0, -edgePreference) * 1.1 +
+      (anchorBias === "interior" ? 0.48 : 0) +
+      (preferredRegion === "interior" ? 0.28 : 0);
+    const middleWeight =
+      regionWeights.middle +
+      (anchorBias === "any" ? 0.1 : 0) +
+      (preferredRegion === "middle" ? 0.28 : 0);
+    const totalWeight = Math.max(0.01, edgeWeight + interiorWeight + middleWeight);
+    const roll =
+      this.getUnitNoise(this.seed * 23.3 + generation * 1.11, this.seed * 53.1) *
+      totalWeight;
+
+    if (roll < edgeWeight) {
+      return "edge";
+    }
+
+    if (roll < edgeWeight + middleWeight) {
+      return "middle";
+    }
+
+    return "interior";
+  }
+
+  private getRegionAnchorPoint(
+    region: CrawlRegion,
+    baseX: number,
+    baseY: number,
+    sideNoise: number,
+  ) {
+    if (region === "edge") {
+      const side = Math.floor(sideNoise * 4);
+      if (side === 0) {
+        return { x: lerp(0.03, 0.14, baseX), y: lerp(0.04, 0.96, baseY) };
+      }
+      if (side === 1) {
+        return { x: lerp(0.86, 0.97, baseX), y: lerp(0.04, 0.96, baseY) };
+      }
+      if (side === 2) {
+        return { x: lerp(0.04, 0.96, baseX), y: lerp(0.03, 0.14, baseY) };
+      }
+
+      return { x: lerp(0.04, 0.96, baseX), y: lerp(0.86, 0.97, baseY) };
+    }
+
+    if (region === "interior") {
+      return { x: lerp(0.24, 0.76, baseX), y: lerp(0.22, 0.78, baseY) };
+    }
+
+    return { x: lerp(0.1, 0.9, baseX), y: lerp(0.1, 0.9, baseY) };
+  }
+
+  private getSocialCohesion(
+    neighbors: BugEntity[],
+    socialAffinity: number,
+    crowdScore: number,
+    config: typeof DEFAULT_GAME_CONFIG,
+  ) {
+    if (socialAffinity <= 0.12 || neighbors.length === 0) {
+      return { x: 0, y: 0 };
+    }
+
+    let centerX = 0;
+    let centerY = 0;
+    let totalWeight = 0;
+
+    for (const neighbor of neighbors) {
+      if (!(neighbor instanceof BugEntity) || isTerminalEntityState(neighbor.state)) {
+        continue;
+      }
+
+      const dx = neighbor.x - this.x;
+      const dy = neighbor.y - this.y;
+      const distance = Math.max(1, getLength(dx, dy));
+      const sameVariantBonus = neighbor.variant === this.variant ? 1.25 : 1;
+      const weight = (1 - clamp(distance / config.crowdAvoidRadius, 0, 1)) * sameVariantBonus;
+
+      centerX += neighbor.x * weight;
+      centerY += neighbor.y * weight;
+      totalWeight += weight;
+    }
+
+    if (totalWeight <= 0 || crowdScore > config.crowdRepathThreshold * 0.85) {
+      return { x: 0, y: 0 };
+    }
+
+    const towardGroup = normalizeVector(centerX / totalWeight - this.x, centerY / totalWeight - this.y);
+    const strength = clamp(socialAffinity, 0, 1) * 0.085;
+
+    return {
+      x: towardGroup.x * strength,
+      y: towardGroup.y * strength,
+    };
+  }
+
   private getWallSteering(
     bounds: { width: number; height: number },
     config: typeof DEFAULT_GAME_CONFIG,
@@ -315,8 +434,29 @@ export class BugEntity extends Entity {
     this.roamTargetY = null;
     this.nextRoamTargetAt = 0;
     this.roamTargetGeneration = 0;
+    this.roamLoiterUntil = 0;
     this.orbitBias = Math.random() < 0.5 ? -1 : 1;
     this.packAffinity = 0.7 + Math.random() * 0.55;
+  }
+
+  private getLoiterDurationMs(profile: CrawlProfile | null, generation: number) {
+    const baseDuration =
+      420 +
+      this.getUnitNoise(this.seed * 19.7 + generation * 0.63, this.seed * 41.9) * 520;
+
+    if (profile?.behavior === "panic") {
+      return baseDuration * 0.72;
+    }
+
+    if (profile?.behavior === "stalk") {
+      return baseDuration * 1.18;
+    }
+
+    if (profile?.behavior === "skitter") {
+      return baseDuration * 0.88;
+    }
+
+    return baseDuration;
   }
 
   private getUnitNoise(position: number, seed: number) {
@@ -327,54 +467,140 @@ export class BugEntity extends Entity {
     bounds: { width: number; height: number },
     now: number,
     config: typeof DEFAULT_GAME_CONFIG,
+    getCrowdingAt?: BugUpdateContext["getCrowdingAt"],
   ) {
+    const profile = this.getActiveProfile();
     this.roamTargetGeneration += 1;
     const margin = Math.max(22, this.size * 3.2, config.wallAvoidDistance * 1.25);
     const usableWidth = Math.max(1, bounds.width - margin * 2);
     const usableHeight = Math.max(1, bounds.height - margin * 2);
     const generation = this.roamTargetGeneration;
-    const driftPhase = this.motionTime * 0.013;
-    const baseX = this.getUnitNoise(
-      this.seed * 31.7 + generation * 0.73 + driftPhase,
-      this.seed * 67.3 + generation * 3.1,
+    const roamRadius = profile?.roamRadius ?? config.roamTargetMinDistance;
+    const wideRoamChance = profile?.wideRoamChance ?? 0.24;
+    const broadCrowding = getCrowdingAt?.(
+      this.x,
+      this.y,
+      config.crowdAvoidRadius * 2.1,
+      this,
     );
-    const baseY = this.getUnitNoise(
-      this.seed * 43.9 + generation * 0.61 + driftPhase,
-      this.seed * 71.5 + generation * 2.7,
-    );
-    const laneBias = this.getUnitNoise(
-      this.seed * 17.1 + generation * 1.37,
-      this.seed * 59.9,
-    );
-    const edgeLane = laneBias < 0.26;
-    const targetX = edgeLane
-      ? (laneBias < 0.13 ? 0.04 : 0.96)
-      : lerp(0.04, 0.96, baseX);
-    const targetY = edgeLane
-      ? lerp(0.04, 0.96, baseY)
-      : lerp(0.04, 0.96, baseY);
+    let bestTargetX = this.x;
+    let bestTargetY = this.y;
+    let bestScore = -Infinity;
 
-    this.roamTargetX = clamp(
-      margin + targetX * usableWidth,
-      margin,
-      bounds.width - margin,
-    );
-    this.roamTargetY = clamp(
-      margin + targetY * usableHeight,
-      margin,
-      bounds.height - margin,
-    );
+    for (let attempt = 0; attempt < 6; attempt += 1) {
+      const attemptPhase = generation + attempt * 0.37;
+      const driftPhase = this.motionTime * 0.013 * (profile?.noiseFrequency ?? 1);
+      const baseX = this.getUnitNoise(
+        this.seed * 31.7 + attemptPhase * 0.73 + driftPhase,
+        this.seed * 67.3 + attemptPhase * 3.1,
+      );
+      const baseY = this.getUnitNoise(
+        this.seed * 43.9 + attemptPhase * 0.61 + driftPhase,
+        this.seed * 71.5 + attemptPhase * 2.7,
+      );
+      const laneBias = this.getUnitNoise(
+        this.seed * 17.1 + attemptPhase * 1.37,
+        this.seed * 59.9 + attempt * 0.41,
+      );
+      const wideRoam = laneBias < wideRoamChance;
+      const region = wideRoam ? "middle" : this.pickRoamRegion(profile, generation + attempt);
+      const anchorPoint = wideRoam
+        ? { x: lerp(0.02, 0.98, baseX), y: lerp(0.02, 0.98, baseY) }
+        : this.getRegionAnchorPoint(region, baseX, baseY, laneBias);
+
+      let candidateX = margin + anchorPoint.x * usableWidth;
+      let candidateY = margin + anchorPoint.y * usableHeight;
+      if (!wideRoam && roamRadius > 0) {
+        const toTargetX = candidateX - this.x;
+        const toTargetY = candidateY - this.y;
+        const distance = getLength(toTargetX, toTargetY);
+
+        if (distance > roamRadius) {
+          const direction = normalizeVector(toTargetX, toTargetY);
+          candidateX = this.x + direction.x * roamRadius;
+          candidateY = this.y + direction.y * roamRadius;
+        }
+      }
+
+      candidateX = clamp(candidateX, margin, bounds.width - margin);
+      candidateY = clamp(candidateY, margin, bounds.height - margin);
+
+      const crowding = getCrowdingAt?.(candidateX, candidateY, config.crowdAvoidRadius);
+      const crowdPenalty = clamp(
+        (crowding?.score ?? 0) / Math.max(config.crowdRepathThreshold * 2.8, 1),
+        0,
+        1,
+      );
+      const broadCandidateCrowding = getCrowdingAt?.(
+        candidateX,
+        candidateY,
+        config.crowdAvoidRadius * 2.1,
+        this,
+      );
+      const broadPenalty = clamp(
+        (broadCandidateCrowding?.score ?? 0) /
+          Math.max(config.crowdRepathThreshold * 5.8, 1),
+        0,
+        1,
+      );
+      const broadEscape = broadCrowding
+        ? clamp(
+            getLength(
+              candidateX - broadCrowding.centerX,
+              candidateY - broadCrowding.centerY,
+            ) / Math.max(Math.min(bounds.width, bounds.height) * 0.48, 1),
+            0,
+            1,
+          )
+        : 0;
+      const distanceScore = clamp(
+        getLength(candidateX - this.x, candidateY - this.y) /
+          Math.max(roamRadius, config.roamTargetMinDistance, 1),
+        0,
+        1,
+      );
+      const edgeCoverage = Math.max(
+        Math.abs(candidateX / bounds.width - 0.5),
+        Math.abs(candidateY / bounds.height - 0.5),
+      );
+      const broadEscapeWeight = broadCrowding && broadCrowding.score > config.crowdRepathThreshold
+        ? 0.12
+        : 0.04;
+      const score =
+        (1 - crowdPenalty) * 0.42 +
+        (1 - broadPenalty) * 0.24 +
+        distanceScore * 0.18 +
+        edgeCoverage * 0.08 +
+        broadEscape * broadEscapeWeight +
+        (region === "edge" ? 0.04 : 0);
+
+      if (score > bestScore) {
+        bestScore = score;
+        bestTargetX = candidateX;
+        bestTargetY = candidateY;
+      }
+    }
+
+    this.roamTargetX = bestTargetX;
+    this.roamTargetY = bestTargetY;
+    const [minInterval, maxInterval] = profile?.anchorDriftInterval ?? DEFAULT_ROAM_INTERVAL;
+    const minIntervalMs = clamp(Math.min(minInterval, maxInterval) * 1000, 1200, 16_000);
+    const maxIntervalMs = clamp(Math.max(minInterval, maxInterval) * 1000, minIntervalMs, 18_000);
     this.nextRoamTargetAt =
       now +
-      1400 +
-      this.getUnitNoise(this.seed * 37.1 + generation * 0.47, this.seed * 83.7) * 3600;
+      minIntervalMs +
+      this.getUnitNoise(this.seed * 37.1 + generation * 0.47, this.seed * 83.7) *
+        (maxIntervalMs - minIntervalMs);
+    this.roamLoiterUntil = 0;
   }
 
   private getRoamTarget(
     bounds: { width: number; height: number },
     now: number,
     config: typeof DEFAULT_GAME_CONFIG,
+    getCrowdingAt?: BugUpdateContext["getCrowdingAt"],
   ) {
+    const profile = this.getActiveProfile();
     const targetMissing = this.roamTargetX == null || this.roamTargetY == null;
     const targetExpired = now >= this.nextRoamTargetAt;
     const targetOutOfBounds =
@@ -383,13 +609,24 @@ export class BugEntity extends Entity {
         this.roamTargetX! > bounds.width ||
         this.roamTargetY! < 0 ||
         this.roamTargetY! > bounds.height);
-    const targetReached =
-      !targetMissing &&
-      getLength(this.roamTargetX! - this.x, this.roamTargetY! - this.y) <=
-        Math.max(config.targetReachRadius * 2.4, this.size * 4);
 
-    if (targetMissing || targetExpired || targetOutOfBounds || targetReached) {
-      this.chooseRoamTarget(bounds, now, config);
+    if (targetMissing || targetExpired || targetOutOfBounds) {
+      this.chooseRoamTarget(bounds, now, config, getCrowdingAt);
+    } else {
+      const targetDistance = getLength(this.roamTargetX! - this.x, this.roamTargetY! - this.y);
+      const loiterEnterRadius = Math.max(config.targetReachRadius * 1.05, this.size * 2.4);
+      const loiterExitRadius = loiterEnterRadius * 1.8;
+
+      if (targetDistance <= loiterEnterRadius) {
+        if (this.roamLoiterUntil === 0) {
+          this.roamLoiterUntil =
+            now + this.getLoiterDurationMs(profile, this.roamTargetGeneration);
+        } else if (now >= this.roamLoiterUntil) {
+          this.chooseRoamTarget(bounds, now, config, getCrowdingAt);
+        }
+      } else if (targetDistance >= loiterExitRadius) {
+        this.roamLoiterUntil = 0;
+      }
     }
 
     return {
@@ -403,9 +640,9 @@ export class BugEntity extends Entity {
     config: typeof DEFAULT_GAME_CONFIG,
   ) {
     const softMargin = Math.max(
-      config.wallAvoidDistance * 1.15,
-      Math.min(bounds.width, bounds.height) * 0.07,
-      this.size * 2.5,
+      config.wallAvoidDistance * 0.72,
+      Math.min(bounds.width, bounds.height) * 0.028,
+      this.size * 1.7,
     );
     const left = clamp((softMargin - this.x) / softMargin, 0, 1);
     const right = clamp((softMargin - (bounds.width - this.x)) / softMargin, 0, 1);
@@ -415,8 +652,8 @@ export class BugEntity extends Entity {
     const pressure = Math.max(left, right, top, bottom);
 
     return {
-      x: inward.x * config.followStrength * pressure * 0.22,
-      y: inward.y * config.followStrength * pressure * 0.22,
+      x: inward.x * config.followStrength * pressure * 0.08,
+      y: inward.y * config.followStrength * pressure * 0.08,
     };
   }
 
@@ -471,6 +708,17 @@ export class BugEntity extends Entity {
   update(dt: number, ctx: BugUpdateContext) {
     const config = ctx.config ?? DEFAULT_GAME_CONFIG;
     const bounds = ctx.bounds ?? { width: 800, height: 600 };
+    const typeSpec = this.syncTypeSpec();
+    const profile = typeSpec?.profile ?? null;
+    const socialAffinity = typeSpec?.socialAffinity ?? 0;
+    const speedMultiplier = profile?.speedMultiplier ?? 1;
+    const turnMultiplier = profile?.turnMultiplier ?? 1;
+    const wanderMultiplier = profile?.wanderMultiplier ?? 1;
+    const noiseFrequency = profile?.noiseFrequency ?? 1;
+    const noiseForwardStrength = 0.65 + (profile?.noiseForwardStrength ?? 0.2);
+    const noiseLateralStrength = 0.65 + (profile?.noiseLateralStrength ?? 0.5);
+    const noiseTurnStrength = profile?.noiseTurnStrength ?? 1;
+    const separationMultiplier = profile?.separationMultiplier ?? 1;
 
     if (this.state === EntityState.Dying) {
       this.deathProgress += dt / this.deathDuration;
@@ -530,36 +778,55 @@ export class BugEntity extends Entity {
     desired.y += wallSteering.y;
 
     const driftNoiseX = perlin1D(
-      this.motionTime * 0.29 + this.seed * 11.3,
+      this.motionTime * 0.29 * noiseFrequency + this.seed * 11.3,
       this.seed * 17.9,
     );
     const driftNoiseY = perlin1D(
-      this.motionTime * 0.33 + this.seed * 7.1,
+      this.motionTime * 0.33 * noiseFrequency + this.seed * 7.1,
       this.seed * 23.4,
     );
     const weaveNoise = perlin1D(
-      this.motionTime * 0.17 + this.seed * 5.7,
+      this.motionTime * 0.17 * noiseFrequency + this.seed * 5.7,
       this.seed * 31.2,
     );
     this.wanderAngle = normalizeAngle(
-      this.wanderAngle + weaveNoise * dt * (0.9 + config.wanderStrength * 1.1),
+      this.wanderAngle +
+        weaveNoise * dt * (0.9 + config.wanderStrength * 1.1) * noiseTurnStrength,
     );
-    desired.x += driftNoiseX * (0.52 + config.wanderStrength * 0.85);
-    desired.y += driftNoiseY * (0.52 + config.wanderStrength * 0.85);
-    desired.x += Math.cos(this.wanderAngle) * 0.18;
-    desired.y += Math.sin(this.wanderAngle) * 0.18;
+    desired.x += driftNoiseX * (0.52 + config.wanderStrength * 0.85) * noiseForwardStrength;
+    desired.y += driftNoiseY * (0.52 + config.wanderStrength * 0.85) * noiseLateralStrength;
+    desired.x += Math.cos(this.wanderAngle) * 0.18 * wanderMultiplier;
+    desired.y += Math.sin(this.wanderAngle) * 0.18 * wanderMultiplier;
 
     const neighbors = ctx.getNeighbors(this, config.separationRadius);
     const separation = this.getNeighborSeparation(
       neighbors,
       config.separationRadius,
-      config.separationStrength * 1.35,
+      config.separationStrength * 1.35 * separationMultiplier,
     );
     desired.x += separation.x;
     desired.y += separation.y;
 
+    const crowding = !isAlly && this.state !== "flee"
+      ? ctx.getCrowdingAt?.(
+          this.x,
+          this.y,
+          config.crowdAvoidRadius,
+          this,
+        )
+      : undefined;
+
+    const socialCohesion = this.getSocialCohesion(
+      neighbors,
+      socialAffinity,
+      crowding?.score ?? 0,
+      config,
+    );
+    desired.x += socialCohesion.x;
+    desired.y += socialCohesion.y;
+
     if (!isAlly && this.state !== "flee") {
-      const roamTarget = this.getRoamTarget(bounds, now, config);
+      const roamTarget = this.getRoamTarget(bounds, now, config, ctx.getCrowdingAt);
       const toTargetX = roamTarget.x - this.x;
       const toTargetY = roamTarget.y - this.y;
       const targetDistance = getLength(toTargetX, toTargetY);
@@ -571,26 +838,36 @@ export class BugEntity extends Entity {
 
       if (targetDistance > config.targetReachRadius * 1.35) {
         const targetRamp = clamp(
-          targetDistance / Math.max(config.roamTargetMinDistance, 1),
+          targetDistance / Math.max(profile?.roamRadius ?? config.roamTargetMinDistance, 1),
           0,
           1,
         );
         const roamPullStrength =
-          config.followStrength * (0.38 + targetRamp * 0.95) * this.packAffinity;
+          config.followStrength *
+          (0.38 + targetRamp * 0.95) *
+          this.packAffinity *
+          (1 + socialAffinity * 0.16);
         desired.x += targetDirection.x * roamPullStrength;
         desired.y += targetDirection.y * roamPullStrength;
       } else {
-        this.nextRoamTargetAt = Math.min(this.nextRoamTargetAt, now + 180);
-        desired.x += Math.cos(this.heading + this.wanderAngle) * config.followStrength * 0.24;
-        desired.y += Math.sin(this.heading + this.wanderAngle) * config.followStrength * 0.24;
+        const tangentDirection = {
+          x: -targetDirection.y * this.orbitBias,
+          y: targetDirection.x * this.orbitBias,
+        };
+        const loiterRadius = Math.max(config.targetReachRadius * 1.2, this.size * 2.8);
+        const radialPressure = clamp(targetDistance / loiterRadius, 0, 1);
+        const orbitStrength = config.followStrength * (0.08 + radialPressure * 0.16);
+        const inwardCorrection = config.followStrength * (0.08 + (1 - radialPressure) * 0.08);
+        const driftStrength = 0.04 + wanderMultiplier * 0.025;
+
+        desired.x += tangentDirection.x * orbitStrength;
+        desired.y += tangentDirection.y * orbitStrength;
+        desired.x += targetDirection.x * inwardCorrection;
+        desired.y += targetDirection.y * inwardCorrection;
+        desired.x += Math.cos(this.wanderAngle) * driftStrength;
+        desired.y += Math.sin(this.wanderAngle) * driftStrength;
       }
 
-      const crowding = ctx.getCrowdingAt?.(
-        this.x,
-        this.y,
-        config.crowdAvoidRadius,
-        this,
-      );
       if (crowding && crowding.score > config.crowdRepathThreshold) {
         const awayFromCrowd = normalizeVector(
           this.x - crowding.centerX,
@@ -673,8 +950,8 @@ export class BugEntity extends Entity {
       desiredDirection.x === 0 && desiredDirection.y === 0
         ? this.heading
         : Math.atan2(desiredDirection.y, desiredDirection.x);
-    const turnMultiplier = isBurnPanicking ? 1.8 : 1;
-    const maxTurn = config.turnSpeed * this.turnRate * turnMultiplier * dt;
+    const panicTurnMultiplier = isBurnPanicking ? 1.8 : 1;
+    const maxTurn = config.turnSpeed * this.turnRate * turnMultiplier * panicTurnMultiplier * dt;
     this.heading += clamp(
       getAngleDelta(this.heading, desiredHeading),
       -maxTurn,
@@ -764,7 +1041,7 @@ export class BugEntity extends Entity {
 
     const slowMult = this.slow ? this.slow.multiplier : 1;
     const burnSpeedBoost = isBurnPanicking ? 1.18 : 1;
-    const desiredSpeed = config.baseSpeed * this.cruiseSpeed * edgeFactor * speedBoost * slowMult * burnSpeedBoost;
+    const desiredSpeed = config.baseSpeed * this.cruiseSpeed * speedMultiplier * edgeFactor * speedBoost * slowMult * burnSpeedBoost;
     const currentSpeed = getLength(this.vx, this.vy);
     const nextSpeed = currentSpeed + (desiredSpeed - currentSpeed) * Math.min(1, dt * 4.2);
     this.vx = Math.cos(this.heading) * nextSpeed;

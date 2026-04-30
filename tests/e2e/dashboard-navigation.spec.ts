@@ -38,15 +38,11 @@ test.describe("dashboard navigation QA", () => {
     );
     await expectMetricValue(
       page,
-      "Bugs completed",
+      "Bugs closed",
       custom.viewMetrics.bugsCompleted,
     );
     await expectMetricValue(page, "Net change", custom.viewMetrics.netChange);
-    await expectMetricValue(
-      page,
-      "Completion rate",
-      custom.viewMetrics.completionRate,
-    );
+    await expectMetricValue(page, "Closure rate", custom.viewMetrics.completionRate);
 
     await page.getByRole("tab", { name: "Insights" }).click();
     await expect(page.getByRole("tab", { name: "Insights" })).toHaveAttribute(
@@ -63,13 +59,13 @@ test.describe("dashboard navigation QA", () => {
     );
     await expectMetricValue(
       page,
-      "SLA breaches",
-      insights.viewMetrics.slaBreaches,
+      "On time",
+      insights.viewMetrics.onTime,
     );
     await expectMetricValue(
       page,
-      "Missing due dates",
-      insights.viewMetrics.missingDueDates,
+      "Overdue",
+      insights.viewMetrics.overdue,
     );
 
     await page.getByRole("tab", { name: "Overview" }).click();

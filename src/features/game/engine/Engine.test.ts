@@ -187,7 +187,7 @@ describe("engine death attribution", () => {
     expect(engine.getBlackHole()).toBeNull();
   });
 
-  it("steers patrol bugs back toward the center before they settle on the edges", () => {
+  it("keeps patrol bugs active near edges without pinning them to the center", () => {
     const engine = new Engine(createCanvas(), {
       height: 200,
       width: 200,
@@ -208,7 +208,8 @@ describe("engine death attribution", () => {
       engine.update(1 / 60, null, null);
     }
 
-    expect(bug.x).toBeLessThan(170);
+    expect(bug.x).toBeLessThan(194);
+    expect(bug.x).toBeGreaterThan(130);
   });
 
   it("reports stable crowding centers and scores", () => {

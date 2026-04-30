@@ -78,21 +78,21 @@ const CommandCenter = memo(function CommandCenter({
     : isPeriods
       ? "Period Outlook"
       : "Delivery outlook";
-  const primaryLabel = isInsights ? "SLA hit rate" : "Fix velocity";
+  const primaryLabel = isInsights ? "SLA hit rate" : "Closure velocity";
   const primaryValue = isInsights
     ? formatPercent(insightsMetrics!.slaHitRate, 1)
     : isPeriods
       ? `${formatNumber(periodWindow!.fixRate, 2)}/day`
       : `${formatNumber(summary.currentFixRate, 2)}/day`;
-  const secondaryLabel = isInsights ? "Breaches" : "Required pace";
+  const secondaryLabel = isInsights ? "On time" : "Required pace";
   const secondaryValue = isInsights
-    ? formatNumber(insightsMetrics!.breachedCompleted)
+    ? formatNumber(insightsMetrics!.onTimeCompleted)
     : isPeriods
       ? `${formatNumber(periodWindow!.addRate, 2)}/day`
       : `${formatNumber(summary.bugsPerDayRequired, 2)}/day`;
-  const tertiaryLabel = isInsights ? "Open overdue" : "Net difference";
+  const tertiaryLabel = isInsights ? "Overdue" : "Net difference";
   const tertiaryValue = isInsights
-    ? formatNumber(insightsMetrics!.openOverdue)
+    ? formatNumber(insightsMetrics!.overdueCompleted)
     : isPeriods
       ? `${formatSignedNumber(periodWindow!.netBurnRate, 2)}/day`
       : `${formatSignedNumber(paceGap, 2)}/day`;
@@ -121,7 +121,7 @@ const CommandCenter = memo(function CommandCenter({
 
           <div className="grid gap-1.5 sm:grid-cols-3 xl:min-w-[29rem]">
             <div
-              data-siege-panel="fix-velocity"
+              data-siege-panel="closure-velocity"
               className={cn(
                 "rounded-[14px] border px-2.5 py-1.75 sm:rounded-[16px] sm:py-2",
                 metricShellClassName,

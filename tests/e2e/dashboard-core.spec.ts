@@ -39,7 +39,7 @@ test.describe("dashboard core QA", () => {
 
     await expectMetricValue(
       page,
-      "Fix velocity",
+      "Closure velocity",
       expected.commandCenter.fixVelocity,
     );
     await expectMetricValue(
@@ -56,8 +56,8 @@ test.describe("dashboard core QA", () => {
     await expect(page.getByText(expected.overlayLabel)).toBeVisible();
     await expect(page.getByText("Bug burndown")).toBeVisible();
     await expect(page.getByText("Open bugs by priority")).toBeVisible();
-    await expect(page.getByText("Bugs by status")).toBeVisible();
-    await expect(page.getByText("Open bug age")).toBeVisible();
+    await expect(page.getByText("Active bugs by status")).toBeVisible();
+    await expect(page.getByText("Active bug age")).toBeVisible();
 
     await clientErrors.expectNoClientErrors();
   });
@@ -84,20 +84,16 @@ test.describe("dashboard core QA", () => {
     );
     await expectMetricValue(
       page,
-      "Bugs completed",
+      "Bugs closed",
       expected.viewMetrics.bugsCompleted,
     );
     await expectMetricValue(page, "Net change", expected.viewMetrics.netChange);
-    await expectMetricValue(
-      page,
-      "Completion rate",
-      expected.viewMetrics.completionRate,
-    );
+    await expectMetricValue(page, "Closure rate", expected.viewMetrics.completionRate);
 
-    await expect(page.getByText("Created vs completed over time")).toBeVisible();
+    await expect(page.getByText("Created vs closed over time")).toBeVisible();
     await expect(page.getByText("Current vs previous window")).toBeVisible();
     await expect(page.getByText("Period-by-period net change")).toBeVisible();
-    await expect(page.getByText("Fix vs intake trend")).toBeVisible();
+    await expect(page.getByText("Closure vs intake trend")).toBeVisible();
 
     await clientErrors.expectNoClientErrors();
   });
@@ -109,11 +105,11 @@ test.describe("dashboard core QA", () => {
     await gotoDashboard(page);
 
     await expect(page.getByRole("tab", { name: "Overview" })).toBeVisible();
-    await expect(page.getByLabel("From date")).toBeVisible();
-    await expect(page.getByLabel("Deadline date")).toBeVisible();
+    await expect(page.getByLabel("Tracking start date")).toBeVisible();
+    await expect(page.getByLabel("Target deadline date")).toBeVisible();
     await expect(page.getByText("Bug burndown")).toBeVisible();
-    await expect(page.getByText("Bugs by status")).toBeVisible();
-    await expect(page.getByText("Open bug age")).toBeVisible();
+    await expect(page.getByText("Active bugs by status")).toBeVisible();
+    await expect(page.getByText("Active bug age")).toBeVisible();
 
     await clientErrors.expectNoClientErrors();
   });

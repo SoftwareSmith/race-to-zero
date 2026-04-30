@@ -22,6 +22,9 @@ export interface WorkdaySettings {
 }
 
 export interface MetricsBug {
+  archivedAt?: string | null;
+  autoClosedAt?: string | null;
+  canceledAt?: string | null;
   createdAt: string;
   completedAt: string | null;
   dueDate?: string | null;
@@ -29,14 +32,16 @@ export interface MetricsBug {
   stateName: string | null;
   stateType: string | null;
   teamKey?: string | null;
+  updatedAt?: string | null;
 }
 
 export interface InsightsPriorityMetrics {
-  averageBreachDays: number;
+  averageOverdueDays: number;
   averageResolutionDays: number;
-  breached: number;
+  overdueCompleted: number;
   eligible: number;
   label: string;
+  medianOverdueDays: number;
   medianResolutionDays: number;
   missingDueDate: number;
   onTime: number;
@@ -45,25 +50,26 @@ export interface InsightsPriorityMetrics {
 }
 
 export interface InsightsTrendEntry {
-  breached: number;
+  overdueCompleted: number;
   completed: number;
   date: string;
   onTime: number;
 }
 
 export interface InsightsMetrics {
-  averageBreachDays: number;
+  averageOverdueDays: number;
   averageResolutionDays: number;
   body: string;
-  breachedCompleted: number;
+  overdueCompleted: number;
   currentWindow: ComparisonWindowMetrics;
-  dueSoonOpen: number;
   eligibleCompleted: number;
   headline: string;
+  medianOverdueDays: number;
   medianResolutionDays: number;
   missingDueDate: number;
   onTimeCompleted: number;
   openOverdue: number;
+  openPending: number;
   priorityMetrics: InsightsPriorityMetrics[];
   rangeLabel: string;
   slaHitRate: number;

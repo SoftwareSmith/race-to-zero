@@ -65,6 +65,13 @@ describe("metrics", () => {
           stateName: null,
           stateType: null,
         },
+        {
+          completedAt: null,
+          createdAt: "2026-03-23",
+          priority: 4,
+          stateName: "Canceled",
+          stateType: "canceled",
+        },
       ],
     };
 
@@ -142,8 +149,6 @@ describe("metrics", () => {
       "In progress",
       "In review",
       "Deploy ready",
-      "Cancelled",
-      "Duplicated",
       "Other",
     ]);
     expect(chartData.labels).toEqual([
@@ -153,11 +158,9 @@ describe("metrics", () => {
       "In progress",
       "In review",
       "Deploy ready",
-      "Cancelled",
-      "Duplicated",
       "Other",
     ]);
-    expect(chartData.datasets[0]?.data).toEqual([1, 1, 0, 0, 1, 0, 0, 1, 0]);
+    expect(chartData.datasets[0]?.data).toEqual([1, 1, 0, 0, 1, 0, 0]);
   });
 
   it("builds an open age chart for unresolved backlog buckets", () => {
@@ -192,6 +195,13 @@ describe("metrics", () => {
               priority: 2,
               stateName: "Backlog",
               stateType: "backlog",
+            },
+            {
+              completedAt: null,
+              createdAt: "2026-03-20",
+              priority: 2,
+              stateName: "Canceled",
+              stateType: "canceled",
             },
           ],
         },
@@ -302,6 +312,36 @@ describe("metrics", () => {
     );
   });
 
+  it("counts archived terminal tickets as backlog closures in period comparisons", () => {
+    const metrics = {
+      bugs: [
+        {
+          archivedAt: null,
+          autoClosedAt: null,
+          canceledAt: "2026-03-05",
+          completedAt: null,
+          createdAt: "2026-03-01",
+          priority: 2,
+          stateName: "Canceled",
+          stateType: "canceled",
+          updatedAt: "2026-03-05",
+        },
+      ],
+    };
+
+    const comparisonMetrics = withFrozenDate("2026-03-10T12:00:00.000Z", () =>
+      getComparisonMetrics(metrics, {
+        customFromDate: "2026-03-05",
+        customToDate: "2026-03-10",
+        rangeKey: "custom",
+      }),
+    );
+
+    expect(comparisonMetrics.currentWindow.created).toBe(0);
+    expect(comparisonMetrics.currentWindow.fixed).toBe(1);
+    expect(comparisonMetrics.currentWindow.netChange).toBe(-1);
+  });
+
   it("calculates SLA insights from due dates and completed dates", () => {
     const metrics = {
       bugs: [
@@ -353,6 +393,22 @@ describe("metrics", () => {
           stateName: "Backlog",
           stateType: "backlog",
         },
+        {
+          completedAt: null,
+          createdAt: "2026-04-02",
+          dueDate: "2026-04-03",
+          priority: 2,
+          stateName: "Canceled",
+          stateType: "canceled",
+        },
+        {
+          completedAt: null,
+          createdAt: "2026-04-02",
+          dueDate: "2026-04-11",
+          priority: 2,
+          stateName: "Duplicate",
+          stateType: "canceled",
+        },
       ],
     };
 
@@ -364,16 +420,17 @@ describe("metrics", () => {
       }),
     );
 
-    expect(insightsMetrics.totalCompleted).toBe(3);
+    expect(insightsMetrics.totalCompleted).toBe(2);
     expect(insightsMetrics.eligibleCompleted).toBe(2);
     expect(insightsMetrics.onTimeCompleted).toBe(1);
-    expect(insightsMetrics.breachedCompleted).toBe(1);
-    expect(insightsMetrics.missingDueDate).toBe(1);
+    expect(insightsMetrics.overdueCompleted).toBe(1);
+    expect(insightsMetrics.missingDueDate).toBe(0);
     expect(insightsMetrics.slaHitRate).toBe(50);
-    expect(insightsMetrics.averageBreachDays).toBe(2);
-    expect(insightsMetrics.medianResolutionDays).toBe(2);
+    expect(insightsMetrics.averageOverdueDays).toBe(2);
+    expect(insightsMetrics.medianOverdueDays).toBe(2);
+    expect(insightsMetrics.medianResolutionDays).toBe(3.5);
     expect(insightsMetrics.openOverdue).toBe(1);
-    expect(insightsMetrics.dueSoonOpen).toBe(1);
+    expect(insightsMetrics.openPending).toBe(1);
 
     const urgentMetrics = insightsMetrics.priorityMetrics.find(
       (entry) => entry.label === "Urgent",
@@ -386,16 +443,15 @@ describe("metrics", () => {
     );
 
     expect(urgentMetrics?.onTime).toBe(1);
-    expect(highMetrics?.breached).toBe(1);
-    expect(normalMetrics?.missingDueDate).toBe(1);
+    expect(highMetrics?.overdueCompleted).toBe(1);
+    expect(normalMetrics?.totalCompleted).toBe(0);
 
     const hitRateChart = buildSlaHitRateChartData(insightsMetrics);
     expect(hitRateChart.datasets[0]?.data.slice(0, 3)).toEqual([100, 0, 0]);
 
     const outcomeChart = buildSlaOutcomeChartData(insightsMetrics);
-    expect(outcomeChart.datasets).toHaveLength(3);
+    expect(outcomeChart.datasets).toHaveLength(2);
     expect(outcomeChart.datasets[0]?.data[0]).toBe(1);
     expect(outcomeChart.datasets[1]?.data[1]).toBe(1);
-    expect(outcomeChart.datasets[2]?.data[2]).toBe(1);
   });
 });

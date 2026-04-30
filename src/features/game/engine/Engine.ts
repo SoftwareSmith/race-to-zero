@@ -321,7 +321,6 @@ export class Engine {
       const n = counts[v] ?? 0;
       for (let i = 0; i < n; i++) {
         let be: BugEntity | undefined = undefined;
-        // spawn uniformly across the canvas with random initial headings
         const { x: spawnX, y: spawnY } = getSpawnPoint();
         const heading = Math.random() * Math.PI * 2;
         const speed = this.config.baseSpeed * (0.8 + Math.random() * 0.6);

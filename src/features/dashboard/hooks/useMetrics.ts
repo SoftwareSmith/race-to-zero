@@ -30,16 +30,32 @@ function isMetricsSource(value: unknown): value is MetricsSource {
       return false;
     }
 
-    const { completedAt, createdAt, dueDate, priority, stateName, stateType, teamKey } = bug;
+    const {
+      archivedAt,
+      autoClosedAt,
+      canceledAt,
+      completedAt,
+      createdAt,
+      dueDate,
+      priority,
+      stateName,
+      stateType,
+      teamKey,
+      updatedAt,
+    } = bug;
 
     return (
+      (archivedAt === null || archivedAt === undefined || typeof archivedAt === "string") &&
+      (autoClosedAt === null || autoClosedAt === undefined || typeof autoClosedAt === "string") &&
+      (canceledAt === null || canceledAt === undefined || typeof canceledAt === "string") &&
       typeof createdAt === "string" &&
       (completedAt === null || completedAt === undefined || typeof completedAt === "string") &&
       (dueDate === null || dueDate === undefined || typeof dueDate === "string") &&
       (priority === undefined || typeof priority === "number") &&
       (stateName === null || stateName === undefined || typeof stateName === "string") &&
       (stateType === null || stateType === undefined || typeof stateType === "string") &&
-      (teamKey === null || teamKey === undefined || typeof teamKey === "string")
+      (teamKey === null || teamKey === undefined || typeof teamKey === "string") &&
+      (updatedAt === null || updatedAt === undefined || typeof updatedAt === "string")
     );
   });
 }

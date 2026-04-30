@@ -55,14 +55,14 @@ const TopNav = memo(function TopNav({
       {activeTab === "overview" ? (
         <div className="flex w-full flex-wrap gap-[0.3125rem] lg:w-auto lg:justify-end">
           <CompactDateField
-            label="From"
+            label="Tracking start"
             max={deadlineDate}
             onChange={onDeadlineFromDateChange}
             size="compact"
             value={deadlineFromDate}
           />
           <CompactDateField
-            label="Deadline"
+            label="Target deadline"
             min={todayDate}
             onChange={onDeadlineDateChange}
             size="compact"

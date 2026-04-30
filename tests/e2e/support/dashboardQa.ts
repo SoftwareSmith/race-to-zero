@@ -181,9 +181,8 @@ export function getExpectedInsightsMetrics(rangeKey: "7" | "30" | "90" | "all" |
     return {
       insightsMetrics,
       viewMetrics: {
-        missingDueDates: formatNumber(insightsMetrics.missingDueDate),
-        openSlaRisk: `${formatNumber(insightsMetrics.openOverdue)} overdue / ${formatNumber(insightsMetrics.dueSoonOpen)} soon`,
-        slaBreaches: formatNumber(insightsMetrics.breachedCompleted),
+        onTime: formatNumber(insightsMetrics.onTimeCompleted),
+        overdue: formatNumber(insightsMetrics.overdueCompleted),
         slaHitRate: formatPercent(insightsMetrics.slaHitRate, 1),
       },
     };

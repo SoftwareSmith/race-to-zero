@@ -171,20 +171,20 @@ function buildPeriodsMetricCards(
       value: formatNumber(comparisonMetrics.currentWindow.created),
     },
     {
-      hint: "Bugs completed during the selected period. Higher is better.",
-      label: "Bugs completed",
+      hint: "Bugs that left the active backlog during the selected period, including completed, canceled, duplicate, and archived terminal work.",
+      label: "Bugs closed",
       tone: completedTone,
       value: formatNumber(comparisonMetrics.currentWindow.fixed),
     },
     {
-      hint: "Created minus completed during the selected period.",
+      hint: "Created minus closed during the selected period.",
       label: "Net change",
       tone: netChangeTone,
       value: formatSignedNumber(comparisonMetrics.currentWindow.netChange),
     },
     {
-      hint: "Completion rate helps normalize periods with different intake volume.",
-      label: "Completion rate",
+      hint: "Closure rate helps normalize periods with different intake volume.",
+      label: "Closure rate",
       tone: completionRateTone,
       value: formatPercent(comparisonMetrics.currentWindow.completionRate, 1),
     },
@@ -195,24 +195,28 @@ function getInsightsHitRateTone(insightsMetrics: InsightsMetrics): Tone {
   return insightsMetrics.tone;
 }
 
-function getInsightsBreachTone(insightsMetrics: InsightsMetrics): Tone {
-  if (insightsMetrics.breachedCompleted === 0) {
+function getInsightsOverdueTone(insightsMetrics: InsightsMetrics): Tone {
+  if (insightsMetrics.overdueCompleted === 0) {
     return insightsMetrics.eligibleCompleted > 0 ? "positive" : "neutral";
   }
 
   return "negative";
 }
 
-function getInsightsMissingDueDateTone(insightsMetrics: InsightsMetrics): Tone {
-  if (insightsMetrics.missingDueDate === 0) {
-    return "positive";
+function getInsightsOnTimeTone(insightsMetrics: InsightsMetrics): Tone {
+  if (insightsMetrics.onTimeCompleted === 0) {
+    return "neutral";
   }
 
-  return insightsMetrics.eligibleCompleted > 0 ? "neutral" : "negative";
+  return "positive";
 }
 
-function getInsightsOpenRiskTone(insightsMetrics: InsightsMetrics): Tone {
-  return insightsMetrics.openOverdue > 0 ? "negative" : "positive";
+function getInsightsMedianOvertimeTone(insightsMetrics: InsightsMetrics): Tone {
+  if (insightsMetrics.overdueCompleted === 0) {
+    return insightsMetrics.eligibleCompleted > 0 ? "positive" : "neutral";
+  }
+
+  return insightsMetrics.medianOverdueDays > 0 ? "negative" : "neutral";
 }
 
 function buildInsightsMetricCards(
@@ -226,28 +230,28 @@ function buildInsightsMetricCards(
       value: formatPercent(insightsMetrics.slaHitRate, 1),
     },
     {
-      hint: "Completed bugs in this period that closed after their Linear due date.",
-      label: "SLA breaches",
-      tone: getInsightsBreachTone(insightsMetrics),
-      value: formatNumber(insightsMetrics.breachedCompleted),
+      hint: "Completed bugs in this period that were finished after their Linear due date.",
+      label: "Overdue",
+      tone: getInsightsOverdueTone(insightsMetrics),
+      value: formatNumber(insightsMetrics.overdueCompleted),
     },
     {
-      hint: "Completed bugs in this period without a Linear due date. These are excluded from SLA hit-rate calculations.",
-      label: "Missing due dates",
-      tone: getInsightsMissingDueDateTone(insightsMetrics),
-      value: formatNumber(insightsMetrics.missingDueDate),
-    },
-    {
-      hint: "Open bugs whose due date has already passed, plus bugs due in the next seven days.",
-      label: "Open SLA risk",
-      tone: getInsightsOpenRiskTone(insightsMetrics),
-      value: `${formatNumber(insightsMetrics.openOverdue)} overdue / ${formatNumber(insightsMetrics.dueSoonOpen)} soon`,
+      hint: "Completed bugs with due dates that closed on or before their Linear due date.",
+      label: "On time",
+      tone: getInsightsOnTimeTone(insightsMetrics),
+      value: formatNumber(insightsMetrics.onTimeCompleted),
     },
     {
       hint: "Median completion time for bugs completed in the selected period.",
       label: "Median resolve time",
       tone: "neutral",
       value: `${formatNumber(insightsMetrics.medianResolutionDays, 1)}d`,
+    },
+    {
+      hint: "Median days late for bugs that missed their due date in the selected period.",
+      label: "Median overtime",
+      tone: getInsightsMedianOvertimeTone(insightsMetrics),
+      value: `${formatNumber(insightsMetrics.medianOverdueDays, 1)}d`,
     },
   ];
 }
@@ -272,7 +276,7 @@ function getStatusDistributionSummary(deadlineMetrics: DeadlineMetrics) {
     );
   }).length;
 
-  return `${leadingStatus.label} is currently the largest Linear column with ${formatNumber(leadingStatus.count)} bugs assigned to it. Done is ignored in the chart because its size would dominate the rest of the workflow view (${formatNumber(doneCount)} bugs).`;
+  return `${leadingStatus.label} is currently the largest active workflow state with ${formatNumber(leadingStatus.count)} bugs in it. Closed states like Done, Cancelled, and Duplicated are excluded from this chart. Done currently contains ${formatNumber(doneCount)} bugs.`;
 }
 
 function getHistoricalWindowSummary(comparisonMetrics: ComparisonMetrics) {
@@ -313,7 +317,7 @@ function getSlaHitRateSummary(insightsMetrics: InsightsMetrics) {
 }
 
 function getSlaOutcomeSummary(insightsMetrics: InsightsMetrics) {
-  return `${formatNumber(insightsMetrics.totalCompleted)} bugs were completed in ${insightsMetrics.rangeLabel}; ${formatNumber(insightsMetrics.missingDueDate)} were missing due dates and are tracked separately from SLA performance.`;
+  return `${formatNumber(insightsMetrics.totalCompleted)} due-dated bugs were completed in ${insightsMetrics.rangeLabel}, split between on-time and overdue completion.`;
 }
 
 function getSlaTrendSummary(insightsMetrics: InsightsMetrics) {
@@ -321,11 +325,11 @@ function getSlaTrendSummary(insightsMetrics: InsightsMetrics) {
     return "No completed bugs were found in the selected period.";
   }
 
-  return "Daily SLA outcomes show whether breaches are clustered on a few delivery days or spread across the period.";
+  return "Daily SLA outcomes show whether overdue completions are clustered on a few delivery days or spread across the period.";
 }
 
 function getResolutionTimeSummary(insightsMetrics: InsightsMetrics) {
-  return `Average resolution time is ${formatNumber(insightsMetrics.averageResolutionDays, 1)} days, and breached bugs were late by ${formatNumber(insightsMetrics.averageBreachDays, 1)} days on average.`;
+  return `Median resolution time is ${formatNumber(insightsMetrics.medianResolutionDays, 1)} days, and overdue completions ran ${formatNumber(insightsMetrics.medianOverdueDays, 1)} days late at the median.`;
 }
 
 function ChartFallback({ className = "" }: { className?: string }) {
@@ -441,11 +445,11 @@ export const OverviewView = memo(function OverviewView({
             chartKey="status-breakdown"
             className="h-full"
             data={statusChartData}
-            description="Bug counts grouped by your Linear workflow columns using a fixed dashboard order."
+            description="Active bug counts grouped by your Linear workflow columns using a fixed dashboard order. Closed states are excluded so this view reconciles with the open backlog."
             onHoverStateChange={onChartFocusChange}
             siegeMode={siegeMode}
             summary={statusSummary}
-            title="Bugs by status"
+            title="Active bugs by status"
             variant="bar"
           />
         </Suspense>
@@ -454,11 +458,11 @@ export const OverviewView = memo(function OverviewView({
             chartKey="open-age-breakdown"
             className="h-full"
             data={openAgeChartData}
-            description="Open backlog grouped by age so stale work is visible separately from fresh intake."
+            description="Active backlog grouped by age so stale work is visible separately from fresh intake. Cancelled and duplicate items are excluded."
             onHoverStateChange={onChartFocusChange}
             siegeMode={siegeMode}
             summary={openAgeSummary}
-            title="Open bug age"
+            title="Active bug age"
             variant="bar"
           />
         </Suspense>
@@ -553,8 +557,8 @@ export const PeriodsView = memo(function PeriodsView({
             data={comparisonTimelineData}
             onHoverStateChange={onChartFocusChange}
             siegeMode={siegeMode}
-            summary="Compare daily intake against completions to see whether recent periods are relieving pressure or letting backlog build."
-            title="Created vs completed over time"
+            summary="Compare daily intake against backlog closures to see whether recent periods are relieving pressure or letting backlog build."
+            title="Created vs closed over time"
           />
         </Suspense>
         <Suspense fallback={<ChartFallback />}>
@@ -565,7 +569,7 @@ export const PeriodsView = memo(function PeriodsView({
             description="Each x-axis group is one metric type, with current and previous period bars paired so the change is easy to read."
             onHoverStateChange={onChartFocusChange}
             siegeMode={siegeMode}
-            summary="These bars compare the current period with the previous one across intake, completions, net movement, and completion rate."
+            summary="These bars compare the current period with the previous one across intake, closures, net movement, and closure rate."
             title="Current vs previous window"
             variant="bar"
           />
@@ -588,11 +592,11 @@ export const PeriodsView = memo(function PeriodsView({
             chartKey="period-rate-history"
             className="h-full"
             data={comparisonRateHistoryData}
-            description="Historical intake and fix rates across the same non-overlapping windows as the net-change view."
+            description="Historical intake and closure rates across the same non-overlapping windows as the net-change view."
             onHoverStateChange={onChartFocusChange}
             siegeMode={siegeMode}
             summary={rateHistorySummary}
-            title="Fix vs intake trend"
+            title="Closure vs intake trend"
           />
         </Suspense>
       </div>
@@ -682,7 +686,7 @@ export const InsightsView = memo(function InsightsView({
             chartKey="sla-outcomes-by-priority"
             className="h-full"
             data={slaOutcomeData}
-            description="Shows on-time completions, breached completions, and missing due dates for each severity group."
+            description="Shows on-time completions versus overdue completions for each severity group."
             onHoverStateChange={onChartFocusChange}
             siegeMode={siegeMode}
             summary={slaOutcomeSummary}
@@ -695,7 +699,7 @@ export const InsightsView = memo(function InsightsView({
             chartKey="sla-outcome-trend"
             className="h-full"
             data={slaTrendData}
-            description="Daily completed bugs split by whether they landed before or after the Linear due date."
+            description="Daily completed bugs split by whether they landed on time or overdue against the Linear due date."
             onHoverStateChange={onChartFocusChange}
             siegeMode={siegeMode}
             summary={slaTrendSummary}
@@ -707,7 +711,7 @@ export const InsightsView = memo(function InsightsView({
             chartKey="resolution-time-by-priority"
             className="h-full"
             data={resolutionTimeData}
-            description="Average completion time and average breach size by severity."
+            description="Average completion time and average overdue size by severity."
             onHoverStateChange={onChartFocusChange}
             siegeMode={siegeMode}
             summary={resolutionTimeSummary}

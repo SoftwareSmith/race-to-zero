@@ -19,6 +19,9 @@ interface LinearLabelNode {
 }
 
 interface LinearIssue {
+  archivedAt?: string | null;
+  autoClosedAt?: string | null;
+  canceledAt?: string | null;
   completedAt?: string | null;
   createdAt: string;
   dueDate?: string | null;
@@ -33,6 +36,7 @@ interface LinearIssue {
   team?: {
     key?: string | null;
   } | null;
+  updatedAt?: string | null;
 }
 
 interface LinearConnection {
@@ -89,6 +93,7 @@ async function fetchBugIssues(): Promise<LinearIssue[]> {
       issues(
         first: 100
         after: $after
+        includeArchived: true
         ${teamFilter}
       ) {
         pageInfo {
@@ -98,8 +103,12 @@ async function fetchBugIssues(): Promise<LinearIssue[]> {
         nodes {
           createdAt
           completedAt
+          canceledAt
+          archivedAt
+          autoClosedAt
           dueDate
           priority
+          updatedAt
           team {
             key
           }
@@ -176,6 +185,9 @@ function buildMetrics(issues: LinearIssue[]): MetricsSource {
     lastUpdated: new Date().toISOString(),
     bugs: sortedIssues.map(
       (issue): MetricsBug => ({
+        archivedAt: issue.archivedAt ? toDay(issue.archivedAt) : null,
+        autoClosedAt: issue.autoClosedAt ? toDay(issue.autoClosedAt) : null,
+        canceledAt: issue.canceledAt ? toDay(issue.canceledAt) : null,
         createdAt: toDay(issue.createdAt),
         completedAt: issue.completedAt ? toDay(issue.completedAt) : null,
         dueDate: issue.dueDate ? toDay(issue.dueDate) : null,
@@ -183,6 +195,7 @@ function buildMetrics(issues: LinearIssue[]): MetricsSource {
         stateName: issue.state?.name ?? null,
         stateType: issue.state?.type ?? null,
         teamKey: issue.team?.key ?? null,
+        updatedAt: issue.updatedAt ? toDay(issue.updatedAt) : null,
       }),
     ),
   };

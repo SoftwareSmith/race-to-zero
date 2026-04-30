@@ -113,6 +113,153 @@ describe("bug movement", () => {
     expect(bug.roamTargetY).not.toBe(80);
   });
 
+  it("uses crawl profile timing for roam-anchor drift", () => {
+    const bug = new BugEntity({
+      heading: 0,
+      size: 10,
+      variant: "low",
+      vx: 0,
+      vy: 0,
+      x: 40,
+      y: 80,
+    });
+    const beforeUpdate = performance.now();
+
+    bug.update(1 / 60, {
+      bounds: { width: 220, height: 160 },
+      config: DEFAULT_GAME_CONFIG,
+      getNeighbors: () => [],
+    });
+
+    expect(bug.nextRoamTargetAt).toBeGreaterThan(beforeUpdate + 7900);
+    expect(bug.nextRoamTargetAt).toBeLessThan(beforeUpdate + 14_100);
+  });
+
+  it("prefers less crowded roam targets to fill open space", () => {
+    const baselineBug = new BugEntity({
+      heading: 0,
+      size: 10,
+      variant: "low",
+      vx: 0,
+      vy: 0,
+      x: 110,
+      y: 80,
+    });
+    const crowdedBug = new BugEntity({
+      heading: 0,
+      size: 10,
+      variant: "low",
+      vx: 0,
+      vy: 0,
+      x: 110,
+      y: 80,
+    });
+
+    baselineBug.update(1 / 60, {
+      bounds: { width: 220, height: 160 },
+      config: DEFAULT_GAME_CONFIG,
+      getNeighbors: () => [],
+    });
+
+    crowdedBug.update(1 / 60, {
+      bounds: { width: 220, height: 160 },
+      config: DEFAULT_GAME_CONFIG,
+      getCrowdingAt: (x, y) => ({
+        centerX: x,
+        centerY: y,
+        count: x > 80 && x < 140 && y > 45 && y < 115 ? 8 : 0,
+        score: x > 80 && x < 140 && y > 45 && y < 115 ? 8 : 0,
+      }),
+      getNeighbors: () => [],
+    });
+
+    const baselineEdgeDistance = Math.max(
+      Math.abs((baselineBug.roamTargetX ?? 110) / 220 - 0.5),
+      Math.abs((baselineBug.roamTargetY ?? 80) / 160 - 0.5),
+    );
+    const crowdedEdgeDistance = Math.max(
+      Math.abs((crowdedBug.roamTargetX ?? 110) / 220 - 0.5),
+      Math.abs((crowdedBug.roamTargetY ?? 80) / 160 - 0.5),
+    );
+
+    expect(crowdedEdgeDistance).toBeGreaterThanOrEqual(baselineEdgeDistance);
+  });
+
+  it("pushes roam targets away from a broad overloaded zone", () => {
+    const crowdedCenterX = 92;
+    const bug = new BugEntity({
+      heading: 0,
+      size: 10,
+      variant: "high",
+      vx: 0,
+      vy: 0,
+      x: 110,
+      y: 80,
+    });
+
+    bug.update(1 / 60, {
+      bounds: { width: 220, height: 160 },
+      config: DEFAULT_GAME_CONFIG,
+      getCrowdingAt: (x, y, radius) => {
+        if (radius > 150) {
+          return {
+            centerX: crowdedCenterX,
+            centerY: 80,
+            count: x < 130 ? 14 : 4,
+            score: x < 130 ? 7.4 : 1.2,
+          };
+        }
+
+        return {
+          centerX: x,
+          centerY: y,
+          count: x < 130 ? 6 : 0,
+          score: x < 130 ? 3.6 : 0.1,
+        };
+      },
+      getNeighbors: () => [],
+    });
+
+    expect((bug.roamTargetX ?? bug.x) - crowdedCenterX).toBeGreaterThan(bug.x - crowdedCenterX);
+  });
+
+  it("applies crawl profile speed multipliers", () => {
+    const codex = cloneCodex(BUG_CODEX);
+    codex.low.profile.speedMultiplier = 2;
+    codex.medium.profile.speedMultiplier = 0.5;
+    setCodex(codex);
+    const fastBug = new BugEntity({
+      heading: 0,
+      size: 10,
+      variant: "low",
+      vx: 0,
+      vy: 0,
+      x: 100,
+      y: 80,
+    });
+    const slowBug = new BugEntity({
+      heading: 0,
+      size: 10,
+      variant: "medium",
+      vx: 0,
+      vy: 0,
+      x: 100,
+      y: 80,
+    });
+    const context = {
+      bounds: { width: 220, height: 160 },
+      config: DEFAULT_GAME_CONFIG,
+      getNeighbors: () => [],
+    };
+
+    fastBug.update(1 / 60, context);
+    slowBug.update(1 / 60, context);
+
+    expect(Math.hypot(fastBug.vx, fastBug.vy)).toBeGreaterThan(
+      Math.hypot(slowBug.vx, slowBug.vy) * 2,
+    );
+  });
+
   it("steers away from local crowding", () => {
     const bug = new BugEntity({
       heading: 0,
@@ -163,16 +310,46 @@ describe("bug movement", () => {
     expect(Math.abs(bug.vy)).toBeGreaterThan(0.01);
   });
 
+  it("lingers near a roam anchor before retargeting", () => {
+    const bug = new BugEntity({
+      heading: 0,
+      size: 10,
+      variant: "low",
+      vx: 0,
+      vy: 0,
+      x: 100,
+      y: 80,
+    });
+    const originalTargetX = 102;
+    const originalTargetY = 80;
+
+    bug.roamTargetX = originalTargetX;
+    bug.roamTargetY = originalTargetY;
+    bug.nextRoamTargetAt = performance.now() + 10_000;
+
+    bug.update(1 / 60, {
+      bounds: { width: 220, height: 160 },
+      config: DEFAULT_GAME_CONFIG,
+      getNeighbors: () => [],
+    });
+
+    expect(bug.roamTargetX).toBe(originalTargetX);
+    expect(bug.roamTargetY).toBe(originalTargetY);
+    expect(bug.roamLoiterUntil).toBeGreaterThan(performance.now());
+  });
+
   it("resets stale roam anchors when revived", () => {
     const bug = new BugEntity({ size: 10, variant: "low", x: 100, y: 80 });
     bug.roamTargetX = 999;
     bug.roamTargetY = 999;
     bug.nextRoamTargetAt = performance.now() + 10_000;
+    bug.roamLoiterUntil = performance.now() + 500;
 
     bug.revive(220, 160);
 
     expect(bug.roamTargetX).toBeNull();
     expect(bug.roamTargetY).toBeNull();
     expect(bug.nextRoamTargetAt).toBe(0);
+    expect(bug.roamLoiterUntil).toBe(0);
   });
 });
