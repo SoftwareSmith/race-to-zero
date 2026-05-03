@@ -471,6 +471,7 @@ export class BugEntity extends Entity {
     targetY: number,
     config: typeof DEFAULT_GAME_CONFIG,
     cursorHoverRepelMultiplier: number,
+    cursorTangentStrength: number,
   ) {
     const away = normalizeVector(this.x - targetX, this.y - targetY);
     const distance = getLength(this.x - targetX, this.y - targetY);
@@ -500,7 +501,8 @@ export class BugEntity extends Entity {
     const directForce =
       (0.12 + cursorHoverRepelMultiplier * 0.9) +
       pressure * (0.94 + cursorHoverRepelMultiplier * 3.1);
-    const lateralForce = pressure * (0.12 + cursorHoverRepelMultiplier * 0.68);
+    const lateralForce =
+      pressure * (0.02 + cursorHoverRepelMultiplier * 0.12) * cursorTangentStrength;
     const immediateThreatThreshold = Math.max(
       0.05,
       0.19 - cursorHoverRepelMultiplier * 0.034,
@@ -512,6 +514,56 @@ export class BugEntity extends Entity {
       steerX: away.x * directForce + lateral.x * scatter * lateralForce,
       steerY: away.y * directForce + lateral.y * scatter * lateralForce,
       immediateThreat: pressure > immediateThreatThreshold,
+    };
+  }
+
+  private getCornerEscapeSteering(
+    bounds: { width: number; height: number },
+    config: typeof DEFAULT_GAME_CONFIG,
+  ) {
+    const senseDistance = Math.max(
+      config.wallAvoidDistance * 1.55,
+      this.size * 3.2,
+      36,
+    );
+    const left = clamp((senseDistance - this.x) / senseDistance, 0, 1);
+    const right = clamp((senseDistance - (bounds.width - this.x)) / senseDistance, 0, 1);
+    const top = clamp((senseDistance - this.y) / senseDistance, 0, 1);
+    const bottom = clamp((senseDistance - (bounds.height - this.y)) / senseDistance, 0, 1);
+    const horizontalPressure = Math.max(left, right);
+    const verticalPressure = Math.max(top, bottom);
+    const cornerPressure = horizontalPressure * verticalPressure;
+
+    if (cornerPressure <= 0.04) {
+      return {
+        active: false,
+        cornerPressure: 0,
+        inwardX: 0,
+        inwardY: 0,
+        steerX: 0,
+        steerY: 0,
+      };
+    }
+
+    const inward = normalizeVector(left - right, top - bottom);
+    const tangentBase =
+      horizontalPressure >= verticalPressure
+        ? { x: 0, y: top > bottom ? 1 : -1 }
+        : { x: left > right ? 1 : -1, y: 0 };
+    const tangentSign = Math.sin(this.seed * 23.7 + this.motionTime * 0.9) >= 0 ? 1 : -1;
+    const tangent = {
+      x: tangentBase.x * tangentSign,
+      y: tangentBase.y * tangentSign,
+    };
+    const steerStrength = config.wallAvoidStrength * (1.35 + cornerPressure * 2.9);
+
+    return {
+      active: true,
+      cornerPressure,
+      inwardX: inward.x,
+      inwardY: inward.y,
+      steerX: inward.x * steerStrength + tangent.x * steerStrength * 0.14,
+      steerY: inward.y * steerStrength + tangent.y * steerStrength * 0.14,
     };
   }
 
@@ -1251,6 +1303,7 @@ export class BugEntity extends Entity {
     const cursorFleeMultiplier = profile?.cursorFleeMultiplier ?? 1;
     const cursorHoverRepelMultiplier =
       profile?.cursorHoverRepelMultiplier ?? cursorFleeMultiplier;
+    const cursorTangentStrength = profile?.cursorTangentStrength ?? 0.03;
     const turnMultiplier = profile?.turnMultiplier ?? 1;
     const wanderMultiplier = profile?.wanderMultiplier ?? 1;
     const noiseFrequency = profile?.noiseFrequency ?? 1;
@@ -1300,13 +1353,21 @@ export class BugEntity extends Entity {
     const targetY = ctx.targetY ?? null;
     const isAlly = this.isAllyActive(now);
     const isBurnPanicking = this.burn !== null && now < this.burn.expiresAt && this.burn.dps > 0.3;
+    const cornerEscape = this.getCornerEscapeSteering(bounds, config);
     const cursorRepel =
       !isAlly && targetX != null && targetY != null
-        ? this.getCursorRepelResponse(targetX, targetY, config, cursorHoverRepelMultiplier)
+        ? this.getCursorRepelResponse(
+            targetX,
+            targetY,
+            config,
+            cursorHoverRepelMultiplier,
+            cursorTangentStrength,
+          )
         : null;
     const hasThreat =
       !isAlly &&
-      cursorRepel?.immediateThreat === true;
+      cursorRepel?.immediateThreat === true &&
+      !cornerEscape.active;
 
     if (hasThreat) {
       this.state = "flee";
@@ -1327,6 +1388,14 @@ export class BugEntity extends Entity {
 
     desired.x += wallSteering.x;
     desired.y += wallSteering.y;
+    if (cornerEscape.active) {
+      desired.x += cornerEscape.steerX * 1.35;
+      desired.y += cornerEscape.steerY * 1.35;
+      this.nextRoamTargetAt = 0;
+    } else {
+      desired.x += cornerEscape.steerX;
+      desired.y += cornerEscape.steerY;
+    }
 
     const driftNoiseX = perlin1D(
       this.motionTime * 0.29 * noiseFrequency + this.seed * 11.3,
@@ -1553,19 +1622,44 @@ export class BugEntity extends Entity {
       }
     }
 
-    if (this.state === "flee" && targetX != null && targetY != null) {
+    if (this.state === "flee" && targetX != null && targetY != null && !cornerEscape.active) {
       const away = normalizeVector(this.x - targetX, this.y - targetY);
       const fleeForce = 2.6 + cursorFleeMultiplier * 1.45;
-      desired.x += away.x * fleeForce;
-      desired.y += away.y * fleeForce;
+      let fleeX = away.x * fleeForce;
+      let fleeY = away.y * fleeForce;
+
+      if (cornerEscape.active) {
+        const trappedProjection = fleeX * cornerEscape.inwardX + fleeY * cornerEscape.inwardY;
+        if (trappedProjection < 0) {
+          fleeX -= cornerEscape.inwardX * trappedProjection * 1.05;
+          fleeY -= cornerEscape.inwardY * trappedProjection * 1.05;
+        }
+        fleeX *= 1 - cornerEscape.cornerPressure * 0.42;
+        fleeY *= 1 - cornerEscape.cornerPressure * 0.42;
+      }
+
+      desired.x += fleeX;
+      desired.y += fleeY;
     }
 
     if (cursorRepel?.active) {
-      desired.x += cursorRepel.steerX;
-      desired.y += cursorRepel.steerY;
+      if (cornerEscape.active) {
+        if (this.nextRoamTargetAt === 0 || this.nextRoamTargetAt > now + 90) {
+          this.nextRoamTargetAt = now + 90;
+        }
+      } else {
+      let cursorSteerX = cursorRepel.steerX;
+      let cursorSteerY = cursorRepel.steerY;
 
-      if (this.nextRoamTargetAt === 0 || this.nextRoamTargetAt > now + 110) {
+      desired.x += cursorSteerX;
+      desired.y += cursorSteerY;
+
+      if (
+        cursorRepel.pressure > 0.42 &&
+        (this.nextRoamTargetAt === 0 || this.nextRoamTargetAt > now + 110)
+      ) {
         this.nextRoamTargetAt = now + 110;
+      }
       }
     }
 

@@ -22,6 +22,7 @@ export interface CrawlProfile {
   anchorBias: "any" | "interior" | "perimeter";
   chaosTangentStrength?: number;
   crowdTangentBias?: number;
+  cursorTangentStrength?: number;
   cursorFleeMultiplier?: number;
   cursorHoverRepelMultiplier?: number;
   edgePreference: number;
@@ -186,6 +187,7 @@ export const BUG_VARIANT_DEFS: Record<BugVariant, BugVariantDef> = {
       chaosTangentStrength: 0.22,
       cursorFleeMultiplier: 1.2,
       cursorHoverRepelMultiplier: 0.2,
+      cursorTangentStrength: 0.02,
       crowdTangentBias: 1.16,
       edgePreference: 0.04,
       flowFieldStrength: 1.28,
@@ -266,6 +268,7 @@ export const BUG_VARIANT_DEFS: Record<BugVariant, BugVariantDef> = {
       chaosTangentStrength: 0.18,
       cursorFleeMultiplier: 1.85,
       cursorHoverRepelMultiplier: 0.72,
+      cursorTangentStrength: 0.03,
       crowdTangentBias: 1,
       edgePreference: 0.02,
       flowFieldStrength: 1.02,
@@ -338,6 +341,7 @@ export const BUG_VARIANT_DEFS: Record<BugVariant, BugVariantDef> = {
       chaosTangentStrength: 0.12,
       cursorFleeMultiplier: 2.9,
       cursorHoverRepelMultiplier: 2.05,
+      cursorTangentStrength: 0.02,
       crowdTangentBias: 0.82,
       edgePreference: 0.02,
       flowFieldStrength: 0.56,
@@ -422,6 +426,7 @@ export const BUG_VARIANT_DEFS: Record<BugVariant, BugVariantDef> = {
       chaosTangentStrength: 0.05,
       cursorFleeMultiplier: 4.6,
       cursorHoverRepelMultiplier: 4.55,
+      cursorTangentStrength: 0.04,
       crowdTangentBias: 0.4,
       edgePreference: 0.06,
       flowFieldStrength: 0.92,

@@ -92,6 +92,36 @@ describe("bug movement", () => {
     expect(Math.min(...tail.map((position) => position.y))).toBeGreaterThan(10);
   });
 
+  it("breaks out of corners while the cursor is herding it inward", () => {
+    const bug = new BugEntity({
+      heading: -Math.PI * 0.75,
+      size: 10,
+      variant: "low",
+      vx: -8,
+      vy: -8,
+      x: 10,
+      y: 10,
+    });
+    const positions: Array<{ x: number; y: number }> = [];
+
+    for (let index = 0; index < 150; index += 1) {
+      bug.update(1 / 60, {
+        bounds: { width: 220, height: 160 },
+        config: DEFAULT_GAME_CONFIG,
+        getNeighbors: () => [],
+        targetX: 38,
+        targetY: 38,
+      });
+      positions.push({ x: bug.x, y: bug.y });
+    }
+
+    const tail = positions.slice(-25);
+    expect(bug.x).toBeGreaterThan(22);
+    expect(bug.y).toBeGreaterThan(22);
+    expect(Math.min(...tail.map((position) => position.x))).toBeGreaterThan(14);
+    expect(Math.min(...tail.map((position) => position.y))).toBeGreaterThan(14);
+  });
+
   it("uses roam anchors instead of always steering at the exact center", () => {
     const bug = new BugEntity({
       heading: 0,
