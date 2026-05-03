@@ -211,9 +211,7 @@ const SiegeExperience = memo(function SiegeExperience({
               ? siegeGame.survivalStatus.runtimeSpeedMultiplier
               : 1
           }
-          gamePaused={
-            ui.openTopMenu === "codex" || !!siegeGame.completionSummary
-          }
+          gamePaused={siegeGame.isPaused}
           onWeaponFired={
             siegeGame.interactiveMode ? siegeGame.handleWeaponFired : undefined
           }
@@ -260,8 +258,11 @@ const SiegeExperience = memo(function SiegeExperience({
           onEndSurvival={siegeGame.triggerSurvivalOverrun}
           onKillAllBugs={siegeGame.killAllBugs}
           onSelectWeapon={siegeGame.selectWeapon}
+          onTogglePause={siegeGame.togglePause}
           onToggleCodex={() => ui.handleTopMenuToggle("codex")}
           onToggleDebugMode={siegeGame.toggleDebugMode}
+          focusPaused={siegeGame.isFocusPaused}
+          manuallyPaused={siegeGame.isManuallyPaused}
           selectedWeaponId={siegeGame.selectedWeaponId}
           streakMultiplier={siegeGame.streakMultiplier}
           survivalStatus={siegeGame.survivalStatus}

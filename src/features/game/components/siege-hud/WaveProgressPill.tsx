@@ -36,7 +36,7 @@ export default function WaveProgressPill({
   return (
     <div
       className={cn(
-        "relative isolate overflow-hidden rounded-full border border-sky-300/18 bg-black/28 px-3 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]",
+        "relative isolate overflow-hidden rounded-full border border-sky-300/14 bg-[linear-gradient(180deg,rgba(8,11,16,0.88),rgba(9,12,16,0.68))] px-3 py-2 shadow-[0_16px_34px_rgba(0,0,0,0.28),inset_0_1px_0_rgba(255,255,255,0.06)] backdrop-blur-xl",
         className,
       )}
       data-testid="siege-wave-loader-pill"

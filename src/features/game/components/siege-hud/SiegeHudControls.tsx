@@ -12,12 +12,15 @@ interface SiegeHudControlsProps {
   codexMenuRef?: RefObject<HTMLDivElement | null>;
   codexOpen: boolean;
   debugMode: boolean;
+  focusPaused?: boolean;
   gameMode: SiegeGameMode;
+  manuallyPaused?: boolean;
   onChangeGameMode?: (mode: SiegeGameMode) => void;
   onExit: () => void;
   onEndSurvival?: () => void;
   onKillAllBugs?: () => void;
   onToggleCodex?: () => void;
+  onTogglePause?: () => void;
   onToggleDebugMode?: () => void;
   onPointerEnterHud: () => void;
   onPointerLeaveHud: () => void;
@@ -38,16 +41,20 @@ const SiegeHudControls = memo(function SiegeHudControls({
   codexMenuRef,
   codexOpen,
   debugMode,
+  focusPaused = false,
   gameMode,
+  manuallyPaused = false,
   onChangeGameMode,
   onEndSurvival,
   onExit,
   onKillAllBugs,
   onToggleCodex,
+  onTogglePause,
   onToggleDebugMode,
   onPointerEnterHud,
   onPointerLeaveHud,
 }: SiegeHudControlsProps) {
+  const pauseActive = manuallyPaused || focusPaused;
   const codexTrigger = onToggleCodex ? (
     <Tooltip content="Open codex">
       <HudActionButton
@@ -73,6 +80,44 @@ const SiegeHudControls = memo(function SiegeHudControls({
     </Tooltip>
   ) : null;
   const controlActions: HudControlAction[] = [
+    ...(gameMode === "outbreak" && onTogglePause
+      ? [
+          {
+            active: pauseActive,
+            ariaLabel: pauseActive ? "Resume survival" : "Pause survival",
+            icon: pauseActive ? (
+              <svg
+                aria-hidden="true"
+                className="h-3.5 w-3.5"
+                fill="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path d="M8 6.5v11l8.5-5.5L8 6.5Z" />
+              </svg>
+            ) : (
+              <svg
+                aria-hidden="true"
+                className="h-3.5 w-3.5"
+                fill="none"
+                stroke="currentColor"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth="1.8"
+                viewBox="0 0 24 24"
+              >
+                <path d="M9 5.5v13" />
+                <path d="M15 5.5v13" />
+              </svg>
+            ),
+            key: "pause",
+            onClick: onTogglePause,
+            tone: "info" as const,
+            tooltip: pauseActive
+              ? "Resume the current Survival run"
+              : "Pause the current Survival run",
+          },
+        ]
+      : []),
     ...(onToggleDebugMode
       ? [
           {

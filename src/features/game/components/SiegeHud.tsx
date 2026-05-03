@@ -19,6 +19,7 @@ interface SiegeHudProps {
   codexOpen?: boolean;
   debugMode?: boolean;
   elapsedMs?: number;
+  focusPaused?: boolean;
   gameMode: SiegeGameMode;
   interactiveKills: number;
   interactivePoints: number;
@@ -26,6 +27,7 @@ interface SiegeHudProps {
   justEvolvedWeaponId?: SiegeWeaponId | null;
   killStreak: number;
   lastFireTimes?: Partial<Record<SiegeWeaponId, number>>;
+  manuallyPaused?: boolean;
   nextWeaponUnlock?: {
     current: number;
     remaining: number;
@@ -38,6 +40,7 @@ interface SiegeHudProps {
   onEndSurvival?: () => void;
   onKillAllBugs?: () => void;
   onToggleCodex?: () => void;
+  onTogglePause?: () => void;
   onSelectWeapon: (id: SiegeWeaponId) => void;
   onToggleDebugMode?: () => void;
   selectedWeaponId: SiegeWeaponId;
@@ -69,17 +72,20 @@ export default function SiegeHud({
   codexOpen = false,
   debugMode = false,
   elapsedMs = 0,
+  focusPaused = false,
   gameMode,
   interactiveKills,
   interactiveRemainingBugs,
   justEvolvedWeaponId,
   killStreak,
   lastFireTimes,
+  manuallyPaused = false,
   onChangeGameMode,
   onEndSurvival,
   onExit,
   onKillAllBugs,
   onToggleCodex,
+  onTogglePause,
   onSelectWeapon,
   onToggleDebugMode,
   selectedWeaponId,
@@ -143,6 +149,11 @@ export default function SiegeHud({
     survivalStatus?.secondsUntilOffline != null
       ? "The site is taking breach damage. This timer shows how long until the run ends if pressure stays this high."
       : "Overall site health. If bug pressure overwhelms the defense threshold, this converts into a time-to-offline countdown.";
+  const pauseStatusLabel = focusPaused
+    ? "Paused • Screen inactive"
+    : manuallyPaused
+      ? "Paused"
+      : null;
 
   useEffect(() => {
     return () => {
@@ -223,64 +234,47 @@ export default function SiegeHud({
     >
       {isSurvival ? (
         <div className="pointer-events-none fixed inset-x-0 top-3 z-[220] flex justify-start px-3 sm:top-4">
-          <HudShell className="pointer-events-auto border-transparent bg-[linear-gradient(180deg,rgba(8,11,16,0.88),rgba(9,12,16,0.68))] overflow-visible px-1.5 py-1.5 shadow-[0_18px_42px_rgba(0,0,0,0.34)] [animation:hud-notch-arrive_320ms_cubic-bezier(0.22,1,0.36,1)_forwards]">
-            <div className="grid min-w-0 grid-cols-[minmax(12rem,18rem)_minmax(0,7.8rem)] gap-1">
-              <WaveProgressPill
-                activeBugLimit={survivalStatus?.activeBugLimit ?? 0}
-                focusLabel={survivalStatus?.focusLabel ?? "Bug rush"}
-                progressPercent={survivalStatus?.waveProgressPercent ?? 0}
-                remainingSpawnBudget={survivalStatus?.remainingSpawnBudget ?? 0}
-                secondsUntilNextWave={
-                  survivalStatus?.secondsUntilNextWave ?? null
-                }
-                spawnRatePerSecond={survivalStatus?.spawnRatePerSecond ?? 0}
-                tacticLabel={survivalStatus?.tacticLabel ?? "Opening wave"}
-                wave={survivalStatus?.wave ?? 1}
-              />
-              <div className="sr-only" data-testid="siege-wave-stat">
-                <span className="block text-[0.48rem] font-semibold uppercase tracking-[0.14em] text-emerald-100/65">
-                  Wave
-                </span>
-                <strong className="mt-1 block font-display text-[0.88rem] leading-none tracking-[-0.04em] text-stone-50">
-                  {waveLabel}
+          <div className="pointer-events-auto flex w-full max-w-[33rem] flex-wrap items-stretch gap-2 [animation:hud-notch-arrive_320ms_cubic-bezier(0.22,1,0.36,1)_forwards]">
+            <WaveProgressPill
+              activeBugLimit={survivalStatus?.activeBugLimit ?? 0}
+              className="min-w-[15rem] flex-1"
+              focusLabel={survivalStatus?.focusLabel ?? "Bug rush"}
+              progressPercent={survivalStatus?.waveProgressPercent ?? 0}
+              remainingSpawnBudget={survivalStatus?.remainingSpawnBudget ?? 0}
+              secondsUntilNextWave={survivalStatus?.secondsUntilNextWave ?? null}
+              spawnRatePerSecond={survivalStatus?.spawnRatePerSecond ?? 0}
+              tacticLabel={survivalStatus?.tacticLabel ?? "Opening wave"}
+              wave={survivalStatus?.wave ?? 1}
+            />
+
+            <div
+              className="min-w-[8.25rem] flex-[0_1_8.75rem] rounded-full border border-white/10 bg-[linear-gradient(180deg,rgba(8,11,16,0.88),rgba(9,12,16,0.68))] px-3 py-2 shadow-[0_16px_34px_rgba(0,0,0,0.28)] backdrop-blur-xl"
+              data-testid="siege-offline-pressure"
+            >
+              <div className="flex items-center justify-between gap-2">
+                <Tooltip
+                  content={survivalIntegrityTooltip}
+                  triggerClassName="inline-flex items-center text-[0.48rem] font-semibold uppercase tracking-[0.14em] text-stone-400"
+                >
+                  <span>{survivalIntegrityLabel}</span>
+                </Tooltip>
+                <strong className="font-display text-[0.82rem] leading-none tracking-[-0.04em] text-stone-50">
+                  {survivalStatus?.secondsUntilOffline != null
+                    ? `${survivalStatus.secondsUntilOffline}s`
+                    : `${survivalIntegrityPercent}%`}
                 </strong>
               </div>
-
-              <div className="sr-only" data-testid="siege-spawn-rate-stat">
-                <span className="block text-[0.48rem] font-semibold uppercase tracking-[0.14em] text-amber-100/65">
-                  Rate
-                </span>
-                <strong className="mt-1 block font-display text-[0.88rem] leading-none tracking-[-0.04em] text-stone-50">
-                  {spawnRateLabel}
-                </strong>
+              <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-red-950/60">
+                <div
+                  className="h-full rounded-full bg-[linear-gradient(90deg,#34d399,#7dd3fc)] transition-[width] duration-300"
+                  style={{ width: `${survivalIntegrityPercent}%` }}
+                />
               </div>
-
-              <div
-                className="rounded-full border border-white/10 bg-black/22 px-2 py-1.5"
-                data-testid="siege-offline-pressure"
-              >
-                <div className="flex items-center justify-between gap-2">
-                  <Tooltip
-                    content={survivalIntegrityTooltip}
-                    triggerClassName="inline-flex items-center text-[0.48rem] font-semibold uppercase tracking-[0.14em] text-stone-400"
-                  >
-                    <span>{survivalIntegrityLabel}</span>
-                  </Tooltip>
-                  <strong className="font-display text-[0.76rem] leading-none tracking-[-0.04em] text-stone-50">
-                    {survivalStatus?.secondsUntilOffline != null
-                      ? `${survivalStatus.secondsUntilOffline}s`
-                      : `${survivalIntegrityPercent}%`}
-                  </strong>
-                </div>
-                <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-red-950/60">
-                  <div
-                    className="h-full rounded-full bg-[linear-gradient(90deg,#34d399,#7dd3fc)] transition-[width] duration-300"
-                    style={{ width: `${survivalIntegrityPercent}%` }}
-                  />
-                </div>
+              <div className="mt-1 text-[0.5rem] font-semibold uppercase tracking-[0.14em] text-stone-400">
+                {waveLabel} • {spawnRateLabel}
               </div>
             </div>
-          </HudShell>
+          </div>
         </div>
       ) : null}
 
@@ -290,12 +284,15 @@ export default function SiegeHud({
             codexMenuRef={codexMenuRef}
             codexOpen={codexOpen}
             debugMode={debugMode}
+            focusPaused={focusPaused}
             gameMode={gameMode}
+            manuallyPaused={manuallyPaused}
             onChangeGameMode={onChangeGameMode}
             onExit={onExit}
             onEndSurvival={onEndSurvival}
             onKillAllBugs={onKillAllBugs}
             onToggleCodex={onToggleCodex}
+            onTogglePause={onTogglePause}
             onToggleDebugMode={onToggleDebugMode}
             onPointerEnterHud={showSystemCursor}
             onPointerLeaveHud={hideSystemCursor}
@@ -386,6 +383,7 @@ export default function SiegeHud({
       {killStreak >= 3 ||
       unlockToast ||
       upgradeToast ||
+      pauseStatusLabel ||
       survivalWaveToast ||
       survivalWarningLabel ? (
         <div className="pointer-events-none fixed inset-x-0 top-[7.15rem] z-[220] flex justify-center px-3 sm:top-[5.95rem]">
@@ -403,6 +401,11 @@ export default function SiegeHud({
             {upgradeToast ? (
               <HudEventPill className="border-orange-300/24 bg-red-500/10 text-orange-100 [animation:evolve-toast_2200ms_ease_forwards]">
                 {upgradeToast}
+              </HudEventPill>
+            ) : null}
+            {pauseStatusLabel ? (
+              <HudEventPill className="border-sky-300/24 bg-sky-300/10 text-sky-100">
+                <span data-testid="siege-pause-status">{pauseStatusLabel}</span>
               </HudEventPill>
             ) : null}
             {survivalWaveToast ? (
