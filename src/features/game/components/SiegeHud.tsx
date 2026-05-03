@@ -136,7 +136,9 @@ export default function SiegeHud({
       ? `Site critical • ${survivalStatus.secondsUntilOffline}s to offline`
       : null;
   const survivalIntegrityLabel =
-    survivalStatus?.secondsUntilOffline != null ? "Offline ETA" : "Site integrity";
+    survivalStatus?.secondsUntilOffline != null
+      ? "Offline ETA"
+      : "Site integrity";
   const survivalIntegrityTooltip =
     survivalStatus?.secondsUntilOffline != null
       ? "The site is taking breach damage. This timer shows how long until the run ends if pressure stays this high."
