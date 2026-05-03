@@ -168,6 +168,12 @@ const SiegeExperience = memo(function SiegeExperience({
 
   const backgroundChartFocus = siegeGame.interactiveMode ? ui.chartFocus : null;
   const shouldRenderSiegeField = siegeGame.siegePhase !== "idle";
+  const siegeFieldClassName =
+    siegeGame.siegePhase === "exiting"
+      ? "z-30 opacity-0 transition-opacity duration-300 ease-out"
+      : siegeGame.interactiveMode
+        ? "z-30 opacity-100 transition-opacity duration-300 ease-out"
+        : "z-0 opacity-100 transition-opacity duration-300 ease-out";
 
   return (
     <>
@@ -176,7 +182,7 @@ const SiegeExperience = memo(function SiegeExperience({
           bugCounts={siegeGame.displayedBugCounts}
           bugVisualSettings={settings.bugVisualSettings}
           chartFocus={backgroundChartFocus}
-          className={siegeGame.interactiveMode ? "z-30" : "z-0"}
+          className={siegeFieldClassName}
           combatStats={siegeGame.interactiveMode ? siegeGame.combatStats : null}
           gameMode={siegeGame.gameMode}
           gameConfig={settings.gameConfig}

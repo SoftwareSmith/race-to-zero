@@ -774,6 +774,7 @@ export class BugEntity extends Entity {
     crowdScore: number,
     config: typeof DEFAULT_GAME_CONFIG,
     wanderMultiplier: number,
+    chaosTangentStrength: number,
   ) {
     const crowdPressure = clamp(
       crowdScore / Math.max(config.crowdRepathThreshold, 1),
@@ -815,8 +816,8 @@ export class BugEntity extends Entity {
         (0.52 + crowdPressure * 0.18);
 
     return {
-      x: tangent.x * turbulence * 0.18 + scatter.x * turbulence * surge,
-      y: tangent.y * turbulence * 0.18 + scatter.y * turbulence * surge,
+      x: tangent.x * turbulence * chaosTangentStrength + scatter.x * turbulence * surge,
+      y: tangent.y * turbulence * chaosTangentStrength + scatter.y * turbulence * surge,
     };
   }
 
@@ -1257,9 +1258,11 @@ export class BugEntity extends Entity {
     const noiseLateralStrength = 0.65 + (profile?.noiseLateralStrength ?? 0.5);
     const noiseTurnStrength = profile?.noiseTurnStrength ?? 1;
     const separationMultiplier = profile?.separationMultiplier ?? 1;
+    const chaosTangentStrength = profile?.chaosTangentStrength ?? 0.18;
     const flowFieldStrength = profile?.flowFieldStrength ?? 1;
     const localAvoidanceStrength = profile?.localAvoidanceStrength ?? 1;
     const crowdTangentBiasScale = profile?.crowdTangentBias ?? 1;
+    const targetOrbitStrength = profile?.targetOrbitStrength ?? 0.1;
 
     if (this.state === EntityState.Dying) {
       this.deathProgress += dt / this.deathDuration;
@@ -1411,6 +1414,7 @@ export class BugEntity extends Entity {
         crowding?.score ?? 0,
         config,
         wanderMultiplier,
+        chaosTangentStrength,
       );
       desired.x += chaosSteering.x;
       desired.y += chaosSteering.y;
@@ -1443,7 +1447,7 @@ export class BugEntity extends Entity {
         const radialPressure = clamp(targetDistance / loiterRadius, 0, 1);
         const orbitStrength = this.roamTargetLongPath
           ? 0
-          : config.followStrength * (0.01 + radialPressure * 0.03);
+          : config.followStrength * targetOrbitStrength * (0.08 + radialPressure * 0.22);
         const inwardCorrection = config.followStrength * (0.16 + (1 - radialPressure) * 0.12);
         const forwardCarry = 0.05 + (1 - radialPressure) * 0.04;
         const driftStrength = 0.02 + wanderMultiplier * 0.014;
