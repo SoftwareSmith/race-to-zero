@@ -34,6 +34,9 @@ export interface SurvivalPressureResult {
   secondsUntilOffline: number | null;
 }
 
+const SURVIVAL_CHIP_PRESSURE_START = 0.52;
+const SURVIVAL_CHIP_DAMAGE_SCALE = 0.55;
+
 export interface SurvivalSpawnAccumulatorInput {
   accumulator: number;
   activeBugCount: number;
@@ -214,11 +217,25 @@ export function getSurvivalPressure({
   const pressurePercent = Math.round(
     clamp((activeBugCount / Math.max(1, plan.pressureThreshold)) * 100, 0, 250),
   );
+  const pressureRatio = activeBugCount / Math.max(1, plan.pressureThreshold);
+  const chipPressureRatio = clamp(
+    (pressureRatio - SURVIVAL_CHIP_PRESSURE_START) /
+      Math.max(1 - SURVIVAL_CHIP_PRESSURE_START, 0.01),
+    0,
+    1,
+  );
   const overloadRatio = overloadedBy / Math.max(1, plan.pressureThreshold);
-  const damagePerSecond =
-    overloadedBy > 0
-      ? Number((plan.offlineDamagePerSecond * (0.45 + overloadRatio)).toFixed(2))
+  const chipDamagePerSecond =
+    chipPressureRatio > 0
+      ? plan.offlineDamagePerSecond * chipPressureRatio * SURVIVAL_CHIP_DAMAGE_SCALE
       : 0;
+  const overloadDamagePerSecond =
+    overloadedBy > 0
+      ? plan.offlineDamagePerSecond * (0.35 + overloadRatio * 1.05)
+      : 0;
+  const damagePerSecond = Number(
+    (chipDamagePerSecond + overloadDamagePerSecond).toFixed(2),
+  );
 
   return {
     damagePerSecond,

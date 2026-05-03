@@ -353,6 +353,81 @@ describe("useSiegeGame", () => {
     expect(result.current.survivalStatus.remainingSpawnBudget).toBeLessThanOrEqual(initialBudget);
   });
 
+  it("keeps the survival wave loader advancing after a wave transition", async () => {
+    vi.useFakeTimers();
+    const qaWindow = window as Window & {
+      __RTZ_QA__?: {
+        enabled?: boolean;
+        setSurvivalState?: (state: { completeWave?: boolean }) => void;
+      };
+    };
+    qaWindow.__RTZ_QA__ = { enabled: true };
+
+    const { result } = renderHook(() =>
+      useSiegeGame({
+        currentBugCount: 20,
+        currentBugCounts: { high: 0, low: 20, medium: 0, urgent: 0 },
+        evolutionStates: {},
+      }),
+    );
+
+    act(() => {
+      result.current.enterInteractiveMode("outbreak");
+      vi.advanceTimersByTime(520);
+    });
+
+    act(() => {
+      vi.advanceTimersByTime(1);
+    });
+
+    expect(qaWindow.__RTZ_QA__?.setSurvivalState).toEqual(expect.any(Function));
+
+    act(() => {
+      qaWindow.__RTZ_QA__?.setSurvivalState?.({ completeWave: true });
+    });
+
+    expect(result.current.survivalStatus.wave).toBe(2);
+
+    const progressAtWaveStart = result.current.survivalStatus.waveProgressPercent;
+
+    act(() => {
+      vi.advanceTimersByTime(1_500);
+    });
+
+    expect(result.current.survivalStatus.waveProgressPercent).toBeGreaterThan(
+      progressAtWaveStart,
+    );
+
+    delete qaWindow.__RTZ_QA__;
+  });
+
+  it("chips survival integrity down under sustained heavy pressure before overload", async () => {
+    vi.useFakeTimers();
+
+    const { result } = renderHook(() =>
+      useSiegeGame({
+        currentBugCount: 20,
+        currentBugCounts: { high: 0, low: 20, medium: 0, urgent: 0 },
+        evolutionStates: {},
+      }),
+    );
+
+    act(() => {
+      result.current.enterInteractiveMode("outbreak");
+      vi.advanceTimersByTime(520);
+      result.current.syncRemainingBugs(280);
+    });
+
+    const startingIntegrity = result.current.survivalStatus.siteIntegrity;
+
+    act(() => {
+      vi.advanceTimersByTime(2_000);
+    });
+
+    expect(result.current.survivalStatus.siteIntegrity).toBeLessThan(startingIntegrity);
+    expect(result.current.survivalStatus.secondsUntilOffline).toBeGreaterThan(0);
+  });
+
   it("advances the timer during an active run", async () => {
     const { result } = renderHook(() =>
       useSiegeGame({

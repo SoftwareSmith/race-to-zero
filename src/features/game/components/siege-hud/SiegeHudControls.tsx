@@ -15,6 +15,7 @@ interface SiegeHudControlsProps {
   gameMode: SiegeGameMode;
   onChangeGameMode?: (mode: SiegeGameMode) => void;
   onExit: () => void;
+  onEndSurvival?: () => void;
   onKillAllBugs?: () => void;
   onToggleCodex?: () => void;
   onToggleDebugMode?: () => void;
@@ -39,6 +40,7 @@ const SiegeHudControls = memo(function SiegeHudControls({
   debugMode,
   gameMode,
   onChangeGameMode,
+  onEndSurvival,
   onExit,
   onKillAllBugs,
   onToggleCodex,
@@ -125,6 +127,32 @@ const SiegeHudControls = memo(function SiegeHudControls({
             onClick: onKillAllBugs,
             tone: "danger" as const,
             tooltip: "Clear the current swarm and trigger completion state",
+          },
+        ]
+      : []),
+    ...(debugMode && onEndSurvival && gameMode === "outbreak"
+      ? [
+          {
+            ariaLabel: "Force survival overrun",
+            icon: (
+              <svg
+                aria-hidden="true"
+                className="h-3.5 w-3.5"
+                fill="none"
+                stroke="currentColor"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth="1.8"
+                viewBox="0 0 24 24"
+              >
+                <path d="M18.36 6.64a9 9 0 1 1-12.73 0" />
+                <line x1="12" y1="2" x2="12" y2="12" />
+              </svg>
+            ),
+            key: "end-survival",
+            onClick: onEndSurvival,
+            tone: "danger" as const,
+            tooltip: "Force the site offline and view the overrun modal",
           },
         ]
       : []),

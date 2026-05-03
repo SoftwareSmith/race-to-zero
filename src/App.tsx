@@ -45,9 +45,7 @@ function AppContent() {
     interactiveMode: false,
     siegePhase: "idle",
   });
-  const shouldRenderDashboard =
-    shellState.siegePhase === "idle" || shellState.siegePhase === "entering";
-  const shouldRenderAmbient = shellState.siegePhase === "idle";
+  const shouldRenderDashboard = shellState.siegePhase !== "active";
   const stableTransitionSnapshot = useMemo(
     () => transitionSnapshot,
     [transitionSnapshot],
@@ -72,14 +70,20 @@ function AppContent() {
     <div className="relative h-screen overflow-hidden bg-[#050608] text-stone-100">
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(74,222,128,0.08),transparent_28%),radial-gradient(circle_at_bottom_right,rgba(56,189,248,0.12),transparent_26%),linear-gradient(180deg,#020304_0%,#050608_44%,#080d12_100%)]" />
       <div className="pointer-events-none absolute inset-x-[12%] top-[-18%] h-[42vh] rounded-full bg-[radial-gradient(circle,rgba(244,114,182,0.14),transparent_62%)] blur-3xl" />
-      {shouldRenderAmbient ? (
+      <div
+        className={
+          shellState.siegePhase === "active"
+            ? "pointer-events-none absolute inset-0 opacity-0 transition-opacity duration-300 ease-out"
+            : "pointer-events-none absolute inset-0 opacity-100 transition-opacity duration-300 ease-out"
+        }
+      >
         <Suspense fallback={null}>
           <AmbientBackgroundHarness
             ref={ambientFieldRef}
             fullDensity={ambientPerfMode}
           />
         </Suspense>
-      ) : null}
+      </div>
       {siegeMounted ? (
         <Suspense fallback={null}>
           <SiegeExperience

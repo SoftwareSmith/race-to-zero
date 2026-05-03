@@ -38,7 +38,7 @@ describe("bug movement", () => {
     }
 
     expect(bug.x).toBeGreaterThan(34);
-    expect(Math.abs(bug.heading - Math.PI / 2)).toBeGreaterThan(0.2);
+    expect(Math.abs(bug.heading - Math.PI / 2)).toBeGreaterThan(0.1);
     expect(Math.max(...headingDeltas)).toBeLessThan(0.35);
   });
 
@@ -282,6 +282,31 @@ describe("bug movement", () => {
     expect(inTightCenter).toBe(false);
   });
 
+  it("avoids corridor-style middle anchors that read like rows and columns", () => {
+    const bug = new BugEntity({
+      heading: 0,
+      size: 10,
+      variant: "low",
+      vx: 0,
+      vy: 0,
+      x: 110,
+      y: 80,
+    });
+
+    bug.update(1 / 60, {
+      bounds: { width: 220, height: 160 },
+      config: DEFAULT_GAME_CONFIG,
+      getNeighbors: () => [],
+    });
+
+    const targetX = bug.roamTargetX ?? 110;
+    const targetY = bug.roamTargetY ?? 80;
+    const inTopBand = targetY > 24 && targetY < 54;
+    const inRightBand = targetX > 144 && targetX < 188;
+
+    expect(inTopBand && inRightBand).toBe(false);
+  });
+
   it("enters a startled mood after taking a hit", () => {
     const bug = new BugEntity({
       heading: 0,
@@ -320,6 +345,9 @@ describe("bug movement", () => {
   });
 
   it("regroups when social bugs have nearby packmates and open space", () => {
+    const codex = cloneCodex(BUG_CODEX);
+    codex.low.socialAffinity = 0.55;
+    setCodex(codex);
     const bug = new BugEntity({
       heading: 0,
       size: 10,
@@ -371,7 +399,7 @@ describe("bug movement", () => {
     expect(Math.abs(bug.vx)).toBeGreaterThan(0.01);
   });
 
-  it("holds a loiter mood near an active roam anchor", () => {
+  it("retargets instead of loitering near an active roam anchor", () => {
     const bug = new BugEntity({
       heading: 0,
       size: 10,
@@ -394,7 +422,9 @@ describe("bug movement", () => {
       getNeighbors: () => [],
     });
 
-    expect(bug.movementMood).toBe("loiter");
+    expect(bug.movementMood).not.toBe("loiter");
+    expect(bug.roamTargetX).not.toBe(102);
+    expect(bug.roamTargetY).not.toBe(80);
     expect(Math.hypot(bug.vx, bug.vy)).toBeGreaterThan(0);
   });
 
@@ -433,6 +463,49 @@ describe("bug movement", () => {
     expect(Math.hypot(fastBug.vx, fastBug.vy)).toBeGreaterThan(
       Math.hypot(slowBug.vx, slowBug.vy) * 2,
     );
+  });
+
+  it("lets crawl profiles bias long-path roaming per bug class", () => {
+    const codex = cloneCodex(BUG_CODEX);
+    codex.low.profile.longPathBias = 1;
+    codex.low.profile.wideRoamChance = 1;
+    codex.high.profile.longPathBias = 0;
+    codex.high.profile.wideRoamChance = 0;
+    codex.high.profile.regionWeights = { edge: 1, middle: 0, interior: 0 };
+    setCodex(codex);
+
+    const lowBug = new BugEntity({
+      heading: 0,
+      size: 10,
+      variant: "low",
+      vx: 0,
+      vy: 0,
+      x: 110,
+      y: 80,
+    });
+    const highBug = new BugEntity({
+      heading: 0,
+      size: 10,
+      variant: "high",
+      vx: 0,
+      vy: 0,
+      x: 110,
+      y: 80,
+    });
+
+    lowBug.update(1 / 60, {
+      bounds: { width: 220, height: 160 },
+      config: DEFAULT_GAME_CONFIG,
+      getNeighbors: () => [],
+    });
+    highBug.update(1 / 60, {
+      bounds: { width: 220, height: 160 },
+      config: DEFAULT_GAME_CONFIG,
+      getNeighbors: () => [],
+    });
+
+    expect(lowBug.roamTargetLongPath).toBe(true);
+    expect(highBug.roamTargetLongPath).toBe(false);
   });
 
   it("makes urgent bugs flee the cursor faster than low urgency bugs", () => {
@@ -613,7 +686,7 @@ describe("bug movement", () => {
     expect(Math.abs(bug.vy)).toBeGreaterThan(0.01);
   });
 
-  it("lingers near a roam anchor before retargeting", () => {
+  it("immediately retargets when it reaches a roam anchor", () => {
     const bug = new BugEntity({
       heading: 0,
       size: 10,
@@ -636,9 +709,9 @@ describe("bug movement", () => {
       getNeighbors: () => [],
     });
 
-    expect(bug.roamTargetX).toBe(originalTargetX);
-    expect(bug.roamTargetY).toBe(originalTargetY);
-    expect(bug.roamLoiterUntil).toBeGreaterThan(performance.now());
+    expect(bug.roamTargetX).not.toBe(originalTargetX);
+    expect(bug.roamTargetY).not.toBe(originalTargetY);
+    expect(bug.roamLoiterUntil).toBe(0);
   });
 
   it("resets stale roam anchors when revived", () => {

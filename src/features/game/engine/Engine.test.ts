@@ -351,13 +351,10 @@ describe("engine death attribution", () => {
 
   it("spawns survival bursts off-screen and sends them inward", () => {
     const randomSpy = vi.spyOn(Math, "random");
-    [
-      0, 0.5, 0.5, 0.5, 0.3, 0.4,
-      0.25, 0.5, 0.5, 0.5, 0.3, 0.4,
-      0.55, 0.5, 0.5, 0.5, 0.3, 0.4,
-      0.8, 0.5, 0.5, 0.5, 0.3, 0.4,
-    ].forEach((value) => {
-      randomSpy.mockReturnValueOnce(value);
+    let seed = 0;
+    randomSpy.mockImplementation(() => {
+      seed = (seed + 0.173) % 1;
+      return seed;
     });
 
     const engine = new Engine(createCanvas(), {
@@ -379,6 +376,35 @@ describe("engine death attribution", () => {
           (bug.x < 0 && bug.vx > 0),
       ),
     ).toBe(true);
+  });
+
+  it("fans larger survival bursts across multiple edge lanes", () => {
+    const randomSpy = vi.spyOn(Math, "random");
+    let seed = 0;
+    randomSpy.mockImplementation(() => {
+      seed = (seed + 0.137) % 1;
+      return seed;
+    });
+
+    const engine = new Engine(createCanvas(), {
+      height: 200,
+      width: 200,
+    });
+
+    engine.spawnBurst({ high: 2, low: 8, medium: 2, urgent: 2 });
+
+    const bugs = engine.getAllBugs() as BugEntity[];
+    const offscreenLanes = new Set(
+      bugs.map((bug) => {
+        if (bug.y < 0 || bug.y > 200) {
+          return `horizontal-${Math.round(bug.x / 24)}`;
+        }
+
+        return `vertical-${Math.round(bug.y / 24)}`;
+      }),
+    );
+
+    expect(offscreenLanes.size).toBeGreaterThan(4);
   });
 
   it.each(WEAPON_REGISTRY.map((weapon) => weapon.id))(

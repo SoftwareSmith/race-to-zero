@@ -31,7 +31,7 @@ export interface GameConfig {
 
 export const DEFAULT_GAME_CONFIG: GameConfig = {
   separationRadius: 28,
-  separationStrength: 0.14,
+  separationStrength: 0.17,
   wanderStrength: 0.2,
   baseSpeed: 20,
   sizeMultiplier: 1,
@@ -43,11 +43,11 @@ export const DEFAULT_GAME_CONFIG: GameConfig = {
   turnSpeed: 3.8,
   wallAvoidDistance: 28,
   wallAvoidStrength: 0.9,
-  crowdAvoidRadius: 96,
+  crowdAvoidRadius: 108,
   crowdRepathDelay: 0.2,
-  crowdRepathThreshold: 1.05,
-  crowdSteerStrength: 1.55,
-  crowdTargetPenalty: 68,
+  crowdRepathThreshold: 0.92,
+  crowdSteerStrength: 1.95,
+  crowdTargetPenalty: 58,
 };
 
 /**

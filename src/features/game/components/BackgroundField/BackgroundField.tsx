@@ -61,6 +61,7 @@ interface BackgroundFieldProps {
   streakMultiplier?: number;
   survivalSpawnPlan?: (SurvivalSpawnPlan & { sequenceId: number }) | null;
   runtimeSpeedMultiplier?: number;
+  gamePaused?: boolean;
   siegeZones?: SiegeZoneRect[];
   interactiveMode: boolean;
   tone: Tone;
@@ -105,6 +106,7 @@ const BackgroundField = memo(
         streakMultiplier = 1,
         survivalSpawnPlan = null,
         runtimeSpeedMultiplier = 1,
+        gamePaused = false,
         siegeZones = [],
         interactiveMode,
         gameConfig,
@@ -297,6 +299,7 @@ const BackgroundField = memo(
             streakMultiplier={streakMultiplier}
             survivalSpawnPlan={survivalSpawnPlan}
             runtimeSpeedMultiplier={runtimeSpeedMultiplier}
+            gamePaused={gamePaused}
             onWeaponFire={interactiveMode ? handleWeaponFire : undefined}
             hammerPositionRef={hammerPositionRef}
             getWeaponTier={getWeaponTier}

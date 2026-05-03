@@ -46,6 +46,8 @@ const STATUS_ORDER = [
   "In progress",
   "In review",
   "Deploy ready",
+  "Cancelled",
+  "Duplicated",
   "Other",
 ] as const;
 const OPEN_AGE_BUCKETS = [
@@ -86,9 +88,6 @@ function normalizeBugRecords(
 ): MetricsBug[] {
   return [...(source?.bugs ?? [])]
     .map((entry) => ({
-      archivedAt: entry.archivedAt || null,
-      autoClosedAt: entry.autoClosedAt || null,
-      canceledAt: entry.canceledAt || null,
       completedAt: entry.completedAt || null,
       createdAt: entry.createdAt,
       dueDate: entry.dueDate || null,
@@ -96,7 +95,6 @@ function normalizeBugRecords(
       stateName: entry.stateName ?? null,
       stateType: entry.stateType ?? null,
       teamKey: entry.teamKey ?? null,
-      updatedAt: entry.updatedAt || null,
     }))
     .filter((entry) => Boolean(entry.createdAt))
     .sort((left, right) => left.createdAt.localeCompare(right.createdAt));
@@ -201,42 +199,6 @@ function getLinearStatusLabel(bug: MetricsBug) {
   return "Other";
 }
 
-function getBacklogExitDate(bug: MetricsBug) {
-  const statusLabel = getLinearStatusLabel(bug);
-
-  if (bug.completedAt) {
-    return bug.completedAt;
-  }
-
-  if (statusLabel === "Cancelled" || statusLabel === "Duplicated") {
-    return bug.canceledAt || bug.autoClosedAt || bug.archivedAt || bug.updatedAt || null;
-  }
-
-  if (statusLabel === "Done") {
-    return bug.autoClosedAt || bug.archivedAt || bug.updatedAt || null;
-  }
-
-  return null;
-}
-
-function isActiveBacklogBug(bug: MetricsBug) {
-  const statusLabel = getLinearStatusLabel(bug);
-
-  if (statusLabel === "Done" || statusLabel === "Cancelled" || statusLabel === "Duplicated") {
-    return false;
-  }
-
-  return !getBacklogExitDate(bug);
-}
-
-function isActiveDueTrackedBug(bug: MetricsBug) {
-  if (!bug.dueDate) {
-    return false;
-  }
-
-  return isActiveBacklogBug(bug);
-}
-
 function buildStatusDistributionFromCounts(
   counts: Map<string, number>,
 ): StatusDistributionEntry[] {
@@ -255,7 +217,7 @@ function buildOpenAgeDistribution(
   );
 
   for (const bug of bugs) {
-    if (!isActiveBacklogBug(bug)) {
+    if (bug.completedAt) {
       continue;
     }
 
@@ -290,17 +252,10 @@ function buildSeriesFromField(
   bugs: MetricsBug[],
   fieldName: "completedAt" | "createdAt",
 ): DailyCountEntry[] {
-  return buildSeriesFromDateSelector(bugs, (bug) => bug[fieldName]);
-}
-
-function buildSeriesFromDateSelector(
-  bugs: MetricsBug[],
-  getDateValue: (bug: MetricsBug) => string | null | undefined,
-): DailyCountEntry[] {
   const countsByDay = new Map<string, number>();
 
   for (const bug of bugs) {
-    const value = getDateValue(bug);
+    const value = bug[fieldName];
     if (!value) {
       continue;
     }
@@ -459,15 +414,13 @@ function prepareMetricsSource(
   const bugs = normalizeBugRecords(source);
   const priorityCounts = new Map<string, number>();
   const statusCounts = new Map<string, number>();
-  const remainingSeriesSourceBugs = bugs.filter(
-    (bug) => getBacklogExitDate(bug) || isActiveBacklogBug(bug),
-  );
   let remainingBugs = 0;
 
   for (const bug of bugs) {
-    if (isActiveBacklogBug(bug)) {
-      const statusLabel = getLinearStatusLabel(bug);
-      statusCounts.set(statusLabel, (statusCounts.get(statusLabel) ?? 0) + 1);
+    const statusLabel = getLinearStatusLabel(bug);
+    statusCounts.set(statusLabel, (statusCounts.get(statusLabel) ?? 0) + 1);
+
+    if (!bug.completedAt) {
       remainingBugs += 1;
       const label = getPriorityLabel(bug.priority);
       priorityCounts.set(label, (priorityCounts.get(label) ?? 0) + 1);
@@ -475,14 +428,8 @@ function prepareMetricsSource(
   }
 
   const createdSeries = buildSeriesFromField(bugs, "createdAt");
-  const completedSeries = buildSeriesFromDateSelector(
-    remainingSeriesSourceBugs,
-    getBacklogExitDate,
-  );
-  const remainingSeries = buildRemainingSeries(
-    buildSeriesFromField(remainingSeriesSourceBugs, "createdAt"),
-    completedSeries,
-  );
+  const completedSeries = buildSeriesFromField(bugs, "completedAt");
+  const remainingSeries = buildRemainingSeries(createdSeries, completedSeries);
   const preparedSource: PreparedMetricsSource = {
     bugs,
     completedIndex: buildSeriesIndex(completedSeries),
@@ -704,12 +651,11 @@ function createEmptyInsightsPriorityMetrics(
   label: string,
 ): InsightsPriorityMetrics {
   return {
-    averageOverdueDays: 0,
+    averageBreachDays: 0,
     averageResolutionDays: 0,
-    overdueCompleted: 0,
+    breached: 0,
     eligible: 0,
     label,
-    medianOverdueDays: 0,
     medianResolutionDays: 0,
     missingDueDate: 0,
     onTime: 0,
@@ -721,13 +667,12 @@ function createEmptyInsightsPriorityMetrics(
 function finalizeInsightsPriorityMetrics(
   metrics: InsightsPriorityMetrics,
   resolutionDays: number[],
-  overdueDays: number[],
+  breachDays: number[],
 ) {
   return {
     ...metrics,
-    averageOverdueDays: getAverage(overdueDays),
+    averageBreachDays: getAverage(breachDays),
     averageResolutionDays: getAverage(resolutionDays),
-    medianOverdueDays: getMedian(overdueDays),
     medianResolutionDays: getMedian(resolutionDays),
     slaHitRate:
       metrics.eligible > 0 ? (metrics.onTime / metrics.eligible) * 100 : 0,
@@ -784,7 +729,7 @@ function getDeadlineStatus({
       tone: "positive" as Tone,
       signal: "Ahead",
       headline: "Ahead of the zero-bug pace",
-      body: "Recent closure velocity is offsetting new bugs and still reducing the backlog quickly enough to reach zero by the selected deadline if the same trend holds.",
+      body: "Recent fix velocity is offsetting new bugs and still reducing the backlog quickly enough to reach zero by the selected deadline if the same trend holds.",
     };
   }
 
@@ -1072,7 +1017,9 @@ export function buildPriorityChartData(
 export function buildStatusChartData(
   deadlineMetrics: DeadlineMetrics,
 ): ChartData<"bar", number[], string> {
-  const visibleStatusEntries = deadlineMetrics.statusDistribution;
+  const visibleStatusEntries = deadlineMetrics.statusDistribution.filter(
+    (entry) => entry.label !== "Done",
+  );
   const palette = [
     ["rgba(56, 189, 248, 0.74)", "#38bdf8"],
     ["rgba(45, 212, 191, 0.72)", "#2dd4bf"],
@@ -1113,7 +1060,7 @@ export function buildOpenAgeChartData(
     labels: ageDistribution.map((entry) => entry.label),
     datasets: [
       {
-        label: "Active bugs",
+        label: "Open bugs",
         data: ageDistribution.map((entry) => entry.count),
         backgroundColor: [
           "rgba(56, 189, 248, 0.72)",
@@ -1203,10 +1150,10 @@ export function getComparisonMetrics(
         : "neutral";
   let headline =
     currentWindow.netChange > 0
-      ? "Intake is outpacing closures"
+      ? "Intake is outpacing completions"
       : currentWindow.netChange < 0
-        ? "Closures are outpacing intake"
-        : "Intake and closures are running even";
+        ? "Completions are outpacing intake"
+        : "Intake and completions are running even";
   let body =
     currentWindow.netChange > 0
       ? `The current window created ${currentWindow.created} bugs and closed ${currentWindow.fixed}, so backlog pressure increased by ${currentWindow.netChange}.`
@@ -1269,32 +1216,32 @@ export function getInsightsMetrics(
   );
   const currentWindow = getWindowStats(preparedSource, startDate, endDate);
   const completedInRange = preparedSource.bugs.filter((bug) =>
-    Boolean(bug.dueDate) && isDateInRange(bug.completedAt, startDate, endDate),
+    isDateInRange(bug.completedAt, startDate, endDate),
   );
   const priorityBuckets = new Map(
     PRIORITY_ORDER.map((label) => [
       label,
       {
         metrics: createEmptyInsightsPriorityMetrics(label),
-        overdueDays: [] as number[],
+        breachDays: [] as number[],
         resolutionDays: [] as number[],
       },
     ]),
   );
   const trendCounts = new Map<string, InsightsTrendEntry>();
   const resolutionDays: number[] = [];
-  const overdueDays: number[] = [];
+  const breachDays: number[] = [];
   let onTimeCompleted = 0;
-  let overdueCompleted = 0;
+  let breachedCompleted = 0;
+  let missingDueDate = 0;
 
   for (const bug of completedInRange) {
     const priorityLabel = getPriorityLabel(bug.priority);
     const bucket = priorityBuckets.get(priorityLabel);
     const completedAt = bug.completedAt as string;
-    const dueDate = bug.dueDate as string;
     const resolutionDayCount = getResolutionDays(bug);
     const trendEntry = trendCounts.get(completedAt) ?? {
-      overdueCompleted: 0,
+      breached: 0,
       completed: 0,
       date: completedAt,
       onTime: 0,
@@ -1308,28 +1255,37 @@ export function getInsightsMetrics(
       bucket.resolutionDays.push(resolutionDayCount);
     }
 
+    if (!bug.dueDate) {
+      missingDueDate += 1;
+      if (bucket) {
+        bucket.metrics.missingDueDate += 1;
+      }
+      trendCounts.set(completedAt, trendEntry);
+      continue;
+    }
+
     if (bucket) {
       bucket.metrics.eligible += 1;
     }
 
-    if (completedAt <= dueDate) {
+    if (completedAt <= bug.dueDate) {
       onTimeCompleted += 1;
       trendEntry.onTime += 1;
       if (bucket) {
         bucket.metrics.onTime += 1;
       }
     } else {
-      const overdueDayCount = Math.max(
-        differenceInCalendarDays(parseISO(completedAt), parseISO(dueDate)),
+      const breachDayCount = Math.max(
+        differenceInCalendarDays(parseISO(completedAt), parseISO(bug.dueDate)),
         0,
       );
 
-      overdueCompleted += 1;
-      trendEntry.overdueCompleted += 1;
-      overdueDays.push(overdueDayCount);
+      breachedCompleted += 1;
+      trendEntry.breached += 1;
+      breachDays.push(breachDayCount);
       if (bucket) {
-        bucket.metrics.overdueCompleted += 1;
-        bucket.overdueDays.push(overdueDayCount);
+        bucket.metrics.breached += 1;
+        bucket.breachDays.push(breachDayCount);
       }
     }
 
@@ -1337,25 +1293,21 @@ export function getInsightsMetrics(
   }
 
   let openOverdue = 0;
-  let openPending = 0;
+  let dueSoonOpen = 0;
   for (const bug of preparedSource.bugs) {
-    if (!isActiveDueTrackedBug(bug)) {
-      continue;
-    }
-
-    if (!bug.dueDate) {
+    if (bug.completedAt || !bug.dueDate) {
       continue;
     }
 
     const daysUntilDue = differenceInCalendarDays(parseISO(bug.dueDate), today);
     if (daysUntilDue < 0) {
       openOverdue += 1;
-    } else {
-      openPending += 1;
+    } else if (daysUntilDue <= 7) {
+      dueSoonOpen += 1;
     }
   }
 
-  const eligibleCompleted = completedInRange.length;
+  const eligibleCompleted = onTimeCompleted + breachedCompleted;
   const slaHitRate =
     eligibleCompleted > 0 ? (onTimeCompleted / eligibleCompleted) * 100 : 0;
   const tone = getInsightsTone(slaHitRate, eligibleCompleted);
@@ -1365,7 +1317,7 @@ export function getInsightsMetrics(
       ? finalizeInsightsPriorityMetrics(
           bucket.metrics,
           bucket.resolutionDays,
-          bucket.overdueDays,
+          bucket.breachDays,
         )
       : createEmptyInsightsPriorityMetrics(label);
   });
@@ -1379,23 +1331,22 @@ export function getInsightsMetrics(
           : "SLA delivery needs attention";
   const body =
     eligibleCompleted === 0
-      ? `No due-dated bugs were completed in ${rangeLabel}, so SLA performance cannot be assessed for that period.`
-      : `${onTimeCompleted} of ${eligibleCompleted} due-dated completed bugs landed on or before SLA in ${rangeLabel}. ${overdueCompleted} were completed after their due date.`;
+      ? `No completed bugs in ${rangeLabel} have a due date, so SLA hit rate cannot be calculated yet.`
+      : `${onTimeCompleted} of ${eligibleCompleted} completed bugs with due dates landed on or before SLA in ${rangeLabel}. ${breachedCompleted} breached and ${missingDueDate} completed bugs were missing due dates.`;
 
   return {
-    averageOverdueDays: getAverage(overdueDays),
+    averageBreachDays: getAverage(breachDays),
     averageResolutionDays: getAverage(resolutionDays),
     body,
-    overdueCompleted,
+    breachedCompleted,
     currentWindow,
+    dueSoonOpen,
     eligibleCompleted,
     headline,
-    medianOverdueDays: getMedian(overdueDays),
     medianResolutionDays: getMedian(resolutionDays),
-    missingDueDate: 0,
+    missingDueDate,
     onTimeCompleted,
     openOverdue,
-    openPending,
     priorityMetrics,
     rangeLabel,
     slaHitRate,
@@ -1448,12 +1399,20 @@ export function buildSlaOutcomeChartData(
         borderRadius: 8,
       },
       {
-        label: "Completed overdue",
-        data: insightsMetrics.priorityMetrics.map(
-          (entry) => entry.overdueCompleted,
-        ),
+        label: "Breached",
+        data: insightsMetrics.priorityMetrics.map((entry) => entry.breached),
         backgroundColor: "rgba(248, 113, 113, 0.72)",
         borderColor: "#f87171",
+        borderWidth: 1,
+        borderRadius: 8,
+      },
+      {
+        label: "Missing due date",
+        data: insightsMetrics.priorityMetrics.map(
+          (entry) => entry.missingDueDate,
+        ),
+        backgroundColor: "rgba(148, 163, 184, 0.64)",
+        borderColor: "#94a3b8",
         borderWidth: 1,
         borderRadius: 8,
       },
@@ -1466,7 +1425,7 @@ export function buildSlaTrendChartData(
 ): ChartData<"line", number[], string> {
   const trendSeries = insightsMetrics.trendSeries.length
     ? insightsMetrics.trendSeries
-    : [{ overdueCompleted: 0, completed: 0, date: "", onTime: 0 }];
+    : [{ breached: 0, completed: 0, date: "", onTime: 0 }];
 
   return {
     labels: trendSeries.map((entry) =>
@@ -1484,8 +1443,8 @@ export function buildSlaTrendChartData(
         pointHoverRadius: 4,
       },
       {
-        label: "Completed overdue",
-        data: trendSeries.map((entry) => entry.overdueCompleted),
+        label: "Breached",
+        data: trendSeries.map((entry) => entry.breached),
         borderColor: "#f87171",
         backgroundColor: "rgba(248, 113, 113, 0.14)",
         tension: 0.25,
@@ -1504,9 +1463,9 @@ export function buildResolutionTimeChartData(
     labels: insightsMetrics.priorityMetrics.map((entry) => entry.label),
     datasets: [
       {
-        label: "Median resolve days",
+        label: "Avg resolution days",
         data: insightsMetrics.priorityMetrics.map((entry) =>
-          Number(entry.medianResolutionDays.toFixed(1)),
+          Number(entry.averageResolutionDays.toFixed(1)),
         ),
         backgroundColor: "rgba(125, 211, 252, 0.72)",
         borderColor: "#7dd3fc",
@@ -1514,9 +1473,9 @@ export function buildResolutionTimeChartData(
         borderRadius: 8,
       },
       {
-        label: "Median overtime days",
+        label: "Avg breach days",
         data: insightsMetrics.priorityMetrics.map((entry) =>
-          Number(entry.medianOverdueDays.toFixed(1)),
+          Number(entry.averageBreachDays.toFixed(1)),
         ),
         backgroundColor: "rgba(251, 191, 36, 0.7)",
         borderColor: "#fbbf24",
@@ -1559,7 +1518,7 @@ export function buildComparisonTimelineChartData(
         pointHoverRadius: 4,
       },
       {
-        label: "Closed",
+        label: "Completed",
         data: completedValues,
         borderColor: "#5eead4",
         backgroundColor: "rgba(94, 234, 212, 0.14)",
@@ -1617,9 +1576,9 @@ export function buildComparisonSummaryChartData(
   return {
     labels: [
       "Bugs created",
-      "Bugs closed",
+      "Bugs completed",
       "Net change",
-      "Closure rate %",
+      "Completion rate %",
     ],
     datasets,
   };
@@ -1690,7 +1649,7 @@ export function buildComparisonRateHistoryChartData(
         pointHoverRadius: 4,
       },
       {
-        label: "Closure rate",
+        label: "Fix rate",
         data: comparisonMetrics.historicalWindows.map((window) =>
           Number(window.fixRate.toFixed(2)),
         ),

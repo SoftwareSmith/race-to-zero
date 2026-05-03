@@ -95,11 +95,16 @@ describe("survival director", () => {
     expect(burst.high + burst.urgent).toBeGreaterThan(0);
   });
 
-  it("reports offline pressure only when active bugs exceed the threshold", () => {
+  it("starts chipping integrity once sustained swarm pressure gets heavy", () => {
     const plan = getSurvivalWavePlan(10);
     const calm = getSurvivalPressure({
-      activeBugCount: plan.pressureThreshold - 1,
+      activeBugCount: Math.floor(plan.pressureThreshold * 0.45),
       siteIntegrity: 100,
+      wave: 10,
+    });
+    const heavy = getSurvivalPressure({
+      activeBugCount: Math.floor(plan.pressureThreshold * 0.82),
+      siteIntegrity: 84,
       wave: 10,
     });
     const overloaded = getSurvivalPressure({
@@ -110,7 +115,10 @@ describe("survival director", () => {
 
     expect(calm.damagePerSecond).toBe(0);
     expect(calm.secondsUntilOffline).toBeNull();
+    expect(heavy.damagePerSecond).toBeGreaterThan(0);
+    expect(heavy.secondsUntilOffline).toBeGreaterThan(0);
     expect(overloaded.damagePerSecond).toBeGreaterThan(0);
+    expect(overloaded.damagePerSecond).toBeGreaterThan(heavy.damagePerSecond);
     expect(overloaded.secondsUntilOffline).toBeGreaterThan(0);
   });
 

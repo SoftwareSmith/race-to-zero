@@ -67,9 +67,9 @@ const ALLY_INTERCEPT_RADIUS = 196;
 const DEFAULT_ROAM_INTERVAL: [number, number] = [1.4, 5];
 
 const DEFAULT_REGION_WEIGHTS: Record<CrawlRegion, number> = {
-  edge: 0.32,
-  interior: 0.3,
-  middle: 0.38,
+  edge: 0.2,
+  interior: 0.34,
+  middle: 0.46,
 };
 
 function isStatusActive(
@@ -119,6 +119,7 @@ export class BugEntity extends Entity {
   roamTargetY: number | null;
   roamTargetRegion: CrawlRegion | null;
   roamTargetWide: boolean;
+  roamTargetLongPath: boolean;
   nextRoamTargetAt: number;
   roamTargetGeneration: number;
   roamLoiterUntil: number;
@@ -184,6 +185,7 @@ export class BugEntity extends Entity {
     this.roamTargetY = null;
     this.roamTargetRegion = null;
     this.roamTargetWide = false;
+    this.roamTargetLongPath = false;
     this.nextRoamTargetAt = 0;
     this.roamTargetGeneration = 0;
     this.roamLoiterUntil = 0;
@@ -278,18 +280,18 @@ export class BugEntity extends Entity {
     const edgePreference = profile?.edgePreference ?? 0;
     const edgeWeight =
       regionWeights.edge +
-      Math.max(0, edgePreference) * 1.05 +
-      (anchorBias === "perimeter" ? 0.2 : 0) +
-      (preferredRegion === "edge" ? 0.12 : 0);
+      Math.max(0, edgePreference) * 0.45 +
+      (anchorBias === "perimeter" ? 0.1 : 0) +
+      (preferredRegion === "edge" ? 0.06 : 0);
     const interiorWeight =
       regionWeights.interior +
-      Math.max(0, -edgePreference) * 0.82 +
-      (anchorBias === "interior" ? 0.22 : 0) +
-      (preferredRegion === "interior" ? 0.14 : 0);
+      Math.max(0, -edgePreference) * 0.68 +
+      (anchorBias === "interior" ? 0.18 : 0) +
+      (preferredRegion === "interior" ? 0.1 : 0);
     const middleWeight =
       regionWeights.middle +
-      (anchorBias === "any" ? 0.08 : 0) +
-      (preferredRegion === "middle" ? 0.1 : 0);
+      (anchorBias === "any" ? 0.12 : 0) +
+      (preferredRegion === "middle" ? 0.12 : 0);
     const totalWeight = Math.max(0.01, edgeWeight + interiorWeight + middleWeight);
     const roll =
       this.getUnitNoise(this.seed * 23.3 + generation * 1.11, this.seed * 53.1) *
@@ -312,37 +314,45 @@ export class BugEntity extends Entity {
     baseY: number,
     sideNoise: number,
   ) {
+    const centerX = 0.5;
+    const centerY = 0.5;
+
     if (region === "edge") {
       const side = Math.floor(sideNoise * 4);
+      const inset = lerp(0.02, 0.13, baseX);
+      const sweep = lerp(0.04, 0.96, baseY);
       if (side === 0) {
-        return { x: lerp(0.03, 0.12, baseX), y: lerp(0.08, 0.92, baseY) };
+        return { x: inset, y: sweep };
       }
       if (side === 1) {
-        return { x: lerp(0.88, 0.97, baseX), y: lerp(0.08, 0.92, baseY) };
+        return { x: 1 - inset, y: sweep };
       }
       if (side === 2) {
-        return { x: lerp(0.08, 0.92, baseX), y: lerp(0.03, 0.12, baseY) };
+        return { x: sweep, y: inset };
       }
 
-      return { x: lerp(0.08, 0.92, baseX), y: lerp(0.88, 0.97, baseY) };
+      return { x: sweep, y: 1 - inset };
     }
 
     if (region === "interior") {
-      return { x: lerp(0.36, 0.64, baseX), y: lerp(0.34, 0.66, baseY) };
+      const angle = sideNoise * Math.PI * 2 + (baseX - 0.5) * 0.7;
+      const radius = lerp(0.05, 0.19, baseY);
+
+      return {
+        x: clamp(centerX + Math.cos(angle) * radius * 0.92, 0.28, 0.72),
+        y: clamp(centerY + Math.sin(angle) * radius * 0.78, 0.26, 0.74),
+      };
     }
 
-    const side = Math.floor(sideNoise * 4);
-    if (side === 0) {
-      return { x: lerp(0.18, 0.82, baseX), y: lerp(0.16, 0.34, baseY) };
-    }
-    if (side === 1) {
-      return { x: lerp(0.66, 0.84, baseX), y: lerp(0.18, 0.82, baseY) };
-    }
-    if (side === 2) {
-      return { x: lerp(0.18, 0.82, baseX), y: lerp(0.66, 0.84, baseY) };
-    }
+    const angle = sideNoise * Math.PI * 2 + (baseY - 0.5) * 1.25;
+    const radius = lerp(0.2, 0.42, baseX);
+    const skewX = (baseY - 0.5) * 0.08;
+    const skewY = (baseX - 0.5) * 0.08;
 
-    return { x: lerp(0.16, 0.34, baseX), y: lerp(0.18, 0.82, baseY) };
+    return {
+      x: clamp(centerX + Math.cos(angle) * radius * 0.94 + skewX, 0.1, 0.9),
+      y: clamp(centerY + Math.sin(angle) * radius * 0.8 + skewY, 0.1, 0.9),
+    };
   }
 
   private getSocialCohesion(
@@ -351,7 +361,7 @@ export class BugEntity extends Entity {
     crowdScore: number,
     config: typeof DEFAULT_GAME_CONFIG,
   ) {
-    if (socialAffinity <= 0.12 || neighbors.length === 0) {
+    if (socialAffinity <= 0.22 || neighbors.length === 0) {
       return { x: 0, y: 0 };
     }
 
@@ -380,7 +390,7 @@ export class BugEntity extends Entity {
     }
 
     const towardGroup = normalizeVector(centerX / totalWeight - this.x, centerY / totalWeight - this.y);
-    const strength = clamp(socialAffinity, 0, 1) * 0.085;
+    const strength = clamp(socialAffinity, 0, 1) * 0.035;
 
     return {
       x: towardGroup.x * strength,
@@ -415,8 +425,8 @@ export class BugEntity extends Entity {
 
     return {
       pressure,
-      x: away.x * config.wallAvoidStrength * pressure * (0.88 + edgeLaneScale * 0.62),
-      y: away.y * config.wallAvoidStrength * pressure * (0.88 + edgeLaneScale * 0.62),
+      x: away.x * config.wallAvoidStrength * pressure * (1.04 + edgeLaneScale * 0.72),
+      y: away.y * config.wallAvoidStrength * pressure * (1.04 + edgeLaneScale * 0.72),
     };
   }
 
@@ -444,15 +454,15 @@ export class BugEntity extends Entity {
     if (side === "left" || side === "right") {
       const laneCenterX = side === "left" ? laneInset : bounds.width - laneInset;
       return {
-        x: clamp((laneCenterX - this.x) / laneWidth, -1, 1) * 0.34,
-        y: clamp((targetY - this.y) / Math.max(bounds.height * 0.22, 1), -1, 1) * 0.12,
+        x: clamp((laneCenterX - this.x) / laneWidth, -1, 1) * 0.18,
+        y: clamp((targetY - this.y) / Math.max(bounds.height * 0.22, 1), -1, 1) * 0.07,
       };
     }
 
     const laneCenterY = side === "top" ? laneInset : bounds.height - laneInset;
     return {
-      x: clamp((targetX - this.x) / Math.max(bounds.width * 0.22, 1), -1, 1) * 0.12,
-      y: clamp((laneCenterY - this.y) / laneWidth, -1, 1) * 0.34,
+      x: clamp((targetX - this.x) / Math.max(bounds.width * 0.22, 1), -1, 1) * 0.07,
+      y: clamp((laneCenterY - this.y) / laneWidth, -1, 1) * 0.18,
     };
   }
 
@@ -509,6 +519,7 @@ export class BugEntity extends Entity {
     neighbors: BugEntity[],
     radius: number,
     strength: number,
+    localAvoidanceStrength: number,
   ) {
     if (!neighbors.length) {
       return { x: 0, y: 0 };
@@ -516,20 +527,80 @@ export class BugEntity extends Entity {
 
     let separationX = 0;
     let separationY = 0;
+    let swirlX = 0;
+    let swirlY = 0;
+    const personalSpace = Math.max(this.size * 2.05, radius * 0.34);
+    const softRadius = Math.max(personalSpace + 1, radius * 0.72);
 
     for (const neighbor of neighbors) {
       const dx = this.x - neighbor.x;
       const dy = this.y - neighbor.y;
       const distance = Math.max(1, getLength(dx, dy));
-      const weight = 1 - clamp(distance / radius, 0, 1);
+      const collisionPressure = 1 - clamp((distance - 1) / Math.max(personalSpace, 1), 0, 1);
+      const softPressure = 1 - clamp((distance - personalSpace) / Math.max(softRadius - personalSpace, 1), 0, 1);
+      const weight = collisionPressure * 0.92 + softPressure * 0.12;
+      if (weight <= 0.001) {
+        continue;
+      }
+      const tangentBias = Math.sin(
+        this.seed * 17.3 + neighbor.seed * 11.9 + this.motionTime * 0.37,
+      );
       separationX += (dx / distance) * weight;
       separationY += (dy / distance) * weight;
+      swirlX += (-dy / distance) * weight * tangentBias;
+      swirlY += (dx / distance) * weight * tangentBias;
     }
 
     const away = normalizeVector(separationX, separationY);
+    const swirl = normalizeVector(swirlX, swirlY);
+    const swirlStrength = Math.min(0.54, neighbors.length * 0.06);
+    const directStrength = 0.62 * localAvoidanceStrength;
+
     return {
-      x: away.x * strength,
-      y: away.y * strength,
+      x: away.x * strength * directStrength + swirl.x * strength * swirlStrength,
+      y: away.y * strength * directStrength + swirl.y * strength * swirlStrength,
+    };
+  }
+
+  private getFlowFieldSteering(
+    bounds: { width: number; height: number },
+    noiseFrequency: number,
+    wanderMultiplier: number,
+    crowdScore: number,
+    config: typeof DEFAULT_GAME_CONFIG,
+    flowFieldStrength: number,
+  ) {
+    const normalizedX = this.x / Math.max(bounds.width, 1);
+    const normalizedY = this.y / Math.max(bounds.height, 1);
+    const fieldScale = 4.8 + noiseFrequency * 1.9;
+    const timePhase = this.motionTime * (0.075 + noiseFrequency * 0.028);
+    const angleNoise = perlin1D(
+      normalizedX * fieldScale + normalizedY * (fieldScale * 0.83) + timePhase + this.seed * 13.1,
+      this.seed * 47.3,
+    );
+    const curlNoise = perlin1D(
+      normalizedY * (fieldScale * 1.07) - normalizedX * (fieldScale * 0.71) + timePhase * 1.3 + this.seed * 29.9,
+      this.seed * 61.7,
+    );
+    const fieldAngle =
+      angleNoise * Math.PI * 1.18 +
+      curlNoise * Math.PI * 0.24 +
+      Math.sin(this.motionTime * 0.19 + this.seed * 17.7) * 0.1;
+    const flowDirection = {
+      x: Math.cos(fieldAngle),
+      y: Math.sin(fieldAngle),
+    };
+    const crowdPressure = clamp(
+      crowdScore / Math.max(config.crowdRepathThreshold, 1),
+      0,
+      1.5,
+    );
+    const strength =
+      (0.16 + wanderMultiplier * 0.08 + crowdPressure * 0.05) * flowFieldStrength;
+
+    return {
+      x: flowDirection.x * strength,
+      y: flowDirection.y * strength,
     };
   }
 
@@ -538,6 +609,7 @@ export class BugEntity extends Entity {
     this.roamTargetY = null;
     this.roamTargetRegion = null;
     this.roamTargetWide = false;
+    this.roamTargetLongPath = false;
     this.nextRoamTargetAt = 0;
     this.roamTargetGeneration = 0;
     this.roamLoiterUntil = 0;
@@ -548,8 +620,8 @@ export class BugEntity extends Entity {
 
   private getLoiterDurationMs(profile: CrawlProfile | null, generation: number) {
     const baseDuration =
-      420 +
-      this.getUnitNoise(this.seed * 19.7 + generation * 0.63, this.seed * 41.9) * 520;
+      180 +
+      this.getUnitNoise(this.seed * 19.7 + generation * 0.63, this.seed * 41.9) * 220;
 
     if (profile?.behavior === "panic") {
       return baseDuration * 0.72;
@@ -585,20 +657,20 @@ export class BugEntity extends Entity {
       return "startled";
     }
 
-    const loiterRadius = Math.max(config.targetReachRadius * 1.55, this.size * 3.2);
-    if (this.roamLoiterUntil > now && targetDistance <= loiterRadius) {
-      return "loiter";
-    }
-
     if (
-      socialAffinity >= 0.45 &&
+      socialAffinity >= 0.12 &&
       neighbors.length >= 2 &&
-      crowdScore < config.crowdRepathThreshold * 0.82
+      crowdScore < config.crowdRepathThreshold * 0.72
     ) {
       return "regroup";
     }
 
-    if (!this.roamTargetWide && this.roamTargetRegion != null && this.roamTargetRegion !== "interior") {
+    if (
+      !this.roamTargetWide &&
+      !this.roamTargetLongPath &&
+      this.roamTargetRegion === "edge" &&
+      targetDistance > config.targetReachRadius * 1.9
+    ) {
       return "lane-follow";
     }
 
@@ -606,10 +678,6 @@ export class BugEntity extends Entity {
   }
 
   private getMoodSpeedMultiplier(mood: BugMovementMood) {
-    if (mood === "loiter") {
-      return 0.84;
-    }
-
     if (mood === "lane-follow") {
       return 1.03;
     }
@@ -635,8 +703,8 @@ export class BugEntity extends Entity {
     const centerY = bounds.height * 0.5;
     const radial = normalizeVector(targetX - centerX, targetY - centerY);
     const tangent = normalizeVector(-radial.y * this.orbitBias, radial.x * this.orbitBias);
-    const tangentStrength = this.roamTargetRegion === "edge" ? 0.16 : 0.12;
-    const laneCorrection = this.roamTargetRegion === "edge" ? 0.12 : 0.08;
+    const tangentStrength = this.roamTargetRegion === "edge" ? 0.08 : 0.06;
+    const laneCorrection = this.roamTargetRegion === "edge" ? 0.06 : 0.04;
 
     return {
       x: tangent.x * tangentStrength + targetDirection.x * laneCorrection,
@@ -650,7 +718,7 @@ export class BugEntity extends Entity {
     crowdScore: number,
     config: typeof DEFAULT_GAME_CONFIG,
   ) {
-    if (socialAffinity < 0.45 || neighbors.length < 2) {
+    if (socialAffinity < 0.12 || neighbors.length < 2) {
       return { x: 0, y: 0 };
     }
 
@@ -691,8 +759,8 @@ export class BugEntity extends Entity {
 
     const towardPack = normalizeVector(centerX / totalWeight - this.x, centerY / totalWeight - this.y);
     const alignedHeading = normalizeVector(headingX, headingY);
-    const packStrength = clamp(socialAffinity, 0, 1) * 0.14 * crowdRelief;
-    const alignStrength = clamp(socialAffinity, 0, 1) * 0.08 * crowdRelief;
+    const packStrength = clamp(socialAffinity, 0, 1) * 0.045 * crowdRelief;
+    const alignStrength = clamp(socialAffinity, 0, 1) * 0.02 * crowdRelief;
 
     return {
       x: towardPack.x * packStrength + alignedHeading.x * alignStrength,
@@ -700,16 +768,113 @@ export class BugEntity extends Entity {
     };
   }
 
-  private getLoiterSteering(targetDirection: { x: number; y: number }) {
+  private getChaosSteering(
+    targetDirection: { x: number; y: number },
+    neighborCount: number,
+    crowdScore: number,
+    config: typeof DEFAULT_GAME_CONFIG,
+    wanderMultiplier: number,
+  ) {
+    const crowdPressure = clamp(
+      crowdScore / Math.max(config.crowdRepathThreshold, 1),
+      0,
+      1.8,
+    );
+    const neighborPressure = clamp(neighborCount / 6, 0, 1.4);
+    const turbulence =
+      0.06 +
+      wanderMultiplier * 0.04 +
+      crowdPressure * 0.09 +
+      neighborPressure * 0.08;
+
+    const baseDirection =
+      targetDirection.x === 0 && targetDirection.y === 0
+        ? { x: Math.cos(this.heading), y: Math.sin(this.heading) }
+        : targetDirection;
+    const tangentSign = Math.sin(
+      this.motionTime * 1.7 + this.seed * 41.3 + neighborCount * 0.33,
+    );
     const tangent = {
-      x: -targetDirection.y * this.orbitBias,
-      y: targetDirection.x * this.orbitBias,
+      x: -baseDirection.y * (tangentSign >= 0 ? 1 : -1),
+      y: baseDirection.x * (tangentSign >= 0 ? 1 : -1),
     };
-    const weave = Math.sin(this.motionTime * 1.8 + this.seed * 9.3) * 0.03;
+    const scatterHeading =
+      this.heading +
+      perlin1D(this.motionTime * (0.82 + crowdPressure * 0.24) + this.seed * 19.1, this.seed * 73.7) *
+        (0.7 + crowdPressure * 0.6 + neighborPressure * 0.4);
+    const scatter = {
+      x: Math.cos(scatterHeading),
+      y: Math.sin(scatterHeading),
+    };
+    const surge =
+      0.68 +
+      this.getUnitNoise(
+        this.motionTime * (0.44 + neighborPressure * 0.12) + this.seed * 27.9,
+        this.seed * 91.7,
+      ) *
+        (0.52 + crowdPressure * 0.18);
 
     return {
-      x: tangent.x * 0.08 + Math.cos(this.wanderAngle) * weave,
-      y: tangent.y * 0.08 + Math.sin(this.wanderAngle) * weave,
+      x: tangent.x * turbulence * 0.18 + scatter.x * turbulence * surge,
+      y: tangent.y * turbulence * 0.18 + scatter.y * turbulence * surge,
+    };
+  }
+
+  private getProjectedRoamTarget(
+    bounds: { width: number; height: number },
+    margin: number,
+    heading: number,
+    headingJitter: number,
+    travelNoise: number,
+  ) {
+    const direction = normalizeVector(
+      Math.cos(heading + headingJitter),
+      Math.sin(heading + headingJitter),
+    );
+    const minX = margin;
+    const maxX = bounds.width - margin;
+    const minY = margin;
+    const maxY = bounds.height - margin;
+    const times: number[] = [];
+
+    if (Math.abs(direction.x) > 0.001) {
+      const tx = direction.x > 0 ? (maxX - this.x) / direction.x : (minX - this.x) / direction.x;
+      if (tx > 0) {
+        times.push(tx);
+      }
+    }
+
+    if (Math.abs(direction.y) > 0.001) {
+      const ty = direction.y > 0 ? (maxY - this.y) / direction.y : (minY - this.y) / direction.y;
+      if (ty > 0) {
+        times.push(ty);
+      }
+    }
+
+    const travelTime = times.length ? Math.min(...times) : Math.min(bounds.width, bounds.height) * 0.45;
+    const tangent = { x: -direction.y, y: direction.x };
+    const tangentShift = (travelNoise - 0.5) * Math.min(bounds.width, bounds.height) * 0.12;
+
+    return {
+      x: clamp(this.x + direction.x * travelTime + tangent.x * tangentShift, minX, maxX),
+      y: clamp(this.y + direction.y * travelTime + tangent.y * tangentShift, minY, maxY),
+    };
+  }
+
+  private getLoiterSteering(targetDirection: { x: number; y: number }) {
+    const forward = {
+      x: Math.cos(this.heading),
+      y: Math.sin(this.heading),
+    };
+    const lateral = {
+      x: -forward.y,
+      y: forward.x,
+    };
+    const weave = Math.sin(this.motionTime * 1.8 + this.seed * 9.3) * 0.022;
+
+    return {
+      x: forward.x * 0.08 + targetDirection.x * 0.04 + lateral.x * weave,
+      y: forward.y * 0.08 + targetDirection.y * 0.04 + lateral.y * weave,
     };
   }
 
@@ -744,6 +909,8 @@ export class BugEntity extends Entity {
     const generation = this.roamTargetGeneration;
     const roamRadius = profile?.roamRadius ?? config.roamTargetMinDistance;
     const wideRoamChance = profile?.wideRoamChance ?? 0.24;
+    const longPathBias = clamp(profile?.longPathBias ?? 0.72, 0, 1);
+    const pathCommitment = Math.max(0.6, profile?.pathCommitment ?? 1);
     const broadCrowding = getCrowdingAt?.(
       this.x,
       this.y,
@@ -770,6 +937,7 @@ export class BugEntity extends Entity {
     let bestScore = -Infinity;
     let bestRegion: CrawlRegion | null = null;
     let bestWideRoam = false;
+    let bestLongPath = false;
 
     for (let attempt = 0; attempt < 6; attempt += 1) {
       const attemptPhase = generation + attempt * 0.37;
@@ -788,13 +956,32 @@ export class BugEntity extends Entity {
       );
       const wideRoam = laneBias < wideRoamChance;
       const region = wideRoam ? "middle" : this.pickRoamRegion(profile, generation + attempt);
-      const anchorPoint = wideRoam
-        ? { x: lerp(0.02, 0.98, baseX), y: lerp(0.02, 0.98, baseY) }
-        : this.getRegionAnchorPoint(region, baseX, baseY, laneBias);
+      const longPathRoll = this.getUnitNoise(
+        this.seed * 13.9 + generation * 0.59 + attempt * 0.43,
+        this.seed * 97.1,
+      );
+      const longPathChance = clamp(
+        longPathBias + (wideRoam ? 0.22 : 0) + (region === "interior" ? 0.12 : region === "middle" ? 0.05 : -0.26),
+        0,
+        1,
+      );
+      const useLongPath = longPathRoll <= longPathChance;
+      const projectedTarget = useLongPath
+        ? this.getProjectedRoamTarget(
+            bounds,
+            margin,
+            this.heading,
+            (baseX - 0.5) * 0.9 + (laneBias - 0.5) * 0.55,
+            baseY,
+          )
+        : null;
+      const anchorPoint = !useLongPath
+        ? this.getRegionAnchorPoint(region, baseX, baseY, laneBias)
+        : null;
 
-      let candidateX = margin + anchorPoint.x * usableWidth;
-      let candidateY = margin + anchorPoint.y * usableHeight;
-      if (!wideRoam && roamRadius > 0) {
+      let candidateX = projectedTarget?.x ?? margin + (anchorPoint?.x ?? 0.5) * usableWidth;
+      let candidateY = projectedTarget?.y ?? margin + (anchorPoint?.y ?? 0.5) * usableHeight;
+      if (!useLongPath && !wideRoam && roamRadius > 0) {
         const toTargetX = candidateX - this.x;
         const toTargetY = candidateY - this.y;
         const distance = getLength(toTargetX, toTargetY);
@@ -861,18 +1048,46 @@ export class BugEntity extends Entity {
       const perimeterResidency = edgeCoverage >= currentEdgeCoverage ? edgeCoverage - currentEdgeCoverage : 0;
       const perimeterCatchup = Math.max(0, perimeterScore - currentPerimeterScore);
       const broadEscapeWeight = broadCrowding && broadCrowding.score > config.crowdRepathThreshold
-        ? 0.16
-        : 0.08;
+        ? 0.22
+        : 0.1;
+      const noveltyScore =
+        this.roamTargetX != null && this.roamTargetY != null
+          ? clamp(
+              getLength(candidateX - this.roamTargetX, candidateY - this.roamTargetY) /
+                Math.max(roamRadius * 0.9, config.roamTargetMinDistance * 0.8, 1),
+              0,
+              1,
+            )
+          : distanceScore;
+      const chaosJitter = this.getUnitNoise(
+        this.seed * 11.7 + generation * 0.83 + attempt * 0.49,
+        this.seed * 109.1,
+      );
+      const tightCenterPenalty =
+        region === "middle" && edgeCoverage < 0.12 && !wideRoam
+          ? 0.08
+          : 0;
+      const regionBonus =
+        region === "edge"
+          ? 0.03 + perimeterScore * 0.05
+          : region === "middle"
+            ? 0.07
+            : 0.05;
       const score =
-        (1 - crowdPenalty) * 0.28 +
-        (1 - broadPenalty) * 0.16 +
-        distanceScore * 0.1 +
-        edgeCoverage * 0.24 +
-        perimeterScore * 0.16 +
-        perimeterResidency * 0.08 +
-        perimeterCatchup * 0.12 +
+        (1 - crowdPenalty) * 0.16 +
+        (1 - broadPenalty) * 0.08 +
+        distanceScore * 0.24 +
+        edgeCoverage * 0.03 +
+        perimeterScore * 0.02 +
+        perimeterResidency * 0.01 +
+        perimeterCatchup * 0.02 +
         broadEscape * broadEscapeWeight +
-        (region === "edge" ? 0.2 : region === "middle" ? 0.01 : 0);
+        noveltyScore * 0.18 +
+        (useLongPath ? 0.06 + longPathBias * 0.08 : 0) +
+        (wideRoam ? 0.04 : 0) +
+        chaosJitter * 0.19 +
+        regionBonus -
+        tightCenterPenalty;
 
       if (score > bestScore) {
         bestScore = score;
@@ -880,6 +1095,7 @@ export class BugEntity extends Entity {
         bestTargetY = candidateY;
         bestRegion = region;
         bestWideRoam = wideRoam;
+        bestLongPath = useLongPath;
       }
     }
 
@@ -887,9 +1103,10 @@ export class BugEntity extends Entity {
     this.roamTargetY = bestTargetY;
     this.roamTargetRegion = bestRegion;
     this.roamTargetWide = bestWideRoam;
+    this.roamTargetLongPath = bestLongPath;
     const [minInterval, maxInterval] = profile?.anchorDriftInterval ?? DEFAULT_ROAM_INTERVAL;
-    const minIntervalMs = clamp(Math.min(minInterval, maxInterval) * 1000, 1200, 16_000);
-    const maxIntervalMs = clamp(Math.max(minInterval, maxInterval) * 1000, minIntervalMs, 18_000);
+    const minIntervalMs = clamp(Math.min(minInterval, maxInterval) * 1000 * pathCommitment, 1200, 18_000);
+    const maxIntervalMs = clamp(Math.max(minInterval, maxInterval) * 1000 * pathCommitment, minIntervalMs, 20_000);
     this.nextRoamTargetAt =
       now +
       minIntervalMs +
@@ -919,16 +1136,12 @@ export class BugEntity extends Entity {
     } else {
       const targetDistance = getLength(this.roamTargetX! - this.x, this.roamTargetY! - this.y);
       const loiterEnterRadius = Math.max(config.targetReachRadius * 1.05, this.size * 2.4);
-      const loiterExitRadius = loiterEnterRadius * 1.8;
 
-      if (targetDistance <= loiterEnterRadius) {
-        if (this.roamLoiterUntil === 0) {
-          this.roamLoiterUntil =
-            now + this.getLoiterDurationMs(profile, this.roamTargetGeneration);
-        } else if (now >= this.roamLoiterUntil) {
-          this.chooseRoamTarget(bounds, now, config, getCrowdingAt);
-        }
-      } else if (targetDistance >= loiterExitRadius) {
+      if (this.roamTargetLongPath && targetDistance <= loiterEnterRadius * 1.4) {
+        this.chooseRoamTarget(bounds, now, config, getCrowdingAt);
+      } else if (targetDistance <= loiterEnterRadius) {
+        this.chooseRoamTarget(bounds, now, config, getCrowdingAt);
+      } else {
         this.roamLoiterUntil = 0;
       }
     }
@@ -995,18 +1208,36 @@ export class BugEntity extends Entity {
       return;
     }
 
-    const inward = normalizeVector(inwardX, inwardY);
+    const motion = normalizeVector(this.vx || Math.cos(this.heading), this.vy || Math.sin(this.heading));
+    let reflectX = motion.x;
+    let reflectY = motion.y;
+
+    if (inwardX !== 0) {
+      reflectX = Math.abs(reflectX) * inwardX;
+    }
+
+    if (inwardY !== 0) {
+      reflectY = Math.abs(reflectY) * inwardY;
+    }
+
     const fallback = normalizeVector(
       bounds.width * 0.5 - this.x,
       bounds.height * 0.5 - this.y,
     );
-    const recovery = inward.x !== 0 || inward.y !== 0 ? inward : fallback;
-    const recoveryHeading = Math.atan2(recovery.y, recovery.x);
+    const recovery = normalizeVector(reflectX, reflectY);
+    const nextDirection = recovery.x !== 0 || recovery.y !== 0 ? recovery : fallback;
+    const recoveryHeading = Math.atan2(nextDirection.y, nextDirection.x);
     const recoverySpeed = Math.max(desiredSpeed * 0.9, config.baseSpeed * 0.72);
 
     this.heading = recoveryHeading;
     this.vx = Math.cos(recoveryHeading) * recoverySpeed;
     this.vy = Math.sin(recoveryHeading) * recoverySpeed;
+    this.roamTargetX = null;
+    this.roamTargetY = null;
+    this.roamTargetWide = false;
+    this.roamTargetLongPath = false;
+    this.roamLoiterUntil = 0;
+    this.nextRoamTargetAt = 0;
   }
 
   update(dt: number, ctx: BugUpdateContext) {
@@ -1026,6 +1257,9 @@ export class BugEntity extends Entity {
     const noiseLateralStrength = 0.65 + (profile?.noiseLateralStrength ?? 0.5);
     const noiseTurnStrength = profile?.noiseTurnStrength ?? 1;
     const separationMultiplier = profile?.separationMultiplier ?? 1;
+    const flowFieldStrength = profile?.flowFieldStrength ?? 1;
+    const localAvoidanceStrength = profile?.localAvoidanceStrength ?? 1;
+    const crowdTangentBiasScale = profile?.crowdTangentBias ?? 1;
 
     if (this.state === EntityState.Dying) {
       this.deathProgress += dt / this.deathDuration;
@@ -1117,6 +1351,7 @@ export class BugEntity extends Entity {
       neighbors,
       config.separationRadius,
       config.separationStrength * 1.35 * separationMultiplier,
+      localAvoidanceStrength,
     );
     desired.x += separation.x;
     desired.y += separation.y;
@@ -1139,6 +1374,17 @@ export class BugEntity extends Entity {
     desired.x += socialCohesion.x;
     desired.y += socialCohesion.y;
 
+    const flowSteering = this.getFlowFieldSteering(
+      bounds,
+      noiseFrequency,
+      wanderMultiplier,
+      crowding?.score ?? 0,
+      config,
+      flowFieldStrength,
+    );
+    desired.x += flowSteering.x;
+    desired.y += flowSteering.y;
+
     if (!isAlly && this.state !== "flee") {
       const roamTarget = this.getRoamTarget(bounds, now, config, ctx.getCrowdingAt);
       const toTargetX = roamTarget.x - this.x;
@@ -1159,11 +1405,21 @@ export class BugEntity extends Entity {
 
       this.movementMood = mood;
 
-  const boardBiasScale = this.roamTargetRegion === "edge" ? 0.18 : 1;
-  desired.x += boardBias.x * boardBiasScale;
-  desired.y += boardBias.y * boardBiasScale;
-  desired.x += perimeterResidency.x;
-  desired.y += perimeterResidency.y;
+      const chaosSteering = this.getChaosSteering(
+        targetDirection,
+        neighbors.length,
+        crowding?.score ?? 0,
+        config,
+        wanderMultiplier,
+      );
+      desired.x += chaosSteering.x;
+      desired.y += chaosSteering.y;
+
+      const boardBiasScale = this.roamTargetRegion === "edge" ? 0.62 : 1;
+      desired.x += boardBias.x * boardBiasScale;
+      desired.y += boardBias.y * boardBiasScale;
+      desired.x += perimeterResidency.x;
+      desired.y += perimeterResidency.y;
 
       if (targetDistance > config.targetReachRadius * 1.35) {
         const targetRamp = clamp(
@@ -1185,14 +1441,19 @@ export class BugEntity extends Entity {
         };
         const loiterRadius = Math.max(config.targetReachRadius * 1.2, this.size * 2.8);
         const radialPressure = clamp(targetDistance / loiterRadius, 0, 1);
-        const orbitStrength = config.followStrength * (0.08 + radialPressure * 0.16);
-        const inwardCorrection = config.followStrength * (0.08 + (1 - radialPressure) * 0.08);
-        const driftStrength = 0.04 + wanderMultiplier * 0.025;
+        const orbitStrength = this.roamTargetLongPath
+          ? 0
+          : config.followStrength * (0.01 + radialPressure * 0.03);
+        const inwardCorrection = config.followStrength * (0.16 + (1 - radialPressure) * 0.12);
+        const forwardCarry = 0.05 + (1 - radialPressure) * 0.04;
+        const driftStrength = 0.02 + wanderMultiplier * 0.014;
 
         desired.x += tangentDirection.x * orbitStrength;
         desired.y += tangentDirection.y * orbitStrength;
         desired.x += targetDirection.x * inwardCorrection;
         desired.y += targetDirection.y * inwardCorrection;
+        desired.x += Math.cos(this.heading) * forwardCarry;
+        desired.y += Math.sin(this.heading) * forwardCarry;
         desired.x += Math.cos(this.wanderAngle) * driftStrength;
         desired.y += Math.sin(this.wanderAngle) * driftStrength;
       }
@@ -1210,10 +1471,6 @@ export class BugEntity extends Entity {
         );
         desired.x += regroup.x;
         desired.y += regroup.y;
-      } else if (mood === "loiter") {
-        const loiter = this.getLoiterSteering(targetDirection);
-        desired.x += loiter.x;
-        desired.y += loiter.y;
       }
 
       if (crowding && crowding.score > config.crowdRepathThreshold) {
@@ -1221,6 +1478,13 @@ export class BugEntity extends Entity {
           this.x - crowding.centerX,
           this.y - crowding.centerY,
         );
+        const crowdTangentBias = Math.sin(
+          this.seed * 29.7 + this.motionTime * 0.24 + crowding.count * 0.31,
+        );
+        const crowdTangent = {
+          x: -awayFromCrowd.y * crowdTangentBias,
+          y: awayFromCrowd.x * crowdTangentBias,
+        };
         const crowdPressure = clamp(
           (crowding.score - config.crowdRepathThreshold) /
             Math.max(1, config.crowdTargetPenalty / 18),
@@ -1228,8 +1492,12 @@ export class BugEntity extends Entity {
           1,
         );
 
-        desired.x += awayFromCrowd.x * config.crowdSteerStrength * crowdPressure;
-        desired.y += awayFromCrowd.y * config.crowdSteerStrength * crowdPressure;
+        desired.x +=
+          awayFromCrowd.x * config.crowdSteerStrength * crowdPressure * 0.5 +
+          crowdTangent.x * config.crowdSteerStrength * crowdPressure * 0.42 * crowdTangentBiasScale;
+        desired.y +=
+          awayFromCrowd.y * config.crowdSteerStrength * crowdPressure * 0.5 +
+          crowdTangent.y * config.crowdSteerStrength * crowdPressure * 0.42 * crowdTangentBiasScale;
         this.nextRoamTargetAt = Math.min(
           this.nextRoamTargetAt,
           now + config.crowdRepathDelay * 1000,
@@ -1418,6 +1686,18 @@ export class BugEntity extends Entity {
     const slowMult = this.slow ? this.slow.multiplier : 1;
     const burnSpeedBoost = isBurnPanicking ? 1.18 : 1;
     const moodSpeedMultiplier = this.getMoodSpeedMultiplier(this.movementMood);
+    const localCrowdPressure = clamp(
+      (crowding?.score ?? 0) / Math.max(config.crowdRepathThreshold, 1),
+      0,
+      1.8,
+    );
+    const speedPulse =
+      0.74 +
+      this.getUnitNoise(
+        this.motionTime * (0.52 + noiseFrequency * 0.16) + this.seed * 37.7,
+        this.seed * 61.1,
+      ) *
+        (0.56 + localCrowdPressure * 0.22);
     const desiredSpeed =
       config.baseSpeed *
       this.cruiseSpeed *
@@ -1426,9 +1706,10 @@ export class BugEntity extends Entity {
       speedBoost *
       slowMult *
       burnSpeedBoost *
-      moodSpeedMultiplier;
+      moodSpeedMultiplier *
+      speedPulse;
     const currentSpeed = getLength(this.vx, this.vy);
-    const nextSpeed = currentSpeed + (desiredSpeed - currentSpeed) * Math.min(1, dt * 4.2);
+    const nextSpeed = currentSpeed + (desiredSpeed - currentSpeed) * Math.min(1, dt * 5.4);
     this.vx = Math.cos(this.heading) * nextSpeed;
     this.vy = Math.sin(this.heading) * nextSpeed;
 

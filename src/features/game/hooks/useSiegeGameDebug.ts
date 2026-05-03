@@ -16,6 +16,8 @@ interface UseSiegeGameDebugOptions {
   interactiveInitialBugCounts: BugCounts;
   interactiveMode: boolean;
   lastKillAtRef: MutableRefObject<number | null>;
+  onClearComplete: () => void;
+  onEndSurvival: () => void;
   updateRuntimeSnapshot: (
     updater: (current: SiegeRuntimeSnapshotLike) => SiegeRuntimeSnapshotLike,
     force?: boolean,
@@ -43,6 +45,8 @@ export function useSiegeGameDebug({
   interactiveInitialBugCounts,
   interactiveMode,
   lastKillAtRef,
+  onClearComplete,
+  onEndSurvival,
   updateRuntimeSnapshot,
 }: UseSiegeGameDebugOptions) {
   const [debugMode, setDebugMode] = useState(getInitialDebugMode);
@@ -124,12 +128,22 @@ export function useSiegeGameDebug({
     );
     lastKillAtRef.current = null;
     setClearSwarmRequestId((current) => current + 1);
-  }, [interactiveMode, lastKillAtRef, updateRuntimeSnapshot]);
+    // Bypass the rAF pre-paint overwrite race: synchronously finalize the run
+    onClearComplete();
+  }, [interactiveMode, lastKillAtRef, onClearComplete, updateRuntimeSnapshot]);
+
+  const triggerSurvivalOverrun = useCallback(() => {
+    if (!interactiveMode) {
+      return;
+    }
+    onEndSurvival();
+  }, [interactiveMode, onEndSurvival]);
 
   return {
     clearSwarmRequestId,
     debugMode,
     killAllBugs,
     toggleDebugMode,
+    triggerSurvivalOverrun,
   };
 }

@@ -37,6 +37,15 @@ interface StructureEntry {
 }
 
 const DEFAULT_MAX_ACTIVE_ALLIES = 5;
+const GOLDEN_RATIO_CONJUGATE = 0.61803398875;
+
+function clamp(value: number, min: number, max: number) {
+  return Math.min(max, Math.max(min, value));
+}
+
+function fract(value: number) {
+  return value - Math.floor(value);
+}
 
 type SpatialCell = Entity[];
 
@@ -321,6 +330,7 @@ export class Engine {
       const n = counts[v] ?? 0;
       for (let i = 0; i < n; i++) {
         let be: BugEntity | undefined = undefined;
+        // spawn uniformly across the canvas with random initial headings
         const { x: spawnX, y: spawnY } = getSpawnPoint();
         const heading = Math.random() * Math.PI * 2;
         const speed = this.config.baseSpeed * (0.8 + Math.random() * 0.6);
@@ -358,11 +368,21 @@ export class Engine {
     }
   }
 
-  private getEdgeSpawnPoint() {
+  private getEdgeSpawnPoint(spawnIndex = 0, totalCount = 1) {
     const padding = 18;
     const edge = Math.floor(Math.random() * 4);
-    const x = padding + Math.random() * Math.max(1, this.width - padding * 2);
-    const y = padding + Math.random() * Math.max(1, this.height - padding * 2);
+    const spanPosition =
+      totalCount > 1
+        ? fract(spawnIndex * GOLDEN_RATIO_CONJUGATE + Math.random() * 0.35)
+        : Math.random();
+    const jitterScale = Math.min(0.22, 0.9 / Math.max(3, totalCount));
+    const lanePosition = clamp(
+      spanPosition + (Math.random() - 0.5) * jitterScale,
+      0.03,
+      0.97,
+    );
+    const x = padding + lanePosition * Math.max(1, this.width - padding * 2);
+    const y = padding + lanePosition * Math.max(1, this.height - padding * 2);
 
     if (edge === 0) {
       return { heading: Math.PI / 2, x, y: -padding };
@@ -382,13 +402,21 @@ export class Engine {
   spawnBurst(counts: Record<string, number>, spawnZones: SpawnZone[] = []) {
     void spawnZones;
     const variants = Object.keys(counts);
+    const totalCount = variants.reduce(
+      (total, variant) => total + Math.max(0, counts[variant] ?? 0),
+      0,
+    );
+    let spawnIndex = 0;
 
     for (const variant of variants) {
       const count = counts[variant] ?? 0;
       for (let index = 0; index < count; index += 1) {
-        const spawnPoint = this.getEdgeSpawnPoint();
-        const heading = spawnPoint.heading + (Math.random() - 0.5) * 0.7;
-        const speed = this.config.baseSpeed * (0.95 + Math.random() * 0.7);
+        const spawnPoint = this.getEdgeSpawnPoint(spawnIndex, totalCount);
+        const targetX = this.width * (0.18 + Math.random() * 0.64);
+        const targetY = this.height * (0.18 + Math.random() * 0.64);
+        const inwardHeading = Math.atan2(targetY - spawnPoint.y, targetX - spawnPoint.x);
+        const heading = inwardHeading + (Math.random() - 0.5) * 0.55;
+        const speed = this.config.baseSpeed * (0.9 + Math.random() * 0.85);
         let bug: BugEntity;
 
         if (this.pool.length > 0) {
@@ -421,6 +449,7 @@ export class Engine {
         }
 
         this.entities.push(bug);
+        spawnIndex += 1;
       }
     }
   }

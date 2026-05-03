@@ -175,6 +175,7 @@ export interface BugCanvasProps {
   maxWeaponTier?: import("@game/types").WeaponTier;
   bugCounts: BugCounts;
   runtimeSpeedMultiplier?: number;
+  gamePaused?: boolean;
   runSeed?: string | null;
   sceneProfile: SceneProfile;
   sessionKey: string;
@@ -243,6 +244,7 @@ const BugCanvas = memo(
       maxWeaponTier,
       bugCounts,
       runtimeSpeedMultiplier = 1,
+      gamePaused = false,
       runSeed = null,
       sceneProfile,
       sessionKey,
@@ -307,6 +309,7 @@ const BugCanvas = memo(
     const latestBugPositionsRef = useRef<RenderedBugPosition[]>([]);
     const lastReportedLiveBugCountRef = useRef<number | null>(null);
     const lastAppliedSpawnPlanRef = useRef(0);
+    const gamePausedRef = useRef(gamePaused);
     const targetSettingsRef = useRef({
       sizeMultiplier: bugVisualSettings?.sizeMultiplier ?? 1,
       speedMultiplier: getSpeedMultiplier(bugVisualSettings?.chaosMultiplier),
@@ -356,6 +359,7 @@ const BugCanvas = memo(
 
     useEffect(() => {
       interactiveModeRef.current = interactiveMode;
+      gamePausedRef.current = gamePaused;
       onWeaponEvolutionStatesChangeRef.current = onWeaponEvolutionStatesChange;
       getWeaponTierRef.current = getWeaponTier;
       onLiveBugCountChangeRef.current = onLiveBugCountChange;
@@ -401,6 +405,7 @@ const BugCanvas = memo(
       streakMultiplier,
       transitionSnapshot,
       interactiveMode,
+      gamePaused,
     ]);
 
     const getLocalSiegeZones = useCallback(() => {
@@ -714,7 +719,7 @@ const BugCanvas = memo(
         );
 
         // advance engine or swarm according to elapsed time to create continuous motion
-        if (swarmRef.current) {
+        if (swarmRef.current && !gamePausedRef.current) {
           if ((swarmRef.current as any).config) {
             const engine = swarmRef.current as any;
             const base =
@@ -771,7 +776,7 @@ const BugCanvas = memo(
         });
         latestBugPositionsRef.current = nextBugPositions;
         if (interactiveModeRef.current) {
-          const liveBugCount = nextBugPositions.length;
+          const liveBugCount = getActiveBugCount(activeParticles as Array<any>);
           if (lastReportedLiveBugCountRef.current !== liveBugCount) {
             lastReportedLiveBugCountRef.current = liveBugCount;
             onLiveBugCountChangeRef.current?.(liveBugCount);

@@ -11,32 +11,17 @@ import type {
 import { WEAPON_DEFS } from "@config/weaponConfig";
 import { getBugVariantColor } from "../../../constants/bugs";
 import type { BugVariant } from "../../../types/dashboard";
-import {
-  WeaponMatchup,
-  WeaponTier,
-  type SiegeWeaponId,
-  type WeaponProgressSnapshot,
-} from "@game/types";
+import { WeaponMatchup, WeaponTier, type SiegeWeaponId } from "@game/types";
 import { getColoredSvgUrl } from "@game/utils/bugSprite";
 import { cn } from "@shared/utils/cn";
 import WeaponGlyph from "@shared/components/icons/WeaponGlyph";
 import Tabs from "@shared/components/Tabs";
 import { getWeaponTiers } from "@game/weapons/progression";
-import {
-  getWeaponTierNodeCount,
-  getTierBarCoreClassName,
-  getTierNodeClassName,
-  getTierNodeFillClassName,
-  getTierNodeFillWidth,
-  getTierNodeOffsetClassName,
-  getTierSelectedFrameClassName,
-} from "./siegeHud.helpers";
 import type { WeaponDef, WeaponTierDefinition } from "@game/weapons/types";
 import {
   getBehaviorLabel,
   getThreatLabel,
   getVariantAccent,
-  type VariantAccent,
 } from "./codexPanel.helpers";
 
 interface CodexPanelProps {
@@ -121,52 +106,6 @@ function buildNeutralWeaponBackground() {
     boxShadow:
       "inset 0 1px 0 rgba(255,255,255,0.06), 0 18px 40px rgba(0,0,0,0.24)",
   } satisfies CSSProperties;
-}
-
-function createTierPreviewSnapshot(
-  weapon: WeaponDef,
-  tierDefinition: WeaponTierDefinition,
-): WeaponProgressSnapshot {
-  const tiers = getWeaponTiers(weapon);
-  const tierIndex = tiers.findIndex(
-    (tier) => tier.tier === tierDefinition.tier,
-  );
-  const previousThreshold =
-    tierIndex > 0 ? (tiers[tierIndex - 1]?.evolveAtKills ?? 0) : 0;
-  const nextThreshold = tierDefinition.evolveAtKills ?? null;
-  const isMaxTier = nextThreshold == null;
-  const progressWindow = Math.max(
-    1,
-    (nextThreshold ?? previousThreshold + 10) - previousThreshold,
-  );
-  const weaponKills = isMaxTier
-    ? Math.max(previousThreshold + 6, previousThreshold)
-    : previousThreshold + Math.max(1, Math.round(progressWindow * 0.62));
-  const killsToNextTier = isMaxTier
-    ? null
-    : Math.max(0, nextThreshold - weaponKills);
-
-  return {
-    cooldownMs: weapon.cooldownMs,
-    current: false,
-    currentTierStartKills: previousThreshold,
-    detail: tierDefinition.detail,
-    hint: tierDefinition.hint,
-    id: weapon.id,
-    inputMode: weapon.inputMode,
-    locked: false,
-    maxTier: tiers[tiers.length - 1]?.tier ?? WeaponTier.TIER_ONE,
-    matchupSummary: [],
-    nextTierGoalKills: nextThreshold,
-    progressText: tierDefinition.title,
-    title: tierDefinition.title,
-    typeHint: weapon.typeHint,
-    typeLabel: weapon.typeLabel,
-    unlockKills: weapon.unlockKills,
-    tier: tierDefinition.tier,
-    weaponKills,
-    killsToNextTier,
-  };
 }
 
 function getBugCardStyle(entry: BugType, id: string) {
@@ -349,11 +288,13 @@ function MatchupBugStrip({
 
 function MatchupWeaponStrip({
   emptyLabel,
+  onSelectWeapon,
   title,
   toneClassName,
   weaponEntries,
 }: {
   emptyLabel: string;
+  onSelectWeapon?: (id: SiegeWeaponId) => void;
   title: string;
   toneClassName: string;
   weaponEntries: Array<[BugWeaponId, BugWeaponMatchup]>;
@@ -379,15 +320,38 @@ function MatchupWeaponStrip({
 
       {preview.length > 0 ? (
         <div className="mt-2 flex items-center gap-1.5">
-          {preview.map(([weaponId, matchup]) => (
-            <div
-              key={`${title}-${weaponId}`}
-              className="flex h-9 w-9 items-center justify-center rounded-[12px] border border-white/10 bg-white/[0.05] text-stone-100 shadow-[0_10px_18px_rgba(0,0,0,0.18)]"
-              title={`${weaponId}: ${matchup.note}`}
-            >
-              <WeaponGlyph className="h-5 w-5" id={weaponId as SiegeWeaponId} />
-            </div>
-          ))}
+          {preview.map(([weaponId, matchup]) =>
+            onSelectWeapon ? (
+              <button
+                key={`${title}-${weaponId}`}
+                data-hud-cursor="pointer"
+                data-testid="codex-matchup-weapon"
+                className="flex h-9 w-9 items-center justify-center rounded-[12px] border border-white/10 bg-white/[0.05] text-stone-100 shadow-[0_10px_18px_rgba(0,0,0,0.18)]"
+                title={`${weaponId}: ${matchup.note}`}
+                type="button"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onSelectWeapon(weaponId as SiegeWeaponId);
+                }}
+              >
+                <WeaponGlyph
+                  className="h-5 w-5"
+                  id={weaponId as SiegeWeaponId}
+                />
+              </button>
+            ) : (
+              <div
+                key={`${title}-${weaponId}`}
+                className="flex h-9 w-9 items-center justify-center rounded-[12px] border border-white/10 bg-white/[0.05] text-stone-100 shadow-[0_10px_18px_rgba(0,0,0,0.18)]"
+                title={`${weaponId}: ${matchup.note}`}
+              >
+                <WeaponGlyph
+                  className="h-5 w-5"
+                  id={weaponId as SiegeWeaponId}
+                />
+              </div>
+            ),
+          )}
           {overflowCount > 0 ? (
             <span className="inline-flex h-9 min-w-9 items-center justify-center rounded-[12px] border border-white/10 bg-white/[0.05] px-2 text-[0.68rem] font-semibold text-stone-200">
               +{overflowCount}
@@ -479,7 +443,7 @@ function CodexSummaryCard({
   footer?: ReactNode;
   icon: ReactNode;
   iconShellClassName?: string;
-  onActivate: () => void;
+  onActivate?: () => void;
   overlay?: ReactNode;
   rightSlot?: ReactNode;
   style: CSSProperties;
@@ -487,20 +451,28 @@ function CodexSummaryCard({
   testId: string;
   title: string;
 }) {
+  const interactive = !!onActivate;
   return (
     <div
-      data-hud-cursor="pointer"
+      data-hud-cursor={interactive ? "pointer" : undefined}
       data-testid={testId}
-      onClick={onActivate}
-      onKeyDown={(event) => {
-        if (event.key === "Enter" || event.key === " ") {
-          event.preventDefault();
-          onActivate();
-        }
-      }}
-      role="button"
-      tabIndex={0}
-      className="group relative overflow-hidden rounded-[20px] border border-white/10 p-3 text-left transition duration-200 hover:border-white/18 hover:bg-white/[0.05]"
+      onClick={interactive ? onActivate : undefined}
+      onKeyDown={
+        interactive
+          ? (event) => {
+              if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault();
+                onActivate?.();
+              }
+            }
+          : undefined
+      }
+      role={interactive ? "button" : undefined}
+      tabIndex={interactive ? 0 : undefined}
+      className={cn(
+        "group relative overflow-hidden rounded-[20px] border border-white/10 p-3 text-left transition duration-200",
+        interactive && "hover:border-white/18 hover:bg-white/[0.05]",
+      )}
       style={style}
     >
       {overlay ? (
@@ -605,71 +577,81 @@ function WeaponSummaryCard({
   );
 }
 
-function WeaponTierCard({
+function getCodexTierTextClassName(tier: WeaponTierDefinition): string {
+  const isMax = tier.evolution == null;
+  if (isMax) return "text-orange-300";
+  switch (tier.tier) {
+    case WeaponTier.TIER_FOUR:
+      return "text-red-400";
+    case WeaponTier.TIER_THREE:
+      return "text-orange-400";
+    case WeaponTier.TIER_TWO:
+      return "text-amber-400";
+    default:
+      return "text-slate-300";
+  }
+}
+
+function WeaponTierPill({
   tier,
-  weapon,
+  unlocksAt,
 }: {
   tier: WeaponTierDefinition;
-  weapon: WeaponDef;
+  unlocksAt: number | null;
 }) {
-  const snapshot = createTierPreviewSnapshot(weapon, tier);
+  const isMax = tier.evolution == null;
+  const borderClass = isMax
+    ? "border-orange-100/40"
+    : tier.tier === WeaponTier.TIER_FOUR
+      ? "border-red-400/30"
+      : tier.tier === WeaponTier.TIER_THREE
+        ? "border-orange-400/30"
+        : tier.tier === WeaponTier.TIER_TWO
+          ? "border-amber-400/30"
+          : "border-slate-400/20";
+
+  const bgClass = isMax
+    ? "bg-[linear-gradient(180deg,rgba(255,247,237,0.10),rgba(153,27,27,0.28))]"
+    : tier.tier === WeaponTier.TIER_FOUR
+      ? "bg-[linear-gradient(180deg,rgba(254,200,140,0.08),rgba(139,27,27,0.22))]"
+      : tier.tier === WeaponTier.TIER_THREE
+        ? "bg-[linear-gradient(180deg,rgba(253,186,116,0.08),rgba(160,50,10,0.22))]"
+        : tier.tier === WeaponTier.TIER_TWO
+          ? "bg-[linear-gradient(180deg,rgba(253,186,116,0.06),rgba(120,53,15,0.22))]"
+          : "bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(30,41,59,0.28))]";
 
   return (
-    <div
-      className={cn(
-        "rounded-[16px] border p-2.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]",
-        snapshot
-          ? getTierSelectedFrameClassName(snapshot)
-          : "border-white/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.06),rgba(255,255,255,0.02))]",
-      )}
-    >
-      <div className="flex items-center justify-between gap-2">
-        <p className="text-[0.62rem] font-semibold uppercase tracking-[0.2em] text-stone-500">
-          {WEAPON_STAGE_LABELS[tier.tier]}
+    <div className="flex min-w-0 flex-1 flex-col items-center gap-1">
+      <span
+        className={cn(
+          "text-[0.58rem] font-bold uppercase tracking-[0.18em]",
+          getCodexTierTextClassName(tier),
+        )}
+      >
+        {WEAPON_STAGE_LABELS[tier.tier]}
+      </span>
+      <div
+        className={cn(
+          "w-full rounded-[10px] border px-2 py-1.5 text-center",
+          borderClass,
+          bgClass,
+        )}
+      >
+        <p className="text-[0.72rem] font-bold tabular-nums text-stone-100">
+          {unlocksAt == null ? "Start" : `${unlocksAt}`}
         </p>
-        <span className="text-[0.62rem] text-stone-500">
-          {tier.evolveAtKills == null ? "Start" : `${tier.evolveAtKills} kills`}
-        </span>
-      </div>
-      {snapshot ? (
-        <div
-          className="mt-2 grid gap-1.5"
-          style={{
-            gridTemplateColumns: `repeat(${getWeaponTierNodeCount(snapshot)}, minmax(0, 1fr))`,
-          }}
-        >
-          {Array.from(
-            { length: getWeaponTierNodeCount(snapshot) },
-            (_, index) => (
-              <span
-                key={`${tier.title}-node-${index + 1}`}
-                className={cn(
-                  getTierNodeOffsetClassName(snapshot, index + 1),
-                  getTierNodeClassName(snapshot, index + 1, "panel"),
-                )}
-              >
-                <span
-                  className={cn(
-                    "absolute inset-y-0 left-0 rounded-full transition-[width] duration-300",
-                    getTierNodeFillClassName(snapshot),
-                  )}
-                  style={{ width: getTierNodeFillWidth(snapshot, index + 1) }}
-                >
-                  <span
-                    className={cn(
-                      "absolute inset-y-0 left-0 right-0 rounded-full",
-                      getTierBarCoreClassName(snapshot),
-                    )}
-                  />
-                </span>
-              </span>
-            ),
+        <p
+          className={cn(
+            "text-[0.56rem] uppercase tracking-[0.12em] text-stone-500",
+            unlocksAt == null && "opacity-0",
           )}
-        </div>
-      ) : null}
-      <h4 className="mt-1.5 text-[0.9rem] font-semibold tracking-[-0.03em] text-stone-50">
+        >
+          kills
+        </p>
+      </div>
+      <p className="w-full truncate text-center text-[0.68rem] font-semibold text-stone-300">
         {tier.title}
-      </h4>
+      </p>
     </div>
   );
 }
@@ -688,189 +670,73 @@ function WeaponDetailView({
 
   return (
     <div
-      className="mx-auto flex w-full max-w-[50rem] flex-col gap-2.5"
+      className="mx-auto flex w-full max-w-[50rem] flex-col gap-2"
       data-testid="codex-weapon-detail-view"
     >
       <section
-        className="rounded-[20px] border border-white/10 p-3"
+        className="rounded-[20px] border border-white/10 p-2.5"
         style={buildNeutralWeaponBackground()}
       >
-        <div className="grid gap-2.5 lg:grid-cols-[minmax(0,1.25fr)_minmax(17rem,0.9fr)]">
-          <div>
-            <div className="flex flex-wrap items-start gap-3">
-              <div className="flex h-14 w-14 items-center justify-center rounded-[18px] border border-white/28 bg-[linear-gradient(180deg,rgba(255,255,255,0.16),rgba(255,255,255,0.05))] text-stone-50 shadow-[0_14px_24px_rgba(0,0,0,0.22)] ring-1 ring-white/10">
-                <WeaponGlyph className="h-7 w-7" id={weapon.id} />
-              </div>
-              <div className="min-w-0 flex-1">
-                <SectionEyebrow>Weapon Dossier</SectionEyebrow>
-                <div className="mt-1 flex flex-wrap items-center gap-2">
-                  <h3 className="text-[1.12rem] font-semibold tracking-[-0.03em] text-stone-50">
-                    {weapon.title}
-                  </h3>
-                  <Badge className="border-white/16 bg-black/18 text-stone-100">
-                    {weapon.typeLabel}
-                  </Badge>
-                </div>
-                <p className="mt-1.5 text-[0.82rem] leading-5 text-stone-200">
-                  {weapon.detail}
-                </p>
-              </div>
+        <div className="space-y-1.5">
+          <SectionEyebrow>Mechanics</SectionEyebrow>
+          <div className="grid grid-cols-4 gap-1.5">
+            <div className="rounded-[12px] border border-white/8 bg-black/16 px-2 py-1.5">
+              <SectionEyebrow>Pattern</SectionEyebrow>
+              <p className="mt-1 text-xs font-semibold text-stone-100">
+                {getHitPatternLabel(weapon.hitPattern)}
+              </p>
             </div>
-
-            <div className="mt-2.5 grid gap-2 sm:grid-cols-2">
-              <MatchupBugStrip
-                bugEntries={favored}
-                emptyLabel="No favored bugs are mapped for this weapon."
-                onSelectBug={onJumpToBug}
-                title="Effective Against"
-                toneClassName="text-emerald-200"
-              />
-              <MatchupBugStrip
-                bugEntries={risky}
-                emptyLabel="No weak pockets are mapped for this weapon."
-                onSelectBug={onJumpToBug}
-                title="Ineffective Against"
-                toneClassName="text-rose-200"
-              />
+            <div className="rounded-[12px] border border-white/8 bg-black/16 px-2 py-1.5">
+              <SectionEyebrow>Input</SectionEyebrow>
+              <p className="mt-1 text-xs font-semibold text-stone-100">
+                {getInputModeLabel(weapon.inputMode)}
+              </p>
             </div>
-          </div>
-
-          <div className="space-y-1.5">
-            <SectionEyebrow>Mechanics</SectionEyebrow>
-            <div className="grid gap-2 sm:grid-cols-2">
-              <div className="rounded-[14px] border border-white/8 bg-black/16 p-2.5">
-                <SectionEyebrow>Pattern</SectionEyebrow>
-                <p className="mt-1.5 text-sm font-semibold text-stone-100">
-                  {getHitPatternLabel(weapon.hitPattern)}
-                </p>
-              </div>
-              <div className="rounded-[14px] border border-white/8 bg-black/16 p-2.5">
-                <SectionEyebrow>Input</SectionEyebrow>
-                <p className="mt-1.5 text-sm font-semibold text-stone-100">
-                  {getInputModeLabel(weapon.inputMode)}
-                </p>
-              </div>
-              <div className="rounded-[14px] border border-white/8 bg-black/16 p-2.5">
-                <SectionEyebrow>Cooldown</SectionEyebrow>
-                <p className="mt-1.5 text-sm font-semibold text-stone-100">
-                  {formatDurationMs(weapon.cooldownMs)}
-                </p>
-              </div>
-              <div className="rounded-[14px] border border-white/8 bg-black/16 p-2.5">
-                <SectionEyebrow>Unlock</SectionEyebrow>
-                <p className="mt-1.5 text-sm font-semibold text-stone-100">
-                  {weapon.unlockKills === 0
-                    ? "Run start"
-                    : `${weapon.unlockKills} kills`}
-                </p>
-              </div>
+            <div className="rounded-[12px] border border-white/8 bg-black/16 px-2 py-1.5">
+              <SectionEyebrow>Cooldown</SectionEyebrow>
+              <p className="mt-1 text-xs font-semibold text-stone-100">
+                {formatDurationMs(weapon.cooldownMs)}
+              </p>
+            </div>
+            <div className="rounded-[12px] border border-white/8 bg-black/16 px-2 py-1.5">
+              <SectionEyebrow>Unlock</SectionEyebrow>
+              <p className="mt-1 text-xs font-semibold text-stone-100">
+                {weapon.unlockKills === 0
+                  ? "Run start"
+                  : `${weapon.unlockKills} kills`}
+              </p>
             </div>
           </div>
         </div>
-      </section>
 
-      <section className="rounded-[20px] border border-white/10 bg-white/[0.03] p-3">
-        <SectionEyebrow>Progression</SectionEyebrow>
-        <div className="mt-2 grid gap-2 md:grid-cols-3">
-          {tiers.map((tier) => (
-            <WeaponTierCard key={tier.tier} tier={tier} weapon={weapon} />
-          ))}
-        </div>
-      </section>
-    </div>
-  );
-}
-
-function BugDetailMotif({ accent }: { accent: VariantAccent }) {
-  return (
-    <>
-      <div
-        className="absolute right-8 top-6 h-14 w-14 rounded-full border border-white/10 opacity-80 animate-pulse"
-        style={{ boxShadow: `0 0 24px ${accent.washA}` }}
-      />
-      <div
-        className="absolute right-14 top-12 h-[2px] w-20 rotate-[14deg] rounded-full opacity-80 animate-pulse"
-        style={{ background: accent.metricFillGradient }}
-      />
-      <div
-        className="absolute right-6 top-20 h-2.5 w-2.5 rounded-full opacity-70 animate-pulse"
-        style={{ background: accent.washB }}
-      />
-    </>
-  );
-}
-
-function BugDetailView({
-  activeEntry,
-  accent,
-  id,
-}: {
-  activeEntry: BugType;
-  accent: VariantAccent;
-  id: string;
-}) {
-  const { favored, risky } = getBugWeaponMatchupBuckets(activeEntry);
-
-  return (
-    <div
-      className="mx-auto flex w-full max-w-[50rem] flex-col gap-2.5"
-      data-testid="codex-detail-view"
-    >
-      <section
-        className="relative overflow-hidden rounded-[20px] border border-white/10 p-3"
-        style={buildCardBackground(accent.washA, accent.washB)}
-      >
-        <div className="pointer-events-none absolute inset-0 opacity-[0.08] [background-image:radial-gradient(circle_at_1px_1px,rgba(255,255,255,0.7)_1px,transparent_0)] [background-size:18px_18px]" />
-        <BugDetailMotif accent={accent} />
-
-        <div className="relative flex flex-wrap items-start gap-3">
-          <div
-            className={cn(
-              "flex h-14 w-14 items-center justify-center rounded-[18px] border bg-[linear-gradient(180deg,rgba(255,255,255,0.16),rgba(255,255,255,0.06))] p-2.5 shadow-[0_14px_24px_rgba(0,0,0,0.22)] ring-1 ring-white/14",
-              accent.iconBorderClass,
-            )}
-          >
-            <img
-              alt=""
-              className="h-8 w-8 object-contain"
-              src={getTabIconSrc(activeEntry, id)}
-            />
-          </div>
-
-          <div className="min-w-0 flex-1">
-            <SectionEyebrow>Bug Dossier</SectionEyebrow>
-            <div className="mt-1 flex flex-wrap items-center gap-2">
-              <h3 className="text-[1.12rem] font-semibold tracking-[-0.03em] text-stone-50">
-                {activeEntry.name}
-              </h3>
-              <Badge className={accent.badgeClass}>
-                {getThreatLabel(
-                  (activeEntry.iconVariant ?? id) as BugVariant,
-                )}
-              </Badge>
-              <Badge className={accent.behaviorClass}>
-                {getBehaviorLabel(activeEntry.profile.behavior)}
-              </Badge>
-            </div>
-            <p className="mt-1.5 text-[0.82rem] leading-5 text-stone-200">
-              {activeEntry.description}
-            </p>
-          </div>
-        </div>
-
-        <div className="relative mt-3 grid gap-2 sm:grid-cols-2">
-          <MatchupWeaponStrip
-            emptyLabel="No weapon weak spots mapped yet."
-            title="Weaknesses"
+        <div className="mt-2 grid gap-2 sm:grid-cols-2">
+          <MatchupBugStrip
+            bugEntries={favored}
+            emptyLabel="No favored bugs are mapped for this weapon."
+            onSelectBug={onJumpToBug}
+            title="Effective Against"
             toneClassName="text-emerald-200"
-            weaponEntries={favored}
           />
-          <MatchupWeaponStrip
-            emptyLabel="No weapon resistances mapped yet."
-            title="Strengths"
+          <MatchupBugStrip
+            bugEntries={risky}
+            emptyLabel="No weak pockets are mapped for this weapon."
+            onSelectBug={onJumpToBug}
+            title="Ineffective Against"
             toneClassName="text-rose-200"
-            weaponEntries={risky}
           />
+        </div>
+      </section>
+
+      <section className="rounded-[20px] border border-white/10 bg-white/[0.03] px-3 py-2.5">
+        <SectionEyebrow>Progression</SectionEyebrow>
+        <div className="mt-2 flex gap-2">
+          {tiers.map((tier, i) => (
+            <WeaponTierPill
+              key={tier.tier}
+              tier={tier}
+              unlocksAt={i === 0 ? null : (tiers[i - 1]?.evolveAtKills ?? null)}
+            />
+          ))}
         </div>
       </section>
     </div>
@@ -881,10 +747,12 @@ function SummaryCard({
   id,
   entry,
   onSelect,
+  onSelectWeapon,
 }: {
   id: string;
   entry: BugType;
   onSelect: (id: string) => void;
+  onSelectWeapon?: (id: SiegeWeaponId) => void;
 }) {
   const variant = (entry.iconVariant ?? id) as BugVariant;
   const accent = getVariantAccent(variant);
@@ -897,12 +765,14 @@ function SummaryCard({
         <div className="grid gap-2 sm:grid-cols-2">
           <MatchupWeaponStrip
             emptyLabel="No mapped weak spots yet."
+            onSelectWeapon={onSelectWeapon}
             title="Weaknesses"
             toneClassName="text-emerald-200"
             weaponEntries={favored}
           />
           <MatchupWeaponStrip
             emptyLabel="No mapped resistances yet."
+            onSelectWeapon={onSelectWeapon}
             title="Strengths"
             toneClassName="text-rose-200"
             weaponEntries={risky}
@@ -920,7 +790,7 @@ function SummaryCard({
         "border-white/24 bg-gradient-to-br shadow-[0_0_20px_rgba(0,0,0,0.16)] ring-white/12",
         accent.iconPanel,
       )}
-      onActivate={() => onSelect(id)}
+      onActivate={undefined}
       overlay={
         <>
           <div
@@ -1001,6 +871,11 @@ export default function CodexPanel({
     setSelectedEntry({ id, kind: "bug" });
   }, []);
 
+  const handleJumpToWeapon = useCallback((id: SiegeWeaponId) => {
+    setActiveView("weapons");
+    setSelectedEntry({ id, kind: "weapon" });
+  }, []);
+
   const handleBackToGrid = useCallback(() => {
     setSelectedEntry(null);
   }, []);
@@ -1066,6 +941,7 @@ export default function CodexPanel({
               <button
                 aria-label="Close bug codex"
                 data-hud-cursor="default"
+                data-no-hammer="true"
                 className="fixed inset-0 z-[260] bg-black/45 backdrop-blur-[2px]"
                 onClick={onMenuToggle}
                 type="button"
@@ -1074,6 +950,7 @@ export default function CodexPanel({
                 className="fixed inset-x-4 top-[8vh] z-[270] mx-auto flex max-h-[78vh] w-full max-w-[58rem] overflow-hidden rounded-[28px] border border-white/10 shadow-[0_30px_90px_rgba(0,0,0,0.52)] backdrop-blur-xl"
                 data-codex-modal-root="true"
                 data-hud-cursor="default"
+                data-no-hammer="true"
                 data-testid="codex-modal"
                 style={backdropStyle}
               >
@@ -1127,22 +1004,36 @@ export default function CodexPanel({
                               </Badge>
                             </div>
                           </div>
-
-                          <div className="mt-2 px-1">
-                            <p className="max-w-[40rem] text-[0.82rem] leading-5 text-stone-300">
-                              {bugEntry.description}
+                        </>
+                      ) : selectedWeapon ? (
+                        <div className="flex min-w-0 items-center gap-3">
+                          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[16px] border border-white/28 bg-[linear-gradient(180deg,rgba(255,255,255,0.16),rgba(255,255,255,0.05))] text-stone-50 shadow-[0_0_20px_rgba(0,0,0,0.16)] ring-1 ring-white/10">
+                            <WeaponGlyph
+                              className="h-7 w-7"
+                              id={selectedWeapon.id}
+                            />
+                          </div>
+                          <div className="min-w-0">
+                            <div className="mt-1 flex flex-wrap items-center gap-2">
+                              <h3 className="text-[1.15rem] font-semibold tracking-[-0.03em] text-stone-50">
+                                {selectedWeapon.title}
+                              </h3>
+                              <Badge className="border-white/16 bg-black/18 text-stone-100">
+                                {selectedWeapon.typeLabel}
+                              </Badge>
+                            </div>
+                            <p className="mt-1 text-xs uppercase tracking-[0.18em] text-stone-300/80">
+                              {getHitPatternLabel(selectedWeapon.hitPattern)}
                             </p>
                           </div>
-                        </>
+                        </div>
                       ) : (
                         <>
                           {/* eyebrow intentionally hidden on list view */}
                           <h2 className="mt-1 text-[1.3rem] font-semibold tracking-[-0.04em] text-stone-50">
                             {activeView === "weapons"
                               ? "Weapon Codex"
-                              : selectedEntry
-                                ? selectedEntry.id
-                                : "Bug Codex"}
+                              : "Bug Codex"}
                           </h2>
                           <p className="mt-1.5 text-[0.82rem] leading-5 text-stone-300">
                             {activeView === "weapons"
@@ -1187,26 +1078,20 @@ export default function CodexPanel({
                     </div>
                   </div>
 
-                  <div
-                    className="relative border-b border-white/8 px-4 py-2.5"
-                    data-testid="codex-tabs"
-                  >
-                    <Tabs
-                      activeTab={activeView as any}
-                      onChange={handleTabChange}
-                      tabs={CODEX_TABS as any}
-                    />
-                  </div>
-
-                  {activeView === "bugs" && bugEntry && selectedVariant ? (
-                    <div className="mb-4 flex-1 overflow-y-auto px-4 py-3">
-                      <BugDetailView
-                        accent={selectedAccent}
-                        activeEntry={bugEntry}
-                        id={selectedEntry?.id ?? fallbackId}
+                  {!(activeView === "weapons" && selectedWeapon) ? (
+                    <div
+                      className="relative border-b border-white/8 px-4 py-2.5"
+                      data-testid="codex-tabs"
+                    >
+                      <Tabs
+                        activeTab={activeView as any}
+                        onChange={handleTabChange}
+                        tabs={CODEX_TABS as any}
                       />
                     </div>
-                  ) : activeView === "bugs" ? (
+                  ) : null}
+
+                  {activeView === "bugs" ? (
                     <div className="flex-1 overflow-y-auto px-4 py-4">
                       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-2">
                         {entries.map(([id, entry]) => (
@@ -1215,6 +1100,7 @@ export default function CodexPanel({
                             id={id}
                             entry={entry}
                             onSelect={handleSelectBug}
+                            onSelectWeapon={handleJumpToWeapon}
                           />
                         ))}
                       </div>

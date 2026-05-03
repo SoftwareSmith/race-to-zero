@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type RefObject } from "react";
 import { getSiegeWeaponLabel } from "@game/progression/progression";
+import Tooltip from "@shared/components/Tooltip";
 import { cn } from "@shared/utils/cn";
 import type {
   SiegeGameMode,
@@ -34,6 +35,7 @@ interface SiegeHudProps {
   } | null;
   onChangeGameMode?: (mode: SiegeGameMode) => void;
   onExit: () => void;
+  onEndSurvival?: () => void;
   onKillAllBugs?: () => void;
   onToggleCodex?: () => void;
   onSelectWeapon: (id: SiegeWeaponId) => void;
@@ -74,6 +76,7 @@ export default function SiegeHud({
   killStreak,
   lastFireTimes,
   onChangeGameMode,
+  onEndSurvival,
   onExit,
   onKillAllBugs,
   onToggleCodex,
@@ -132,6 +135,12 @@ export default function SiegeHud({
     survivalIntegrityPercent > 0
       ? `Site critical • ${survivalStatus.secondsUntilOffline}s to offline`
       : null;
+  const survivalIntegrityLabel =
+    survivalStatus?.secondsUntilOffline != null ? "Offline ETA" : "Site integrity";
+  const survivalIntegrityTooltip =
+    survivalStatus?.secondsUntilOffline != null
+      ? "The site is taking breach damage. This timer shows how long until the run ends if pressure stays this high."
+      : "Overall site health. If bug pressure overwhelms the defense threshold, this converts into a time-to-offline countdown.";
 
   useEffect(() => {
     return () => {
@@ -249,9 +258,12 @@ export default function SiegeHud({
                 data-testid="siege-offline-pressure"
               >
                 <div className="flex items-center justify-between gap-2">
-                  <span className="text-[0.48rem] font-semibold uppercase tracking-[0.14em] text-stone-400">
-                    Site online
-                  </span>
+                  <Tooltip
+                    content={survivalIntegrityTooltip}
+                    triggerClassName="inline-flex items-center text-[0.48rem] font-semibold uppercase tracking-[0.14em] text-stone-400"
+                  >
+                    <span>{survivalIntegrityLabel}</span>
+                  </Tooltip>
                   <strong className="font-display text-[0.76rem] leading-none tracking-[-0.04em] text-stone-50">
                     {survivalStatus?.secondsUntilOffline != null
                       ? `${survivalStatus.secondsUntilOffline}s`
@@ -279,6 +291,7 @@ export default function SiegeHud({
             gameMode={gameMode}
             onChangeGameMode={onChangeGameMode}
             onExit={onExit}
+            onEndSurvival={onEndSurvival}
             onKillAllBugs={onKillAllBugs}
             onToggleCodex={onToggleCodex}
             onToggleDebugMode={onToggleDebugMode}

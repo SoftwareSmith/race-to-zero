@@ -1,10 +1,17 @@
-import { memo, useEffect, useRef, useState, type KeyboardEvent } from "react";
+import {
+  memo,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type KeyboardEvent,
+} from "react";
 import { formatElapsedTime } from "@game/components/siege-hud/formatElapsedTime";
 import type {
   SiegeCompletionSummary,
   SiegeLeaderboardEntry,
 } from "@game/hooks/useSiegeRunCompletion";
-import { SIEGE_GAME_MODE_META, type SiegeGameMode } from "@game/types";
+import { SIEGE_GAME_MODE_META } from "@game/types";
 
 interface SiegeRunCompleteOverlayProps {
   completionSummary: SiegeCompletionSummary;
@@ -14,13 +21,42 @@ interface SiegeRunCompleteOverlayProps {
   onSwitchMode: () => void;
 }
 
-interface CompletionActionCardProps {
-  description: string;
-  label: string;
-  onClick: () => void;
-  testId: string;
-  title: string;
-  tone: "default" | "sky" | "emerald";
+const TIME_ATTACK_QUIPS = [
+  "Now go back to work and fix the actual bugs.",
+  "Zero bugs — for the next five minutes, at least.",
+  "Clean sweep. The real backlog awaits.",
+  "Bugs resolved. Your Linear board is still a disaster.",
+  "Victory! Now, about that PR that's been in review for three weeks\u2026",
+  "Impressive. Now let's pretend production doesn't exist.",
+  "Speedrun complete. QA already found something.",
+  "All fixed. Nobody knows how, but it's fixed.",
+  "You fixed the bugs. Please don't touch anything else.",
+  "Perfect run. Ship it before anyone notices.",
+  "Fast fixes deployed. Long-term consequences pending.",
+  "Everything works. This is suspicious.",
+];
+
+const SURVIVAL_QUIPS = [
+  "They won. You deserve a coffee break.",
+  "Site overwhelmed \u2014 honestly, same.",
+  "Overrun. At least now you know your exact bug count.",
+  "Critical failure. Have you tried turning it off and on again?",
+  "The bugs are winning\u2026 in production too, probably.",
+  "You held longer than that one ticket that's been 'in progress' since Q3.",
+  "You lasted longer than the last deployment.",
+  "Crash confirmed. Logs are, of course, useless.",
+  "Downtime achieved. Accidentally.",
+  "Production sends its regards.",
+  "It worked locally.",
+  "We’ll call it a flaky issue.",
+];
+
+function getQuipIndex(runId: string, arrayLength: number): number {
+  let hash = 0;
+  for (let i = 0; i < runId.length; i++) {
+    hash = (hash * 31 + runId.charCodeAt(i)) >>> 0;
+  }
+  return hash % arrayLength;
 }
 
 const CONFETTI = Array.from({ length: 28 }, (_, index) => ({
@@ -32,45 +68,6 @@ const CONFETTI = Array.from({ length: 28 }, (_, index) => ({
   size: 8 + (index % 3) * 3,
 }));
 
-function CompletionActionCard({
-  description,
-  label,
-  onClick,
-  testId,
-  title,
-  tone,
-}: CompletionActionCardProps) {
-  const className = {
-    default:
-      "border-white/12 bg-white/6 hover:border-white/20 hover:bg-white/10",
-    emerald:
-      "border-emerald-300/24 bg-emerald-300/10 hover:border-emerald-200/40 hover:bg-emerald-300/16",
-    sky: "border-sky-300/24 bg-sky-300/10 hover:border-sky-200/40 hover:bg-sky-300/16",
-  }[tone];
-  const labelClassName = {
-    default: "text-stone-400",
-    emerald: "text-emerald-100/72",
-    sky: "text-sky-100/72",
-  }[tone];
-
-  return (
-    <button
-      className={`rounded-2xl border px-4 py-4 text-left transition ${className}`}
-      data-testid={testId}
-      onClick={onClick}
-      type="button"
-    >
-      <div
-        className={`text-[0.72rem] uppercase tracking-[0.18em] ${labelClassName}`}
-      >
-        {label}
-      </div>
-      <div className="mt-2 text-lg font-semibold text-white">{title}</div>
-      <div className="mt-1 text-sm leading-5 text-stone-300">{description}</div>
-    </button>
-  );
-}
-
 const SiegeRunCompleteOverlay = memo(function SiegeRunCompleteOverlay({
   completionSummary,
   leaderboard,
@@ -80,6 +77,7 @@ const SiegeRunCompleteOverlay = memo(function SiegeRunCompleteOverlay({
 }: SiegeRunCompleteOverlayProps) {
   const dialogRef = useRef<HTMLElement | null>(null);
   const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
+  const [sortBy, setSortBy] = useState<"primary" | "secondary">("primary");
   const alternateMode =
     completionSummary.mode === "purge" ? "outbreak" : "purge";
   const alternateModeMeta = SIEGE_GAME_MODE_META[alternateMode];
@@ -89,38 +87,24 @@ const SiegeRunCompleteOverlay = memo(function SiegeRunCompleteOverlay({
   const backdropClassName = isSurvivalOverrun
     ? "bg-[radial-gradient(circle_at_top,rgba(248,113,113,0.22),transparent_34%),radial-gradient(circle_at_20%_20%,rgba(251,191,36,0.16),transparent_28%),rgba(2,6,23,0.76)]"
     : "bg-[radial-gradient(circle_at_top,rgba(125,211,252,0.2),transparent_36%),radial-gradient(circle_at_20%_20%,rgba(251,191,36,0.18),transparent_28%),rgba(2,6,23,0.72)]";
-  const outcomeBadgeClassName = isSurvivalOverrun
-    ? "border-red-300/28 bg-red-400/12 text-red-100"
-    : "border-emerald-400/24 bg-emerald-300/10 text-emerald-100";
-  const title = isSurvivalOverrun
-    ? "Site overrun. Survival score saved."
-    : "Swarm cleared. Time recorded.";
-  const actionCards: CompletionActionCardProps[] = [
-    {
-      description: `Restart ${modeMeta.shortLabel} and chase a better local rank.`,
-      label: "Play again",
-      onClick: onReplayMode,
-      testId: "siege-complete-replay",
-      title: `Play ${modeMeta.shortLabel} Again`,
-      tone: "sky",
-    },
-    {
-      description: alternateModeMeta.description,
-      label: "Mode swap",
-      onClick: onSwitchMode,
-      testId: "siege-complete-switch-mode",
-      title: alternateModeMeta.switchActionLabel,
-      tone: "emerald",
-    },
-    {
-      description: "Leave the arena and return to the reporting view.",
-      label: "Wrap up",
-      onClick: onExit,
-      testId: "siege-complete-back-dashboard",
-      title: "Back to dashboard",
-      tone: "default",
-    },
+  const quipPool = isSurvivalOverrun ? SURVIVAL_QUIPS : TIME_ATTACK_QUIPS;
+  const quip = quipPool[getQuipIndex(completionSummary.id, quipPool.length)];
+  const title = isSurvivalOverrun ? "Site overrun." : "Swarm cleared.";
+  const sortOptions: Array<{ key: "primary" | "secondary"; label: string }> = [
+    { key: "primary", label: isSurvival ? "Wave" : "Time" },
+    { key: "secondary", label: isSurvival ? "Survived" : "Speed" },
   ];
+
+  const sortedLeaderboard = useMemo(() => {
+    if (sortBy === "primary") return leaderboard;
+    const entries = [...leaderboard];
+    if (isSurvival) {
+      entries.sort((a, b) => (b.survivedMs ?? 0) - (a.survivedMs ?? 0));
+    } else {
+      entries.sort((a, b) => b.bugsPerSecond - a.bugsPerSecond);
+    }
+    return entries;
+  }, [isSurvival, leaderboard, sortBy]);
 
   useEffect(() => {
     if (
@@ -129,17 +113,11 @@ const SiegeRunCompleteOverlay = memo(function SiegeRunCompleteOverlay({
     ) {
       return undefined;
     }
-
     const mediaQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
-    const updatePreference = () => {
-      setPrefersReducedMotion(mediaQuery.matches);
-    };
-
+    const updatePreference = () => setPrefersReducedMotion(mediaQuery.matches);
     updatePreference();
     mediaQuery.addEventListener("change", updatePreference);
-    return () => {
-      mediaQuery.removeEventListener("change", updatePreference);
-    };
+    return () => mediaQuery.removeEventListener("change", updatePreference);
   }, []);
 
   useEffect(() => {
@@ -150,9 +128,7 @@ const SiegeRunCompleteOverlay = memo(function SiegeRunCompleteOverlay({
     const focusTarget = dialogRef.current?.querySelector<HTMLElement>(
       '[data-testid="siege-complete-replay"]',
     );
-
     focusTarget?.focus();
-
     return () => {
       previousActiveElement?.focus?.();
     };
@@ -164,30 +140,20 @@ const SiegeRunCompleteOverlay = memo(function SiegeRunCompleteOverlay({
       onExit();
       return;
     }
-
-    if (event.key !== "Tab") {
-      return;
-    }
-
+    if (event.key !== "Tab") return;
     const focusableElements = Array.from(
       dialogRef.current?.querySelectorAll<HTMLElement>(
         'button:not([disabled]), [href], [tabindex]:not([tabindex="-1"])',
       ) ?? [],
     ).filter((element) => element.offsetParent !== null);
-
-    if (focusableElements.length === 0) {
-      return;
-    }
-
+    if (focusableElements.length === 0) return;
     const firstElement = focusableElements[0];
     const lastElement = focusableElements[focusableElements.length - 1];
-
     if (event.shiftKey && document.activeElement === firstElement) {
       event.preventDefault();
       lastElement.focus();
       return;
     }
-
     if (!event.shiftKey && document.activeElement === lastElement) {
       event.preventDefault();
       firstElement.focus();
@@ -197,6 +163,8 @@ const SiegeRunCompleteOverlay = memo(function SiegeRunCompleteOverlay({
   return (
     <div
       className={`pointer-events-auto fixed inset-0 z-[260] overflow-hidden ${backdropClassName} backdrop-blur-[3px]`}
+      data-hud-cursor="default"
+      data-no-hammer="true"
       data-testid="siege-complete-overlay"
     >
       {!prefersReducedMotion && !isSurvivalOverrun ? (
@@ -226,148 +194,170 @@ const SiegeRunCompleteOverlay = memo(function SiegeRunCompleteOverlay({
           aria-modal="true"
           aria-describedby="siege-complete-summary"
           aria-labelledby="siege-complete-title"
-          className={`w-full max-w-5xl rounded-[2rem] border border-white/12 bg-[linear-gradient(155deg,rgba(15,23,42,0.98),rgba(10,15,28,0.94))] p-5 text-stone-100 shadow-[0_32px_120px_rgba(15,23,42,0.48)] sm:p-7 ${prefersReducedMotion ? "" : "[animation:siege-complete-pop_420ms_cubic-bezier(0.22,1,0.36,1)_forwards]"}`}
+          className={`w-full max-w-5xl rounded-[2rem] border border-white/12 bg-[linear-gradient(155deg,rgba(15,23,42,0.98),rgba(10,15,28,0.94))] p-6 text-stone-100 shadow-[0_32px_120px_rgba(15,23,42,0.48)] sm:p-8 ${prefersReducedMotion ? "" : "[animation:siege-complete-pop_420ms_cubic-bezier(0.22,1,0.36,1)_forwards]"}`}
           onKeyDown={handleDialogKeyDown}
           ref={dialogRef}
           role="dialog"
           tabIndex={-1}
         >
-          <div className="grid gap-6 lg:grid-cols-[1.3fr_0.9fr]">
-            <div className="space-y-5">
-              <div
-                className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 text-[0.72rem] font-semibold uppercase tracking-[0.22em] ${outcomeBadgeClassName}`}
-                data-testid="siege-complete-outcome"
-              >
-                {completionSummary.isNewBest
-                  ? "New local best"
-                  : completionSummary.rank == null
-                    ? "Run saved"
-                    : `Leaderboard rank ${completionSummary.rank}`}
-              </div>
+          <div className="grid gap-8 lg:grid-cols-[1.2fr_1fr]">
+            {/* ── LEFT ── */}
+            <div className="flex flex-col gap-5">
+              {/* eyebrow */}
+              <p className="text-[0.67rem] font-semibold uppercase tracking-[0.28em] text-stone-500">
+                {modeMeta.shortLabel}
+              </p>
 
-              <div className="space-y-2">
-                <p className="text-[0.74rem] font-semibold uppercase tracking-[0.28em] text-sky-100/72">
-                  Run complete • {modeMeta.shortLabel}
-                </p>
+              {/* headline + quip */}
+              <div>
                 <h2
-                  className="max-w-xl text-3xl font-semibold tracking-[-0.04em] text-white sm:text-5xl"
+                  className="text-4xl font-bold tracking-[-0.04em] text-white sm:text-[3.5rem] sm:leading-[1.08]"
                   id="siege-complete-title"
                   data-testid="siege-complete-title"
                 >
                   {title}
                 </h2>
                 <p
-                  className="max-w-2xl text-sm leading-6 text-stone-300 sm:text-[0.95rem]"
+                  className="mt-3 text-lg italic leading-snug text-stone-300 sm:text-xl"
+                  data-testid="siege-complete-quip"
                   id="siege-complete-summary"
                 >
-                  {isSurvival ? (
-                    <>
-                      Bugs overwhelmed the site at wave{" "}
-                      {completionSummary.waveReached.toLocaleString()} and the
-                      run survived{" "}
-                      {formatElapsedTime(completionSummary.survivedMs)} with{" "}
-                      {completionSummary.topWeaponLabel} leading the run.
-                    </>
-                  ) : (
-                    <>
-                      {completionSummary.bugCount.toLocaleString()} bugs cleared
-                      in {formatElapsedTime(completionSummary.elapsedMs)} with{" "}
-                      {completionSummary.topWeaponLabel} leading the run.
-                    </>
-                  )}
+                  &ldquo;{quip}&rdquo;
                 </p>
               </div>
 
-              <div className="grid gap-3 sm:grid-cols-3">
-                <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-                  <div className="text-[0.7rem] uppercase tracking-[0.2em] text-stone-400">
-                    {isSurvival ? "Wave reached" : "Clear time"}
+              {/* stats — borderless strip */}
+              <div className="flex items-start gap-6 border-t border-white/8 pt-5">
+                <div>
+                  <div className="text-[0.62rem] font-semibold uppercase tracking-[0.2em] text-stone-500">
+                    {isSurvival ? "Wave" : "Time"}
                   </div>
-                  <div className="mt-2 text-3xl font-semibold tracking-[-0.04em] text-white">
+                  <div className="mt-1 text-2xl font-semibold tabular-nums tracking-[-0.03em] text-white">
                     {isSurvival
                       ? completionSummary.waveReached.toLocaleString()
                       : formatElapsedTime(completionSummary.elapsedMs)}
                   </div>
                 </div>
-                <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-                  <div className="text-[0.7rem] uppercase tracking-[0.2em] text-stone-400">
-                    {isSurvival ? "Survival time" : "Bugs cleared"}
+                <div className="mt-1 h-8 w-px shrink-0 bg-white/10" />
+                <div>
+                  <div className="text-[0.62rem] font-semibold uppercase tracking-[0.2em] text-stone-500">
+                    {isSurvival ? "Survived" : "Bugs"}
                   </div>
-                  <div className="mt-2 text-3xl font-semibold tracking-[-0.04em] text-white">
+                  <div className="mt-1 text-2xl font-semibold tabular-nums tracking-[-0.03em] text-white">
                     {isSurvival
                       ? formatElapsedTime(completionSummary.survivedMs)
                       : completionSummary.bugCount.toLocaleString()}
                   </div>
                 </div>
-                <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-                  <div className="text-[0.7rem] uppercase tracking-[0.2em] text-stone-400">
-                    {isSurvival ? "Offline status" : "Bugs per second"}
+                <div className="mt-1 h-8 w-px shrink-0 bg-white/10" />
+                <div>
+                  <div className="text-[0.62rem] font-semibold uppercase tracking-[0.2em] text-stone-500">
+                    {isSurvival ? "Status" : "Bugs/s"}
                   </div>
-                  <div className="mt-2 text-3xl font-semibold tracking-[-0.04em] text-white">
+                  <div className="mt-1 text-2xl font-semibold tabular-nums tracking-[-0.03em] text-white">
                     {isSurvival
-                      ? (completionSummary.offlineReason ?? "Site offline")
+                      ? "Offline"
                       : completionSummary.bugsPerSecond.toFixed(2)}
                   </div>
                 </div>
               </div>
 
-              <div className="grid gap-3 sm:grid-cols-3">
-                {actionCards.map((card) => (
-                  <CompletionActionCard key={card.title} {...card} />
-                ))}
+              {/* actions — pill buttons */}
+              <div className="mt-auto flex flex-wrap items-center gap-2 border-t border-white/8 pt-5">
+                <button
+                  className="rounded-full border border-emerald-400/30 bg-emerald-500/[0.16] px-4 py-1.5 text-sm font-semibold text-emerald-300 transition hover:border-emerald-400/50 hover:bg-emerald-500/25 hover:text-emerald-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300/40"
+                  data-testid="siege-complete-replay"
+                  onClick={onReplayMode}
+                  type="button"
+                >
+                  Play {modeMeta.shortLabel} Again
+                </button>
+                <button
+                  className="rounded-full border border-white/12 px-4 py-1.5 text-sm font-semibold text-stone-400 transition hover:border-white/22 hover:text-stone-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/20"
+                  data-testid="siege-complete-switch-mode"
+                  onClick={onSwitchMode}
+                  type="button"
+                >
+                  {alternateModeMeta.switchActionLabel}
+                </button>
+                <button
+                  className="rounded-full border border-white/12 px-4 py-1.5 text-sm font-semibold text-stone-400 transition hover:border-white/22 hover:text-stone-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/20"
+                  data-testid="siege-complete-back-dashboard"
+                  onClick={onExit}
+                  type="button"
+                >
+                  Back to dashboard
+                </button>
               </div>
             </div>
 
-            <div className="rounded-[1.6rem] border border-white/10 bg-white/[0.045] p-4 sm:p-5">
+            {/* ── RIGHT — leaderboard ── */}
+            <div className="rounded-[1.6rem] border border-white/10 bg-white/[0.04] p-4 sm:p-5">
               <div className="flex items-center justify-between gap-3">
-                <div>
-                  <p className="text-[0.72rem] font-semibold uppercase tracking-[0.2em] text-stone-400">
-                    Local leaderboard
-                  </p>
-                  <p className="mt-1 text-sm text-stone-300">
-                    {isSurvival
-                      ? "Survival runs are ranked by wave reached, then survival time."
-                      : "Time Attack clears are ranked by fastest finish, then bug count."}
-                  </p>
-                </div>
-                <div className="rounded-full border border-white/10 bg-white/6 px-2.5 py-1 text-[0.68rem] font-semibold uppercase tracking-[0.18em] text-stone-300">
-                  Top {Math.min(leaderboard.length, 8)}
+                <p className="text-[0.67rem] font-semibold uppercase tracking-[0.22em] text-stone-400">
+                  Leaderboard
+                </p>
+                <div className="flex gap-0.5 rounded-full border border-white/10 bg-black/24 p-0.5">
+                  {sortOptions.map(({ key, label }) => (
+                    <button
+                      key={key}
+                      className={`rounded-full px-2.5 py-0.5 text-[0.62rem] font-semibold uppercase tracking-[0.12em] transition ${
+                        sortBy === key
+                          ? "bg-white/12 text-white"
+                          : "text-stone-500 hover:text-stone-300"
+                      }`}
+                      onClick={() => setSortBy(key)}
+                      type="button"
+                    >
+                      {label}
+                    </button>
+                  ))}
                 </div>
               </div>
 
-              <div className="mt-4 space-y-2.5">
-                {leaderboard.map((entry, index) => (
-                  <div
-                    key={entry.id}
-                    className={`grid grid-cols-[auto_1fr_auto] items-center gap-3 rounded-2xl border px-3 py-3 ${entry.id === completionSummary.id ? "border-emerald-300/32 bg-emerald-300/10" : "border-white/8 bg-black/18"}`}
-                    data-current-run={
-                      entry.id === completionSummary.id ? "true" : "false"
-                    }
-                  >
-                    <div className="flex h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-white/6 text-sm font-semibold text-white">
-                      {index + 1}
-                    </div>
-                    <div>
-                      <div className="text-sm font-semibold text-white">
-                        {entry.mode === "outbreak"
-                          ? `Wave ${entry.waveReached.toLocaleString()} • ${formatElapsedTime(entry.survivedMs)}`
-                          : `${formatElapsedTime(entry.elapsedMs)} • ${entry.bugCount.toLocaleString()} bugs`}
+              <div className="mt-3 max-h-[320px] space-y-0.5 overflow-y-auto">
+                {sortedLeaderboard.map((entry, index) => {
+                  const isCurrent = entry.id === completionSummary.id;
+                  return (
+                    <div
+                      key={entry.id}
+                      className={`grid grid-cols-[1.75rem_1fr] items-start gap-2 rounded-xl px-2.5 py-2 ${
+                        isCurrent
+                          ? "bg-emerald-300/8 ring-1 ring-inset ring-emerald-300/20"
+                          : "hover:bg-white/4"
+                      }`}
+                      data-current-run={isCurrent ? "true" : "false"}
+                    >
+                      <div
+                        className={`pt-0.5 text-sm font-semibold tabular-nums ${
+                          isCurrent ? "text-emerald-400" : "text-stone-500"
+                        }`}
+                      >
+                        {index + 1}
                       </div>
-                      <div className="mt-1 text-xs uppercase tracking-[0.16em] text-stone-400">
-                        {SIEGE_GAME_MODE_META[entry.mode].shortLabel} •{" "}
-                        {entry.topWeaponLabel} •{" "}
-                        {entry.bugsPerSecond.toFixed(2)} bugs/s
+                      <div>
+                        <div className="flex items-baseline justify-between gap-2">
+                          <div className="text-xs font-semibold text-white">
+                            {entry.mode === "outbreak"
+                              ? `Wave ${entry.waveReached} · ${formatElapsedTime(entry.survivedMs)}`
+                              : `${formatElapsedTime(entry.elapsedMs)} · ${entry.bugCount.toLocaleString()} bugs`}
+                          </div>
+                          {isCurrent ? (
+                            <span className="shrink-0 text-[0.6rem] font-bold uppercase tracking-[0.1em] text-emerald-400/80">
+                              You
+                            </span>
+                          ) : null}
+                        </div>
+                        <div className="mt-0.5 text-[0.63rem] text-stone-500">
+                          {entry.topWeaponLabel}
+                          {!isSurvival
+                            ? ` · ${entry.bugsPerSecond.toFixed(2)} bugs/s`
+                            : ""}
+                        </div>
                       </div>
                     </div>
-                    <div className="text-right text-[0.68rem] uppercase tracking-[0.14em] text-stone-500">
-                      {entry.id === completionSummary.id
-                        ? "Current"
-                        : index === 0
-                          ? "Best"
-                          : "Run"}
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           </div>

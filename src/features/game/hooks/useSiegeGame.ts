@@ -29,6 +29,8 @@ import { SIEGE_GAME_MODE_META } from "@game/types";
 
 const SIEGE_ENTER_DURATION_MS = 520;
 const SIEGE_EXIT_DURATION_MS = 220;
+const SURVIVAL_PRESSURE_TICK_MS = 500;
+const SURVIVAL_INTEGRITY_REGEN_PER_SECOND = 0.36;
 
 function scheduleTimeout(callback: () => void, delay: number): number {
   if (typeof window !== "undefined") {
@@ -236,6 +238,7 @@ export function useSiegeGame({
   const survivalSpawnAccumulatorRef = useRef(0);
   const survivalLastSpawnTickAtRef = useRef<number | null>(null);
   const survivalSpawnSequenceRef = useRef(0);
+  const gamePausedRef = useRef(false);
 
   const interactiveMode = siegePhase !== "idle";
 
@@ -396,10 +399,28 @@ export function useSiegeGame({
     updateRuntimeSnapshot,
   });
 
-  const { clearSwarmRequestId, debugMode, killAllBugs, toggleDebugMode } = useSiegeGameDebug({
+  useEffect(() => {
+    gamePausedRef.current = pauseTimer || completionSummary != null;
+  }, [pauseTimer, completionSummary]);
+
+  const onClearComplete = useCallback(() => {
+    if (interactiveMode && siegePhase === "active" && gameMode === "purge") {
+      finalizeRun({ interactiveRemainingBugs: 0 });
+    }
+  }, [finalizeRun, gameMode, interactiveMode, siegePhase]);
+
+  const onEndSurvival = useCallback(() => {
+    if (interactiveMode && siegePhase === "active" && gameMode === "outbreak") {
+      finalizeRun({ siteOffline: true });
+    }
+  }, [finalizeRun, gameMode, interactiveMode, siegePhase]);
+
+  const { clearSwarmRequestId, debugMode, killAllBugs, toggleDebugMode, triggerSurvivalOverrun } = useSiegeGameDebug({
     interactiveInitialBugCounts,
     interactiveMode,
     lastKillAtRef,
+    onClearComplete,
+    onEndSurvival,
     updateRuntimeSnapshot,
   });
 
@@ -604,15 +625,24 @@ export function useSiegeGame({
       !interactiveMode ||
       siegePhase !== "active" ||
       gameMode !== "outbreak" ||
-      survivalStatus.offlineReason != null
+      survivalStatus.offlineReason != null ||
+      completionSummary != null
     ) {
       return undefined;
     }
 
     survivalPressureTimerRef.current = scheduleTimeout(function tickPressure() {
+      if (gamePausedRef.current) {
+        survivalPressureTimerRef.current = scheduleTimeout(
+          tickPressure,
+          SURVIVAL_PRESSURE_TICK_MS,
+        );
+        return;
+      }
       const currentStatus = survivalStatusRef.current;
       const plan = getSurvivalWavePlan(currentStatus.wave);
       const now = performance.now();
+      const pressureTickSeconds = SURVIVAL_PRESSURE_TICK_MS / 1000;
       const waveEndsAt = survivalWaveEndsAtRef.current;
       const secondsUntilNextWave =
         waveEndsAt != null
@@ -626,32 +656,43 @@ export function useSiegeGame({
       const nextIntegrity = Math.max(
         0,
         pressure.damagePerSecond > 0
-          ? currentStatus.siteIntegrity - pressure.damagePerSecond * 0.5
-          : Math.min(100, currentStatus.siteIntegrity + 0.65),
+          ? currentStatus.siteIntegrity - pressure.damagePerSecond * pressureTickSeconds
+          : Math.min(
+              100,
+              currentStatus.siteIntegrity +
+                SURVIVAL_INTEGRITY_REGEN_PER_SECOND * pressureTickSeconds,
+            ),
       );
       const offlineReason =
         nextIntegrity <= 0
           ? `Site offline at wave ${currentStatus.wave}`
           : currentStatus.offlineReason;
 
-      setSurvivalStatus((current) => ({
-        ...current,
-        activeBugLimit: plan.activeBugLimit,
-        offlineReason,
-        pressurePercent: pressure.pressurePercent,
-        remainingSpawnBudget: survivalRemainingBudgetRef.current,
-        secondsUntilNextWave,
-        secondsUntilOffline: pressure.secondsUntilOffline,
-        siteIntegrity: nextIntegrity,
-        spawnRatePerSecond: plan.spawnRatePerSecond,
-        waveDurationMs: plan.waveDurationMs,
-        waveEndsAt,
-        waveProgressPercent: calculateWaveProgress(
-          now,
-          current.waveStartedAt,
-          plan.waveDurationMs,
-        ),
-      }));
+      setSurvivalStatus((current) => {
+        const startedAtFallback =
+          current.waveStartedAt == null && waveEndsAt != null
+            ? Math.max(0, waveEndsAt - plan.waveDurationMs)
+            : current.waveStartedAt;
+
+        return {
+          ...current,
+          activeBugLimit: plan.activeBugLimit,
+          offlineReason,
+          pressurePercent: pressure.pressurePercent,
+          remainingSpawnBudget: survivalRemainingBudgetRef.current,
+          secondsUntilNextWave,
+          secondsUntilOffline: pressure.secondsUntilOffline,
+          siteIntegrity: nextIntegrity,
+          spawnRatePerSecond: plan.spawnRatePerSecond,
+          waveDurationMs: plan.waveDurationMs,
+          waveEndsAt,
+          waveProgressPercent: calculateWaveProgress(
+            now,
+            startedAtFallback,
+            plan.waveDurationMs,
+          ),
+        };
+      });
 
       if (offlineReason) {
         updateRuntimeSnapshot(
@@ -667,37 +708,56 @@ export function useSiegeGame({
 
       if (waveEndsAt != null && now >= waveEndsAt) {
         startSurvivalWave(currentStatus.wave + 1);
+        survivalPressureTimerRef.current = scheduleTimeout(
+          tickPressure,
+          SURVIVAL_PRESSURE_TICK_MS,
+        );
         return;
       }
 
-      survivalPressureTimerRef.current = scheduleTimeout(tickPressure, 500);
-    }, 500);
+      survivalPressureTimerRef.current = scheduleTimeout(
+        tickPressure,
+        SURVIVAL_PRESSURE_TICK_MS,
+      );
+    }, SURVIVAL_PRESSURE_TICK_MS);
 
     return () => {
       cancelTimeout(survivalPressureTimerRef.current);
       survivalPressureTimerRef.current = null;
     };
-  }, [gameMode, interactiveMode, siegePhase, startSurvivalWave, survivalStatus.offlineReason, updateRuntimeSnapshot]);
+  }, [completionSummary, gameMode, interactiveMode, siegePhase, startSurvivalWave, survivalStatus.offlineReason, updateRuntimeSnapshot]);
 
   useEffect(() => {
     if (
       !interactiveMode ||
       siegePhase !== "active" ||
       gameMode !== "outbreak" ||
-      survivalStatus.offlineReason != null
+      survivalStatus.offlineReason != null ||
+      completionSummary != null
     ) {
       return undefined;
     }
 
     survivalSpawnTimerRef.current = scheduleTimeout(function tickSpawn() {
+      if (gamePausedRef.current) {
+        survivalSpawnTimerRef.current = scheduleTimeout(tickSpawn, 250);
+        return;
+      }
       const status = survivalStatusRef.current;
       const plan = getSurvivalWavePlan(status.wave);
       const activeBugs = runtimeSnapshotRef.current.remainingBugs;
       const remainingBudget = survivalRemainingBudgetRef.current;
       const waveEndsAt = survivalWaveEndsAtRef.current;
       const now = performance.now();
-      const waveExpired =
-        waveEndsAt != null && now >= waveEndsAt;
+      const waveExpired = waveEndsAt != null && now >= waveEndsAt;
+
+      // Ensure waves advance even if the pressure timer wasn't active for
+      // some reason (keeps survival rolling while bugs remain).
+      if (waveExpired) {
+        startSurvivalWave(status.wave + 1);
+        survivalSpawnTimerRef.current = scheduleTimeout(tickSpawn, 250);
+        return;
+      }
 
       if (!waveExpired && remainingBudget > 0 && activeBugs < plan.activeBugLimit) {
         const lastSpawnTickAt = survivalLastSpawnTickAtRef.current ?? now;
@@ -735,7 +795,7 @@ export function useSiegeGame({
       cancelTimeout(survivalSpawnTimerRef.current);
       survivalSpawnTimerRef.current = null;
     };
-  }, [gameMode, interactiveMode, queueSurvivalSpawn, siegePhase, survivalStatus.offlineReason]);
+  }, [completionSummary, gameMode, interactiveMode, queueSurvivalSpawn, siegePhase, survivalStatus.offlineReason]);
 
   useEffect(() => {
     if (
@@ -913,6 +973,7 @@ export function useSiegeGame({
       runtimeSpeedMultiplier: getSurvivalRuntimeSpeedMultiplier(survivalStatus.wave),
     },
     toggleDebugMode,
+    triggerSurvivalOverrun,
     weaponSnapshots,
   };
 }
