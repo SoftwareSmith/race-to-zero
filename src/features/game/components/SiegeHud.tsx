@@ -241,7 +241,9 @@ export default function SiegeHud({
               focusLabel={survivalStatus?.focusLabel ?? "Bug rush"}
               progressPercent={survivalStatus?.waveProgressPercent ?? 0}
               remainingSpawnBudget={survivalStatus?.remainingSpawnBudget ?? 0}
-              secondsUntilNextWave={survivalStatus?.secondsUntilNextWave ?? null}
+              secondsUntilNextWave={
+                survivalStatus?.secondsUntilNextWave ?? null
+              }
               spawnRatePerSecond={survivalStatus?.spawnRatePerSecond ?? 0}
               tacticLabel={survivalStatus?.tacticLabel ?? "Opening wave"}
               wave={survivalStatus?.wave ?? 1}
