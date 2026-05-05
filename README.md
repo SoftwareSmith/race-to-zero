@@ -97,4 +97,4 @@ The workflow in `.github/workflows/sync-linear.yml` runs every day at midnight U
 
 - `LINEAR_API_KEY`
 
-The workflow runs `scripts/fetch-linear.ts`, scopes to the configured Linear teams, writes sanitized bug records into `public/data/metrics.json`, then commits and pushes the result back to the repository. The frontend calculates the deadline, rates, projections, and siege-state visuals locally.
+The workflow runs `scripts/fetch-linear.ts`, scopes to the configured Linear teams (`CP`, `T1`, `TA`, and `PF` by default), writes sanitized bug records into `public/data/metrics.json`, then commits and pushes the result back to the repository. The frontend calculates the deadline, rates, projections, and siege-state visuals locally.

@@ -69,7 +69,7 @@ function toDay(dateValue: string | Date) {
 
 function getTeamKeys() {
   const rawValue =
-    process.env.LINEAR_TEAM_KEYS ?? process.env.LINEAR_TEAM_KEY ?? "CP,T1,TA";
+    process.env.LINEAR_TEAM_KEYS ?? process.env.LINEAR_TEAM_KEY ?? "CP,T1,TA,PF";
 
   return [
     ...new Set(
