@@ -65,8 +65,20 @@ export function drawBugFramePass({
   width,
 }: DrawBugFramePassOptions): RenderedBugPosition[] {
   void _height;
+  const safeWidth = Math.max(1, width);
+  const hasChartFocus = chartFocus !== null;
   const focusX = chartFocus?.relativeIndex ?? 0.5;
   const nextBugPositions = reusablePositions ?? [];
+  const statusFlags = {
+    ally: 0,
+    burn: 0,
+    charged: 0,
+    ensnare: 0,
+    freeze: 0,
+    marked: 0,
+    poison: 0,
+    unstable: 0,
+  };
   let nextBugPositionIndex = 0;
   const useSparseAmbientDraw =
     !interactiveMode &&
@@ -86,9 +98,9 @@ export function drawBugFramePass({
     }
 
     const bugCodex = BUG_CODEX[particle.variant as BugVariant];
-    const normalizedX = particle.x / Math.max(1, width);
+    const normalizedX = particle.x / safeWidth;
     const focusDistance = Math.abs(normalizedX - focusX);
-    const focusFalloff = chartFocus ? Math.max(0, 1 - focusDistance * 3.1) : 0;
+    const focusFalloff = hasChartFocus ? Math.max(0, 1 - focusDistance * 3.1) : 0;
     const x = particle.x;
     const y = particle.y;
     const opacity = clampNumber(
@@ -101,7 +113,7 @@ export function drawBugFramePass({
       motionProfile.scale *
       sizeMultiplier *
       (bugCodex?.size ?? 1) *
-      (chartFocus ? 0.92 + focusFalloff * 0.26 : 1);
+      (hasChartFocus ? 0.92 + focusFalloff * 0.26 : 1);
     const velX = particle.vx ?? particle.driftX ?? 1;
     const velY = particle.vy ?? particle.driftY ?? 0;
     const rotation =
@@ -126,21 +138,21 @@ export function drawBugFramePass({
       continue;
     }
 
+    statusFlags.ally = getStatusStrength(particle.ally?.expiresAt, frameNow, 7000);
+    statusFlags.burn = getStatusStrength(particle.burn?.expiresAt, frameNow, 2800);
+    statusFlags.charged = getStatusStrength(particle.charged?.expiresAt, frameNow, 2400);
+    statusFlags.ensnare = getStatusStrength(particle.ensnare?.expiresAt, frameNow, 2200);
+    statusFlags.freeze = getStatusStrength(particle.slow?.expiresAt, frameNow, 2200);
+    statusFlags.marked = getStatusStrength(particle.marked?.expiresAt, frameNow, 2600);
+    statusFlags.poison = getStatusStrength(particle.poison?.expiresAt, frameNow, 3200);
+    statusFlags.unstable = getStatusStrength(particle.unstable?.expiresAt, frameNow, 2600);
+
     drawBugSprite(context, {
       color: bugCodex?.color,
       opacity,
       rotation,
       size,
-      statusFlags: {
-        ally: getStatusStrength(particle.ally?.expiresAt, frameNow, 7000),
-        burn: getStatusStrength(particle.burn?.expiresAt, frameNow, 2800),
-        charged: getStatusStrength(particle.charged?.expiresAt, frameNow, 2400),
-        ensnare: getStatusStrength(particle.ensnare?.expiresAt, frameNow, 2200),
-        freeze: getStatusStrength(particle.slow?.expiresAt, frameNow, 2200),
-        marked: getStatusStrength(particle.marked?.expiresAt, frameNow, 2600),
-        poison: getStatusStrength(particle.poison?.expiresAt, frameNow, 3200),
-        unstable: getStatusStrength(particle.unstable?.expiresAt, frameNow, 2600),
-      },
+      statusFlags,
       timeMs: frameNow,
       variant: particle.variant,
       x,

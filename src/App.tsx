@@ -12,10 +12,12 @@ import type {
   BackgroundFieldHandle,
   BugTransitionSnapshotItem,
 } from "@game/components/BackgroundField/types";
+import { preloadVfxEngine } from "@game/components/VfxCanvas";
 import DashboardShell from "./features/app/DashboardShell";
 import { DashboardProvider } from "./features/dashboard/context/DashboardContext";
 
 const loadSiegeExperience = () => import("./features/app/SiegeExperience");
+const loadWeaponEffectLayer = () => import("@game/components/WeaponEffectLayer");
 const SiegeExperience = lazy(loadSiegeExperience);
 const AmbientBackgroundHarness = lazy(
   () => import("./features/app/AmbientBackgroundHarness"),
@@ -53,6 +55,8 @@ function AppContent() {
 
   const prefetchSiege = useCallback(() => {
     void loadSiegeExperience();
+    void loadWeaponEffectLayer();
+    void preloadVfxEngine();
   }, []);
 
   const handleEnterInteractiveMode = useCallback(() => {

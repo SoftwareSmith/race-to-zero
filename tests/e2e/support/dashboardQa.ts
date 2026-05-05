@@ -60,11 +60,26 @@ interface QaSurvivalState {
 }
 
 interface QaPerformanceMetrics {
+  breakdown?: Record<
+    string,
+    {
+      lastMs?: number;
+      maxMs?: number;
+      sampleCount?: number;
+      samplesMs?: number[];
+      totalMs?: number;
+    }
+  >;
   firstBugPositionsAtMs?: number;
   firstFrameAtMs?: number;
   frameDurationsMs?: number[];
+  heapPeakBytes?: number;
+  heapUsedBytes?: number;
   lastFrameDurationMs?: number;
   lastRenderedBugCount?: number;
+  longTaskCount?: number;
+  longTaskDurationsMs?: number[];
+  longTaskTotalMs?: number;
   maxFrameDurationMs?: number;
   maxRenderedBugCount?: number;
   measurementStartAtMs?: number;
@@ -308,6 +323,18 @@ export async function enableCanvasQa(
 
   await page.addInitScript(
     ({ performanceSampleLimit, startMeasurementOnInit, stabilizeEngine }) => {
+      const createQaPerformanceMetrics = (): QaPerformanceMetrics => ({
+        breakdown: {},
+        frameDurationsMs: [],
+        longTaskCount: 0,
+        longTaskDurationsMs: [],
+        longTaskTotalMs: 0,
+        maxFrameDurationMs: 0,
+        maxRenderedBugCount: 0,
+        measurementStartAtMs: performance.now(),
+        sampleLimit: performanceSampleLimit,
+      });
+
       const qaState: {
         enabled: boolean;
         performanceMetrics?: QaPerformanceMetrics;
@@ -318,13 +345,36 @@ export async function enableCanvasQa(
       };
 
       if (startMeasurementOnInit) {
-        qaState.performanceMetrics = {
-          frameDurationsMs: [],
-          maxFrameDurationMs: 0,
-          maxRenderedBugCount: 0,
-          measurementStartAtMs: performance.now(),
-          sampleLimit: performanceSampleLimit,
-        };
+        qaState.performanceMetrics = createQaPerformanceMetrics();
+      }
+
+      if (
+        typeof window.PerformanceObserver === "function" &&
+        Array.isArray(window.PerformanceObserver.supportedEntryTypes) &&
+        window.PerformanceObserver.supportedEntryTypes.includes("longtask")
+      ) {
+        const observer = new window.PerformanceObserver((list) => {
+          const metrics = qaState.performanceMetrics;
+          if (!metrics) {
+            return;
+          }
+
+          for (const entry of list.getEntries()) {
+            const sampleLimit = metrics.sampleLimit ?? performanceSampleLimit;
+            const longTaskDurationsMs =
+              metrics.longTaskDurationsMs ?? (metrics.longTaskDurationsMs = []);
+
+            if (longTaskDurationsMs.length < sampleLimit) {
+              longTaskDurationsMs.push(entry.duration);
+            }
+
+            metrics.longTaskCount = (metrics.longTaskCount ?? 0) + 1;
+            metrics.longTaskTotalMs =
+              (metrics.longTaskTotalMs ?? 0) + entry.duration;
+          }
+        });
+
+        observer.observe({ entryTypes: ["longtask"] });
       }
 
       (window as Window & { __RTZ_QA__?: typeof qaState }).__RTZ_QA__ = qaState;
@@ -366,7 +416,11 @@ export async function startQaPerformanceMeasurement(
     }
 
     qaState.performanceMetrics = {
+      breakdown: {},
       frameDurationsMs: [],
+      longTaskCount: 0,
+      longTaskDurationsMs: [],
+      longTaskTotalMs: 0,
       maxFrameDurationMs: 0,
       maxRenderedBugCount: 0,
       measurementStartAtMs: performance.now(),

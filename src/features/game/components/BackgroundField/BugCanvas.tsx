@@ -40,6 +40,7 @@ import type {
 } from "./types";
 import {
   isQaEnabled,
+  recordQaDurationSample,
   recordQaFrameTiming,
   updateQaBugPositions,
   syncQaBugPositionsFromEngine,
@@ -482,6 +483,12 @@ const BugCanvas = memo(
           height: h,
           config: (gameConfigRef.current as any) ?? undefined,
           maxWeaponTier,
+          onPerformanceSample: (sample) => {
+            recordQaDurationSample("engineUpdateMs", sample.totalMs);
+            recordQaDurationSample("engineGridMs", sample.spatialGridMs);
+            recordQaDurationSample("engineEntityMs", sample.entityUpdateMs);
+            recordQaDurationSample("engineEvolutionMs", sample.evolutionMs);
+          },
           onEntityDeath: (x, y, variant, meta) => {
             try {
               const viewportX = Math.round(x + (boundsRef.current.left || 0));
@@ -761,6 +768,7 @@ const BugCanvas = memo(
         const activeMotionProfile = motionProfileRef.current;
         const activeChartFocus = chartFocusRef.current;
         const frameNow = performance.now();
+        const drawStartedAt = performance.now();
         const nextBugPositions = drawBugFramePass({
           chartFocus: activeChartFocus,
           context,
@@ -774,6 +782,7 @@ const BugCanvas = memo(
           sizeMultiplier,
           width,
         });
+        recordQaDurationSample("drawMs", performance.now() - drawStartedAt);
         latestBugPositionsRef.current = nextBugPositions;
         if (interactiveModeRef.current) {
           const liveBugCount = getActiveBugCount(activeParticles as Array<any>);

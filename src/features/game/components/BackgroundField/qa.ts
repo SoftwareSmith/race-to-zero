@@ -1,9 +1,17 @@
 import type {
   BugHitPayload,
+  QaDurationMetric,
+  QaDurationMetricKey,
   QaPerformanceMetrics,
   QaWindowState,
   RenderedBugPosition,
 } from "./types";
+
+type PerformanceWithMemory = Performance & {
+  memory?: {
+    usedJSHeapSize?: number;
+  };
+};
 
 function getQaState(): QaWindowState | undefined {
   if (typeof window === "undefined") return undefined;
@@ -16,6 +24,70 @@ function getQaPerformanceMetrics(): QaPerformanceMetrics | undefined {
 
 export function isQaEnabled(): boolean {
   return Boolean(getQaState()?.enabled);
+}
+
+function recordDurationMetric(
+  metrics: QaPerformanceMetrics,
+  key: QaDurationMetricKey,
+  durationMs: number,
+): void {
+  const sampleLimit = metrics.sampleLimit ?? 180;
+  const breakdown = metrics.breakdown ?? (metrics.breakdown = {});
+  const metric = (breakdown[key] ??= {}) as QaDurationMetric;
+  const samplesMs = metric.samplesMs ?? (metric.samplesMs = []);
+
+  if (samplesMs.length < sampleLimit) {
+    samplesMs.push(durationMs);
+  }
+
+  metric.lastMs = durationMs;
+  metric.maxMs = Math.max(metric.maxMs ?? 0, durationMs);
+  metric.sampleCount = (metric.sampleCount ?? 0) + 1;
+  metric.totalMs = (metric.totalMs ?? 0) + durationMs;
+}
+
+function updateQaHeapUsage(metrics: QaPerformanceMetrics): void {
+  const heapUsedBytes = (performance as PerformanceWithMemory).memory
+    ?.usedJSHeapSize;
+
+  if (typeof heapUsedBytes !== "number" || Number.isNaN(heapUsedBytes)) {
+    return;
+  }
+
+  metrics.heapUsedBytes = heapUsedBytes;
+  metrics.heapPeakBytes = Math.max(metrics.heapPeakBytes ?? 0, heapUsedBytes);
+}
+
+export function recordQaDurationSample(
+  key: QaDurationMetricKey,
+  durationMs: number,
+): void {
+  const qaState = getQaState();
+  const metrics = getQaPerformanceMetrics();
+  if (!qaState?.enabled || !metrics) {
+    return;
+  }
+
+  recordDurationMetric(metrics, key, durationMs);
+}
+
+export function recordQaLongTask(durationMs: number): void {
+  const qaState = getQaState();
+  const metrics = getQaPerformanceMetrics();
+  if (!qaState?.enabled || !metrics) {
+    return;
+  }
+
+  const sampleLimit = metrics.sampleLimit ?? 180;
+  const longTaskDurationsMs =
+    metrics.longTaskDurationsMs ?? (metrics.longTaskDurationsMs = []);
+
+  if (longTaskDurationsMs.length < sampleLimit) {
+    longTaskDurationsMs.push(durationMs);
+  }
+
+  metrics.longTaskCount = (metrics.longTaskCount ?? 0) + 1;
+  metrics.longTaskTotalMs = (metrics.longTaskTotalMs ?? 0) + durationMs;
 }
 
 export function recordQaFrameTiming(
@@ -49,6 +121,7 @@ export function recordQaFrameTiming(
     metrics.maxRenderedBugCount ?? 0,
     renderedBugCount,
   );
+  updateQaHeapUsage(metrics);
 }
 
 export function updateQaBugPositions(

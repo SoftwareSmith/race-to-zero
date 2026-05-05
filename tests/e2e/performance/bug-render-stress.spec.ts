@@ -15,9 +15,19 @@ import { makeBugMetrics } from "../weapons/weaponQa";
 test.describe.configure({ timeout: 300000 });
 
 type PerfSnapshot = {
+  breakdown?: Record<
+    string,
+    {
+      maxMs?: number;
+      sampleCount?: number;
+      totalMs?: number;
+    }
+  >;
   firstBugPositionsAtMs?: number;
   firstFrameAtMs?: number;
   frameDurationsMs?: number[];
+  heapPeakBytes?: number;
+  longTaskCount?: number;
   maxFrameDurationMs?: number;
   maxRenderedBugCount?: number;
   measurementStartAtMs?: number;
@@ -38,6 +48,16 @@ function getPercentile(values: number[], percentile: number) {
 
 function summarizeMetrics(metrics: PerfSnapshot) {
   const samples = metrics.frameDurationsMs ?? [];
+  const getBreakdownMean = (key: string) => {
+    const metric = metrics.breakdown?.[key];
+    const sampleCount = metric?.sampleCount ?? 0;
+    if (sampleCount <= 0) {
+      return 0;
+    }
+
+    return (metric?.totalMs ?? 0) / sampleCount;
+  };
+
   const mean =
     samples.length > 0
       ? samples.reduce((total, value) => total + value, 0) / samples.length
@@ -52,13 +72,19 @@ function summarizeMetrics(metrics: PerfSnapshot) {
       metrics.firstFrameAtMs != null && metrics.measurementStartAtMs != null
         ? metrics.firstFrameAtMs - metrics.measurementStartAtMs
         : Number.POSITIVE_INFINITY,
+    drawSamples: metrics.breakdown?.drawMs?.sampleCount ?? 0,
+    engineGridMeanMs: getBreakdownMean("engineGridMs"),
+    engineSamples: metrics.breakdown?.engineUpdateMs?.sampleCount ?? 0,
+    heapPeakBytes: metrics.heapPeakBytes ?? 0,
     jankFrames: samples.filter((value) => value > 50).length,
+    longTaskCount: metrics.longTaskCount ?? 0,
     maxFrameMs: metrics.maxFrameDurationMs ?? 0,
     meanFrameMs: mean,
     p95FrameMs: getPercentile(samples, 95),
     p99FrameMs: getPercentile(samples, 99),
     renderedBugCount: metrics.maxRenderedBugCount ?? 0,
     sampleCount: samples.length,
+    vfxSamples: metrics.breakdown?.vfxMs?.sampleCount ?? 0,
   };
 }
 
@@ -96,6 +122,9 @@ test.describe("bug render stress", () => {
 
     expect(result.renderedBugCount).toBeGreaterThanOrEqual(500);
     expect(result.sampleCount).toBeGreaterThanOrEqual(20);
+    expect(result.engineSamples).toBeGreaterThan(0);
+    expect(result.drawSamples).toBeGreaterThan(0);
+    expect(result.vfxSamples).toBeGreaterThan(0);
     expect(result.firstFrameMs).toBeLessThan(1200);
     expect(result.firstBugRenderMs).toBeLessThan(1500);
     expect(result.meanFrameMs).toBeLessThan(25);
@@ -108,6 +137,9 @@ test.describe("bug render stress", () => {
 
     expect(result.renderedBugCount).toBeGreaterThanOrEqual(1000);
     expect(result.sampleCount).toBeGreaterThanOrEqual(20);
+    expect(result.engineSamples).toBeGreaterThan(0);
+    expect(result.drawSamples).toBeGreaterThan(0);
+    expect(result.vfxSamples).toBeGreaterThan(0);
     expect(result.firstFrameMs).toBeLessThan(1500);
     expect(result.firstBugRenderMs).toBeLessThan(1800);
     expect(result.meanFrameMs).toBeLessThan(80);
@@ -122,6 +154,9 @@ test.describe("bug render stress", () => {
 
     expect(result.renderedBugCount).toBeGreaterThanOrEqual(5000);
     expect(result.sampleCount).toBeGreaterThanOrEqual(5);
+    expect(result.engineSamples).toBeGreaterThan(0);
+    expect(result.drawSamples).toBeGreaterThan(0);
+    expect(result.vfxSamples).toBeGreaterThan(0);
     expect(result.firstFrameMs).toBeLessThan(3000);
     expect(result.firstBugRenderMs).toBeLessThan(3500);
     expect(result.meanFrameMs).toBeLessThan(2200);

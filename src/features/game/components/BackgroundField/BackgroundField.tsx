@@ -25,7 +25,11 @@ import type {
   Tone,
 } from "../../../../types/dashboard";
 import WeaponCursor from "@game/components/WeaponCursor";
-import { createEffectEvent, isEffectAlive } from "@game/utils/weaponEffects";
+import {
+  createEffectEvent,
+  EFFECT_DURATION,
+  isEffectAlive,
+} from "@game/utils/weaponEffects";
 import { getWeaponHeatProfile } from "@game/utils/weaponHeat";
 import type { GameConfig } from "@game/engine/types";
 import type { SurvivalSpawnPlan } from "@game/sim/survivalDirector";
@@ -237,30 +241,34 @@ const BackgroundField = memo(
 
       useEffect(() => {
         if (!interactiveMode) {
-          const timeoutId = window.setTimeout(() => {
+          if (weaponEffects.length > 0) {
             setWeaponEffects([]);
-          }, 0);
+          }
 
-          return () => {
-            window.clearTimeout(timeoutId);
-          };
+          return undefined;
         }
 
         if (weaponEffects.length === 0) {
           return undefined;
         }
 
-        const intervalId = window.setInterval(() => {
-          const now = performance.now();
+        const now = performance.now();
+        const nextCleanupDelay = weaponEffects.reduce((soonestExpiry, effect) => {
+          const remainingMs =
+            EFFECT_DURATION[effect.weapon] - (now - effect.startedAt);
+          return Math.min(soonestExpiry, Math.max(0, remainingMs));
+        }, Number.POSITIVE_INFINITY);
+        const timeoutId = window.setTimeout(() => {
+          const cleanupNow = performance.now();
           setWeaponEffects((previous) =>
-            previous.filter((effect) => isEffectAlive(effect, now)),
+            previous.filter((effect) => isEffectAlive(effect, cleanupNow)),
           );
-        }, 80);
+        }, Math.max(16, Number.isFinite(nextCleanupDelay) ? nextCleanupDelay : 16));
 
         return () => {
-          window.clearInterval(intervalId);
+          window.clearTimeout(timeoutId);
         };
-      }, [interactiveMode, weaponEffects.length]);
+      }, [interactiveMode, weaponEffects]);
 
       return (
         <div

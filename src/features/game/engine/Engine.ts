@@ -49,6 +49,23 @@ function fract(value: number) {
 
 type SpatialCell = Entity[];
 
+interface BugUpdateContextLike {
+  bounds: {
+    height: number;
+    width: number;
+  };
+  config: GameConfig;
+  getCrowdingAt: (x: number, y: number, radius: number, exclude?: Entity) => {
+    centerX: number;
+    centerY: number;
+    count: number;
+    score: number;
+  };
+  getNeighbors: (entity: Entity, radius: number) => Entity[];
+  targetX?: number | null;
+  targetY?: number | null;
+}
+
 interface SpawnZone {
   height: number;
   left: number;
@@ -60,6 +77,7 @@ export interface EngineOptions {
   width: number;
   height: number;
   config?: Partial<GameConfig>;
+  onPerformanceSample?: (sample: EnginePerformanceSample) => void;
   onEntityDeath?: (
     x: number,
     y: number,
@@ -92,6 +110,14 @@ export interface EngineOptions {
   initialEvolutionStates?: Partial<Record<SiegeWeaponId, WeaponEvolutionState>>;
   /** Highest weapon tier allowed for the active game mode. */
   maxWeaponTier?: WeaponTier;
+}
+
+export interface EnginePerformanceSample {
+  entityCount: number;
+  entityUpdateMs: number;
+  evolutionMs: number;
+  spatialGridMs: number;
+  totalMs: number;
 }
 
 export class Engine {
@@ -127,6 +153,7 @@ export class Engine {
   }) => void;
   private structures: StructureEntry[] = [];
   private elapsedMs = 0;
+  private onPerformanceSample?: (sample: EnginePerformanceSample) => void;
   /** Per-weapon kill counts and tiers for the evolution system. */
   weaponEvolutionStates: Map<SiegeWeaponId, WeaponEvolutionState>;
   onWeaponEvolution?: (weaponId: SiegeWeaponId, newTier: WeaponTier) => void;
@@ -140,6 +167,8 @@ export class Engine {
     weaponId?: SiegeWeaponId;
   }> = [];
   private spatialGrid = new Map<string, SpatialCell>();
+  private spatialBucketPool: SpatialCell[] = [];
+  private activeSpatialBuckets: SpatialCell[] = [];
   private spatialCellSize = Math.max(
     DEFAULT_GAME_CONFIG.separationRadius * 2,
     56,
@@ -171,6 +200,7 @@ export class Engine {
     this.width = opts.width ?? canvas.clientWidth;
     this.height = opts.height ?? canvas.clientHeight;
     this.config = { ...DEFAULT_GAME_CONFIG, ...(opts.config ?? {}) };
+    this.onPerformanceSample = opts.onPerformanceSample;
     this.onEntityDeath = opts.onEntityDeath;
     this.onStructureKill = opts.onStructureKill;
     this.onAgentAbsorb = opts.onAgentAbsorb;
@@ -234,6 +264,12 @@ export class Engine {
   }
 
   private rebuildSpatialGrid(): void {
+    for (const bucket of this.activeSpatialBuckets) {
+      bucket.length = 0;
+      this.spatialBucketPool.push(bucket);
+    }
+
+    this.activeSpatialBuckets.length = 0;
     this.spatialGrid.clear();
 
     for (const entity of this.entities) {
@@ -250,16 +286,23 @@ export class Engine {
         continue;
       }
 
-      this.spatialGrid.set(key, [entity]);
+      const nextBucket = this.spatialBucketPool.pop() ?? [];
+      nextBucket.push(entity);
+      this.spatialGrid.set(key, nextBucket);
+      this.activeSpatialBuckets.push(nextBucket);
     }
   }
 
-  private getSpatialCandidates(x: number, y: number, radius: number): Entity[] {
+  private forEachSpatialCandidate(
+    x: number,
+    y: number,
+    radius: number,
+    visit: (entity: Entity) => void,
+  ): void {
     const minCellX = Math.floor((x - radius) / this.spatialCellSize);
     const maxCellX = Math.floor((x + radius) / this.spatialCellSize);
     const minCellY = Math.floor((y - radius) / this.spatialCellSize);
     const maxCellY = Math.floor((y + radius) / this.spatialCellSize);
-    const candidates: Entity[] = [];
 
     for (let cellY = minCellY; cellY <= maxCellY; cellY += 1) {
       for (let cellX = minCellX; cellX <= maxCellX; cellX += 1) {
@@ -268,11 +311,11 @@ export class Engine {
           continue;
         }
 
-        candidates.push(...bucket);
+        for (let index = 0; index < bucket.length; index += 1) {
+          visit(bucket[index]);
+        }
       }
     }
-
-    return candidates;
   }
 
   spawnFromCounts(
@@ -588,14 +631,12 @@ export class Engine {
   getNeighbors(e: Entity, radius: number) {
     const r2 = radius * radius;
     const out: Entity[] = [];
-    const candidates = this.getSpatialCandidates(e.x, e.y, radius);
-
-    for (const o of candidates) {
-      if (o === e) continue;
+    this.forEachSpatialCandidate(e.x, e.y, radius, (o) => {
+      if (o === e) return;
       const dx = e.x - o.x;
       const dy = e.y - o.y;
       if (dx * dx + dy * dy <= r2) out.push(o);
-    }
+    });
     return out;
   }
 
@@ -606,14 +647,12 @@ export class Engine {
     let centerX = 0;
     let centerY = 0;
 
-    const candidates = this.getSpatialCandidates(x, y, radius);
-
-    for (const entity of candidates) {
-      if (entity === exclude) continue;
+    this.forEachSpatialCandidate(x, y, radius, (entity) => {
+      if (entity === exclude) return;
       const dx = entity.x - x;
       const dy = entity.y - y;
       const distanceSquared = dx * dx + dy * dy;
-      if (distanceSquared > r2) continue;
+      if (distanceSquared > r2) return;
 
       const distance = Math.max(1, Math.sqrt(distanceSquared));
       const weight = 1 - distance / radius;
@@ -621,7 +660,7 @@ export class Engine {
       weightedCount += weight;
       centerX += entity.x * weight;
       centerY += entity.y * weight;
-    }
+    });
 
     return {
       centerX: weightedCount > 0 ? centerX / weightedCount : x,
@@ -634,27 +673,38 @@ export class Engine {
   update(dt: number, targetX?: number | null, targetY?: number | null) {
     // simple fixed-step update called by the host render loop
     this.elapsedMs += dt * 1000;
+    const perfStartedAt = this.onPerformanceSample ? performance.now() : 0;
 
     for (const ent of this.entities) {
       ent.beginStep();
     }
 
+    const spatialGridStartedAt = this.onPerformanceSample
+      ? performance.now()
+      : 0;
     this.rebuildSpatialGrid();
+    const spatialGridMs = this.onPerformanceSample
+      ? performance.now() - spatialGridStartedAt
+      : 0;
+    const updateContext: BugUpdateContextLike = {
+      bounds: { height: this.height, width: this.width },
+      config: this.config,
+      getCrowdingAt: (x, y, radius, exclude) =>
+        this.getCrowdingAt(x, y, radius, exclude),
+      getNeighbors: (entity, radius) => this.getNeighbors(entity, radius),
+      targetX,
+      targetY,
+    };
 
     // iterate backwards so we can safely remove dead entities into the pool
+    const entityUpdateStartedAt = this.onPerformanceSample
+      ? performance.now()
+      : 0;
     for (let i = this.entities.length - 1; i >= 0; i--) {
       const ent = this.entities[i];
       if ((ent as any).update.length >= 2) {
         // pass context expected by BugEntity
-        (ent as any).update(dt, {
-          getNeighbors: (e: any, r: number) => this.getNeighbors(e, r),
-          getCrowdingAt: (x: number, y: number, r: number, exclude?: any) =>
-            this.getCrowdingAt(x, y, r, exclude),
-          targetX,
-          targetY,
-          config: this.config,
-          bounds: { width: this.width, height: this.height },
-        });
+        (ent as any).update(dt, updateContext);
       } else {
         (ent as any).update(dt);
       }
@@ -693,9 +743,26 @@ export class Engine {
         this.entities.splice(i, 1);
       }
     }
+    const entityUpdateMs = this.onPerformanceSample
+      ? performance.now() - entityUpdateStartedAt
+      : 0;
 
     // tick T3 evolution effects (event horizons)
+    const evolutionStartedAt = this.onPerformanceSample ? performance.now() : 0;
     this.tickEvolutionEffects(dt * 1000);
+    const evolutionMs = this.onPerformanceSample
+      ? performance.now() - evolutionStartedAt
+      : 0;
+
+    if (this.onPerformanceSample) {
+      this.onPerformanceSample({
+        entityCount: this.entities.length,
+        entityUpdateMs,
+        evolutionMs,
+        spatialGridMs,
+        totalMs: performance.now() - perfStartedAt,
+      });
+    }
   }
 
   handleHit(index: number, damage = 1, creditOnDeath = false, weaponId?: SiegeWeaponId) {

@@ -66,6 +66,8 @@ const DashboardShell = memo(function DashboardShell({
       return undefined;
     }
 
+    let frameId = 0;
+
     const measure = () => {
       const frameRect = frame.getBoundingClientRect();
       const nextScale = Math.min(
@@ -79,19 +81,31 @@ const DashboardShell = memo(function DashboardShell({
       );
     };
 
+    const scheduleMeasure = () => {
+      if (frameId !== 0) {
+        return;
+      }
+
+      frameId = window.requestAnimationFrame(() => {
+        frameId = 0;
+        measure();
+      });
+    };
+
     measure();
 
     const resizeObserver = new ResizeObserver(() => {
-      measure();
+      scheduleMeasure();
     });
 
     resizeObserver.observe(frame);
     resizeObserver.observe(content);
-    window.addEventListener("resize", measure);
 
     return () => {
+      if (frameId !== 0) {
+        window.cancelAnimationFrame(frameId);
+      }
       resizeObserver.disconnect();
-      window.removeEventListener("resize", measure);
     };
   }, [dashboardRef, ui.activeTab]);
 
@@ -142,14 +156,12 @@ const DashboardShell = memo(function DashboardShell({
             interactiveMode ? "pointer-events-none select-none" : "",
           )}
           style={{
-            opacity: siegePhase === "entering" ? 0 : 1,
-            filter:
+            opacity: siegePhase === "entering" ? 0.04 : 1,
+            transform:
               siegePhase === "entering"
-                ? "blur(3px) saturate(0.68)"
+                ? "translateY(6px) scale(0.992)"
                 : undefined,
-            transform: siegePhase === "entering" ? "scale(0.98)" : undefined,
-            transition:
-              "opacity 260ms ease-out, filter 340ms ease-out, transform 340ms ease-out",
+            transition: "opacity 220ms ease-out, transform 260ms ease-out",
           }}
         >
           <header

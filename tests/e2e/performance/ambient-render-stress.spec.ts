@@ -13,6 +13,13 @@ import { makeBugMetrics } from "../weapons/weaponQa";
 test.describe.configure({ timeout: 300000 });
 
 type PerfSnapshot = {
+  breakdown?: Record<
+    string,
+    {
+      sampleCount?: number;
+      totalMs?: number;
+    }
+  >;
   firstBugPositionsAtMs?: number;
   firstFrameAtMs?: number;
   frameDurationsMs?: number[];
@@ -36,6 +43,16 @@ function getPercentile(values: number[], percentile: number) {
 
 function summarizeMetrics(metrics: PerfSnapshot) {
   const samples = metrics.frameDurationsMs ?? [];
+  const getBreakdownMean = (key: string) => {
+    const metric = metrics.breakdown?.[key];
+    const sampleCount = metric?.sampleCount ?? 0;
+    if (sampleCount <= 0) {
+      return 0;
+    }
+
+    return (metric?.totalMs ?? 0) / sampleCount;
+  };
+
   const mean =
     samples.length > 0
       ? samples.reduce((total, value) => total + value, 0) / samples.length
@@ -50,6 +67,9 @@ function summarizeMetrics(metrics: PerfSnapshot) {
       metrics.firstFrameAtMs != null && metrics.measurementStartAtMs != null
         ? metrics.firstFrameAtMs - metrics.measurementStartAtMs
         : Number.POSITIVE_INFINITY,
+    drawSamples: metrics.breakdown?.drawMs?.sampleCount ?? 0,
+    engineGridMeanMs: getBreakdownMean("engineGridMs"),
+    engineSamples: metrics.breakdown?.engineUpdateMs?.sampleCount ?? 0,
     maxFrameMs: metrics.maxFrameDurationMs ?? 0,
     meanFrameMs: mean,
     p95FrameMs: getPercentile(samples, 95),
@@ -90,6 +110,8 @@ test.describe("@nightly ambient render stress", () => {
 
     expect(result.renderedBugCount).toBeGreaterThanOrEqual(500);
     expect(result.sampleCount).toBeGreaterThanOrEqual(20);
+    expect(result.engineSamples).toBeGreaterThan(0);
+    expect(result.drawSamples).toBeGreaterThan(0);
     expect(result.firstFrameMs).toBeLessThan(1200);
     expect(result.firstBugRenderMs).toBeLessThan(1200);
   });
@@ -99,6 +121,8 @@ test.describe("@nightly ambient render stress", () => {
 
     expect(result.renderedBugCount).toBeGreaterThanOrEqual(1000);
     expect(result.sampleCount).toBeGreaterThanOrEqual(20);
+    expect(result.engineSamples).toBeGreaterThan(0);
+    expect(result.drawSamples).toBeGreaterThan(0);
     expect(result.firstFrameMs).toBeLessThan(1600);
     expect(result.firstBugRenderMs).toBeLessThan(1600);
   });
@@ -110,6 +134,8 @@ test.describe("@nightly ambient render stress", () => {
 
     expect(result.renderedBugCount).toBeGreaterThanOrEqual(5000);
     expect(result.sampleCount).toBeGreaterThanOrEqual(5);
+    expect(result.engineSamples).toBeGreaterThan(0);
+    expect(result.drawSamples).toBeGreaterThan(0);
     expect(result.firstFrameMs).toBeLessThan(3000);
     expect(result.firstBugRenderMs).toBeLessThan(2000);
   });

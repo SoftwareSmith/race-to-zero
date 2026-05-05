@@ -11,6 +11,15 @@
 
 import { forwardRef, useEffect, useImperativeHandle, useRef } from "react";
 import type { VfxEngine } from "../engine/VfxEngine";
+import { recordQaDurationSample } from "./BackgroundField/qa";
+
+let vfxEngineModulePromise: Promise<typeof import("../engine/VfxEngine")> | null =
+  null;
+
+export function preloadVfxEngine() {
+  vfxEngineModulePromise ??= import("../engine/VfxEngine");
+  return vfxEngineModulePromise;
+}
 
 interface Props {
   className?: string;
@@ -39,7 +48,7 @@ const VfxCanvas = forwardRef<VfxEngine | null, Props>(function VfxCanvas(
       const w = wrapper.clientWidth || window.innerWidth;
       const h = wrapper.clientHeight || window.innerHeight;
 
-      const { VfxEngine } = await import("../engine/VfxEngine");
+      const { VfxEngine } = await preloadVfxEngine();
       const engine = new VfxEngine();
       await engine.init(w, h);
 
@@ -60,7 +69,9 @@ const VfxCanvas = forwardRef<VfxEngine | null, Props>(function VfxCanvas(
       const loop = (now: number) => {
         const dt = Math.min(now - prevTimeRef.current, 50); // cap at 50ms
         prevTimeRef.current = now;
+        const tickStartedAt = performance.now();
         engine.tick(dt);
+        recordQaDurationSample("vfxMs", performance.now() - tickStartedAt);
         rafRef.current = requestAnimationFrame(loop);
       };
       prevTimeRef.current = performance.now();

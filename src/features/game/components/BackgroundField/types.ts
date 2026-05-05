@@ -43,15 +43,37 @@ export interface GameState {
 }
 
 export interface QaPerformanceMetrics {
+  breakdown?: Partial<Record<QaDurationMetricKey, QaDurationMetric>>;
   firstBugPositionsAtMs?: number;
   firstFrameAtMs?: number;
   frameDurationsMs?: number[];
+  heapPeakBytes?: number;
+  heapUsedBytes?: number;
   lastFrameDurationMs?: number;
   lastRenderedBugCount?: number;
+  longTaskCount?: number;
+  longTaskDurationsMs?: number[];
+  longTaskTotalMs?: number;
   maxFrameDurationMs?: number;
   maxRenderedBugCount?: number;
   measurementStartAtMs?: number;
   sampleLimit?: number;
+}
+
+export type QaDurationMetricKey =
+  | "drawMs"
+  | "engineEntityMs"
+  | "engineEvolutionMs"
+  | "engineGridMs"
+  | "engineUpdateMs"
+  | "vfxMs";
+
+export interface QaDurationMetric {
+  lastMs?: number;
+  maxMs?: number;
+  sampleCount?: number;
+  samplesMs?: number[];
+  totalMs?: number;
 }
 
 export interface QaWindowState {
