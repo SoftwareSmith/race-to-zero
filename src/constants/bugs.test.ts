@@ -8,15 +8,6 @@ import {
 } from "./bugs";
 
 describe("bug utilities", () => {
-  it("creates empty bug counts", () => {
-    expect(createEmptyBugCounts()).toEqual({
-      high: 0,
-      low: 0,
-      medium: 0,
-      urgent: 0,
-    });
-  });
-
   it("normalizes missing and invalid values", () => {
     expect(
       normalizeBugCounts({
@@ -49,11 +40,11 @@ describe("bug utilities", () => {
     });
   });
 
-  it("builds a stable bug count key", () => {
+  it("builds the same key for equivalent bug counts", () => {
     expect(getBugCountsKey({ low: 2, urgent: 1 })).toBe(
-      "low:2|medium:0|high:0|urgent:1",
+      getBugCountsKey({ high: 0, low: 2.9, medium: -4, urgent: 1 }),
     );
-    expect(getBugCountsKey({ high: 0, low: 2, medium: 0, urgent: 1 })).toBe(
+    expect(getBugCountsKey({ low: 3, urgent: 1 })).not.toBe(
       getBugCountsKey({ low: 2, urgent: 1 }),
     );
   });

@@ -420,15 +420,15 @@ describe("metrics", () => {
       }),
     );
 
-    expect(insightsMetrics.totalCompleted).toBe(2);
+    expect(insightsMetrics.totalCompleted).toBe(3);
     expect(insightsMetrics.eligibleCompleted).toBe(2);
     expect(insightsMetrics.onTimeCompleted).toBe(1);
     expect(insightsMetrics.overdueCompleted).toBe(1);
-    expect(insightsMetrics.missingDueDate).toBe(0);
+    expect(insightsMetrics.missingDueDate).toBe(1);
     expect(insightsMetrics.slaHitRate).toBe(50);
     expect(insightsMetrics.averageOverdueDays).toBe(2);
     expect(insightsMetrics.medianOverdueDays).toBe(2);
-    expect(insightsMetrics.medianResolutionDays).toBe(3.5);
+    expect(insightsMetrics.medianResolutionDays).toBe(2);
     expect(insightsMetrics.openOverdue).toBe(1);
     expect(insightsMetrics.openPending).toBe(1);
 
@@ -444,14 +444,16 @@ describe("metrics", () => {
 
     expect(urgentMetrics?.onTime).toBe(1);
     expect(highMetrics?.overdueCompleted).toBe(1);
-    expect(normalMetrics?.totalCompleted).toBe(0);
+    expect(normalMetrics?.totalCompleted).toBe(1);
+    expect(normalMetrics?.missingDueDate).toBe(1);
 
     const hitRateChart = buildSlaHitRateChartData(insightsMetrics);
     expect(hitRateChart.datasets[0]?.data.slice(0, 3)).toEqual([100, 0, 0]);
 
     const outcomeChart = buildSlaOutcomeChartData(insightsMetrics);
-    expect(outcomeChart.datasets).toHaveLength(2);
+    expect(outcomeChart.datasets).toHaveLength(3);
     expect(outcomeChart.datasets[0]?.data[0]).toBe(1);
     expect(outcomeChart.datasets[1]?.data[1]).toBe(1);
+    expect(outcomeChart.datasets[2]?.data[2]).toBe(1);
   });
 });

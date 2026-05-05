@@ -457,6 +457,51 @@ describe("useSiegeGame", () => {
     );
   });
 
+  it("supports manual pause state during Survival runs", async () => {
+    vi.useFakeTimers();
+
+    const { result } = renderHook(() =>
+      useSiegeGame({
+        currentBugCount: 20,
+        currentBugCounts: { high: 0, low: 20, medium: 0, urgent: 0 },
+        evolutionStates: {},
+      }),
+    );
+
+    act(() => {
+      result.current.enterInteractiveMode("outbreak");
+      vi.advanceTimersByTime(520);
+    });
+
+    expect(result.current.isFocusPaused).toBe(false);
+    expect(result.current.isManuallyPaused).toBe(false);
+    expect(result.current.isPaused).toBe(false);
+
+    act(() => {
+      result.current.togglePause();
+    });
+
+    expect(result.current.isManuallyPaused).toBe(true);
+    expect(result.current.isPaused).toBe(true);
+
+    const pausedElapsed = result.current.interactiveElapsedMs;
+
+    act(() => {
+      vi.advanceTimersByTime(1_500);
+    });
+
+    expect(result.current.interactiveElapsedMs).toBe(pausedElapsed);
+
+    act(() => {
+      result.current.togglePause();
+      vi.advanceTimersByTime(500);
+    });
+
+    expect(result.current.isManuallyPaused).toBe(false);
+    expect(result.current.isPaused).toBe(false);
+    expect(result.current.interactiveElapsedMs).toBeGreaterThanOrEqual(pausedElapsed);
+  });
+
   it("creates a completion summary when the live engine count reaches zero", async () => {
     const { result } = renderHook(() =>
       useSiegeGame({

@@ -67,6 +67,20 @@ For e2e coverage:
 npm run test:e2e
 ```
 
+For optional nightly perf coverage:
+
+```bash
+npm run test:e2e:nightly
+```
+
+## Testing Strategy
+
+- Unit and hook tests should own engine rules, progression thresholds, leaderboard ordering, and deterministic dashboard math.
+- Playwright should cover user-visible contracts: navigation, mode switching, completion flows, codex access, and representative weapon behavior.
+- Performance stress specs are intentionally split from the default gate. Keep them for profiling and nightly regression checks, not routine feature feedback.
+
+Avoid adding tests that only mirror constants, depend on debug-only controls, rely on hardcoded sleeps, or duplicate the same outcome through multiple layers.
+
 ## Deployment
 
 Builds and deploys automatically from GitHub Actions on pushes to `main`.

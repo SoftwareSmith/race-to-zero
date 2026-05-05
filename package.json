@@ -16,9 +16,10 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
-    "test:e2e": "playwright test",
-    "test:qa": "playwright test tests/e2e",
-    "test:qa:headed": "playwright test --headed tests/e2e"
+    "test:e2e": "playwright test --grep-invert @nightly",
+    "test:e2e:nightly": "playwright test --grep @nightly",
+    "test:qa": "playwright test --grep-invert @nightly tests/e2e",
+    "test:qa:headed": "playwright test --headed --grep-invert @nightly tests/e2e"
   },
   "dependencies": {
     "@dimforge/rapier2d-compat": "^0.19.3",

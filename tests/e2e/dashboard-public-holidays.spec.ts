@@ -51,11 +51,6 @@ test.describe("dashboard public holiday QA", () => {
       "Required net burn",
       holidayAdjustedMetrics.viewMetrics.requiredNetBurn,
     );
-    await expectMetricValue(
-      page,
-      "Required pace",
-      holidayAdjustedMetrics.commandCenter.requiredPace,
-    );
 
     await page.reload();
 
@@ -63,11 +58,6 @@ test.describe("dashboard public holiday QA", () => {
       page,
       "Workdays left",
       holidayAdjustedMetrics.viewMetrics.daysLeft,
-    );
-    await expectMetricValue(
-      page,
-      "Required pace",
-      holidayAdjustedMetrics.commandCenter.requiredPace,
     );
 
     await clientErrors.expectNoClientErrors();

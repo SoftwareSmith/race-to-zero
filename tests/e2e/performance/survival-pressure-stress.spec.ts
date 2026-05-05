@@ -65,7 +65,7 @@ function summarizeMetrics(metrics: PerfSnapshot) {
   };
 }
 
-test("profiles survival pressure at elevated waves", async ({ page }) => {
+test("@nightly profiles survival pressure at elevated waves", async ({ page }) => {
   const errors = createConsoleCollectors(page);
 
   await page.setViewportSize({ height: 1200, width: 1440 });

@@ -57,6 +57,18 @@ describe("siege run completion leaderboards", () => {
     ]);
   });
 
+  it("breaks Survival ties on kill count after wave and survival time", () => {
+    const leaderboards = buildSiegeLeaderboards([
+      createEntry({ id: "higher-kills", mode: "outbreak", waveReached: 6, survivedMs: 75_000, bugCount: 140 }),
+      createEntry({ id: "lower-kills", mode: "outbreak", waveReached: 6, survivedMs: 75_000, bugCount: 110 }),
+    ]);
+
+    expect(leaderboards.outbreak.map((entry) => entry.id)).toEqual([
+      "higher-kills",
+      "lower-kills",
+    ]);
+  });
+
   it("trims each mode leaderboard to the top eight entries", () => {
     const leaderboards = buildSiegeLeaderboards(
       Array.from({ length: 12 }, (_, index) =>

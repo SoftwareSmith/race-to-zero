@@ -115,7 +115,7 @@ test.describe("bug render stress", () => {
     expect(result.p99FrameMs).toBeLessThan(150);
   });
 
-  test("profiles 5000 bugs", async ({ page }) => {
+  test("@nightly profiles 5000 bugs", async ({ page }) => {
     test.slow();
 
     const result = await profileSiegeRender(page, 5000);

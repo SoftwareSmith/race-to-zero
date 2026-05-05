@@ -214,6 +214,7 @@ export function useSiegeGame({
   >(null);
   const [selectedWeaponId, setSelectedWeaponId] =
     useState<SiegeWeaponId>("hammer");
+  const [manuallyPaused, setManuallyPaused] = useState(false);
   const [runtimeSnapshot, setRuntimeSnapshot] = useState<SiegeRuntimeSnapshot>(
     () => createRuntimeSnapshot(),
   );
@@ -394,14 +395,14 @@ export function useSiegeGame({
     interactiveMode,
     interactiveRunningSinceRef,
     interactiveStartedAt,
-    pauseTimer,
+    pauseTimer: pauseTimer || manuallyPaused,
     resetInactiveRuntime,
     updateRuntimeSnapshot,
   });
 
   useEffect(() => {
-    gamePausedRef.current = pauseTimer || completionSummary != null;
-  }, [pauseTimer, completionSummary]);
+    gamePausedRef.current = pauseTimer || manuallyPaused || completionSummary != null;
+  }, [pauseTimer, manuallyPaused, completionSummary]);
 
   const onClearComplete = useCallback(() => {
     if (interactiveMode && siegePhase === "active" && gameMode === "purge") {
@@ -448,6 +449,7 @@ export function useSiegeGame({
     flushRuntimeSnapshot(true);
     lastKillAtRef.current = null;
     resetCompletion();
+    setManuallyPaused(false);
     setSelectedWeaponId("hammer");
     if (nextMode === "outbreak") {
       survivalRemainingBudgetRef.current = Math.max(
@@ -475,6 +477,7 @@ export function useSiegeGame({
 
   const exitInteractiveMode = useCallback(() => {
     cancelTimeout(phaseTimerRef.current);
+    setManuallyPaused(false);
     setSiegePhase("exiting");
     phaseTimerRef.current = scheduleTimeout(() => {
       phaseTimerRef.current = null;
@@ -934,6 +937,14 @@ export function useSiegeGame({
     [finalizeRun, gameMode, interactiveMode, siegePhase, updateRuntimeSnapshot],
   );
 
+  const togglePause = useCallback(() => {
+    if (!interactiveMode || siegePhase !== "active" || gameMode !== "outbreak") {
+      return;
+    }
+
+    setManuallyPaused((current) => !current);
+  }, [gameMode, interactiveMode, siegePhase]);
+
   return {
     combatStats,
     changeGameMode,
@@ -960,6 +971,9 @@ export function useSiegeGame({
     maxWeaponTier,
     nextWeaponUnlock,
     completionSummary,
+    isFocusPaused: pauseTimer,
+    isManuallyPaused: manuallyPaused,
+    isPaused: pauseTimer || manuallyPaused,
     selectedWeaponId,
     selectWeapon,
     setInteractiveMode: (v: boolean) =>
@@ -973,6 +987,7 @@ export function useSiegeGame({
       runtimeSpeedMultiplier: getSurvivalRuntimeSpeedMultiplier(survivalStatus.wave),
     },
     toggleDebugMode,
+    togglePause,
     triggerSurvivalOverrun,
     weaponSnapshots,
   };

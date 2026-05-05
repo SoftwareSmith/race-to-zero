@@ -84,7 +84,7 @@ async function profileAmbientRender(page: Parameters<typeof test>[0]["page"], bu
   return summary;
 }
 
-test.describe("ambient render stress", () => {
+test.describe("@nightly ambient render stress", () => {
   test("profiles 500 ambient bugs", async ({ page }) => {
     const result = await profileAmbientRender(page, 500);
 

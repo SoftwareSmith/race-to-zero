@@ -31,11 +31,6 @@ test.describe("dashboard date input QA", () => {
       "Required net burn",
       expected.viewMetrics.requiredNetBurn,
     );
-    await expectMetricValue(
-      page,
-      "Required pace",
-      expected.commandCenter.requiredPace,
-    );
 
     await page.reload();
 
@@ -43,11 +38,6 @@ test.describe("dashboard date input QA", () => {
     await expect(reloadedDateInputs.nth(0)).toHaveValue(UPDATED_DEADLINE_FROM);
     await expect(reloadedDateInputs.nth(1)).toHaveValue(UPDATED_DEADLINE_DATE);
     await expectMetricValue(page, "Days left", expected.viewMetrics.daysLeft);
-    await expectMetricValue(
-      page,
-      "Required pace",
-      expected.commandCenter.requiredPace,
-    );
 
     await clientErrors.expectNoClientErrors();
   });

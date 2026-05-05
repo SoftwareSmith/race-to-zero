@@ -1,31 +1,10 @@
-/**
- * Registry integrity test.
- *
- * Imports the barrel (which runs all self-registrations) and asserts that
- * every expected weapon ID has been registered exactly once.
- *
- * Note: ES module cache means registrations run once per test run. We do NOT
- * reset between tests here because we are only verifying static invariants.
- */
-
 import { describe, it, expect } from "vitest";
 import { registeredIds, getEntry, hasEntry } from "../runtime/registry";
-
-// Import the barrel to trigger all self-registrations.
-import "../index";
-
-const EXPECTED_WEAPON_IDS = [
-  "hammer",
-  "zapper",     // bug-spray
-  "chain",
-  "nullpointer",
-  "plasma",
-  "void",
-] as const;
+import { WEAPON_REGISTRY } from "../index";
 
 describe("weapon plugin registry — integrity", () => {
-  it("registers exactly 6 weapons", () => {
-    expect(registeredIds().length).toBe(6);
+  it("registers one plugin for every authored weapon", () => {
+    expect(registeredIds().length).toBe(WEAPON_REGISTRY.length);
   });
 
   it("registers no duplicate IDs", () => {
@@ -33,18 +12,21 @@ describe("weapon plugin registry — integrity", () => {
     expect(new Set(ids).size).toBe(ids.length);
   });
 
-  it.each(EXPECTED_WEAPON_IDS)('weapon "%s" is registered', (id) => {
-    expect(hasEntry(id as any)).toBe(true);
-  });
+  it.each(WEAPON_REGISTRY)(
+    'registers a usable plugin for "%s"',
+    (weaponDef) => {
+      expect(hasEntry(weaponDef.id)).toBe(true);
 
-  it.each(EXPECTED_WEAPON_IDS)(
-    'weapon "%s" entry has a valid config with cooldownMs',
-    (id) => {
-      const entry = getEntry(id as any)!;
+      const entry = getEntry(weaponDef.id);
       expect(entry).toBeDefined();
-      expect(entry.weaponId).toBe(id);
+      if (!entry) {
+        throw new Error(`Missing registry entry for ${weaponDef.id}`);
+      }
+
+      expect(entry?.weaponId).toBe(weaponDef.id);
       expect(typeof entry.config.cooldownMs).toBe("number");
       expect(typeof entry.createSession).toBe("function");
+      expect(entry.config.cooldownMs).toBeGreaterThan(0);
     },
   );
 });
