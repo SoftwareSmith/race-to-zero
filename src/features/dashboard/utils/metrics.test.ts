@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  buildDeadlineBurndownChartData,
   buildComparisonWindowHistoryChartData,
   buildOpenAgeChartData,
   buildComparisonRateHistoryChartData,
@@ -91,33 +92,33 @@ describe("metrics", () => {
     expect(summary.currentAddRate).toBeGreaterThan(0);
   });
 
-  it("excludes cancelled and archived terminal bugs from burndown history", () => {
+  it("keeps terminal bugs in backlog history until they actually leave the queue", () => {
     const deadlineMetrics = withFrozenDate("2026-03-06T12:00:00.000Z", () =>
       getDeadlineMetrics(
         {
           bugs: [
             {
+              canceledAt: "2026-03-04",
               completedAt: null,
               createdAt: "2026-03-01",
+              priority: 2,
+              stateName: "Canceled",
+              stateType: "canceled",
+              updatedAt: "2026-03-04",
+            },
+            {
+              completedAt: null,
+              createdAt: "2026-03-02",
               priority: 2,
               stateName: "Backlog",
               stateType: "backlog",
             },
             {
               completedAt: "2026-03-05",
-              createdAt: "2026-03-02",
+              createdAt: "2026-03-03",
               priority: 2,
               stateName: "Done",
               stateType: "completed",
-            },
-            {
-              canceledAt: "2026-03-04",
-              completedAt: null,
-              createdAt: "2026-03-03",
-              priority: 3,
-              stateName: "Canceled",
-              stateType: "canceled",
-              updatedAt: "2026-03-04",
             },
             {
               archivedAt: "2026-03-06",
@@ -132,7 +133,7 @@ describe("metrics", () => {
         },
         {
           deadlineDate: "2026-12-31",
-          trackingStartDate: "2026-03-01",
+          trackingStartDate: "2026-03-04",
           workdaySettings: {
             excludePublicHolidays: false,
             excludeWeekends: false,
@@ -145,11 +146,67 @@ describe("metrics", () => {
     expect(deadlineMetrics.allRemainingPerDay).toEqual([
       { date: "2026-03-01", count: 1 },
       { date: "2026-03-02", count: 2 },
-      { date: "2026-03-05", count: 1 },
+      { date: "2026-03-03", count: 3 },
+      { date: "2026-03-04", count: 3 },
+      { date: "2026-03-05", count: 2 },
+      { date: "2026-03-06", count: 1 },
     ]);
-    expect(deadlineMetrics.trackingStartBacklog).toBe(1);
-    expect(deadlineMetrics.currentAddRate).toBeCloseTo(2 / 6, 5);
-    expect(deadlineMetrics.currentFixRate).toBeCloseTo(1 / 6, 5);
+    expect(deadlineMetrics.trackingStartBacklog).toBe(3);
+    expect(deadlineMetrics.currentAddRate).toBe(0);
+    expect(deadlineMetrics.currentFixRate).toBeCloseTo(1 / 3, 5);
+  });
+
+  it("starts the burndown chart at the selected date even when no event lands that day", () => {
+    const deadlineMetrics = withFrozenDate("2026-01-06T12:00:00.000Z", () =>
+      getDeadlineMetrics(
+        {
+          bugs: [
+            {
+              completedAt: null,
+              createdAt: "2025-12-20",
+              priority: 2,
+              stateName: "Backlog",
+              stateType: "backlog",
+            },
+            {
+              completedAt: "2026-01-04",
+              createdAt: "2025-12-28",
+              priority: 2,
+              stateName: "Done",
+              stateType: "completed",
+            },
+            {
+              completedAt: null,
+              createdAt: "2026-01-04",
+              priority: 2,
+              stateName: "Backlog",
+              stateType: "backlog",
+            },
+          ],
+        },
+        {
+          deadlineDate: "2026-01-10",
+          trackingStartDate: "2026-01-01",
+          workdaySettings: {
+            excludePublicHolidays: false,
+            excludeWeekends: false,
+          },
+        },
+      ),
+    );
+
+    const chartData = buildDeadlineBurndownChartData(deadlineMetrics);
+
+    expect(deadlineMetrics.trackingStartBacklog).toBe(2);
+    expect(chartData.labels?.slice(0, 6)).toEqual([
+      "Jan 1",
+      "Jan 2",
+      "Jan 3",
+      "Jan 4",
+      "Jan 5",
+      "Jan 6",
+    ]);
+    expect(chartData.datasets[0]?.data.slice(0, 6)).toEqual([2, 2, 2, 2, 2, 2]);
   });
 
   it("builds a status chart using the fixed Linear column order", () => {

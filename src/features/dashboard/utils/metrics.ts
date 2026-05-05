@@ -83,10 +83,13 @@ interface PreparedMetricsSource {
 
 interface BurndownSeriesSource {
   completedIndex: SeriesIndex;
+  createdIndex: SeriesIndex;
+}
+
+interface BacklogHistorySource {
   firstBugDate: Date | null;
   remainingIndex: SeriesIndex;
   remainingSeries: DailyCountEntry[];
-  createdIndex: SeriesIndex;
 }
 
 function normalizeBugRecords(
@@ -322,14 +325,20 @@ function buildBurndownSeriesSource(bugs: MetricsBug[]): BurndownSeriesSource {
   );
   const createdSeries = buildSeriesFromField(burndownBugs, "createdAt");
   const completedSeries = buildSeriesFromField(burndownBugs, "completedAt");
-  const remainingSeries = buildRemainingSeries(createdSeries, completedSeries);
 
   return {
     completedIndex: buildSeriesIndex(completedSeries),
     createdIndex: buildSeriesIndex(createdSeries),
-    firstBugDate: burndownBugs[0]?.createdAt
-      ? parseISO(burndownBugs[0].createdAt)
-      : null,
+  };
+}
+
+function buildBacklogHistorySource(bugs: MetricsBug[]): BacklogHistorySource {
+  const createdSeries = buildSeriesFromField(bugs, "createdAt");
+  const completedSeries = buildClosureSeries(bugs);
+  const remainingSeries = buildRemainingSeries(createdSeries, completedSeries);
+
+  return {
+    firstBugDate: bugs[0]?.createdAt ? parseISO(bugs[0].createdAt) : null,
     remainingIndex: buildSeriesIndex(remainingSeries, { usePrefixSums: false }),
     remainingSeries,
   };
@@ -463,6 +472,17 @@ function getSeriesValueAtOrBefore(
 ) {
   const dateKey = typeof date === "string" ? date : format(date, "yyyy-MM-dd");
   const index = findUpperBound(seriesIndex.dates, dateKey) - 1;
+
+  if (index < 0) {
+    return 0;
+  }
+
+  return seriesIndex.values[index] ?? 0;
+}
+
+function getSeriesValueBefore(seriesIndex: SeriesIndex, date: Date | string) {
+  const dateKey = typeof date === "string" ? date : format(date, "yyyy-MM-dd");
+  const index = findLowerBound(seriesIndex.dates, dateKey) - 1;
 
   if (index < 0) {
     return 0;
@@ -883,11 +903,12 @@ export function getDeadlineMetrics(
 ): DeadlineMetrics {
   const preparedSource = prepareMetricsSource(source);
   const burndownSource = buildBurndownSeriesSource(preparedSource.bugs);
+  const backlogHistorySource = buildBacklogHistorySource(preparedSource.bugs);
   const remainingBugs = preparedSource.remainingBugs;
   const today = startOfDay(new Date());
   const defaultDeadline = getDeadlineDate(today);
   const deadline = getValidDate(deadlineDate, defaultDeadline);
-  const firstBugDate = burndownSource.firstBugDate ?? today;
+  const firstBugDate = backlogHistorySource.firstBugDate ?? today;
   const requestedTrackingStartDate = getValidDate(
     trackingStartDate,
     subDays(today, DEADLINE_TREND_WINDOW_DAYS - 1),
@@ -941,12 +962,12 @@ export function getDeadlineMetrics(
 
   return {
     bugs: preparedSource.bugs,
-    allRemainingPerDay: burndownSource.remainingSeries,
+    allRemainingPerDay: backlogHistorySource.remainingSeries,
     remainingBugs,
     trackingStartDate: trackingStart,
     trackingStartLabel: format(trackingStart, "MMM d, yyyy"),
-    trackingStartBacklog: getSeriesValueAtOrBefore(
-      burndownSource.remainingIndex,
+    trackingStartBacklog: getSeriesValueBefore(
+      backlogHistorySource.remainingIndex,
       trackingStart,
     ),
     currentAddRate,
@@ -979,23 +1000,19 @@ export function getDeadlineMetrics(
 export function buildDeadlineBurndownChartData(
   deadlineMetrics: DeadlineMetrics,
 ): ChartData<"line", Array<number | null>, string> {
-  const actualHistory = deadlineMetrics.allRemainingPerDay.filter(
-    (entry) =>
-      entry.date >= format(deadlineMetrics.trackingStartDate, "yyyy-MM-dd"),
-  );
-  const historyDates = actualHistory.map((entry) => entry.date);
-  const futureDates =
-    compareAsc(deadlineMetrics.today, deadlineMetrics.deadline) === -1
-      ? eachDayOfInterval({
-          start: addDays(deadlineMetrics.today, 1),
-          end: deadlineMetrics.deadline,
-        }).map((entry) => format(entry, "yyyy-MM-dd"))
-      : [];
-  const labels = [...new Set([...historyDates, ...futureDates])];
+  const trackingStartKey = format(deadlineMetrics.trackingStartDate, "yyyy-MM-dd");
   const todayKey = format(deadlineMetrics.today, "yyyy-MM-dd");
-  const actualLookup = new Map(
-    actualHistory.map((entry) => [entry.date, entry.count]),
-  );
+  const rangeEnd =
+    compareAsc(deadlineMetrics.today, deadlineMetrics.deadline) === 1
+      ? deadlineMetrics.today
+      : deadlineMetrics.deadline;
+  const labels = eachDayOfInterval({
+    start: deadlineMetrics.trackingStartDate,
+    end: rangeEnd,
+  }).map((entry) => format(entry, "yyyy-MM-dd"));
+  const remainingIndex = buildSeriesIndex(deadlineMetrics.allRemainingPerDay, {
+    usePrefixSums: false,
+  });
   const idealStartDate = deadlineMetrics.trackingStartDate;
   const idealStartCount = deadlineMetrics.trackingStartBacklog;
   const idealDuration = Math.max(
@@ -1013,9 +1030,15 @@ export function buildDeadlineBurndownChartData(
     datasets: [
       {
         label: "Remaining bugs",
-        data: labels.map((entry) =>
-          entry <= todayKey ? (actualLookup.get(entry) ?? null) : null,
-        ),
+        data: labels.map((entry) => {
+          if (entry > todayKey) {
+            return null;
+          }
+
+          return entry === trackingStartKey
+            ? getSeriesValueBefore(remainingIndex, entry)
+            : getSeriesValueAtOrBefore(remainingIndex, entry);
+        }),
         borderColor: "#f87171",
         backgroundColor: "rgba(248, 113, 113, 0.18)",
         fill: false,
