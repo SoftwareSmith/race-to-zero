@@ -81,6 +81,14 @@ interface PreparedMetricsSource {
   statusDistribution: StatusDistributionEntry[];
 }
 
+interface BurndownSeriesSource {
+  completedIndex: SeriesIndex;
+  firstBugDate: Date | null;
+  remainingIndex: SeriesIndex;
+  remainingSeries: DailyCountEntry[];
+  createdIndex: SeriesIndex;
+}
+
 function normalizeBugRecords(
   source: MetricsSource | null | undefined,
 ): MetricsBug[] {
@@ -306,6 +314,25 @@ function buildClosureSeries(bugs: MetricsBug[]): DailyCountEntry[] {
   return [...countsByDay.entries()]
     .sort(([left], [right]) => left.localeCompare(right))
     .map(([date, count]) => ({ date, count }));
+}
+
+function buildBurndownSeriesSource(bugs: MetricsBug[]): BurndownSeriesSource {
+  const burndownBugs = bugs.filter(
+    (bug) => !isTerminalStatusLabel(getLinearStatusLabel(bug)),
+  );
+  const createdSeries = buildSeriesFromField(burndownBugs, "createdAt");
+  const completedSeries = buildSeriesFromField(burndownBugs, "completedAt");
+  const remainingSeries = buildRemainingSeries(createdSeries, completedSeries);
+
+  return {
+    completedIndex: buildSeriesIndex(completedSeries),
+    createdIndex: buildSeriesIndex(createdSeries),
+    firstBugDate: burndownBugs[0]?.createdAt
+      ? parseISO(burndownBugs[0].createdAt)
+      : null,
+    remainingIndex: buildSeriesIndex(remainingSeries, { usePrefixSums: false }),
+    remainingSeries,
+  };
 }
 
 function buildRemainingSeries(
@@ -855,11 +882,12 @@ export function getDeadlineMetrics(
   } = {},
 ): DeadlineMetrics {
   const preparedSource = prepareMetricsSource(source);
+  const burndownSource = buildBurndownSeriesSource(preparedSource.bugs);
   const remainingBugs = preparedSource.remainingBugs;
   const today = startOfDay(new Date());
   const defaultDeadline = getDeadlineDate(today);
   const deadline = getValidDate(deadlineDate, defaultDeadline);
-  const firstBugDate = preparedSource.firstBugDate ?? today;
+  const firstBugDate = burndownSource.firstBugDate ?? today;
   const requestedTrackingStartDate = getValidDate(
     trackingStartDate,
     subDays(today, DEADLINE_TREND_WINDOW_DAYS - 1),
@@ -868,12 +896,12 @@ export function getDeadlineMetrics(
     ? firstBugDate
     : requestedTrackingStartDate;
   const recentCreatedPerDay = filterSeriesByDateRange(
-    preparedSource.createdIndex,
+    burndownSource.createdIndex,
     trackingStart,
     today,
   );
   const recentCompletedPerDay = filterSeriesByDateRange(
-    preparedSource.completedIndex,
+    burndownSource.completedIndex,
     trackingStart,
     today,
   );
@@ -913,12 +941,12 @@ export function getDeadlineMetrics(
 
   return {
     bugs: preparedSource.bugs,
-    allRemainingPerDay: preparedSource.remainingSeries,
+    allRemainingPerDay: burndownSource.remainingSeries,
     remainingBugs,
     trackingStartDate: trackingStart,
     trackingStartLabel: format(trackingStart, "MMM d, yyyy"),
     trackingStartBacklog: getSeriesValueAtOrBefore(
-      preparedSource.remainingIndex,
+      burndownSource.remainingIndex,
       trackingStart,
     ),
     currentAddRate,

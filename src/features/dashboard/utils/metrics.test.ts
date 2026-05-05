@@ -91,6 +91,67 @@ describe("metrics", () => {
     expect(summary.currentAddRate).toBeGreaterThan(0);
   });
 
+  it("excludes cancelled and archived terminal bugs from burndown history", () => {
+    const deadlineMetrics = withFrozenDate("2026-03-06T12:00:00.000Z", () =>
+      getDeadlineMetrics(
+        {
+          bugs: [
+            {
+              completedAt: null,
+              createdAt: "2026-03-01",
+              priority: 2,
+              stateName: "Backlog",
+              stateType: "backlog",
+            },
+            {
+              completedAt: "2026-03-05",
+              createdAt: "2026-03-02",
+              priority: 2,
+              stateName: "Done",
+              stateType: "completed",
+            },
+            {
+              canceledAt: "2026-03-04",
+              completedAt: null,
+              createdAt: "2026-03-03",
+              priority: 3,
+              stateName: "Canceled",
+              stateType: "canceled",
+              updatedAt: "2026-03-04",
+            },
+            {
+              archivedAt: "2026-03-06",
+              completedAt: null,
+              createdAt: "2026-03-04",
+              priority: 4,
+              stateName: "Duplicate",
+              stateType: "canceled",
+              updatedAt: "2026-03-06",
+            },
+          ],
+        },
+        {
+          deadlineDate: "2026-12-31",
+          trackingStartDate: "2026-03-01",
+          workdaySettings: {
+            excludePublicHolidays: false,
+            excludeWeekends: false,
+          },
+        },
+      ),
+    );
+
+    expect(deadlineMetrics.remainingBugs).toBe(1);
+    expect(deadlineMetrics.allRemainingPerDay).toEqual([
+      { date: "2026-03-01", count: 1 },
+      { date: "2026-03-02", count: 2 },
+      { date: "2026-03-05", count: 1 },
+    ]);
+    expect(deadlineMetrics.trackingStartBacklog).toBe(1);
+    expect(deadlineMetrics.currentAddRate).toBeCloseTo(2 / 6, 5);
+    expect(deadlineMetrics.currentFixRate).toBeCloseTo(1 / 6, 5);
+  });
+
   it("builds a status chart using the fixed Linear column order", () => {
     const metrics = {
       bugs: [
