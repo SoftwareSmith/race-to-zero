@@ -10,6 +10,11 @@ import { WEAPON_EVOLVE_THRESHOLDS } from "@config/gameDefaults";
 import { applyMatchupDamage, getBugWeaponMatchup } from "@game/combat/weaponMatchups";
 import type { AllyConversionConfig } from "@game/weapons/runtime/types";
 import type { BugVariant } from "../../../types/dashboard";
+import {
+  getWrappedDelta,
+  getWrappedDistance,
+  wrapCoordinate,
+} from "./toroidalMath";
 import type {
   BugTransitionSnapshotItem,
   QaBugTelemetryItem,
@@ -266,6 +271,68 @@ export class Engine {
     return `${cellX}:${cellY}`;
   }
 
+  private isToroidalEntity(entity: Entity | null | undefined): boolean {
+    return Boolean(entity && "hasEnteredField" in entity && (entity as BugEntity).hasEnteredField);
+  }
+
+  private getSpatialColumnCount(): number {
+    return Math.max(1, Math.ceil(this.width / this.spatialCellSize));
+  }
+
+  private getSpatialRowCount(): number {
+    return Math.max(1, Math.ceil(this.height / this.spatialCellSize));
+  }
+
+  private getWrappedCellIndex(index: number, count: number): number {
+    if (count <= 0) {
+      return index;
+    }
+
+    const wrapped = index % count;
+    return wrapped < 0 ? wrapped + count : wrapped;
+  }
+
+  private getEntityDeltaFromPoint(x: number, y: number, entity: Entity) {
+    if (this.isToroidalEntity(entity)) {
+      return {
+        dx: getWrappedDelta(x, entity.x, this.width),
+        dy: getWrappedDelta(y, entity.y, this.height),
+      };
+    }
+
+    return {
+      dx: entity.x - x,
+      dy: entity.y - y,
+    };
+  }
+
+  private getPointNearEntity(x: number, y: number, entity: Entity) {
+    const { dx, dy } = this.getEntityDeltaFromPoint(x, y, entity);
+    return {
+      x: x + dx,
+      y: y + dy,
+    };
+  }
+
+  private getEntityDelta(a: Entity, b: Entity) {
+    if (this.isToroidalEntity(a) && this.isToroidalEntity(b)) {
+      return {
+        dx: getWrappedDelta(a.x, b.x, this.width),
+        dy: getWrappedDelta(a.y, b.y, this.height),
+      };
+    }
+
+    return {
+      dx: b.x - a.x,
+      dy: b.y - a.y,
+    };
+  }
+
+  private getDistanceFromPointToEntity(x: number, y: number, entity: Entity) {
+    const { dx, dy } = this.getEntityDeltaFromPoint(x, y, entity);
+    return Math.hypot(dx, dy);
+  }
+
   private rebuildSpatialGrid(): void {
     for (const bucket of this.activeSpatialBuckets) {
       bucket.length = 0;
@@ -275,13 +342,26 @@ export class Engine {
     this.activeSpatialBuckets.length = 0;
     this.spatialGrid.clear();
 
+    const columnCount = this.getSpatialColumnCount();
+    const rowCount = this.getSpatialRowCount();
+
     for (const entity of this.entities) {
       if (isTerminalEntityState((entity as any).state)) {
         continue;
       }
 
-      const cellX = Math.floor(entity.x / this.spatialCellSize);
-      const cellY = Math.floor(entity.y / this.spatialCellSize);
+      const entityX = this.isToroidalEntity(entity)
+        ? wrapCoordinate(entity.x, this.width)
+        : entity.x;
+      const entityY = this.isToroidalEntity(entity)
+        ? wrapCoordinate(entity.y, this.height)
+        : entity.y;
+      const cellX = this.isToroidalEntity(entity)
+        ? this.getWrappedCellIndex(Math.floor(entityX / this.spatialCellSize), columnCount)
+        : Math.floor(entityX / this.spatialCellSize);
+      const cellY = this.isToroidalEntity(entity)
+        ? this.getWrappedCellIndex(Math.floor(entityY / this.spatialCellSize), rowCount)
+        : Math.floor(entityY / this.spatialCellSize);
       const key = this.getSpatialKey(cellX, cellY);
       const bucket = this.spatialGrid.get(key);
       if (bucket) {
@@ -300,6 +380,7 @@ export class Engine {
     x: number,
     y: number,
     radius: number,
+    useToroidal: boolean,
     visit: (entity: Entity) => void,
   ): void {
     const minCellX = Math.floor((x - radius) / this.spatialCellSize);
@@ -307,9 +388,25 @@ export class Engine {
     const minCellY = Math.floor((y - radius) / this.spatialCellSize);
     const maxCellY = Math.floor((y + radius) / this.spatialCellSize);
 
+    const columnCount = this.getSpatialColumnCount();
+    const rowCount = this.getSpatialRowCount();
+    const visitedKeys = useToroidal ? new Set<string>() : null;
+
     for (let cellY = minCellY; cellY <= maxCellY; cellY += 1) {
       for (let cellX = minCellX; cellX <= maxCellX; cellX += 1) {
-        const bucket = this.spatialGrid.get(this.getSpatialKey(cellX, cellY));
+        const lookupCellX = useToroidal
+          ? this.getWrappedCellIndex(cellX, columnCount)
+          : cellX;
+        const lookupCellY = useToroidal
+          ? this.getWrappedCellIndex(cellY, rowCount)
+          : cellY;
+        const key = this.getSpatialKey(lookupCellX, lookupCellY);
+        if (visitedKeys?.has(key)) {
+          continue;
+        }
+        visitedKeys?.add(key);
+
+        const bucket = this.spatialGrid.get(key);
         if (!bucket?.length) {
           continue;
         }
@@ -394,6 +491,7 @@ export class Engine {
           be.vx = Math.cos(heading) * speed;
           be.vy = Math.sin(heading) * speed;
           be.heading = heading;
+          be.hasEnteredField = true;
         } else {
           be = new BugEntity({
             x: spawnX,
@@ -408,6 +506,7 @@ export class Engine {
           be.baseSize = be.size;
           be.maxHp = getBugVariantMaxHp(be.variant as any);
           be.hp = be.maxHp;
+          be.hasEnteredField = true;
         }
         this.entities.push(be);
       }
@@ -478,6 +577,7 @@ export class Engine {
           bug.vx = Math.cos(heading) * speed;
           bug.vy = Math.sin(heading) * speed;
           bug.heading = heading;
+          bug.hasEnteredField = false;
         } else {
           bug = new BugEntity({
             heading,
@@ -492,6 +592,7 @@ export class Engine {
           bug.baseSize = bug.size;
           bug.maxHp = getBugVariantMaxHp(bug.variant as any);
           bug.hp = bug.maxHp;
+          bug.hasEnteredField = false;
         }
 
         this.entities.push(bug);
@@ -519,6 +620,8 @@ export class Engine {
         bug.vy = item.vy;
         bug.heading = item.heading;
         bug.opacity = item.opacity;
+        bug.hasEnteredField =
+          item.x >= 0 && item.x <= this.width && item.y >= 0 && item.y <= this.height;
       } else {
         bug = new BugEntity({
           heading: item.heading,
@@ -533,6 +636,8 @@ export class Engine {
         bug.baseSize = item.size;
         bug.maxHp = item.maxHp;
         bug.hp = item.hp;
+        bug.hasEnteredField =
+          item.x >= 0 && item.x <= this.width && item.y >= 0 && item.y <= this.height;
       }
 
       this.entities.push(bug);
@@ -545,9 +650,7 @@ export class Engine {
     for (let i = 0; i < this.entities.length; i++) {
       const e = this.entities[i] as any;
       if (isTerminalEntityState(e.state)) continue;
-      const dx = x - e.x;
-      const dy = y - e.y;
-      const dist = Math.hypot(dx, dy);
+      const dist = this.getDistanceFromPointToEntity(x, y, e);
       const radius = Math.max((e.size ?? 12) * 0.5, 12);
       if (dist <= radius && (!best || dist < best.distance)) {
         best = { index: i, distance: dist };
@@ -563,22 +666,27 @@ export class Engine {
    */
   lineHitTest(x1: number, y1: number, x2: number, y2: number, hitRadius = 12): number[] {
     const result: number[] = [];
-    const dx = x2 - x1;
-    const dy = y2 - y1;
+    const dx = getWrappedDelta(x1, x2, this.width);
+    const dy = getWrappedDelta(y1, y2, this.height);
     const lenSq = dx * dx + dy * dy;
 
     for (let i = 0; i < this.entities.length; i++) {
       const e = this.entities[i] as any;
       if (isTerminalEntityState(e.state)) continue;
 
+      const projected = this.getPointNearEntity(x1, y1, e);
+
       // Closest point on segment to entity center
       let t = 0;
       if (lenSq > 0) {
-        t = Math.max(0, Math.min(1, ((e.x - x1) * dx + (e.y - y1) * dy) / lenSq));
+        t = Math.max(
+          0,
+          Math.min(1, ((projected.x - x1) * dx + (projected.y - y1) * dy) / lenSq),
+        );
       }
       const closestX = x1 + t * dx;
       const closestY = y1 + t * dy;
-      const dist = Math.hypot(e.x - closestX, e.y - closestY);
+      const dist = Math.hypot(projected.x - closestX, projected.y - closestY);
 
       if (dist <= Math.max((e.size ?? 12) * 0.5, 8) + hitRadius) {
         result.push(i);
@@ -599,7 +707,7 @@ export class Engine {
       const e = this.entities[i] as any;
       if (isTerminalEntityState(e.state)) continue;
 
-      const dist = Math.hypot(e.x - cx, e.y - cy);
+      const dist = this.getDistanceFromPointToEntity(cx, cy, e);
       if (dist <= radius + Math.max((e.size ?? 12) * 0.5, 8)) {
         result.push(i);
       }
@@ -622,6 +730,10 @@ export class Engine {
 
     for (let index = 0; index < this.entities.length; index += 1) {
       const entity = this.entities[index] as Entity & {
+        lastCrowdCount?: number;
+        lastCrowdScore?: number;
+        lastNeighborCount?: number;
+        lastSeparationScale?: number;
         heading?: number;
         movementMood?: string;
         roamTargetX?: number | null;
@@ -633,12 +745,17 @@ export class Engine {
       }
 
       telemetry.push({
+        crowdCount: entity.lastCrowdCount ?? 0,
+        crowdScore: entity.lastCrowdScore ?? 0,
         heading: entity.heading ?? Math.atan2(entity.vy ?? 0, entity.vx ?? 0),
         index: telemetry.length,
         movementMood: entity.movementMood ?? null,
+        neighborCount: entity.lastNeighborCount ?? 0,
         radius: Math.max((entity.size ?? 12) * 0.7, 12),
+        separationScale: entity.lastSeparationScale ?? 1,
         targetX: entity.roamTargetX ?? null,
         targetY: entity.roamTargetY ?? null,
+        variant: (entity.variant as BugVariant) ?? "low",
         vx: entity.vx ?? 0,
         vy: entity.vy ?? 0,
         x: entity.x,
@@ -666,10 +783,9 @@ export class Engine {
   getNeighbors(e: Entity, radius: number) {
     const r2 = radius * radius;
     const out: Entity[] = [];
-    this.forEachSpatialCandidate(e.x, e.y, radius, (o) => {
+    this.forEachSpatialCandidate(e.x, e.y, radius, this.isToroidalEntity(e), (o) => {
       if (o === e) return;
-      const dx = e.x - o.x;
-      const dy = e.y - o.y;
+      const { dx, dy } = this.getEntityDelta(e, o);
       if (dx * dx + dy * dy <= r2) out.push(o);
     });
     return out;
@@ -682,10 +798,19 @@ export class Engine {
     let centerX = 0;
     let centerY = 0;
 
-    this.forEachSpatialCandidate(x, y, radius, (entity) => {
+    const useToroidal = this.isToroidalEntity(exclude);
+
+    this.forEachSpatialCandidate(x, y, radius, useToroidal, (entity) => {
       if (entity === exclude) return;
-      const dx = entity.x - x;
-      const dy = entity.y - y;
+      const { dx, dy } = useToroidal
+        ? {
+            dx: getWrappedDelta(x, entity.x, this.width),
+            dy: getWrappedDelta(y, entity.y, this.height),
+          }
+        : {
+            dx: entity.x - x,
+            dy: entity.y - y,
+          };
       const distanceSquared = dx * dx + dy * dy;
       if (distanceSquared > r2) return;
 
@@ -693,13 +818,16 @@ export class Engine {
       const weight = 1 - distance / radius;
       count += 1;
       weightedCount += weight;
-      centerX += entity.x * weight;
-      centerY += entity.y * weight;
+      centerX += (x + dx) * weight;
+      centerY += (y + dy) * weight;
     });
 
+    const averagedCenterX = weightedCount > 0 ? centerX / weightedCount : x;
+    const averagedCenterY = weightedCount > 0 ? centerY / weightedCount : y;
+
     return {
-      centerX: weightedCount > 0 ? centerX / weightedCount : x,
-      centerY: weightedCount > 0 ? centerY / weightedCount : y,
+      centerX: useToroidal ? wrapCoordinate(averagedCenterX, this.width) : averagedCenterX,
+      centerY: useToroidal ? wrapCoordinate(averagedCenterY, this.height) : averagedCenterY,
       count,
       score: weightedCount,
     };
@@ -743,10 +871,6 @@ export class Engine {
       } else {
         (ent as any).update(dt);
       }
-
-      // Keep a final safety clamp here, but leave edge behavior to the entity.
-      ent.x = Math.min(this.width, Math.max(0, ent.x));
-      ent.y = Math.min(this.height, Math.max(0, ent.y));
 
       // handle dead entities: move to pool and remove from active list once
       if ((ent as any).state === EntityState.Dead) {
@@ -858,8 +982,7 @@ export class Engine {
       const e = this.entities[i] as any;
       if (isTerminalEntityState(e.state)) continue;
 
-      const dx = e.x - cx;
-      const dy = e.y - cy;
+      const { dx, dy } = this.getEntityDeltaFromPoint(cx, cy, e);
       const dist = Math.hypot(dx, dy);
       const entityRadius = Math.max((e.size ?? 12) * 0.5, 8);
 
@@ -906,7 +1029,9 @@ export class Engine {
         if (visited.has(i)) continue;
         const e = this.entities[i] as any;
         if (isTerminalEntityState(e.state)) continue;
-        const dist = Math.hypot(current.x - e.x, current.y - e.y);
+        const dist = this.isToroidalEntity(current) && this.isToroidalEntity(e)
+          ? getWrappedDistance(current.x, current.y, e.x, e.y, this.width, this.height)
+          : Math.hypot(current.x - e.x, current.y - e.y);
         if (dist <= chainRadius && dist < bestDist) {
           bestDist = dist;
           bestIndex = i;
@@ -939,7 +1064,7 @@ export class Engine {
     for (let i = 0; i < this.entities.length; i++) {
       const e = this.entities[i] as any;
       if (isTerminalEntityState(e.state)) continue;
-      const dist = Math.hypot(e.x - cx, e.y - cy);
+      const dist = this.getDistanceFromPointToEntity(cx, cy, e);
       if (dist > useRadius) continue;
       const hp = e.hp ?? 1;
       if (hp > bestHp || (hp === bestHp && dist < bestDist)) {
@@ -1001,7 +1126,7 @@ export class Engine {
     for (const e of this.entities) {
       const bug = e as any;
       if (isTerminalEntityState(bug.state)) continue;
-      if (Math.hypot(e.x - cx, e.y - cy) <= radius) {
+      if (this.getDistanceFromPointToEntity(cx, cy, e) <= radius) {
         if (weaponId) {
           const matchup = getBugWeaponMatchup(bug.variant as BugVariant, weaponId);
           if (matchup === WeaponMatchup.Immune) continue;
@@ -1023,7 +1148,7 @@ export class Engine {
     for (const e of this.entities) {
       const bug = e as any;
       if (isTerminalEntityState(bug.state)) continue;
-      const dist = Math.hypot(e.x - cx, e.y - cy);
+      const dist = this.getDistanceFromPointToEntity(cx, cy, e);
       if (dist > radius) continue;
       if (weaponId) {
         const matchup = getBugWeaponMatchup(bug.variant as BugVariant, weaponId);
@@ -1041,7 +1166,7 @@ export class Engine {
     for (const e of this.entities) {
       const bug = e as any;
       if (isTerminalEntityState(bug.state)) continue;
-      if (Math.hypot(e.x - cx, e.y - cy) <= radius) {
+      if (this.getDistanceFromPointToEntity(cx, cy, e) <= radius) {
         if (weaponId) {
           const matchup = getBugWeaponMatchup(bug.variant as BugVariant, weaponId);
           if (matchup === WeaponMatchup.Immune) continue;
@@ -1080,6 +1205,10 @@ export class Engine {
     return this.blackHole;
   }
 
+  getFieldSize() {
+    return { height: this.height, width: this.width };
+  }
+
   /** Call each tick; fires onCollapse callback once when duration expires. */
   tickBlackHole(dtMs: number, onCollapse: (x: number, y: number, radius: number) => void): void {
     if (!this.blackHole?.active) return;
@@ -1100,8 +1229,12 @@ export class Engine {
     for (let index = 0; index < this.entities.length; index++) {
       const bug = this.entities[index] as any;
       if (isTerminalEntityState(bug.state)) continue;
-      const dx = x - bug.x;
-      const dy = y - bug.y;
+      const dx = this.isToroidalEntity(bug)
+        ? getWrappedDelta(bug.x, x, this.width)
+        : x - bug.x;
+      const dy = this.isToroidalEntity(bug)
+        ? getWrappedDelta(bug.y, y, this.height)
+        : y - bug.y;
       const dist = Math.hypot(dx, dy);
       if (dist > radius || dist < 1) continue;
       const pull = (1 - dist / radius) * 2.5 * (dtMs / 16);
@@ -1148,7 +1281,9 @@ export class Engine {
         if (visited.has(i)) continue;
         const e = this.entities[i] as any;
         if (isTerminalEntityState(e.state)) continue;
-        const dist = Math.hypot(current.x - e.x, current.y - e.y);
+        const dist = this.isToroidalEntity(current) && this.isToroidalEntity(e)
+          ? getWrappedDistance(current.x, current.y, e.x, e.y, this.width, this.height)
+          : Math.hypot(current.x - e.x, current.y - e.y);
         if (dist > chainRadius) continue;
         const now = performance.now();
         const frozen = e.slow != null && now < (e.slow?.expiresAt ?? 0);
@@ -1185,7 +1320,7 @@ export class Engine {
     for (const e of this.entities) {
       const bug = e as any;
       if (isTerminalEntityState(bug.state)) continue;
-      if (Math.hypot(e.x - cx, e.y - cy) <= radius && typeof bug.applyCharged === "function") {
+      if (this.getDistanceFromPointToEntity(cx, cy, e) <= radius && typeof bug.applyCharged === "function") {
         bug.applyCharged(durationMs);
       }
     }
@@ -1195,7 +1330,7 @@ export class Engine {
     for (const e of this.entities) {
       const bug = e as any;
       if (isTerminalEntityState(bug.state)) continue;
-      if (Math.hypot(e.x - cx, e.y - cy) <= radius && typeof bug.applyMarked === "function") {
+      if (this.getDistanceFromPointToEntity(cx, cy, e) <= radius && typeof bug.applyMarked === "function") {
         bug.applyMarked(durationMs);
       }
     }
@@ -1205,7 +1340,7 @@ export class Engine {
     for (const e of this.entities) {
       const bug = e as any;
       if (isTerminalEntityState(bug.state)) continue;
-      if (Math.hypot(e.x - cx, e.y - cy) <= radius && typeof bug.applyUnstable === "function") {
+      if (this.getDistanceFromPointToEntity(cx, cy, e) <= radius && typeof bug.applyUnstable === "function") {
         bug.applyUnstable(durationMs);
       }
     }
@@ -1245,8 +1380,12 @@ export class Engine {
     e.hp = Math.max(1, Math.ceil(e.maxHp / 2));
     // Spawn clone from pool
     const clone = this.pool.pop() ?? new BugEntity();
-    clone.x = e.x + (Math.random() - 0.5) * 40;
-    clone.y = e.y + (Math.random() - 0.5) * 40;
+    clone.x = this.isToroidalEntity(e)
+      ? wrapCoordinate(e.x + (Math.random() - 0.5) * 40, this.width)
+      : e.x + (Math.random() - 0.5) * 40;
+    clone.y = this.isToroidalEntity(e)
+      ? wrapCoordinate(e.y + (Math.random() - 0.5) * 40, this.height)
+      : e.y + (Math.random() - 0.5) * 40;
     clone.maxHp = e.maxHp;
     clone.hp = Math.max(1, Math.ceil(e.maxHp / 2));
     clone.variant = e.variant;
@@ -1305,7 +1444,7 @@ export class Engine {
       if (i === index) continue;
       const e = this.entities[i] as any;
       if (isTerminalEntityState(e.state)) continue;
-      if (Math.hypot(e.x - x, e.y - y) <= splashRadius) {
+      if (this.getDistanceFromPointToEntity(x, y, e) <= splashRadius) {
         this.handleHit(i, damage, false, weaponId);
       }
     }
@@ -1337,7 +1476,7 @@ export class Engine {
       for (let i = 0; i < this.entities.length; i++) {
         const bug = this.entities[i] as any;
         if (isTerminalEntityState(bug.state)) continue;
-        if (bug.unstable && Math.hypot(bug.x - hz.x, bug.y - hz.y) <= hz.radius) {
+        if (bug.unstable && this.getDistanceFromPointToEntity(hz.x, hz.y, bug) <= hz.radius) {
           bug.unstable = null;
           this.handleHit(i, bug.maxHp ?? 99, false, hz.weaponId);
         }

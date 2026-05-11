@@ -60,6 +60,7 @@ export interface AllyConversionConfig {
 }
 
 export interface GameEngine {
+  getFieldSize(): { width: number; height: number };
   hitTest(x: number, y: number): { index: number; distance: number } | null;
   lineHitTest(
     x1: number,

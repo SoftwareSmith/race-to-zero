@@ -26,6 +26,43 @@ function advanceUntilRemoved(engine: Engine, maxFrames = 120) {
   }
 }
 
+function getMaxLocalClusterSize(bugs: BugEntity[], radius: number) {
+  let maxClusterSize = 0;
+
+  for (const bug of bugs) {
+    let clusterSize = 0;
+    for (const other of bugs) {
+      if (Math.hypot(bug.x - other.x, bug.y - other.y) <= radius) {
+        clusterSize += 1;
+      }
+    }
+    maxClusterSize = Math.max(maxClusterSize, clusterSize);
+  }
+
+  return maxClusterSize;
+}
+
+function countBugsInPods(bugs: BugEntity[], radius: number, minimumNeighbors: number) {
+  let poddedBugCount = 0;
+
+  for (const bug of bugs) {
+    let neighborCount = 0;
+    for (const other of bugs) {
+      if (bug === other) {
+        continue;
+      }
+      if (Math.hypot(bug.x - other.x, bug.y - other.y) <= radius) {
+        neighborCount += 1;
+      }
+    }
+    if (neighborCount >= minimumNeighbors) {
+      poddedBugCount += 1;
+    }
+  }
+
+  return poddedBugCount;
+}
+
 describe("engine death attribution", () => {
   beforeEach(() => {
     setCodex(cloneCodex(BUG_CODEX));
@@ -187,7 +224,7 @@ describe("engine death attribution", () => {
     expect(engine.getBlackHole()).toBeNull();
   });
 
-  it("keeps patrol bugs active near edges without pinning them to the center", () => {
+  it("keeps patrol bugs active near seams without pinning them to the center", () => {
     const engine = new Engine(createCanvas(), {
       height: 200,
       width: 200,
@@ -203,13 +240,15 @@ describe("engine death attribution", () => {
     });
 
     engine.entities = [bug];
+    const xSamples: number[] = [];
 
     for (let frame = 0; frame < 120; frame += 1) {
       engine.update(1 / 60, null, null);
+      xSamples.push(bug.x);
     }
 
-    expect(bug.x).toBeLessThan(194);
-    expect(bug.x).toBeGreaterThan(130);
+    expect(xSamples.some((x) => x > 180)).toBe(true);
+    expect(xSamples.every((x) => x > 70)).toBe(true);
   });
 
   it("reports stable crowding centers and scores", () => {
@@ -234,6 +273,65 @@ describe("engine death attribution", () => {
     expect(crowding.centerX).toBeLessThan(100);
   });
 
+  it("treats seam-adjacent bugs as local neighbors across the wrap", () => {
+    const engine = new Engine(createCanvas(), {
+      height: 200,
+      width: 200,
+    });
+    const subject = new BugEntity({ size: 10, variant: "low", x: 4, y: 100 });
+    const seamNeighbor = new BugEntity({ size: 10, variant: "medium", x: 196, y: 100 });
+
+    engine.entities = [subject, seamNeighbor];
+    engine.update(1 / 60, null, null);
+
+    expect(engine.getNeighbors(subject, 16)).toContain(seamNeighbor);
+  });
+
+  it("reports wrapped crowding centers near the seam", () => {
+    const engine = new Engine(createCanvas(), {
+      height: 200,
+      width: 200,
+    });
+    const subject = new BugEntity({ size: 10, variant: "low", x: 4, y: 100 });
+    const seamNeighbor = new BugEntity({ size: 10, variant: "medium", x: 196, y: 100 });
+
+    engine.entities = [subject, seamNeighbor];
+    engine.update(1 / 60, null, null);
+
+    const crowding = engine.getCrowdingAt(4, 100, 16, subject);
+
+    expect(crowding.count).toBe(1);
+    expect(crowding.centerX).toBeGreaterThan(180);
+  });
+
+  it("hits seam-adjacent bugs with wrapped point and line hit tests", () => {
+    const engine = new Engine(createCanvas(), {
+      height: 200,
+      width: 200,
+    });
+    const seamBug = new BugEntity({ size: 10, variant: "high", x: 196, y: 100 });
+
+    engine.entities = [seamBug];
+
+    expect(engine.hitTest(4, 100)).toEqual({ distance: 8, index: 0 });
+    expect(engine.lineHitTest(4, 100, 196, 100, 0)).toEqual([0]);
+    expect(engine.radiusHitTest(4, 100, 4)).toEqual([0]);
+  });
+
+  it("does not clamp pre-entry bugs back onto the board during engine updates", () => {
+    const engine = new Engine(createCanvas(), {
+      height: 200,
+      width: 200,
+    });
+    const entrant = new BugEntity({ size: 10, variant: "low", x: -12, y: 80, vx: 0, vy: 0 });
+
+    entrant.hasEnteredField = false;
+    engine.entities = [entrant];
+    engine.update(1 / 60, null, null);
+
+    expect(entrant.x).toBeLessThan(0);
+  });
+
   it("returns read-only bug telemetry snapshots for live bugs", () => {
     const engine = new Engine(createCanvas(), {
       height: 200,
@@ -250,7 +348,7 @@ describe("engine death attribution", () => {
     });
     const deadBug = new BugEntity({ size: 8, variant: "medium", x: 40, y: 50 });
 
-    liveBug.movementMood = "loiter";
+    liveBug.movementMood = "patrol";
     liveBug.roamTargetX = 160;
     liveBug.roamTargetY = 80;
     deadBug.state = EntityState.Dead;
@@ -260,9 +358,10 @@ describe("engine death attribution", () => {
       expect.objectContaining({
         heading: Math.PI / 3,
         index: 0,
-        movementMood: "loiter",
+        movementMood: "patrol",
         targetX: 160,
         targetY: 80,
+        variant: "low",
         vx: 2,
         vy: -1,
         x: 100,
@@ -380,6 +479,60 @@ describe("engine death attribution", () => {
     ).length;
 
     expect(perimeterBandCount).toBeGreaterThan(engine.getAllBugs().length * 0.26);
+  });
+
+  it("does not collapse edge spawns into a handful of dense startup clusters", () => {
+    const randomSpy = vi.spyOn(Math, "random");
+    let seed = 0;
+    randomSpy.mockImplementation(() => {
+      seed = (seed + 0.173) % 1;
+      return seed;
+    });
+    const engine = new Engine(createCanvas(), {
+      height: 200,
+      width: 200,
+    });
+
+    engine.spawnBurst({ high: 10, low: 30, medium: 10, urgent: 6 });
+
+    for (let frame = 0; frame < 90; frame += 1) {
+      engine.update(1 / 60, null, null);
+    }
+
+    const bugs = engine.getAllBugs() as BugEntity[];
+    const maxClusterSize = getMaxLocalClusterSize(bugs, 18);
+    const centerBoxCount = bugs.filter(
+      (bug) => bug.x >= 70 && bug.x <= 130 && bug.y >= 56 && bug.y <= 144,
+    ).length;
+
+    expect(maxClusterSize).toBeLessThan(8);
+    expect(centerBoxCount).toBeLessThan(bugs.length * 0.4);
+  });
+
+  it("does not settle into persistent close-range pods over time", () => {
+    const randomSpy = vi.spyOn(Math, "random");
+    let seed = 0;
+    randomSpy.mockImplementation(() => {
+      seed = (seed + 0.173) % 1;
+      return seed;
+    });
+    const engine = new Engine(createCanvas(), {
+      height: 200,
+      width: 200,
+    });
+
+    engine.spawnFromCounts({ high: 10, low: 30, medium: 10, urgent: 6 });
+
+    for (let frame = 0; frame < 540; frame += 1) {
+      engine.update(1 / 60, null, null);
+    }
+
+    const bugs = engine.getAllBugs() as BugEntity[];
+    const poddedBugCount = countBugsInPods(bugs, 12, 5);
+    const maxClusterSize = getMaxLocalClusterSize(bugs, 18);
+
+    expect(poddedBugCount).toBeLessThan(bugs.length * 0.62);
+    expect(maxClusterSize).toBeLessThanOrEqual(15);
   });
 
   it("caps temporary allies so conversion stays readable", () => {

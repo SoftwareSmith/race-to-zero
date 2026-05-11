@@ -16,6 +16,7 @@ import {
   createSurvivalBurstCounts,
   getSurvivalPressure,
   getSurvivalRuntimeSpeedMultiplier,
+  getSurvivalRuntimeSpeedMultiplierForPressure,
   getSurvivalWavePlan,
   type SurvivalSpawnPlan,
 } from "@game/sim/survivalDirector";
@@ -984,7 +985,10 @@ export function useSiegeGame({
     survivalSpawnPlan,
     survivalStatus: {
       ...survivalStatus,
-      runtimeSpeedMultiplier: getSurvivalRuntimeSpeedMultiplier(survivalStatus.wave),
+      runtimeSpeedMultiplier: getSurvivalRuntimeSpeedMultiplierForPressure(
+        survivalStatus.wave,
+        survivalStatus.pressurePercent,
+      ),
     },
     toggleDebugMode,
     togglePause,

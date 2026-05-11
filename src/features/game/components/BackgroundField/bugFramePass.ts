@@ -55,7 +55,7 @@ export function drawBugFramePass({
   chartFocus,
   context,
   frameNow,
-  height: _height,
+  height,
   interactiveMode,
   motionProfile,
   particles,
@@ -64,8 +64,8 @@ export function drawBugFramePass({
   sizeMultiplier,
   width,
 }: DrawBugFramePassOptions): RenderedBugPosition[] {
-  void _height;
   const safeWidth = Math.max(1, width);
+  const safeHeight = Math.max(1, height);
   const hasChartFocus = chartFocus !== null;
   const focusX = chartFocus?.relativeIndex ?? 0.5;
   const nextBugPositions = reusablePositions ?? [];
@@ -124,6 +124,7 @@ export function drawBugFramePass({
     const nextPosition = nextBugPositions[nextBugPositionIndex] ?? {
       index: 0,
       radius: 0,
+      renderedCopies: [],
       x: 0,
       y: 0,
     };
@@ -131,6 +132,7 @@ export function drawBugFramePass({
     nextPosition.radius = Math.max(size * 0.7, 12);
     nextPosition.x = x;
     nextPosition.y = y;
+    const renderedCopies = nextPosition.renderedCopies ?? [];
     nextBugPositions[nextBugPositionIndex] = nextPosition;
     nextBugPositionIndex += 1;
 
@@ -147,17 +149,54 @@ export function drawBugFramePass({
     statusFlags.poison = getStatusStrength(particle.poison?.expiresAt, frameNow, 3200);
     statusFlags.unstable = getStatusStrength(particle.unstable?.expiresAt, frameNow, 2600);
 
-    drawBugSprite(context, {
-      color: bugCodex?.color,
-      opacity,
-      rotation,
-      size,
-      statusFlags,
-      timeMs: frameNow,
-      variant: particle.variant,
-      x,
-      y,
-    });
+    const seamMargin = Math.max(12, size * 0.7);
+    const xOffsets = [0];
+    const yOffsets = [0];
+
+    if (x < seamMargin) {
+      xOffsets.push(safeWidth);
+    }
+    if (x > safeWidth - seamMargin) {
+      xOffsets.push(-safeWidth);
+    }
+    if (y < seamMargin) {
+      yOffsets.push(safeHeight);
+    }
+    if (y > safeHeight - seamMargin) {
+      yOffsets.push(-safeHeight);
+    }
+
+    let renderedCopyIndex = 0;
+    for (const xOffset of xOffsets) {
+      for (const yOffset of yOffsets) {
+        const copy = renderedCopies[renderedCopyIndex] ?? {
+          copyIndex: 0,
+          isWrappedCopy: false,
+          x: 0,
+          y: 0,
+        };
+        copy.copyIndex = renderedCopyIndex;
+        copy.isWrappedCopy = xOffset !== 0 || yOffset !== 0;
+        copy.x = x + xOffset;
+        copy.y = y + yOffset;
+        renderedCopies[renderedCopyIndex] = copy;
+        renderedCopyIndex += 1;
+
+        drawBugSprite(context, {
+          color: bugCodex?.color,
+          opacity,
+          rotation,
+          size,
+          statusFlags,
+          timeMs: frameNow,
+          variant: particle.variant,
+          x: x + xOffset,
+          y: y + yOffset,
+        });
+      }
+    }
+    renderedCopies.length = renderedCopyIndex;
+    nextPosition.renderedCopies = renderedCopies;
 
     const lastHitTime: number = particle.lastHitTime ?? 0;
     const bugMaxHp: number = particle.maxHp ?? 1;
@@ -170,19 +209,23 @@ export function drawBugFramePass({
       bugMaxHp > 1 &&
       (poisonActive || (lastHitTime > 0 && bugHp < bugMaxHp && elapsed < HEALTHBAR_SHOW_DURATION))
     ) {
-      drawHealthBar(
-        context,
-        x,
-        y,
-        bugHp,
-        bugMaxHp,
-        size,
-        poisonActive ? 0 : elapsed,
-        {
-          persistent: poisonActive,
-          projectedHp: getPoisonProjectedHp(particle, frameNow),
-        },
-      );
+      for (const xOffset of xOffsets) {
+        for (const yOffset of yOffsets) {
+          drawHealthBar(
+            context,
+            x + xOffset,
+            y + yOffset,
+            bugHp,
+            bugMaxHp,
+            size,
+            poisonActive ? 0 : elapsed,
+            {
+              persistent: poisonActive,
+              projectedHp: getPoisonProjectedHp(particle, frameNow),
+            },
+          );
+        }
+      }
     }
   }
 

@@ -57,13 +57,7 @@ function variantDefToBugType(def: BugVariantDef): BugType {
     name: def.name,
     description: def.description,
     dossier: { ...def.dossier },
-    profile: {
-      ...def.crawlProfile,
-      anchorDriftInterval: [
-        ...def.crawlProfile.anchorDriftInterval,
-      ] as [number, number],
-      regionWeights: { ...def.crawlProfile.regionWeights },
-    },
+    profile: { ...def.crawlProfile },
     socialAffinity: def.socialAffinity,
     preferredRegion: def.preferredRegion,
     iconVariant: def.iconVariant,
@@ -103,13 +97,7 @@ export function cloneCodex(source: Record<string, BugType>) {
         const defaultEntry = BUG_CODEX[key] ?? entry;
         return {
           ...entry,
-          profile: {
-            ...entry.profile,
-            anchorDriftInterval: [
-              ...entry.profile.anchorDriftInterval,
-            ] as [number, number],
-            regionWeights: { ...entry.profile.regionWeights },
-          },
+          profile: { ...entry.profile },
           dossier: { ...defaultEntry.dossier, ...entry.dossier },
           weaponMatchups: cloneWeaponMatchups(
             entry.weaponMatchups,

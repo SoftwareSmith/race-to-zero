@@ -29,20 +29,33 @@ export interface BugHitPayload {
   comboEvents?: Array<"detonate" | "quench">;
 }
 
+export interface RenderedBugCopyPosition {
+  copyIndex: number;
+  isWrappedCopy: boolean;
+  x: number;
+  y: number;
+}
+
 export interface RenderedBugPosition {
   index: number;
   radius: number;
+  renderedCopies?: RenderedBugCopyPosition[];
   x: number;
   y: number;
 }
 
 export interface QaBugTelemetryItem {
+  crowdCount: number;
+  crowdScore: number;
   heading: number;
   index: number;
   movementMood: string | null;
+  neighborCount: number;
   radius: number;
+  separationScale: number;
   targetX: number | null;
   targetY: number | null;
+  variant: BugVariant;
   vx: number;
   vy: number;
   x: number;
@@ -92,7 +105,16 @@ export interface QaDurationMetric {
 export interface QaWindowState {
   bugTelemetry?: QaBugTelemetryItem[];
   enabled?: boolean;
-  bugPositions?: Array<{ index: number; x: number; y: number; radius: number }>;
+  bugPositions?: Array<{
+    canonicalX?: number;
+    canonicalY?: number;
+    copyIndex?: number;
+    index: number;
+    isWrappedCopy?: boolean;
+    x: number;
+    y: number;
+    radius: number;
+  }>;
   clearLiveBugs?: () => number;
   getLiveBugCount?: () => number;
   getLiveBugTelemetry?: () => QaBugTelemetryItem[];
@@ -104,5 +126,13 @@ export interface QaWindowState {
     y: number;
   };
   performanceMetrics?: QaPerformanceMetrics;
+  repositionLiveBug?: (request: {
+    heading?: number;
+    index: number;
+    vx?: number;
+    vy?: number;
+    x: number;
+    y: number;
+  }) => boolean;
   stabilizeEngine?: boolean;
 }

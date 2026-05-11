@@ -61,14 +61,14 @@ function roundWeight(value: number): number {
 
 export function getSurvivalVariantWeights(wave: number): SurvivalVariantWeights {
   const safeWave = Math.max(1, Math.floor(wave));
-  const earlyRamp = clamp((safeWave - 1) / 24, 0, 1);
-  const lateRamp = clamp((safeWave - 25) / 35, 0, 1);
-  const urgentRamp = Math.pow(earlyRamp, 1.65);
+  const earlyRamp = clamp((safeWave - 1) / 20, 0, 1);
+  const lateRamp = clamp((safeWave - 18) / 32, 0, 1);
+  const urgentRamp = Math.pow(lateRamp, 1.35);
 
-  const low = clamp(0.72 - earlyRamp * 0.44 - lateRamp * 0.12, 0.08, 0.72);
-  const medium = clamp(0.23 + earlyRamp * 0.04 - lateRamp * 0.05, 0.14, 0.3);
-  const high = clamp(0.05 + earlyRamp * 0.25 - lateRamp * 0.04, 0.05, 0.34);
-  const urgent = clamp(0.01 + urgentRamp * 0.24 + lateRamp * 0.16, 0.01, 0.42);
+  const low = clamp(0.72 - earlyRamp * 0.34 - lateRamp * 0.18, 0.12, 0.72);
+  const medium = clamp(0.22 + earlyRamp * 0.06 - lateRamp * 0.06, 0.16, 0.32);
+  const high = clamp(0.05 + earlyRamp * 0.2 + lateRamp * 0.06, 0.05, 0.36);
+  const urgent = clamp(0.01 + urgentRamp * 0.18 + lateRamp * 0.12, 0.01, 0.28);
   const total = low + medium + high + urgent;
 
   return {
@@ -117,21 +117,23 @@ export function getSurvivalWavePlan(wave: number): SurvivalSpawnPlan {
   const variantWeights = getSurvivalVariantWeights(safeWave);
   const waveDurationMs = 30_000;
   const spawnRatePerSecond = Number(
-    clamp(2 + Math.pow(safeWave, 1.22) * 0.85, 2, 72).toFixed(2),
+    clamp(2 + Math.pow(safeWave, 1.12) * 0.58, 2, 28).toFixed(2),
   );
   const spawnBudget = Math.round(
     clamp(spawnRatePerSecond * (waveDurationMs / 1000), 24, 2300),
   );
   const burstSize = Math.max(1, Math.ceil(spawnRatePerSecond));
-  const pressureThreshold = Math.round(clamp(220 + safeWave * 120, 220, 2200));
+  const pressureThreshold = Math.round(
+    clamp(220 + safeWave * 34 + Math.pow(safeWave, 1.02) * 11, 220, 760),
+  );
   const offlineDamagePerSecond = Number(
-    clamp(0.7 + Math.pow(safeWave, 1.05) * 0.18, 0.7, 18).toFixed(2),
+    clamp(0.7 + Math.pow(safeWave, 1.04) * 0.16, 0.7, 15).toFixed(2),
   );
   const urgentIsFocus = variantWeights.urgent >= 0.18;
   const highIsFocus = !urgentIsFocus && variantWeights.high >= 0.18;
 
   return {
-    activeBugLimit: Math.round(clamp(pressureThreshold * 1.22, 320, 2600)),
+    activeBugLimit: Math.round(clamp(pressureThreshold * 1.02, 280, 780)),
     burstSize,
     counts: buildCountsFromWeights(spawnBudget, variantWeights),
     focusLabel: urgentIsFocus
@@ -204,7 +206,19 @@ export function calculateSurvivalSpawnRequest({
 }
 
 export function getSurvivalRuntimeSpeedMultiplier(wave: number): number {
-  return Number(clamp(1 + Math.max(0, wave - 1) * 0.025, 1, 2.35).toFixed(2));
+  return getSurvivalRuntimeSpeedMultiplierForPressure(wave, 0);
+}
+
+export function getSurvivalRuntimeSpeedMultiplierForPressure(
+  wave: number,
+  pressurePercent: number,
+): number {
+  const safeWave = Math.max(1, Math.floor(wave));
+  const pressureRatio = clamp(pressurePercent / 100, 0, 2.5);
+  const waveSpeed = 1 + Math.max(0, safeWave - 1) * 0.016;
+  const pressureBonus = clamp((pressureRatio - 0.72) * 0.22, 0, 0.2);
+
+  return Number(clamp(waveSpeed + pressureBonus, 1, 1.92).toFixed(2));
 }
 
 export function getSurvivalPressure({

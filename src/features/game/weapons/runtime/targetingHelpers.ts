@@ -5,6 +5,7 @@
  */
 
 import type { GameEngine, CanvasBounds } from "@game/weapons/runtime/types";
+import { getWrappedDistance } from "@game/engine/toroidalMath";
 
 // ─── Nearest bug ────────────────────────────────────────────────────────────
 
@@ -22,11 +23,12 @@ export function findNearestBugInRadius(
   if (direct) return direct;
 
   const bugs = engine.getAllBugs();
+  const { width, height } = engine.getFieldSize();
   let best: { index: number; distance: number } | null = null;
   for (let i = 0; i < bugs.length; i++) {
     const bug = bugs[i];
     if (!bug) continue;
-    const dist = Math.hypot(bug.x - cx, bug.y - cy);
+    const dist = getWrappedDistance(cx, cy, bug.x, bug.y, width, height);
     if (dist <= maxRadius && (!best || dist < best.distance)) {
       best = { index: i, distance: dist };
     }

@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { drawBugFramePass } from "./bugFramePass";
+import { drawBugSprite } from "@game/utils/bugSprite";
 
 vi.mock("@game/utils/bugSprite", () => ({
   drawBugSprite: vi.fn(),
@@ -91,5 +92,73 @@ describe("drawBugFramePass", () => {
     expect(positions).toBe(reusablePositions);
     expect(positions).toHaveLength(1);
     expect(positions[0]).toMatchObject({ index: 0, x: 100, y: 100 });
+  });
+
+  it("draws seam-adjacent bugs on the opposite edge as well", () => {
+    const context = createContext();
+    const drawBugSpriteMock = vi.mocked(drawBugSprite);
+    drawBugSpriteMock.mockClear();
+
+    drawBugFramePass({
+      chartFocus: null,
+      context,
+      frameNow: 0,
+      height: 160,
+      interactiveMode: true,
+      motionProfile: { durationMultiplier: 1, opacityMultiplier: 1, scale: 1 },
+      particles: [
+        {
+          opacity: 1,
+          size: 12,
+          state: "alive",
+          variant: "low",
+          vx: 0,
+          vy: 0,
+          x: 6,
+          y: 80,
+        },
+      ],
+      qaEnabled: false,
+      sizeMultiplier: 1,
+      width: 220,
+    });
+
+    expect(drawBugSpriteMock).toHaveBeenCalledTimes(2);
+    expect(drawBugFramePass({
+      chartFocus: null,
+      context,
+      frameNow: 0,
+      height: 160,
+      interactiveMode: true,
+      motionProfile: { durationMultiplier: 1, opacityMultiplier: 1, scale: 1 },
+      particles: [
+        {
+          opacity: 1,
+          size: 12,
+          state: "alive",
+          variant: "low",
+          vx: 0,
+          vy: 0,
+          x: 6,
+          y: 80,
+        },
+      ],
+      qaEnabled: false,
+      sizeMultiplier: 1,
+      width: 220,
+    })[0]?.renderedCopies).toEqual([
+      expect.objectContaining({ copyIndex: 0, isWrappedCopy: false, x: 6, y: 80 }),
+      expect.objectContaining({ copyIndex: 1, isWrappedCopy: true, x: 226, y: 80 }),
+    ]);
+    expect(drawBugSpriteMock).toHaveBeenNthCalledWith(
+      1,
+      context,
+      expect.objectContaining({ x: 6, y: 80 }),
+    );
+    expect(drawBugSpriteMock).toHaveBeenNthCalledWith(
+      2,
+      context,
+      expect.objectContaining({ x: 226, y: 80 }),
+    );
   });
 });

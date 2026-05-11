@@ -7,6 +7,7 @@ import {
   createSurvivalBurstCounts,
   getSurvivalPressure,
   getSurvivalRuntimeSpeedMultiplier,
+  getSurvivalRuntimeSpeedMultiplierForPressure,
   getSurvivalVariantWeights,
   getSurvivalWavePlan,
 } from "./survivalDirector";
@@ -27,6 +28,7 @@ describe("survival director", () => {
     expect(waves[2].weights.high).toBeGreaterThan(waves[0].weights.high);
     expect(waves[4].weights.urgent).toBeGreaterThan(waves[2].weights.urgent);
     expect(waves[5].weights.urgent).toBeGreaterThan(waves[4].weights.urgent);
+    expect(waves[4].weights.high).toBeGreaterThan(waves[1].weights.high);
   });
 
   it("keeps generated counts deterministic and equal to the requested total", () => {
@@ -48,10 +50,21 @@ describe("survival director", () => {
     expect(wave25.spawnBudget).toBeGreaterThan(wave1.spawnBudget);
     expect(wave50.spawnBudget).toBeGreaterThan(wave25.spawnBudget);
     expect(wave50.activeBugLimit).toBeGreaterThan(wave1.activeBugLimit);
+    expect(wave50.activeBugLimit).toBeLessThan(wave50.pressureThreshold * 1.2);
     expect(wave1.waveDurationMs).toBe(30_000);
     expect(wave25.spawnBudget).toBe(
       Math.round(wave25.spawnRatePerSecond * (wave25.waveDurationMs / 1000)),
     );
+  });
+
+  it("caps late-wave survival below the known pooling band", () => {
+    const wave14 = getSurvivalWavePlan(14);
+    const wave25 = getSurvivalWavePlan(25);
+
+    expect(wave14.activeBugLimit).toBeLessThanOrEqual(780);
+    expect(wave25.activeBugLimit).toBeLessThanOrEqual(780);
+    expect(wave14.spawnRatePerSecond).toBeLessThan(16);
+    expect(wave25.spawnRatePerSecond).toBeLessThanOrEqual(28);
   });
 
   it("calculates wave loader progress from timestamps", () => {
@@ -125,6 +138,16 @@ describe("survival director", () => {
   it("raises runtime speed multiplier without becoming unbounded", () => {
     expect(getSurvivalRuntimeSpeedMultiplier(1)).toBe(1);
     expect(getSurvivalRuntimeSpeedMultiplier(25)).toBeGreaterThan(1);
-    expect(getSurvivalRuntimeSpeedMultiplier(250)).toBeLessThanOrEqual(2.35);
+    expect(getSurvivalRuntimeSpeedMultiplier(250)).toBeLessThanOrEqual(1.92);
+  });
+
+  it("adds only a bounded speed bonus when pressure gets heavy", () => {
+    const calm = getSurvivalRuntimeSpeedMultiplierForPressure(18, 48);
+    const strained = getSurvivalRuntimeSpeedMultiplierForPressure(18, 108);
+    const overloaded = getSurvivalRuntimeSpeedMultiplierForPressure(18, 180);
+
+    expect(strained).toBeGreaterThan(calm);
+    expect(overloaded).toBeGreaterThanOrEqual(strained);
+    expect(overloaded - calm).toBeLessThanOrEqual(0.2);
   });
 });

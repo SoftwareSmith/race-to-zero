@@ -428,6 +428,35 @@ describe("useSiegeGame", () => {
     expect(result.current.survivalStatus.secondsUntilOffline).toBeGreaterThan(0);
   });
 
+  it("keeps survival speed escalation bounded and pressure-reactive", async () => {
+    vi.useFakeTimers();
+
+    const { result } = renderHook(() =>
+      useSiegeGame({
+        currentBugCount: 20,
+        currentBugCounts: { high: 0, low: 20, medium: 0, urgent: 0 },
+        evolutionStates: {},
+      }),
+    );
+
+    act(() => {
+      result.current.enterInteractiveMode("outbreak");
+      vi.advanceTimersByTime(520);
+    });
+
+    const calmSpeed = result.current.survivalStatus.runtimeSpeedMultiplier;
+
+    act(() => {
+      result.current.syncRemainingBugs(320);
+      vi.advanceTimersByTime(2_000);
+    });
+
+    const pressuredSpeed = result.current.survivalStatus.runtimeSpeedMultiplier;
+
+    expect(pressuredSpeed).toBeGreaterThan(calmSpeed);
+    expect(pressuredSpeed).toBeLessThanOrEqual(1.92);
+  });
+
   it("advances the timer during an active run", async () => {
     const { result } = renderHook(() =>
       useSiegeGame({

@@ -560,6 +560,14 @@ const BugCanvas = memo(
                 enabled?: boolean;
                 getLiveBugCount?: () => number;
                 getLiveBugTelemetry?: () => Array<any>;
+                repositionLiveBug?: (request: {
+                  heading?: number;
+                  index: number;
+                  vx?: number;
+                  vy?: number;
+                  x: number;
+                  y: number;
+                }) => boolean;
               };
             }
           ).__RTZ_QA__;
@@ -576,6 +584,41 @@ const BugCanvas = memo(
               updateQaBugPositions([], boundsRef.current);
               updateQaBugTelemetry([], boundsRef.current);
               return clearedCount;
+            };
+            qaState.repositionLiveBug = ({ heading, index, vx, vy, x, y }) => {
+              const liveBugs = engine.getAllBugs() as Array<any>;
+              const bug = liveBugs[index];
+
+              if (!bug || isTerminalEntityState(bug.state)) {
+                return false;
+              }
+
+              bug.x = x;
+              bug.y = y;
+
+              if (typeof vx === "number") {
+                bug.vx = vx;
+              }
+              if (typeof vy === "number") {
+                bug.vy = vy;
+              }
+              if (typeof heading === "number") {
+                bug.heading = heading;
+              }
+
+              if (x >= 0 && x <= w && y >= 0 && y <= h) {
+                bug.hasEnteredField = true;
+              }
+              if ("roamTargetX" in bug) {
+                bug.roamTargetX = null;
+              }
+              if ("roamTargetY" in bug) {
+                bug.roamTargetY = null;
+              }
+
+              syncQaBugPositionsFromEngine(engine, boundsRef.current);
+              syncQaBugTelemetryFromEngine(engine, boundsRef.current);
+              return true;
             };
           }
         }
@@ -625,6 +668,14 @@ const BugCanvas = memo(
                 clearLiveBugs?: () => number;
                 getLiveBugCount?: () => number;
                 getLiveBugTelemetry?: () => Array<any>;
+                repositionLiveBug?: (request: {
+                  heading?: number;
+                  index: number;
+                  vx?: number;
+                  vy?: number;
+                  x: number;
+                  y: number;
+                }) => boolean;
               };
             }
           ).__RTZ_QA__;
@@ -637,6 +688,9 @@ const BugCanvas = memo(
           }
           if (qaState?.getLiveBugTelemetry) {
             delete qaState.getLiveBugTelemetry;
+          }
+          if (qaState?.repositionLiveBug) {
+            delete qaState.repositionLiveBug;
           }
         }
         swarmRef.current = null;

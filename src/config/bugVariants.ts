@@ -18,34 +18,18 @@ export type CrawlRegion = "edge" | "middle" | "interior";
 
 export interface CrawlProfile {
   behavior: "skitter" | "patrol" | "stalk" | "panic";
-  anchorDriftInterval: [number, number];
-  anchorBias: "any" | "interior" | "perimeter";
-  chaosTangentStrength?: number;
-  crowdTangentBias?: number;
-  cursorTangentStrength?: number;
   cursorFleeMultiplier?: number;
   cursorHoverRepelMultiplier?: number;
-  edgePreference: number;
-  flowFieldStrength?: number;
   localAvoidanceStrength?: number;
-  longPathBias?: number;
   noiseFrequency: number;
   noiseForwardStrength: number;
   noiseLateralStrength: number;
   noiseTurnStrength: number;
-  pathCommitment?: number;
-  targetOrbitStrength?: number;
-  regionWeights: {
-    edge: number;
-    interior: number;
-    middle: number;
-  };
   roamRadius: number;
   separationMultiplier: number;
   speedMultiplier: number;
   turnMultiplier: number;
   wanderMultiplier: number;
-  wideRoamChance: number;
 }
 
 // ── Weapon matchup types ──────────────────────────────────────────────────────
@@ -182,33 +166,21 @@ export const BUG_VARIANT_DEFS: Record<BugVariant, BugVariantDef> = {
     swayFrequency: 5.6,
     crawlProfile: {
       behavior: "skitter",
-      anchorDriftInterval: [8, 14],
-      anchorBias: "any",
-      chaosTangentStrength: 0.22,
-      cursorFleeMultiplier: 1.2,
-      cursorHoverRepelMultiplier: 0.2,
-      cursorTangentStrength: 0.02,
-      crowdTangentBias: 1.16,
-      edgePreference: 0.04,
-      flowFieldStrength: 1.28,
-      localAvoidanceStrength: 0.68,
-      longPathBias: 0.9,
+      cursorFleeMultiplier: 1.15,
+      cursorHoverRepelMultiplier: 0.14,
+      localAvoidanceStrength: 0.92,
       noiseFrequency: 0.9,
-      noiseForwardStrength: 0.2,
-      noiseLateralStrength: 0.72,
-      noiseTurnStrength: 1.05,
-      pathCommitment: 1.22,
-      targetOrbitStrength: 0.18,
-      regionWeights: { edge: 0.2, middle: 0.5, interior: 0.3 },
-      roamRadius: 150,
+      noiseForwardStrength: 0.16,
+      noiseLateralStrength: 0.48,
+      noiseTurnStrength: 0.76,
+      roamRadius: 210,
       separationMultiplier: 0.8,
-      speedMultiplier: 0.82,
-      turnMultiplier: 1.18,
-      wanderMultiplier: 1.2,
-      wideRoamChance: 0.58,
+      speedMultiplier: 0.8,
+      turnMultiplier: 1.08,
+      wanderMultiplier: 0.88,
     },
     socialAffinity: 0,
-    preferredRegion: "middle",
+    preferredRegion: "edge",
     weaponMatchups: steadyMatchups({
       hammer: {
         note: "Fine for single cleanup once a straggler is already isolated.",
@@ -263,30 +235,18 @@ export const BUG_VARIANT_DEFS: Record<BugVariant, BugVariantDef> = {
     swayFrequency: 4.2,
     crawlProfile: {
       behavior: "patrol",
-      anchorDriftInterval: [7, 12],
-      anchorBias: "any",
-      chaosTangentStrength: 0.18,
       cursorFleeMultiplier: 1.85,
-      cursorHoverRepelMultiplier: 0.72,
-      cursorTangentStrength: 0.03,
-      crowdTangentBias: 1,
-      edgePreference: 0.02,
-      flowFieldStrength: 1.02,
-      localAvoidanceStrength: 0.78,
-      longPathBias: 0.74,
+      cursorHoverRepelMultiplier: 0.66,
+      localAvoidanceStrength: 0.9,
       noiseFrequency: 0.64,
       noiseForwardStrength: 0.14,
-      noiseLateralStrength: 0.38,
-      noiseTurnStrength: 0.6,
-      pathCommitment: 1.08,
-      targetOrbitStrength: 0.14,
-      regionWeights: { edge: 0.16, middle: 0.5, interior: 0.34 },
-      roamRadius: 180,
+      noiseLateralStrength: 0.28,
+      noiseTurnStrength: 0.42,
+      roamRadius: 230,
       separationMultiplier: 0.78,
-      speedMultiplier: 0.95,
-      turnMultiplier: 1,
-      wanderMultiplier: 0.85,
-      wideRoamChance: 0.6,
+      speedMultiplier: 0.96,
+      turnMultiplier: 0.96,
+      wanderMultiplier: 0.68,
     },
     socialAffinity: 0.02,
     preferredRegion: "middle",
@@ -336,30 +296,18 @@ export const BUG_VARIANT_DEFS: Record<BugVariant, BugVariantDef> = {
     swayFrequency: 3.4,
     crawlProfile: {
       behavior: "stalk",
-      anchorDriftInterval: [6, 10],
-      anchorBias: "any",
-      chaosTangentStrength: 0.12,
-      cursorFleeMultiplier: 2.9,
-      cursorHoverRepelMultiplier: 2.05,
-      cursorTangentStrength: 0.02,
-      crowdTangentBias: 0.82,
-      edgePreference: 0.02,
-      flowFieldStrength: 0.56,
-      localAvoidanceStrength: 0.92,
-      longPathBias: 0.48,
+      cursorFleeMultiplier: 2.8,
+      cursorHoverRepelMultiplier: 2.15,
+      localAvoidanceStrength: 1.04,
       noiseFrequency: 0.42,
       noiseForwardStrength: 0.08,
-      noiseLateralStrength: 0.14,
-      noiseTurnStrength: 0.26,
-      pathCommitment: 0.94,
-      targetOrbitStrength: 0.08,
-      regionWeights: { edge: 0.14, middle: 0.42, interior: 0.44 },
-      roamRadius: 220,
+      noiseLateralStrength: 0.08,
+      noiseTurnStrength: 0.18,
+      roamRadius: 250,
       separationMultiplier: 0.9,
-      speedMultiplier: 1.06,
-      turnMultiplier: 0.86,
-      wanderMultiplier: 0.55,
-      wideRoamChance: 0.62,
+      speedMultiplier: 1.1,
+      turnMultiplier: 0.8,
+      wanderMultiplier: 0.34,
     },
     socialAffinity: -0.3,
     preferredRegion: "interior",
@@ -421,30 +369,18 @@ export const BUG_VARIANT_DEFS: Record<BugVariant, BugVariantDef> = {
     swayFrequency: 2.8,
     crawlProfile: {
       behavior: "panic",
-      anchorDriftInterval: [4, 8],
-      anchorBias: "any",
-      chaosTangentStrength: 0.05,
-      cursorFleeMultiplier: 4.6,
-      cursorHoverRepelMultiplier: 4.55,
-      cursorTangentStrength: 0.04,
-      crowdTangentBias: 0.4,
-      edgePreference: 0.06,
-      flowFieldStrength: 0.92,
-      localAvoidanceStrength: 0.62,
-      longPathBias: 0.68,
+      cursorFleeMultiplier: 4.35,
+      cursorHoverRepelMultiplier: 4.1,
+      localAvoidanceStrength: 0.88,
       noiseFrequency: 1.18,
       noiseForwardStrength: 0.28,
-      noiseLateralStrength: 0.64,
-      noiseTurnStrength: 0.86,
-      pathCommitment: 0.92,
-      targetOrbitStrength: 0,
-      regionWeights: { edge: 0.16, middle: 0.52, interior: 0.32 },
-      roamRadius: 280,
+      noiseLateralStrength: 0.44,
+      noiseTurnStrength: 0.58,
+      roamRadius: 300,
       separationMultiplier: 0.75,
-      speedMultiplier: 1,
-      turnMultiplier: 1.28,
-      wanderMultiplier: 1,
-      wideRoamChance: 0.72,
+      speedMultiplier: 1.08,
+      turnMultiplier: 1.12,
+      wanderMultiplier: 0.82,
     },
     socialAffinity: -0.1,
     preferredRegion: "middle",

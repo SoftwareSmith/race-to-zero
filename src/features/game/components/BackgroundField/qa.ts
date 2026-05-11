@@ -143,24 +143,42 @@ export function updateQaBugPositions(
   }
 
   const qaBugPositions = qaState.bugPositions ?? (qaState.bugPositions = []);
+  let qaBugPositionIndex = 0;
 
   for (let index = 0; index < bugPositions.length; index += 1) {
     const position = bugPositions[index];
-    const qaPosition = qaBugPositions[index] ?? {
-      index: 0,
-      radius: 0,
-      x: 0,
-      y: 0,
-    };
+    const renderedCopies =
+      position.renderedCopies && position.renderedCopies.length > 0
+        ? position.renderedCopies
+        : [{ copyIndex: 0, isWrappedCopy: false, x: position.x, y: position.y }];
 
-    qaPosition.index = position.index;
-    qaPosition.radius = position.radius;
-    qaPosition.x = position.x + bounds.left;
-    qaPosition.y = position.y + bounds.top;
-    qaBugPositions[index] = qaPosition;
+    for (let copyIndex = 0; copyIndex < renderedCopies.length; copyIndex += 1) {
+      const renderedCopy = renderedCopies[copyIndex];
+      const qaPosition = qaBugPositions[qaBugPositionIndex] ?? {
+        canonicalX: 0,
+        canonicalY: 0,
+        copyIndex: 0,
+        index: 0,
+        isWrappedCopy: false,
+        radius: 0,
+        x: 0,
+        y: 0,
+      };
+
+      qaPosition.canonicalX = position.x + bounds.left;
+      qaPosition.canonicalY = position.y + bounds.top;
+      qaPosition.copyIndex = renderedCopy.copyIndex;
+      qaPosition.index = position.index;
+      qaPosition.isWrappedCopy = renderedCopy.isWrappedCopy;
+      qaPosition.radius = position.radius;
+      qaPosition.x = renderedCopy.x + bounds.left;
+      qaPosition.y = renderedCopy.y + bounds.top;
+      qaBugPositions[qaBugPositionIndex] = qaPosition;
+      qaBugPositionIndex += 1;
+    }
   }
 
-  qaBugPositions.length = bugPositions.length;
+  qaBugPositions.length = qaBugPositionIndex;
 }
 
 export function updateQaBugTelemetry(
@@ -175,26 +193,36 @@ export function updateQaBugTelemetry(
   for (let index = 0; index < bugTelemetry.length; index += 1) {
     const telemetry = bugTelemetry[index];
     const qaTelemetry = qaBugTelemetry[index] ?? {
+      crowdCount: 0,
+      crowdScore: 0,
       heading: 0,
       index: 0,
       movementMood: null,
+      neighborCount: 0,
       radius: 0,
+      separationScale: 1,
       targetX: null,
       targetY: null,
+      variant: "low",
       vx: 0,
       vy: 0,
       x: 0,
       y: 0,
     };
 
+    qaTelemetry.crowdCount = telemetry.crowdCount;
+    qaTelemetry.crowdScore = telemetry.crowdScore;
     qaTelemetry.heading = telemetry.heading;
     qaTelemetry.index = telemetry.index;
     qaTelemetry.movementMood = telemetry.movementMood;
+    qaTelemetry.neighborCount = telemetry.neighborCount;
     qaTelemetry.radius = telemetry.radius;
+    qaTelemetry.separationScale = telemetry.separationScale;
     qaTelemetry.targetX =
       telemetry.targetX == null ? null : telemetry.targetX + bounds.left;
     qaTelemetry.targetY =
       telemetry.targetY == null ? null : telemetry.targetY + bounds.top;
+    qaTelemetry.variant = telemetry.variant;
     qaTelemetry.vx = telemetry.vx;
     qaTelemetry.vy = telemetry.vy;
     qaTelemetry.x = telemetry.x + bounds.left;

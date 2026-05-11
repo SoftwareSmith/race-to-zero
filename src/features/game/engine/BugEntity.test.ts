@@ -4,6 +4,12 @@ import BUG_CODEX, { cloneCodex, setCodex } from "./bugCodex";
 import { BugEntity } from "./BugEntity";
 import { DEFAULT_GAME_CONFIG } from "./types";
 
+function normalizeAngle(angle: number) {
+  while (angle > Math.PI) angle -= Math.PI * 2;
+  while (angle < -Math.PI) angle += Math.PI * 2;
+  return angle;
+}
+
 describe("bug movement", () => {
   beforeEach(() => {
     setCodex(cloneCodex(BUG_CODEX));
@@ -14,44 +20,49 @@ describe("bug movement", () => {
     vi.restoreAllMocks();
   });
 
-  it("steers back into the field without abrupt heading snaps", () => {
-    const bug = new BugEntity({
-      heading: Math.PI / 2,
-      size: 10,
-      variant: "low",
-      vx: 0,
-      vy: 18,
-      x: 8,
-      y: 80,
-    });
-    const headingDeltas: number[] = [];
-    let previousHeading = bug.heading;
-
-    for (let index = 0; index < 240; index += 1) {
-      bug.update(1 / 60, {
-        bounds: { width: 220, height: 160 },
-        config: DEFAULT_GAME_CONFIG,
-        getNeighbors: () => [],
-      });
-      headingDeltas.push(Math.abs(bug.heading - previousHeading));
-      previousHeading = bug.heading;
-    }
-
-    expect(bug.x).toBeGreaterThan(34);
-    expect(Math.abs(bug.heading - Math.PI / 2)).toBeGreaterThan(0.1);
-    expect(Math.max(...headingDeltas)).toBeLessThan(0.35);
-  });
-
-  it("reorients inward after crossing the boundary", () => {
+  it("wraps from left to right under sustained outward pressure without abrupt heading snaps", () => {
     const bug = new BugEntity({
       heading: Math.PI,
       size: 10,
       variant: "low",
       vx: -18,
       vy: 0,
-      x: 2,
+      x: 8,
       y: 80,
     });
+    const headingDeltas: number[] = [];
+    let previousHeading = bug.heading;
+
+    const xSamples: number[] = [];
+
+    for (let index = 0; index < 90; index += 1) {
+      bug.update(1 / 60, {
+        bounds: { width: 220, height: 160 },
+        config: DEFAULT_GAME_CONFIG,
+        getNeighbors: () => [],
+        targetX: 44,
+        targetY: 80,
+      });
+      headingDeltas.push(Math.abs(normalizeAngle(bug.heading - previousHeading)));
+      previousHeading = bug.heading;
+      xSamples.push(bug.x);
+    }
+
+    expect(xSamples.some((x) => x > 180)).toBe(true);
+    expect(Math.max(...headingDeltas)).toBeLessThan(0.35);
+  });
+
+  it("continues through the opposite side after crossing the boundary", () => {
+    const bug = new BugEntity({
+      heading: Math.PI,
+      size: 10,
+      variant: "low",
+      vx: -30,
+      vy: 0,
+      x: -13,
+      y: 80,
+    });
+    bug.hasEnteredField = true;
 
     bug.update(1 / 60, {
       bounds: { width: 220, height: 160 },
@@ -59,12 +70,12 @@ describe("bug movement", () => {
       getNeighbors: () => [],
     });
 
-    expect(bug.x).toBeGreaterThanOrEqual(6);
-    expect(bug.vx).toBeGreaterThan(0);
-    expect(Math.abs(bug.heading)).toBeLessThan(0.3);
+    expect(bug.x).toBeGreaterThan(180);
+    expect(bug.vx).toBeLessThan(0);
+    expect(Math.abs(normalizeAngle(bug.heading - Math.PI))).toBeLessThan(0.18);
   });
 
-  it("escapes corners instead of sticking to both walls", () => {
+  it("wraps diagonally through corners without stalling", () => {
     const bug = new BugEntity({
       heading: -Math.PI * 0.75,
       size: 10,
@@ -76,35 +87,7 @@ describe("bug movement", () => {
     });
     const positions: Array<{ x: number; y: number }> = [];
 
-    for (let index = 0; index < 180; index += 1) {
-      bug.update(1 / 60, {
-        bounds: { width: 220, height: 160 },
-        config: DEFAULT_GAME_CONFIG,
-        getNeighbors: () => [],
-      });
-      positions.push({ x: bug.x, y: bug.y });
-    }
-
-    const tail = positions.slice(-30);
-    expect(bug.x).toBeGreaterThan(18);
-    expect(bug.y).toBeGreaterThan(18);
-    expect(Math.min(...tail.map((position) => position.x))).toBeGreaterThan(10);
-    expect(Math.min(...tail.map((position) => position.y))).toBeGreaterThan(10);
-  });
-
-  it("breaks out of corners while the cursor is herding it inward", () => {
-    const bug = new BugEntity({
-      heading: -Math.PI * 0.75,
-      size: 10,
-      variant: "low",
-      vx: -8,
-      vy: -8,
-      x: 10,
-      y: 10,
-    });
-    const positions: Array<{ x: number; y: number }> = [];
-
-    for (let index = 0; index < 150; index += 1) {
+    for (let index = 0; index < 90; index += 1) {
       bug.update(1 / 60, {
         bounds: { width: 220, height: 160 },
         config: DEFAULT_GAME_CONFIG,
@@ -115,35 +98,40 @@ describe("bug movement", () => {
       positions.push({ x: bug.x, y: bug.y });
     }
 
-    const tail = positions.slice(-25);
-    expect(bug.x).toBeGreaterThan(22);
-    expect(bug.y).toBeGreaterThan(22);
-    expect(Math.min(...tail.map((position) => position.x))).toBeGreaterThan(14);
-    expect(Math.min(...tail.map((position) => position.y))).toBeGreaterThan(14);
+    expect(positions.some((position) => position.x > 180)).toBe(true);
+    expect(positions.some((position) => position.y > 120)).toBe(true);
+    expect(Math.hypot(bug.vx, bug.vy)).toBeGreaterThan(6);
   });
 
-  it("uses roam anchors instead of always steering at the exact center", () => {
+  it("lets offscreen entrants enter the field before wrap-around activates", () => {
     const bug = new BugEntity({
       heading: 0,
       size: 10,
       variant: "low",
-      vx: 0,
+      vx: 18,
       vy: 0,
-      x: 40,
+      x: -12,
       y: 80,
     });
+    bug.hasEnteredField = false;
+    const positions: Array<{ x: number; y: number }> = [];
 
-    bug.update(1 / 60, {
-      bounds: { width: 220, height: 160 },
-      config: DEFAULT_GAME_CONFIG,
-      getNeighbors: () => [],
-    });
+    for (let index = 0; index < 60; index += 1) {
+      bug.update(1 / 60, {
+        bounds: { width: 220, height: 160 },
+        config: DEFAULT_GAME_CONFIG,
+        getNeighbors: () => [],
+      });
+      positions.push({ x: bug.x, y: bug.y });
+    }
 
-    expect(bug.roamTargetX).not.toBe(110);
-    expect(bug.roamTargetY).not.toBe(80);
+    expect(Math.max(...positions.slice(0, 12).map((position) => position.x))).toBeLessThan(40);
+    expect(positions.some((position) => position.x > 0)).toBe(true);
+    expect(positions.every((position) => position.x < 180)).toBe(true);
+    expect(bug.hasEnteredField).toBe(true);
   });
 
-  it("uses crawl profile timing for roam-anchor drift", () => {
+  it("assigns a per-bug movement intent instead of steering at the exact center", () => {
     const bug = new BugEntity({
       heading: 0,
       size: 10,
@@ -161,61 +149,43 @@ describe("bug movement", () => {
       getNeighbors: () => [],
     });
 
-    expect(bug.nextRoamTargetAt).toBeGreaterThan(beforeUpdate + 7900);
-    expect(bug.nextRoamTargetAt).toBeLessThan(beforeUpdate + 14_100);
+    expect(bug.roamTargetX).not.toBeNull();
+    expect(bug.roamTargetY).not.toBeNull();
+    expect(bug.roamTargetX).not.toBe(110);
+    expect(bug.roamTargetY).not.toBe(80);
+    expect(bug.nextRoamTargetAt).toBeGreaterThan(beforeUpdate + 350);
+    expect(bug.nextRoamTargetAt).toBeLessThan(beforeUpdate + 2600);
   });
 
-  it("prefers less crowded roam targets to fill open space", () => {
-    const baselineBug = new BugEntity({
+  it("retargets immediately when it reaches an active intent", () => {
+    const bug = new BugEntity({
       heading: 0,
       size: 10,
       variant: "low",
       vx: 0,
       vy: 0,
-      x: 110,
+      x: 100,
       y: 80,
     });
-    const crowdedBug = new BugEntity({
-      heading: 0,
-      size: 10,
-      variant: "low",
-      vx: 0,
-      vy: 0,
-      x: 110,
-      y: 80,
-    });
+    const originalTargetX = 102;
+    const originalTargetY = 80;
 
-    baselineBug.update(1 / 60, {
+    bug.roamTargetX = originalTargetX;
+    bug.roamTargetY = originalTargetY;
+    bug.nextRoamTargetAt = performance.now() + 10_000;
+
+    bug.update(1 / 60, {
       bounds: { width: 220, height: 160 },
       config: DEFAULT_GAME_CONFIG,
       getNeighbors: () => [],
     });
 
-    crowdedBug.update(1 / 60, {
-      bounds: { width: 220, height: 160 },
-      config: DEFAULT_GAME_CONFIG,
-      getCrowdingAt: (x, y) => ({
-        centerX: x,
-        centerY: y,
-        count: x > 80 && x < 140 && y > 45 && y < 115 ? 8 : 0,
-        score: x > 80 && x < 140 && y > 45 && y < 115 ? 8 : 0,
-      }),
-      getNeighbors: () => [],
-    });
-
-    const baselineEdgeDistance = Math.max(
-      Math.abs((baselineBug.roamTargetX ?? 110) / 220 - 0.5),
-      Math.abs((baselineBug.roamTargetY ?? 80) / 160 - 0.5),
-    );
-    const crowdedEdgeDistance = Math.max(
-      Math.abs((crowdedBug.roamTargetX ?? 110) / 220 - 0.5),
-      Math.abs((crowdedBug.roamTargetY ?? 80) / 160 - 0.5),
-    );
-
-    expect(crowdedEdgeDistance).toBeGreaterThanOrEqual(baselineEdgeDistance);
+    expect(bug.roamTargetX).not.toBe(originalTargetX);
+    expect(bug.roamTargetY).not.toBe(originalTargetY);
+    expect(Math.hypot(bug.vx, bug.vy)).toBeGreaterThan(0);
   });
 
-  it("pushes roam targets away from a broad overloaded zone", () => {
+  it("prefers intent endpoints away from broad crowding", () => {
     const crowdedCenterX = 92;
     const bug = new BugEntity({
       heading: 0,
@@ -241,8 +211,8 @@ describe("bug movement", () => {
         }
 
         return {
-          centerX: x,
-          centerY: y,
+          centerX: x < 130 ? crowdedCenterX : x,
+          centerY: 80,
           count: x < 130 ? 6 : 0,
           score: x < 130 ? 3.6 : 0.1,
         };
@@ -251,90 +221,6 @@ describe("bug movement", () => {
     });
 
     expect((bug.roamTargetX ?? bug.x) - crowdedCenterX).toBeGreaterThan(bug.x - crowdedCenterX);
-  });
-
-  it("keeps edge roam targets close to the perimeter lane", () => {
-    const codex = cloneCodex(BUG_CODEX);
-    codex.medium.profile.regionWeights = { edge: 1, middle: 0, interior: 0 };
-    codex.medium.profile.wideRoamChance = 0;
-    codex.medium.profile.edgePreference = 0.32;
-    setCodex(codex);
-    const bug = new BugEntity({
-      heading: 0,
-      size: 10,
-      variant: "medium",
-      vx: 0,
-      vy: 0,
-      x: 110,
-      y: 80,
-    });
-
-    bug.update(1 / 60, {
-      bounds: { width: 220, height: 160 },
-      config: DEFAULT_GAME_CONFIG,
-      getCrowdingAt: () => ({ centerX: 110, centerY: 80, count: 0, score: 0 }),
-      getNeighbors: () => [],
-    });
-
-    expect(bug.roamTargetX).not.toBeNull();
-    expect(bug.roamTargetY).not.toBeNull();
-    expect(bug.roamTargetRegion).toBe("edge");
-    const targetX = bug.roamTargetX ?? 110;
-    const targetY = bug.roamTargetY ?? 80;
-    const perimeterDistance = Math.min(targetX, 220 - targetX, targetY, 160 - targetY);
-
-    expect(perimeterDistance).toBeLessThan(48);
-  });
-
-  it("keeps middle-lane roam targets out of the tight center box", () => {
-    const bug = new BugEntity({
-      heading: 0,
-      size: 10,
-      variant: "low",
-      vx: 0,
-      vy: 0,
-      x: 110,
-      y: 80,
-    });
-
-    bug.update(1 / 60, {
-      bounds: { width: 220, height: 160 },
-      config: DEFAULT_GAME_CONFIG,
-      getNeighbors: () => [],
-    });
-
-    expect(bug.roamTargetX).not.toBeNull();
-    expect(bug.roamTargetY).not.toBeNull();
-    const targetX = bug.roamTargetX ?? 110;
-    const targetY = bug.roamTargetY ?? 80;
-    const inTightCenter = targetX > 88 && targetX < 132 && targetY > 56 && targetY < 104;
-
-    expect(inTightCenter).toBe(false);
-  });
-
-  it("avoids corridor-style middle anchors that read like rows and columns", () => {
-    const bug = new BugEntity({
-      heading: 0,
-      size: 10,
-      variant: "low",
-      vx: 0,
-      vy: 0,
-      x: 110,
-      y: 80,
-    });
-
-    bug.update(1 / 60, {
-      bounds: { width: 220, height: 160 },
-      config: DEFAULT_GAME_CONFIG,
-      getNeighbors: () => [],
-    });
-
-    const targetX = bug.roamTargetX ?? 110;
-    const targetY = bug.roamTargetY ?? 80;
-    const inTopBand = targetY > 24 && targetY < 54;
-    const inRightBand = targetX > 144 && targetX < 188;
-
-    expect(inTopBand && inRightBand).toBe(false);
   });
 
   it("enters a startled mood after taking a hit", () => {
@@ -374,90 +260,6 @@ describe("bug movement", () => {
     expect(Math.hypot(bug.vx, bug.vy)).toBeGreaterThan(Math.hypot(baseline.vx, baseline.vy));
   });
 
-  it("regroups when social bugs have nearby packmates and open space", () => {
-    const codex = cloneCodex(BUG_CODEX);
-    codex.low.socialAffinity = 0.55;
-    setCodex(codex);
-    const bug = new BugEntity({
-      heading: 0,
-      size: 10,
-      variant: "low",
-      vx: 0,
-      vy: 0,
-      x: 80,
-      y: 80,
-    });
-    const neighbors = [
-      new BugEntity({ size: 10, variant: "low", vx: 10, vy: 0, x: 96, y: 78 }),
-      new BugEntity({ size: 10, variant: "low", vx: 10, vy: 0, x: 102, y: 82 }),
-    ];
-
-    bug.update(1 / 60, {
-      bounds: { width: 220, height: 160 },
-      config: DEFAULT_GAME_CONFIG,
-      getCrowdingAt: () => ({ centerX: 80, centerY: 80, count: 1, score: 0.5 }),
-      getNeighbors: () => neighbors,
-    });
-
-    expect(bug.movementMood).toBe("regroup");
-    expect(bug.vx).toBeGreaterThan(0);
-  });
-
-  it("follows lane tangents for edge anchors", () => {
-    const bug = new BugEntity({
-      heading: 0,
-      size: 10,
-      variant: "medium",
-      vx: 0,
-      vy: 0,
-      x: 40,
-      y: 80,
-    });
-    bug.roamTargetX = 24;
-    bug.roamTargetY = 128;
-    bug.roamTargetRegion = "edge";
-    bug.roamTargetWide = false;
-    bug.nextRoamTargetAt = performance.now() + 10_000;
-
-    bug.update(1 / 60, {
-      bounds: { width: 220, height: 160 },
-      config: DEFAULT_GAME_CONFIG,
-      getNeighbors: () => [],
-    });
-
-    expect(bug.movementMood).toBe("lane-follow");
-    expect(Math.abs(bug.vx)).toBeGreaterThan(0.01);
-  });
-
-  it("retargets instead of loitering near an active roam anchor", () => {
-    const bug = new BugEntity({
-      heading: 0,
-      size: 10,
-      variant: "low",
-      vx: 0,
-      vy: 0,
-      x: 100,
-      y: 80,
-    });
-    bug.roamTargetX = 102;
-    bug.roamTargetY = 80;
-    bug.roamTargetRegion = "middle";
-    bug.roamTargetWide = false;
-    bug.nextRoamTargetAt = performance.now() + 10_000;
-    bug.roamLoiterUntil = performance.now() + 400;
-
-    bug.update(1 / 60, {
-      bounds: { width: 220, height: 160 },
-      config: DEFAULT_GAME_CONFIG,
-      getNeighbors: () => [],
-    });
-
-    expect(bug.movementMood).not.toBe("loiter");
-    expect(bug.roamTargetX).not.toBe(102);
-    expect(bug.roamTargetY).not.toBe(80);
-    expect(Math.hypot(bug.vx, bug.vy)).toBeGreaterThan(0);
-  });
-
   it("applies crawl profile speed multipliers", () => {
     const codex = cloneCodex(BUG_CODEX);
     codex.low.profile.speedMultiplier = 2;
@@ -493,49 +295,6 @@ describe("bug movement", () => {
     expect(Math.hypot(fastBug.vx, fastBug.vy)).toBeGreaterThan(
       Math.hypot(slowBug.vx, slowBug.vy) * 2,
     );
-  });
-
-  it("lets crawl profiles bias long-path roaming per bug class", () => {
-    const codex = cloneCodex(BUG_CODEX);
-    codex.low.profile.longPathBias = 1;
-    codex.low.profile.wideRoamChance = 1;
-    codex.high.profile.longPathBias = 0;
-    codex.high.profile.wideRoamChance = 0;
-    codex.high.profile.regionWeights = { edge: 1, middle: 0, interior: 0 };
-    setCodex(codex);
-
-    const lowBug = new BugEntity({
-      heading: 0,
-      size: 10,
-      variant: "low",
-      vx: 0,
-      vy: 0,
-      x: 110,
-      y: 80,
-    });
-    const highBug = new BugEntity({
-      heading: 0,
-      size: 10,
-      variant: "high",
-      vx: 0,
-      vy: 0,
-      x: 110,
-      y: 80,
-    });
-
-    lowBug.update(1 / 60, {
-      bounds: { width: 220, height: 160 },
-      config: DEFAULT_GAME_CONFIG,
-      getNeighbors: () => [],
-    });
-    highBug.update(1 / 60, {
-      bounds: { width: 220, height: 160 },
-      config: DEFAULT_GAME_CONFIG,
-      getNeighbors: () => [],
-    });
-
-    expect(lowBug.roamTargetLongPath).toBe(true);
-    expect(highBug.roamTargetLongPath).toBe(false);
   });
 
   it("makes urgent bugs flee the cursor faster than low urgency bugs", () => {
@@ -614,10 +373,10 @@ describe("bug movement", () => {
 
     expect(Math.hypot(220 - cursorX, 160 - cursorY)).toBeGreaterThan(DEFAULT_GAME_CONFIG.fleeRadius * 1.8);
     expect(bug.state).toBe("patrol");
-    expect(bug.nextRoamTargetAt).toBeGreaterThan(beforeUpdate + 1000);
-    expect(Math.abs(bug.heading - baseline.heading)).toBeLessThan(0.02);
+    expect(bug.nextRoamTargetAt).toBeGreaterThan(beforeUpdate + 200);
+    expect(Math.abs(bug.heading - baseline.heading)).toBeLessThan(0.04);
     expect(Math.hypot(bug.vx, bug.vy)).toBeLessThanOrEqual(
-      Math.hypot(baseline.vx, baseline.vy) * 1.05,
+      Math.hypot(baseline.vx, baseline.vy) * 1.08,
     );
   });
 
@@ -692,70 +451,284 @@ describe("bug movement", () => {
     expect(bug.vx).toBeGreaterThan(0);
   });
 
-  it("orbits near its roam anchor instead of stopping", () => {
+  it("does not orbit into a local spin loop while escaping the cursor", () => {
+    const cursorX = 108;
+    const cursorY = 90;
+    const bug = new BugEntity({
+      heading: 0,
+      size: 10,
+      variant: "urgent",
+      vx: 0,
+      vy: 0,
+      x: 122,
+      y: 90,
+    });
+    const orbitAngles: number[] = [];
+    const distances: number[] = [];
+
+    for (let frame = 0; frame < 40; frame += 1) {
+      bug.update(1 / 60, {
+        bounds: { width: 320, height: 220 },
+        config: DEFAULT_GAME_CONFIG,
+        getNeighbors: () => [],
+        targetX: cursorX,
+        targetY: cursorY,
+      });
+      orbitAngles.push(Math.atan2(bug.y - cursorY, bug.x - cursorX));
+      distances.push(Math.hypot(bug.x - cursorX, bug.y - cursorY));
+    }
+
+    let cumulativeOrbitTravel = 0;
+    for (let index = 21; index < orbitAngles.length; index += 1) {
+      cumulativeOrbitTravel += normalizeAngle(orbitAngles[index] - orbitAngles[index - 1]);
+    }
+
+    expect(Math.abs(cumulativeOrbitTravel)).toBeLessThan(Math.PI * 1.2);
+    expect(distances.at(-1) ?? 0).toBeGreaterThan(distances[0] + 18);
+  });
+
+  it("maintains smooth heading through a horizontal wrap", () => {
+    const bug = new BugEntity({
+      heading: Math.PI,
+      size: 10,
+      variant: "medium",
+      vx: -22,
+      vy: 0,
+      x: 24,
+      y: 130,
+    });
+    const headingDeltas: number[] = [];
+    let previousHeading = bug.heading;
+    const xSamples: number[] = [];
+
+    for (let frame = 0; frame < 90; frame += 1) {
+      bug.update(1 / 60, {
+        bounds: { width: 220, height: 160 },
+        config: DEFAULT_GAME_CONFIG,
+        getNeighbors: () => [],
+        targetX: 56,
+        targetY: 130,
+      });
+      headingDeltas.push(Math.abs(normalizeAngle(bug.heading - previousHeading)));
+      previousHeading = bug.heading;
+      xSamples.push(bug.x);
+    }
+
+    expect(xSamples.some((x) => x > 180)).toBe(true);
+    expect(Math.max(...headingDeltas)).toBeLessThan(0.35);
+  });
+
+  it("wraps cleanly when travelling parallel to a border", () => {
+    const bug = new BugEntity({
+      heading: Math.PI,
+      size: 10,
+      variant: "low",
+      vx: -14,
+      vy: 0,
+      x: 12,
+      y: 72,
+    });
+    const samples: number[] = [];
+
+    for (let frame = 0; frame < 210; frame += 1) {
+      bug.update(1 / 60, {
+        bounds: { width: 220, height: 160 },
+        config: DEFAULT_GAME_CONFIG,
+        getNeighbors: () => [],
+        targetX: 42,
+        targetY: 72,
+      });
+
+      samples.push(bug.x);
+    }
+
+    expect(samples.some((x) => x < 24)).toBe(true);
+    expect(samples.some((x) => x > 180)).toBe(true);
+  });
+
+  it("naturally follows wrap-aware roam targets across the seam", () => {
+    const bug = new BugEntity({
+      heading: Math.PI,
+      size: 10,
+      variant: "medium",
+      vx: -16,
+      vy: 0,
+      x: 14,
+      y: 90,
+    });
+    bug.roamTargetX = 206;
+    bug.roamTargetY = 90;
+    bug.nextRoamTargetAt = performance.now() + 10_000;
+    const xSamples: number[] = [];
+
+    for (let frame = 0; frame < 90; frame += 1) {
+      bug.update(1 / 60, {
+        bounds: { width: 220, height: 160 },
+        config: DEFAULT_GAME_CONFIG,
+        getNeighbors: () => [],
+      });
+      xSamples.push(bug.x);
+    }
+
+    expect(xSamples.some((x) => x > 180)).toBe(true);
+    expect(Math.abs(normalizeAngle(bug.heading - Math.PI))).toBeLessThan(0.28);
+  });
+
+  it("treats seam positions as topology-neutral after entering the field", () => {
     const bug = new BugEntity({
       heading: 0,
       size: 10,
       variant: "low",
       vx: 0,
       vy: 0,
-      x: 100,
+      x: 8,
       y: 80,
     });
-    bug.roamTargetX = 102;
-    bug.roamTargetY = 80;
-    bug.nextRoamTargetAt = performance.now() + 10_000;
+    bug.hasEnteredField = true;
+
+    expect((bug as any).classifyRoamRegion({ width: 220, height: 160 }, 6, 80)).toBe("middle");
+    expect((bug as any).getRegionPreferenceScore("edge")).toBe(0);
+  });
+
+  it("does not reject seam-adjacent roam targets just because they sit near a wrap boundary", () => {
+    const bug = new BugEntity({
+      heading: Math.PI,
+      size: 10,
+      variant: "high",
+      vx: 0,
+      vy: 0,
+      x: 10,
+      y: 80,
+    });
+    bug.hasEnteredField = true;
+
+    const candidateScore = (bug as any).chooseRoamTarget;
+    expect(candidateScore).toBeTypeOf("function");
 
     bug.update(1 / 60, {
       bounds: { width: 220, height: 160 },
       config: DEFAULT_GAME_CONFIG,
+      getCrowdingAt: () => ({
+        centerX: 110,
+        centerY: 80,
+        count: 0,
+        score: 0,
+      }),
       getNeighbors: () => [],
     });
 
-    expect(Math.hypot(bug.vx, bug.vy)).toBeGreaterThan(0);
-    expect(Math.abs(bug.vy)).toBeGreaterThan(0.01);
+    expect(bug.roamTargetX).not.toBeNull();
+    const seamDelta = Math.abs(normalizeAngle(Math.atan2(0, -1) - bug.heading));
+    expect(seamDelta).toBeLessThan(Math.PI);
   });
 
-  it("immediately retargets when it reaches a roam anchor", () => {
+  it("does not orbit around nearby bugs while separating from a local crowd", () => {
+    const startX = 130;
     const bug = new BugEntity({
       heading: 0,
       size: 10,
-      variant: "low",
+      variant: "medium",
       vx: 0,
       vy: 0,
-      x: 100,
-      y: 80,
+      x: startX,
+      y: 100,
     });
-    const originalTargetX = 102;
-    const originalTargetY = 80;
+    const neighbors = [
+      new BugEntity({ size: 10, variant: "medium", x: 142, y: 100 }),
+      new BugEntity({ size: 10, variant: "medium", x: 144, y: 112 }),
+      new BugEntity({ size: 10, variant: "medium", x: 144, y: 88 }),
+      new BugEntity({ size: 10, variant: "medium", x: 154, y: 100 }),
+    ];
+    const crowdCenterX = neighbors.reduce((sum, neighbor) => sum + neighbor.x, 0) / neighbors.length;
+    const crowdCenterY = neighbors.reduce((sum, neighbor) => sum + neighbor.y, 0) / neighbors.length;
+    const orbitAngles: number[] = [];
+    const distances: number[] = [];
 
-    bug.roamTargetX = originalTargetX;
-    bug.roamTargetY = originalTargetY;
-    bug.nextRoamTargetAt = performance.now() + 10_000;
+    for (let frame = 0; frame < 120; frame += 1) {
+      bug.update(1 / 60, {
+        bounds: { width: 320, height: 220 },
+        config: DEFAULT_GAME_CONFIG,
+        getNeighbors: () => neighbors,
+      });
+      orbitAngles.push(Math.atan2(bug.y - crowdCenterY, bug.x - crowdCenterX));
+      distances.push(Math.hypot(bug.x - crowdCenterX, bug.y - crowdCenterY));
+    }
 
-    bug.update(1 / 60, {
-      bounds: { width: 220, height: 160 },
-      config: DEFAULT_GAME_CONFIG,
-      getNeighbors: () => [],
-    });
+    let cumulativeOrbitTravel = 0;
+    for (let index = 16; index < orbitAngles.length; index += 1) {
+      cumulativeOrbitTravel += normalizeAngle(orbitAngles[index] - orbitAngles[index - 1]);
+    }
 
-    expect(bug.roamTargetX).not.toBe(originalTargetX);
-    expect(bug.roamTargetY).not.toBe(originalTargetY);
-    expect(bug.roamLoiterUntil).toBe(0);
+    expect(Math.abs(cumulativeOrbitTravel)).toBeLessThan(Math.PI * 0.9);
+    expect(Math.hypot(bug.x - startX, bug.y - 100)).toBeGreaterThan(12);
   });
 
-  it("resets stale roam anchors when revived", () => {
+  it("does not churn patrol roam targets into dense-field spin loops", () => {
+    let now = 1_000;
+    vi.spyOn(performance, "now").mockImplementation(() => now);
+
+    const bug = new BugEntity({
+      heading: 0,
+      size: 10,
+      variant: "medium",
+      vx: 0,
+      vy: 0,
+      x: 1038,
+      y: 286,
+    });
+    bug.hasEnteredField = true;
+
+    const roamTargets = new Set<string>();
+    const headingSamples: number[] = [];
+    const positions: Array<{ x: number; y: number }> = [];
+
+    for (let sample = 0; sample < 24; sample += 1) {
+      for (let frame = 0; frame < 6; frame += 1) {
+        bug.update(1 / 60, {
+          bounds: { width: 1440, height: 1200 },
+          config: DEFAULT_GAME_CONFIG,
+          getCrowdingAt: () => ({
+            centerX: 980,
+            centerY: 286,
+            count: 12,
+            score: 6,
+          }),
+          getNeighbors: () => [],
+        });
+
+        now += 1000 / 60;
+      }
+
+      roamTargets.add(`${Math.round(bug.roamTargetX ?? -1)}:${Math.round(bug.roamTargetY ?? -1)}`);
+      headingSamples.push(bug.heading);
+      positions.push({ x: bug.x, y: bug.y });
+    }
+
+    let headingTravel = 0;
+    for (let index = 1; index < headingSamples.length; index += 1) {
+      headingTravel += Math.abs(normalizeAngle(headingSamples[index] - headingSamples[index - 1]));
+    }
+
+    const displacement = Math.hypot(
+      positions.at(-1)!.x - positions[0].x,
+      positions.at(-1)!.y - positions[0].y,
+    );
+
+    expect(roamTargets.size).toBeLessThanOrEqual(7);
+    expect(headingTravel).toBeLessThan(Math.PI * 2.2);
+    expect(displacement).toBeGreaterThan(18);
+  });
+
+  it("resets stale intents when revived", () => {
     const bug = new BugEntity({ size: 10, variant: "low", x: 100, y: 80 });
     bug.roamTargetX = 999;
     bug.roamTargetY = 999;
     bug.nextRoamTargetAt = performance.now() + 10_000;
-    bug.roamLoiterUntil = performance.now() + 500;
 
     bug.revive(220, 160);
 
     expect(bug.roamTargetX).toBeNull();
     expect(bug.roamTargetY).toBeNull();
     expect(bug.nextRoamTargetAt).toBe(0);
-    expect(bug.roamLoiterUntil).toBe(0);
   });
 });

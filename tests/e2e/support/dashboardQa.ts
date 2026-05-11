@@ -99,6 +99,26 @@ interface QaBugTelemetry {
   y: number;
 }
 
+interface QaBugPosition {
+  canonicalX?: number;
+  canonicalY?: number;
+  copyIndex?: number;
+  index: number;
+  isWrappedCopy?: boolean;
+  radius: number;
+  x: number;
+  y: number;
+}
+
+interface QaBugRepositionRequest {
+  heading?: number;
+  index: number;
+  vx?: number;
+  vy?: number;
+  x: number;
+  y: number;
+}
+
 interface EnableCanvasQaOptions {
   performanceSampleLimit?: number;
   startMeasurementOnInit?: boolean;
@@ -481,11 +501,31 @@ export async function getQaBugPositions(page: Page) {
   return page.evaluate(() => {
     const qaState = (window as Window & {
       __RTZ_QA__?: {
-        bugPositions?: Array<{ index: number; radius: number; x: number; y: number }>;
+        bugPositions?: QaBugPosition[];
       };
     }).__RTZ_QA__;
     return qaState?.bugPositions ?? [];
   });
+}
+
+export async function setQaLiveBugPosition(
+  page: Page,
+  request: QaBugRepositionRequest,
+) {
+  return page.evaluate((nextRequest) => {
+    const qaState = (window as Window & {
+      __RTZ_QA__?: {
+        enabled?: boolean;
+        repositionLiveBug?: (request: QaBugRepositionRequest) => boolean;
+      };
+    }).__RTZ_QA__;
+
+    if (!qaState?.enabled || !qaState.repositionLiveBug) {
+      throw new Error("QA live bug repositioner is unavailable");
+    }
+
+    return qaState.repositionLiveBug(nextRequest);
+  }, request);
 }
 
 export async function getQaBugTelemetry(page: Page) {
