@@ -36,6 +36,19 @@ export interface RenderedBugPosition {
   y: number;
 }
 
+export interface QaBugTelemetryItem {
+  heading: number;
+  index: number;
+  movementMood: string | null;
+  radius: number;
+  targetX: number | null;
+  targetY: number | null;
+  vx: number;
+  vy: number;
+  x: number;
+  y: number;
+}
+
 export interface GameState {
   remainingTargets: number;
   sessionKey: string;
@@ -77,10 +90,12 @@ export interface QaDurationMetric {
 }
 
 export interface QaWindowState {
+  bugTelemetry?: QaBugTelemetryItem[];
   enabled?: boolean;
   bugPositions?: Array<{ index: number; x: number; y: number; radius: number }>;
   clearLiveBugs?: () => number;
   getLiveBugCount?: () => number;
+  getLiveBugTelemetry?: () => QaBugTelemetryItem[];
   lastHit?: {
     defeated: boolean;
     remainingHp: number;

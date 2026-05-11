@@ -9,7 +9,7 @@ export {
 export const TAB_ITEMS: TabItem[] = [
   { id: "overview", label: "Target" },
   { id: "periods", label: "Trend" },
-  { id: "insights", label: "Risk" },
+  { id: "insights", label: "SLAs" },
 ];
 
 export const COMPARE_RANGE_OPTIONS: CompareRangeOption[] = [

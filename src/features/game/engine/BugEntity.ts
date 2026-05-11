@@ -454,15 +454,15 @@ export class BugEntity extends Entity {
     if (side === "left" || side === "right") {
       const laneCenterX = side === "left" ? laneInset : bounds.width - laneInset;
       return {
-        x: clamp((laneCenterX - this.x) / laneWidth, -1, 1) * 0.18,
-        y: clamp((targetY - this.y) / Math.max(bounds.height * 0.22, 1), -1, 1) * 0.07,
+        x: clamp((laneCenterX - this.x) / laneWidth, -1, 1) * 0.11,
+        y: clamp((targetY - this.y) / Math.max(bounds.height * 0.22, 1), -1, 1) * 0.05,
       };
     }
 
     const laneCenterY = side === "top" ? laneInset : bounds.height - laneInset;
     return {
-      x: clamp((targetX - this.x) / Math.max(bounds.width * 0.22, 1), -1, 1) * 0.07,
-      y: clamp((laneCenterY - this.y) / laneWidth, -1, 1) * 0.18,
+      x: clamp((targetX - this.x) / Math.max(bounds.width * 0.22, 1), -1, 1) * 0.05,
+      y: clamp((laneCenterY - this.y) / laneWidth, -1, 1) * 0.11,
     };
   }
 
@@ -579,8 +579,8 @@ export class BugEntity extends Entity {
 
     let separationX = 0;
     let separationY = 0;
-    let swirlX = 0;
-    let swirlY = 0;
+  let swirlX = 0;
+  let swirlY = 0;
     const personalSpace = Math.max(this.size * 2.05, radius * 0.34);
     const softRadius = Math.max(personalSpace + 1, radius * 0.72);
 
@@ -648,7 +648,7 @@ export class BugEntity extends Entity {
       1.5,
     );
     const strength =
-      (0.16 + wanderMultiplier * 0.08 + crowdPressure * 0.05) * flowFieldStrength;
+      (0.07 + wanderMultiplier * 0.035 + crowdPressure * 0.025) * flowFieldStrength;
 
     return {
       x: flowDirection.x * strength,

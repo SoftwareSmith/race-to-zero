@@ -10,7 +10,10 @@ import { WEAPON_EVOLVE_THRESHOLDS } from "@config/gameDefaults";
 import { applyMatchupDamage, getBugWeaponMatchup } from "@game/combat/weaponMatchups";
 import type { AllyConversionConfig } from "@game/weapons/runtime/types";
 import type { BugVariant } from "../../../types/dashboard";
-import type { BugTransitionSnapshotItem } from "@game/components/BackgroundField/types";
+import type {
+  BugTransitionSnapshotItem,
+  QaBugTelemetryItem,
+} from "@game/components/BackgroundField/types";
 
 interface StructureEntry {
   id: string;
@@ -612,6 +615,38 @@ export class Engine {
   // compatibility helper used by BackgroundField (replaces legacy BugSwarm API)
   getAllBugs() {
     return this.entities;
+  }
+
+  getBugTelemetrySnapshot(): QaBugTelemetryItem[] {
+    const telemetry: QaBugTelemetryItem[] = [];
+
+    for (let index = 0; index < this.entities.length; index += 1) {
+      const entity = this.entities[index] as Entity & {
+        heading?: number;
+        movementMood?: string;
+        roamTargetX?: number | null;
+        roamTargetY?: number | null;
+      };
+
+      if (isTerminalEntityState((entity as any).state)) {
+        continue;
+      }
+
+      telemetry.push({
+        heading: entity.heading ?? Math.atan2(entity.vy ?? 0, entity.vx ?? 0),
+        index: telemetry.length,
+        movementMood: entity.movementMood ?? null,
+        radius: Math.max((entity.size ?? 12) * 0.7, 12),
+        targetX: entity.roamTargetX ?? null,
+        targetY: entity.roamTargetY ?? null,
+        vx: entity.vx ?? 0,
+        vy: entity.vy ?? 0,
+        x: entity.x,
+        y: entity.y,
+      });
+    }
+
+    return telemetry;
   }
 
   clearAllBugs(): number {

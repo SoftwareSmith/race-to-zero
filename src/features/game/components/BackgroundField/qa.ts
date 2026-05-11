@@ -1,5 +1,6 @@
 import type {
   BugHitPayload,
+  QaBugTelemetryItem,
   QaDurationMetric,
   QaDurationMetricKey,
   QaPerformanceMetrics,
@@ -162,6 +163,48 @@ export function updateQaBugPositions(
   qaBugPositions.length = bugPositions.length;
 }
 
+export function updateQaBugTelemetry(
+  bugTelemetry: QaBugTelemetryItem[],
+  bounds: { left: number; top: number },
+): void {
+  const qaState = getQaState();
+  if (!qaState?.enabled) return;
+
+  const qaBugTelemetry = qaState.bugTelemetry ?? (qaState.bugTelemetry = []);
+
+  for (let index = 0; index < bugTelemetry.length; index += 1) {
+    const telemetry = bugTelemetry[index];
+    const qaTelemetry = qaBugTelemetry[index] ?? {
+      heading: 0,
+      index: 0,
+      movementMood: null,
+      radius: 0,
+      targetX: null,
+      targetY: null,
+      vx: 0,
+      vy: 0,
+      x: 0,
+      y: 0,
+    };
+
+    qaTelemetry.heading = telemetry.heading;
+    qaTelemetry.index = telemetry.index;
+    qaTelemetry.movementMood = telemetry.movementMood;
+    qaTelemetry.radius = telemetry.radius;
+    qaTelemetry.targetX =
+      telemetry.targetX == null ? null : telemetry.targetX + bounds.left;
+    qaTelemetry.targetY =
+      telemetry.targetY == null ? null : telemetry.targetY + bounds.top;
+    qaTelemetry.vx = telemetry.vx;
+    qaTelemetry.vy = telemetry.vy;
+    qaTelemetry.x = telemetry.x + bounds.left;
+    qaTelemetry.y = telemetry.y + bounds.top;
+    qaBugTelemetry[index] = qaTelemetry;
+  }
+
+  qaBugTelemetry.length = bugTelemetry.length;
+}
+
 export function syncQaBugPositionsFromEngine(
   engine: { getAllBugs: () => Array<any> } | null,
   bounds: { left: number; top: number },
@@ -177,6 +220,15 @@ export function syncQaBugPositionsFromEngine(
     })),
     bounds,
   );
+}
+
+export function syncQaBugTelemetryFromEngine(
+  engine: { getBugTelemetrySnapshot: () => QaBugTelemetryItem[] } | null,
+  bounds: { left: number; top: number },
+): void {
+  if (!engine) return;
+
+  updateQaBugTelemetry(engine.getBugTelemetrySnapshot(), bounds);
 }
 
 export function updateQaLastHit(payload: BugHitPayload): void {

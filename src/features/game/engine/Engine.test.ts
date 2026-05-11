@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { WEAPON_EVOLVE_THRESHOLDS } from "@config/gameDefaults";
-import { WeaponTier } from "@game/types";
+import { EntityState, WeaponTier } from "@game/types";
 import { WEAPON_REGISTRY } from "@game/weapons";
 import BUG_CODEX, { cloneCodex, setCodex } from "./bugCodex";
 import { BugEntity } from "./BugEntity";
@@ -234,6 +234,43 @@ describe("engine death attribution", () => {
     expect(crowding.centerX).toBeLessThan(100);
   });
 
+  it("returns read-only bug telemetry snapshots for live bugs", () => {
+    const engine = new Engine(createCanvas(), {
+      height: 200,
+      width: 200,
+    });
+    const liveBug = new BugEntity({
+      heading: Math.PI / 3,
+      size: 10,
+      variant: "low",
+      vx: 2,
+      vy: -1,
+      x: 100,
+      y: 120,
+    });
+    const deadBug = new BugEntity({ size: 8, variant: "medium", x: 40, y: 50 });
+
+    liveBug.movementMood = "loiter";
+    liveBug.roamTargetX = 160;
+    liveBug.roamTargetY = 80;
+    deadBug.state = EntityState.Dead;
+    engine.entities = [liveBug, deadBug];
+
+    expect(engine.getBugTelemetrySnapshot()).toEqual([
+      expect.objectContaining({
+        heading: Math.PI / 3,
+        index: 0,
+        movementMood: "loiter",
+        targetX: 160,
+        targetY: 80,
+        vx: 2,
+        vy: -1,
+        x: 100,
+        y: 120,
+      }),
+    ]);
+  });
+
   it("keeps simulated swarms distributed across board quadrants", () => {
     const randomSpy = vi.spyOn(Math, "random");
     let seed = 0;
@@ -260,6 +297,38 @@ describe("engine death attribution", () => {
 
     expect(quadrantCounts.filter((count) => count > 0)).toHaveLength(4);
     expect(Math.max(...quadrantCounts)).toBeLessThan(engine.getAllBugs().length * 0.55);
+  });
+
+  it("keeps the swarm centroid near the board center over time", () => {
+    const randomSpy = vi.spyOn(Math, "random");
+    let seed = 0;
+    randomSpy.mockImplementation(() => {
+      seed = (seed + 0.173) % 1;
+      return seed;
+    });
+    const engine = new Engine(createCanvas(), {
+      height: 200,
+      width: 200,
+    });
+
+    engine.spawnFromCounts({ high: 10, low: 30, medium: 10, urgent: 6 });
+
+    for (let frame = 0; frame < 360; frame += 1) {
+      engine.update(1 / 60, null, null);
+    }
+
+    const bugs = engine.getAllBugs() as BugEntity[];
+    const centroid = bugs.reduce(
+      (acc, bug) => ({ x: acc.x + bug.x, y: acc.y + bug.y }),
+      { x: 0, y: 0 },
+    );
+    const centroidX = centroid.x / Math.max(1, bugs.length);
+    const centroidY = centroid.y / Math.max(1, bugs.length);
+
+    expect(centroidX).toBeGreaterThan(78);
+    expect(centroidX).toBeLessThan(122);
+    expect(centroidY).toBeGreaterThan(78);
+    expect(centroidY).toBeLessThan(122);
   });
 
   it("keeps a meaningful share of the swarm outside the center box", () => {

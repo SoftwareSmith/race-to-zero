@@ -86,6 +86,19 @@ interface QaPerformanceMetrics {
   sampleLimit?: number;
 }
 
+interface QaBugTelemetry {
+  heading: number;
+  index: number;
+  movementMood: string | null;
+  radius: number;
+  targetX: number | null;
+  targetY: number | null;
+  vx: number;
+  vy: number;
+  x: number;
+  y: number;
+}
+
 interface EnableCanvasQaOptions {
   performanceSampleLimit?: number;
   startMeasurementOnInit?: boolean;
@@ -472,6 +485,24 @@ export async function getQaBugPositions(page: Page) {
       };
     }).__RTZ_QA__;
     return qaState?.bugPositions ?? [];
+  });
+}
+
+export async function getQaBugTelemetry(page: Page) {
+  return page.evaluate(() => {
+    const qaState = (window as Window & {
+      __RTZ_QA__?: {
+        bugTelemetry?: QaBugTelemetry[];
+        enabled?: boolean;
+        getLiveBugTelemetry?: () => QaBugTelemetry[];
+      };
+    }).__RTZ_QA__;
+
+    if (!qaState?.enabled) {
+      throw new Error("QA bug telemetry is unavailable");
+    }
+
+    return qaState.getLiveBugTelemetry?.() ?? qaState.bugTelemetry ?? [];
   });
 }
 

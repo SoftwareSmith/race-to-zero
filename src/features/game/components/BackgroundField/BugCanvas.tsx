@@ -42,7 +42,9 @@ import {
   isQaEnabled,
   recordQaDurationSample,
   recordQaFrameTiming,
+  syncQaBugTelemetryFromEngine,
   updateQaBugPositions,
+  updateQaBugTelemetry,
   syncQaBugPositionsFromEngine,
   stabilizeQaEngine,
 } from "./qa";
@@ -547,14 +549,17 @@ const BugCanvas = memo(
         stabilizeQaEngine(engine, w, h);
         swarmRef.current = engine;
         syncQaBugPositionsFromEngine(engine, boundsRef.current);
+        syncQaBugTelemetryFromEngine(engine, boundsRef.current);
 
         if (typeof window !== "undefined") {
           const qaState = (
             window as Window & {
               __RTZ_QA__?: {
+                bugTelemetry?: Array<any>;
                 clearLiveBugs?: () => number;
                 enabled?: boolean;
                 getLiveBugCount?: () => number;
+                getLiveBugTelemetry?: () => Array<any>;
               };
             }
           ).__RTZ_QA__;
@@ -562,12 +567,14 @@ const BugCanvas = memo(
           if (qaState?.enabled) {
             qaState.getLiveBugCount = () =>
               getActiveBugCount(engine.getAllBugs() as Array<any>);
+            qaState.getLiveBugTelemetry = () => qaState.bugTelemetry ?? [];
             qaState.clearLiveBugs = () => {
               const clearedCount = engine.clearAllBugs();
               latestBugPositionsRef.current = [];
               lastReportedLiveBugCountRef.current = 0;
               onLiveBugCountChangeRef.current?.(0);
               updateQaBugPositions([], boundsRef.current);
+              updateQaBugTelemetry([], boundsRef.current);
               return clearedCount;
             };
           }
@@ -617,6 +624,7 @@ const BugCanvas = memo(
               __RTZ_QA__?: {
                 clearLiveBugs?: () => number;
                 getLiveBugCount?: () => number;
+                getLiveBugTelemetry?: () => Array<any>;
               };
             }
           ).__RTZ_QA__;
@@ -626,6 +634,9 @@ const BugCanvas = memo(
           }
           if (qaState?.getLiveBugCount) {
             delete qaState.getLiveBugCount;
+          }
+          if (qaState?.getLiveBugTelemetry) {
+            delete qaState.getLiveBugTelemetry;
           }
         }
         swarmRef.current = null;
@@ -794,6 +805,7 @@ const BugCanvas = memo(
           lastReportedLiveBugCountRef.current = null;
         }
         updateQaBugPositions(nextBugPositions, boundsRef.current);
+        syncQaBugTelemetryFromEngine(swarmRef.current, boundsRef.current);
         recordQaFrameTiming(
           performance.now() - frameStart,
           nextBugPositions.length,

@@ -47,7 +47,7 @@ function AppContent() {
     interactiveMode: false,
     siegePhase: "idle",
   });
-  const shouldRenderDashboard = shellState.siegePhase !== "active";
+  const shouldRenderDashboard = shellState.siegePhase === "idle";
   const stableTransitionSnapshot = useMemo(
     () => transitionSnapshot,
     [transitionSnapshot],
@@ -76,7 +76,7 @@ function AppContent() {
       <div className="pointer-events-none absolute inset-x-[12%] top-[-18%] h-[42vh] rounded-full bg-[radial-gradient(circle,rgba(244,114,182,0.14),transparent_62%)] blur-3xl" />
       <div
         className={
-          shellState.siegePhase === "active"
+          shellState.siegePhase !== "idle"
             ? "pointer-events-none absolute inset-0 opacity-0 transition-opacity duration-300 ease-out"
             : "pointer-events-none absolute inset-0 opacity-100 transition-opacity duration-300 ease-out"
         }
