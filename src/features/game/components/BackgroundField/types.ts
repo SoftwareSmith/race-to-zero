@@ -1,20 +1,37 @@
+import type { Engine } from "@game/engine/Engine";
 import type { BugVariant } from "../../../../types/dashboard";
 
 export interface BugTransitionSnapshotItem {
+  cruiseSpeed?: number;
+  fleeTimer?: number | null;
+  hasEnteredField?: boolean;
   heading: number;
   hp: number;
   maxHp: number;
+  motionTime?: number;
+  movementMood?: "patrol" | "startled";
+  nextRoamTargetDelayMs?: number;
   opacity: number;
+  roamTargetGeneration?: number;
+  roamTargetLongPath?: boolean;
+  roamTargetWide?: boolean;
+  roamTargetX?: number | null;
+  roamTargetY?: number | null;
+  seed?: number;
   size: number;
+  state?: "patrol" | "flee";
+  turnRate?: number;
   variant: BugVariant;
   vx: number;
   vy: number;
+  wanderAngle?: number;
   x: number;
   y: number;
 }
 
 export interface BackgroundFieldHandle {
   captureTransitionSnapshot: () => BugTransitionSnapshotItem[];
+  detachTransitionSwarm: () => Engine | null;
 }
 
 export interface BugHitPayload {

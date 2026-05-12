@@ -36,6 +36,7 @@ function makeBug(overrides: Partial<BugSnapshot> = {}): BugSnapshot {
 
 function makeMockEngine(bugs: BugSnapshot[] = [makeBug()]): GameEngine {
   return {
+    getFieldSize: vi.fn(() => ({ height: 400, width: 400 })),
     hitTest: vi.fn((x, y) => {
       for (let i = 0; i < bugs.length; i++) {
         const b = bugs[i];

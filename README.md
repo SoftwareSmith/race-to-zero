@@ -59,6 +59,7 @@ npm run dev
 npm run typecheck
 npm run test
 npm run build
+npm run build:guard
 ```
 
 For e2e coverage:

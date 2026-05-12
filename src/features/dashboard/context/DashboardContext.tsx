@@ -58,7 +58,6 @@ type DashboardSettingsValue = Pick<
   | "workdaySettings"
 >;
 
-const DashboardContext = createContext<DashboardContextValue | null>(null);
 const DashboardUiContext = createContext<DashboardUiValue | null>(null);
 const DashboardMetricsContext = createContext<DashboardMetricsValue | null>(
   null,
@@ -165,26 +164,14 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
   );
 
   return (
-    <DashboardContext.Provider value={value}>
-      <DashboardUiContext.Provider value={uiValue}>
-        <DashboardMetricsContext.Provider value={metricsValue}>
-          <DashboardSettingsContext.Provider value={settingsValue}>
-            {children}
-          </DashboardSettingsContext.Provider>
-        </DashboardMetricsContext.Provider>
-      </DashboardUiContext.Provider>
-    </DashboardContext.Provider>
+    <DashboardUiContext.Provider value={uiValue}>
+      <DashboardMetricsContext.Provider value={metricsValue}>
+        <DashboardSettingsContext.Provider value={settingsValue}>
+          {children}
+        </DashboardSettingsContext.Provider>
+      </DashboardMetricsContext.Provider>
+    </DashboardUiContext.Provider>
   );
-}
-
-export function useDashboardContext(): DashboardContextValue {
-  const ctx = useContext(DashboardContext);
-  if (!ctx) {
-    throw new Error(
-      "useDashboardContext must be used within a DashboardProvider",
-    );
-  }
-  return ctx;
 }
 
 function useRequiredDashboardContext<T>(

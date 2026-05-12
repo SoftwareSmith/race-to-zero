@@ -9,12 +9,7 @@ import {
   useState,
 } from "react";
 import Engine from "@game/engine/Engine";
-import {
-  createPreferredPhysicsAdapter,
-  type PhysicsAdapter,
-} from "@game/engine/physicsAdapter";
 import type { GameConfig } from "@game/engine/types";
-import { DEFAULT_GAME_CONFIG } from "@game/engine/types";
 import { isTerminalEntityState } from "@game/types";
 import type {
   SiegeCombatStats,
@@ -39,52 +34,24 @@ import type {
   RenderedBugPosition,
 } from "./types";
 import {
-  isQaEnabled,
-  recordQaDurationSample,
-  recordQaFrameTiming,
-  syncQaBugTelemetryFromEngine,
-  updateQaBugPositions,
-  updateQaBugTelemetry,
-  syncQaBugPositionsFromEngine,
-  stabilizeQaEngine,
-} from "./qa";
-import { drawBugFramePass } from "./bugFramePass";
-import {
-  measureCanvasBounds,
-  reseedClusteredBugs,
-  updateLiveCanvasBounds,
   type CanvasBounds,
   type ReseedInfo,
 } from "./canvasState";
-import { createPointerDownHandler } from "./weaponInput";
-
-const AMBIENT_TARGET_FRAME_MS = 1000 / 24;
-const INTERACTIVE_TARGET_FRAME_MS = 1000 / 45;
-const TRANSITION_EASING = 0.08;
-const STRESS_STEP_CAP_1200 = 3;
-const STRESS_STEP_CAP_2500 = 2;
-const STRESS_STEP_CAP_5000 = 1;
-
-function interpolate(
-  currentValue: number,
-  targetValue: number,
-  easing = TRANSITION_EASING,
-) {
-  return currentValue + (targetValue - currentValue) * easing;
-}
+import {
+  clearBugCanvasQaBindings,
+  installBugCanvasQaBindings,
+  setupBugCanvasEngine,
+} from "./bugCanvasEngineSetup";
+import { setupBugCanvasRenderLoop } from "./bugCanvasRenderLoop";
+import {
+  applySurvivalSpawnPlan,
+  clearInteractiveSwarm,
+  getActiveBugCount,
+  getLocalSiegeZones as computeLocalSiegeZones,
+} from "./bugCanvasLiveState";
 
 function clampNumber(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max);
-}
-
-function getActiveBugCount(bugs: Array<any> | undefined | null) {
-  if (!bugs?.length) {
-    return 0;
-  }
-
-  return bugs.reduce((count, bug) => {
-    return isTerminalEntityState(bug?.state) ? count : count + 1;
-  }, 0);
 }
 
 function getSpeedMultiplier(chaosMultiplier?: number) {
@@ -93,54 +60,6 @@ function getSpeedMultiplier(chaosMultiplier?: number) {
     0.5,
     1.35,
   );
-}
-
-function getSimulationSteps(frameTimeSeconds: number, bugCount: number) {
-  const requestedSteps = Math.max(1, Math.floor(frameTimeSeconds * 60));
-
-  if (bugCount >= 5000) {
-    return Math.min(requestedSteps, STRESS_STEP_CAP_5000);
-  }
-
-  if (bugCount >= 2500) {
-    return Math.min(requestedSteps, STRESS_STEP_CAP_2500);
-  }
-
-  if (bugCount >= 1200) {
-    return Math.min(requestedSteps, STRESS_STEP_CAP_1200);
-  }
-
-  return requestedSteps;
-}
-
-function getInteractiveCursorTarget(
-  bounds: CanvasBounds,
-  hammerPositionRef?: { current: { x: number; y: number } },
-) {
-  if (!bounds.width || !bounds.height || !hammerPositionRef) {
-    return null;
-  }
-
-  const { x, y } = hammerPositionRef.current;
-  if (!Number.isFinite(x) || !Number.isFinite(y) || (x === 0 && y === 0)) {
-    return null;
-  }
-
-  const hoverPadding = DEFAULT_GAME_CONFIG.fleeRadius * 3.5;
-  const withinHoverRange =
-    x >= bounds.left - hoverPadding &&
-    x <= bounds.left + bounds.width + hoverPadding &&
-    y >= bounds.top - hoverPadding &&
-    y <= bounds.top + bounds.height + hoverPadding;
-
-  if (!withinHoverRange) {
-    return null;
-  }
-
-  return {
-    targetX: x - bounds.left,
-    targetY: y - bounds.top,
-  };
 }
 
 export interface BugCanvasProps {
@@ -215,19 +134,7 @@ export interface BugCanvasProps {
     Record<SiegeWeaponId, import("@game/types").WeaponEvolutionState>
   >;
   transitionSnapshot?: BugTransitionSnapshotItem[] | null;
-}
-
-function shouldHandlePointerDown(
-  interactiveMode: boolean,
-  eventTarget: EventTarget | null,
-) {
-  if (!interactiveMode) {
-    return false;
-  }
-
-  return eventTarget instanceof Element
-    ? !eventTarget.closest("[data-no-hammer]")
-    : true;
+  transitionSwarm?: Engine | null;
 }
 
 const BugCanvas = memo(
@@ -264,6 +171,7 @@ const BugCanvas = memo(
       onPhysicsBackendChange,
       initialEvolutionStates,
       transitionSnapshot = null,
+      transitionSwarm = null,
     }: BugCanvasProps,
     ref,
   ) {
@@ -287,6 +195,7 @@ const BugCanvas = memo(
     const gameConfigRef = useRef(gameConfig);
     const initialEvolutionStatesRef = useRef(initialEvolutionStates);
     const transitionSnapshotRef = useRef(transitionSnapshot);
+    const transitionSwarmRef = useRef<Engine | null>(transitionSwarm);
     const vfxRef = useRef<VfxEngine | null>(null);
     const blackHoleVfxIdRef = useRef<string | null>(null);
     const streakMultiplierRef = useRef(streakMultiplier);
@@ -341,20 +250,62 @@ const BugCanvas = memo(
           return bugs
             .filter((bug) => !isTerminalEntityState(bug.state))
             .map((bug) => ({
+              cruiseSpeed:
+                typeof bug.cruiseSpeed === "number" ? bug.cruiseSpeed : undefined,
+              fleeTimer:
+                typeof bug.fleeTimer === "number" ? bug.fleeTimer : null,
+              hasEnteredField: bug.hasEnteredField === true,
               heading:
                 typeof bug.heading === "number"
                   ? bug.heading
                   : Math.atan2(bug.vy ?? 0, bug.vx ?? 1),
               hp: bug.hp ?? bug.maxHp ?? 1,
               maxHp: bug.maxHp ?? 1,
+              motionTime:
+                typeof bug.motionTime === "number" ? bug.motionTime : undefined,
+              movementMood:
+                bug.movementMood === "startled" ? "startled" : "patrol",
+              nextRoamTargetDelayMs:
+                typeof bug.nextRoamTargetAt === "number"
+                  ? Math.max(0, bug.nextRoamTargetAt - performance.now())
+                  : undefined,
               opacity: bug.opacity ?? 1,
+              roamTargetGeneration:
+                typeof bug.roamTargetGeneration === "number"
+                  ? bug.roamTargetGeneration
+                  : undefined,
+              roamTargetLongPath: bug.roamTargetLongPath === true,
+              roamTargetWide: bug.roamTargetWide === true,
+              roamTargetX:
+                typeof bug.roamTargetX === "number" ? bug.roamTargetX : null,
+              roamTargetY:
+                typeof bug.roamTargetY === "number" ? bug.roamTargetY : null,
+              seed: typeof bug.seed === "number" ? bug.seed : undefined,
               size: bug.size ?? 12,
+              state: bug.state === "flee" ? "flee" : "patrol",
+              turnRate:
+                typeof bug.turnRate === "number" ? bug.turnRate : undefined,
               variant: bug.variant,
               vx: bug.vx ?? 0,
               vy: bug.vy ?? 0,
+              wanderAngle:
+                typeof bug.wanderAngle === "number" ? bug.wanderAngle : undefined,
               x: bug.x,
               y: bug.y,
             }));
+        },
+        detachTransitionSwarm: () => {
+          const liveSwarm = swarmRef.current as Engine | null;
+
+          if (!liveSwarm) {
+            return null;
+          }
+
+          clearBugCanvasQaBindings();
+          swarmRef.current = null;
+          latestBugPositionsRef.current = [];
+          lastReportedLiveBugCountRef.current = null;
+          return liveSwarm;
         },
       }),
       [],
@@ -370,6 +321,7 @@ const BugCanvas = memo(
       gameConfigRef.current = gameConfig;
       initialEvolutionStatesRef.current = initialEvolutionStates;
       transitionSnapshotRef.current = transitionSnapshot;
+      transitionSwarmRef.current = transitionSwarm;
       streakMultiplierRef.current = streakMultiplier;
       motionProfileRef.current = motionProfile;
       sceneProfileRef.current = sceneProfile;
@@ -411,39 +363,20 @@ const BugCanvas = memo(
       gamePaused,
     ]);
 
-    const getLocalSiegeZones = useCallback(() => {
-      const canvasBounds = canvasRef.current?.getBoundingClientRect();
-      const left = canvasBounds?.left ?? boundsRef.current.left;
-      const top = canvasBounds?.top ?? boundsRef.current.top;
-
-      return siegeZonesRef.current
-        .map((zone) => ({
-          height: zone.height,
-          left: zone.left - left,
-          top: zone.top - top,
-          width: zone.width,
-        }))
-        .filter((zone) => zone.width > 0 && zone.height > 0);
-    }, []);
+    const getLocalSiegeZones = useCallback(
+      () => computeLocalSiegeZones(canvasRef, boundsRef, siegeZonesRef),
+      [],
+    );
 
     useEffect(() => {
-      if (
-        !interactiveMode ||
-        !survivalSpawnPlan ||
-        !swarmRef.current ||
-        survivalSpawnPlan.sequenceId <= lastAppliedSpawnPlanRef.current
-      ) {
-        return;
-      }
-
-      lastAppliedSpawnPlanRef.current = survivalSpawnPlan.sequenceId;
-      swarmRef.current.spawnBurst?.(
-        survivalSpawnPlan.counts as any,
-        getLocalSiegeZones(),
-      );
-      onLiveBugCountChangeRef.current?.(
-        getActiveBugCount(swarmRef.current.getAllBugs?.() as Array<any>),
-      );
+      applySurvivalSpawnPlan({
+        getLocalZones: getLocalSiegeZones,
+        interactiveMode,
+        lastAppliedSpawnPlanRef,
+        onLiveBugCountChange: onLiveBugCountChangeRef.current,
+        spawnPlan: survivalSpawnPlan,
+        swarm: swarmRef.current,
+      });
     }, [getLocalSiegeZones, interactiveMode, survivalSpawnPlan]);
 
     useEffect(() => {
@@ -455,7 +388,7 @@ const BugCanvas = memo(
       const w = canvas?.clientWidth || boundsRef.current.width || 800;
       const h = canvas?.clientHeight || boundsRef.current.height || 600;
       let cancelled = false;
-      let physicsAdapter: PhysicsAdapter | null = null;
+      let disposePhysicsAdapter: (() => void) | undefined;
 
       const setupEngine = async () => {
         if (!canvas) {
@@ -473,23 +406,27 @@ const BugCanvas = memo(
           }
         }
 
-        physicsAdapter = await createPreferredPhysicsAdapter(interactiveMode);
-        if (cancelled) {
-          physicsAdapter.dispose?.();
-          return;
-        }
-
-        onPhysicsBackendChangeRef.current?.(physicsAdapter.id);
-        const engine = new Engine(canvas, {
-          width: w,
+        const result = await setupBugCanvasEngine({
+          bugCounts,
+          bounds: boundsRef.current,
+          canvas,
+          gameConfig: (gameConfigRef.current as any) ?? undefined,
+          getLocalSiegeZones,
           height: h,
-          config: (gameConfigRef.current as any) ?? undefined,
+          initialEvolutionStates:
+            initialEvolutionStatesRef.current ?? undefined,
+          interactiveMode,
+          latestBugPositionsRef,
           maxWeaponTier,
-          onPerformanceSample: (sample) => {
-            recordQaDurationSample("engineUpdateMs", sample.totalMs);
-            recordQaDurationSample("engineGridMs", sample.spatialGridMs);
-            recordQaDurationSample("engineEntityMs", sample.entityUpdateMs);
-            recordQaDurationSample("engineEvolutionMs", sample.evolutionMs);
+          notifyPhysicsBackendChange: (backendId) =>
+            onPhysicsBackendChangeRef.current?.(backendId),
+          notifyWeaponEvolution: (weaponId, newTier) => {
+            const bounds = boundsRef.current;
+            vfxRef.current?.spawnLevelUp?.(
+              Math.round((bounds.width || w) * 0.5),
+              Math.round(Math.max(72, (bounds.height || h) * 0.24)),
+            );
+            onWeaponEvolution?.(weaponId, newTier);
           },
           onEntityDeath: (x, y, variant, meta) => {
             try {
@@ -521,123 +458,34 @@ const BugCanvas = memo(
               void 0;
             }
           },
-          onWeaponEvolution: (weaponId, newTier) => {
-            const bounds = boundsRef.current;
-            vfxRef.current?.spawnLevelUp?.(
-              Math.round((bounds.width || w) * 0.5),
-              Math.round(Math.max(72, (bounds.height || h) * 0.24)),
-            );
-            onWeaponEvolution?.(weaponId, newTier);
-          },
-          initialEvolutionStates:
-            initialEvolutionStatesRef.current ?? undefined,
+          onLiveBugCountChange: onLiveBugCountChangeRef.current ?? undefined,
+          reseedSpeedMultiplier: targetSettingsRef.current.speedMultiplier,
+          syncWeaponEvolutionStates,
+          transitionSnapshot: transitionSnapshotRef.current,
+          transitionSwarm: transitionSwarmRef.current,
+          width: w,
         });
-        try {
-          (engine as any).__baseSpeedOriginal = engine.config.baseSpeed;
-        } catch {
-          void 0;
-        }
-        const nextTransitionSnapshot = transitionSnapshotRef.current;
-        if (interactiveMode && nextTransitionSnapshot?.length) {
-          engine.spawnFromSnapshot(nextTransitionSnapshot);
-        } else {
-          engine.spawnFromCounts(
-            bugCounts as any,
-            interactiveMode ? getLocalSiegeZones() : [],
-          );
-        }
-        stabilizeQaEngine(engine, w, h);
-        swarmRef.current = engine;
-        syncQaBugPositionsFromEngine(engine, boundsRef.current);
-        syncQaBugTelemetryFromEngine(engine, boundsRef.current);
-
-        if (typeof window !== "undefined") {
-          const qaState = (
-            window as Window & {
-              __RTZ_QA__?: {
-                bugTelemetry?: Array<any>;
-                clearLiveBugs?: () => number;
-                enabled?: boolean;
-                getLiveBugCount?: () => number;
-                getLiveBugTelemetry?: () => Array<any>;
-                repositionLiveBug?: (request: {
-                  heading?: number;
-                  index: number;
-                  vx?: number;
-                  vy?: number;
-                  x: number;
-                  y: number;
-                }) => boolean;
-              };
-            }
-          ).__RTZ_QA__;
-
-          if (qaState?.enabled) {
-            qaState.getLiveBugCount = () =>
-              getActiveBugCount(engine.getAllBugs() as Array<any>);
-            qaState.getLiveBugTelemetry = () => qaState.bugTelemetry ?? [];
-            qaState.clearLiveBugs = () => {
-              const clearedCount = engine.clearAllBugs();
-              latestBugPositionsRef.current = [];
-              lastReportedLiveBugCountRef.current = 0;
-              onLiveBugCountChangeRef.current?.(0);
-              updateQaBugPositions([], boundsRef.current);
-              updateQaBugTelemetry([], boundsRef.current);
-              return clearedCount;
-            };
-            qaState.repositionLiveBug = ({ heading, index, vx, vy, x, y }) => {
-              const liveBugs = engine.getAllBugs() as Array<any>;
-              const bug = liveBugs[index];
-
-              if (!bug || isTerminalEntityState(bug.state)) {
-                return false;
-              }
-
-              bug.x = x;
-              bug.y = y;
-
-              if (typeof vx === "number") {
-                bug.vx = vx;
-              }
-              if (typeof vy === "number") {
-                bug.vy = vy;
-              }
-              if (typeof heading === "number") {
-                bug.heading = heading;
-              }
-
-              if (x >= 0 && x <= w && y >= 0 && y <= h) {
-                bug.hasEnteredField = true;
-              }
-              if ("roamTargetX" in bug) {
-                bug.roamTargetX = null;
-              }
-              if ("roamTargetY" in bug) {
-                bug.roamTargetY = null;
-              }
-
-              syncQaBugPositionsFromEngine(engine, boundsRef.current);
-              syncQaBugTelemetryFromEngine(engine, boundsRef.current);
-              return true;
-            };
-          }
+        if (cancelled) {
+          result.physicsAdapter.dispose?.();
+          return;
         }
 
-        const maybeBugs = swarmRef.current.getAllBugs() as Array<any>;
-        const nextReseedInfo = reseedClusteredBugs(
-          maybeBugs,
-          w,
-          h,
-          targetSettingsRef.current.speedMultiplier,
-          {
-            baseSpeed:
-              (swarmRef.current as any)?.__baseSpeedOriginal ??
-              DEFAULT_GAME_CONFIG.baseSpeed,
-            thresholdRatio: 0.25,
-          },
-        );
-        if (nextReseedInfo) {
-          setReseedInfo(nextReseedInfo);
+        swarmRef.current = result.engine;
+        if (transitionSwarmRef.current === result.engine) {
+          transitionSwarmRef.current = null;
+        }
+        disposePhysicsAdapter = () => result.physicsAdapter.dispose?.();
+        installBugCanvasQaBindings({
+          bounds: boundsRef.current,
+          engine: result.engine,
+          height: h,
+          latestBugPositionsRef,
+          onLiveBugCountChange: onLiveBugCountChangeRef.current ?? undefined,
+          width: w,
+        });
+
+        if (result.reseedInfo) {
+          setReseedInfo(result.reseedInfo);
         }
       };
 
@@ -660,39 +508,8 @@ const BugCanvas = memo(
             void 0;
           }
         }
-        physicsAdapter?.dispose?.();
-        if (typeof window !== "undefined") {
-          const qaState = (
-            window as Window & {
-              __RTZ_QA__?: {
-                clearLiveBugs?: () => number;
-                getLiveBugCount?: () => number;
-                getLiveBugTelemetry?: () => Array<any>;
-                repositionLiveBug?: (request: {
-                  heading?: number;
-                  index: number;
-                  vx?: number;
-                  vy?: number;
-                  x: number;
-                  y: number;
-                }) => boolean;
-              };
-            }
-          ).__RTZ_QA__;
-
-          if (qaState?.clearLiveBugs) {
-            delete qaState.clearLiveBugs;
-          }
-          if (qaState?.getLiveBugCount) {
-            delete qaState.getLiveBugCount;
-          }
-          if (qaState?.getLiveBugTelemetry) {
-            delete qaState.getLiveBugTelemetry;
-          }
-          if (qaState?.repositionLiveBug) {
-            delete qaState.repositionLiveBug;
-          }
-        }
+        disposePhysicsAdapter?.();
+        clearBugCanvasQaBindings();
         swarmRef.current = null;
       };
     }, [
@@ -713,297 +530,49 @@ const BugCanvas = memo(
       if (!canvas) {
         return undefined;
       }
-      const currentVfx = vfxRef.current;
-
-      const context = canvas.getContext("2d", { alpha: true });
-      if (!context) {
-        return undefined;
-      }
-
-      let animationFrameId = 0;
-      let lastDrawTime = 0;
-      let width = 0;
-      let height = 0;
-      let isActive = !document.hidden && document.hasFocus();
-
-      const resizeCanvas = () => {
-        const measurement = measureCanvasBounds(canvas);
-        if (!measurement) {
-          return;
-        }
-
-        width = measurement.width;
-        height = measurement.height;
-        boundsRef.current = measurement.bounds;
-        canvas.width = Math.floor(width * measurement.devicePixelRatio);
-        canvas.height = Math.floor(height * measurement.devicePixelRatio);
-        context.setTransform(
-          measurement.devicePixelRatio,
-          0,
-          0,
-          measurement.devicePixelRatio,
-          0,
-          0,
-        );
-        swarmRef.current?.setSize?.(width, height);
-      };
-
-      const updateActivity = () => {
-        isActive = !document.hidden && document.hasFocus();
-
-        if (isActive && !animationFrameId) {
-          animationFrameId = window.requestAnimationFrame(renderFrame);
-        }
-      };
-
-      const renderFrame = (timestamp: number) => {
-        const frameStart = performance.now();
-
-        if (!isActive) {
-          animationFrameId = 0;
-          return;
-        }
-
-        if (!lastDrawTime) {
-          lastDrawTime = timestamp;
-          animationFrameId = window.requestAnimationFrame(renderFrame);
-          return;
-        }
-
-        const dtSec = Math.min(0.12, (timestamp - lastDrawTime) / 1000);
-        lastDrawTime = timestamp;
-        const nextSettings = targetSettingsRef.current;
-        const animatedState = animatedStateRef.current;
-        animatedState.sizeMultiplier = interpolate(
-          animatedState.sizeMultiplier,
-          nextSettings.sizeMultiplier,
-        );
-        animatedState.speedMultiplier = interpolate(
-          animatedState.speedMultiplier,
-          nextSettings.speedMultiplier,
-        );
-
-        const sizeMultiplier = animatedState.sizeMultiplier;
-        const speedMultiplier = clampNumber(
-          animatedState.speedMultiplier * runtimeSpeedMultiplier,
-          0.2,
-          6,
-        );
-
-        // advance engine or swarm according to elapsed time to create continuous motion
-        if (swarmRef.current && !gamePausedRef.current) {
-          if ((swarmRef.current as any).config) {
-            const engine = swarmRef.current as any;
-            const base =
-              engine.__baseSpeedOriginal ??
-              engine.config.baseSpeed ??
-              DEFAULT_GAME_CONFIG.baseSpeed;
-            engine.config.baseSpeed = base * speedMultiplier;
-          }
-          const steps = getSimulationSteps(
-            dtSec,
-            (swarmRef.current as any).getAllBugs().length,
-          );
-          const cursorTarget = getInteractiveCursorTarget(
-            boundsRef.current,
-            hammerPositionRef,
-          );
-          for (let s = 0; s < steps; s++) {
-            if ((swarmRef.current as any).update.length >= 1) {
-              (swarmRef.current as any).update(
-                1 / 60,
-                cursorTarget?.targetX ?? null,
-                cursorTarget?.targetY ?? null,
-              );
-            } else {
-              (swarmRef.current as any).update();
-            }
-          }
-        }
-        context.clearRect(0, 0, width, height);
-
-        // ensure width/height are valid before math that divides by them
-        if (!width || !height) {
-          width = canvas.clientWidth || boundsRef.current.width || 800;
-          height = canvas.clientHeight || boundsRef.current.height || 600;
-        }
-        const activeParticles = swarmRef.current
-          ? swarmRef.current.getAllBugs()
-          : [];
-        const activeMotionProfile = motionProfileRef.current;
-        const activeChartFocus = chartFocusRef.current;
-        const frameNow = performance.now();
-        const drawStartedAt = performance.now();
-        const nextBugPositions = drawBugFramePass({
-          chartFocus: activeChartFocus,
-          context,
-          frameNow,
-          height,
-          interactiveMode: interactiveModeRef.current,
-          motionProfile: activeMotionProfile,
-          particles: activeParticles,
-          qaEnabled: isQaEnabled(),
-          reusablePositions: latestBugPositionsRef.current,
-          sizeMultiplier,
-          width,
-        });
-        recordQaDurationSample("drawMs", performance.now() - drawStartedAt);
-        latestBugPositionsRef.current = nextBugPositions;
-        if (interactiveModeRef.current) {
-          const liveBugCount = getActiveBugCount(activeParticles as Array<any>);
-          if (lastReportedLiveBugCountRef.current !== liveBugCount) {
-            lastReportedLiveBugCountRef.current = liveBugCount;
-            onLiveBugCountChangeRef.current?.(liveBugCount);
-          }
-        } else {
-          lastReportedLiveBugCountRef.current = null;
-        }
-        updateQaBugPositions(nextBugPositions, boundsRef.current);
-        syncQaBugTelemetryFromEngine(swarmRef.current, boundsRef.current);
-        recordQaFrameTiming(
-          performance.now() - frameStart,
-          nextBugPositions.length,
-        );
-
-        // Tick black hole gravity well (Void Pulse weapon)
-        if (
-          swarmRef.current &&
-          typeof swarmRef.current.tickBlackHole === "function"
-        ) {
-          swarmRef.current.tickBlackHole(
-            dtSec * 1000,
-            (bx: number, by: number, brad: number) => {
-              if (vfxRef.current) {
-                vfxRef.current.spawnVoidCollapse(
-                  bx,
-                  by,
-                  Math.max(56, brad * 0.46),
-                );
-              }
-              // Clean up the black hole visual
-              if (blackHoleVfxIdRef.current && vfxRef.current) {
-                vfxRef.current.destroyBlackHole(blackHoleVfxIdRef.current);
-                blackHoleVfxIdRef.current = null;
-              }
-            },
-          );
-          // Animate the persistent black hole rings each frame
-          const bhId = blackHoleVfxIdRef.current;
-          if (bhId && vfxRef.current) {
-            vfxRef.current.tickBlackHoleVfx(bhId);
-          }
-        }
-
-        // one-time safety reseed: if many bugs still sit at 0,0, reseed and surface badge
-        if (!reseedInfoRef.current && swarmRef.current) {
-          const bugs = swarmRef.current.getAllBugs() as Array<any>;
-          const nextReseedInfo = reseedClusteredBugs(
-            bugs,
-            width,
-            height,
-            targetSettingsRef.current.speedMultiplier,
-            {
-              baseSpeed:
-                (swarmRef.current as any)?.__baseSpeedOriginal ??
-                DEFAULT_GAME_CONFIG.baseSpeed,
-              thresholdRatio: 0.2,
-            },
-          );
-          if (nextReseedInfo) {
-            reseedInfoRef.current = nextReseedInfo;
-            setReseedInfo(nextReseedInfo);
-          }
-        }
-
-        animationFrameId = window.requestAnimationFrame(renderFrame);
-      };
-
-      resizeCanvas();
-
-      const resizeObserver = new ResizeObserver(() => {
-        resizeCanvas();
-      });
-      resizeObserver.observe(canvas);
-
-      const handlePointerDown = createPointerDownHandler(
-        {
-          blackHoleVfxIdRef,
-          boundsRef,
-          canvasRef,
-          currentMouseRef,
-          fireIntervalRef,
-          getWeaponTier: (weaponId) => getWeaponTierRef.current(weaponId),
-          hammerPositionRef,
-          isFiringRef,
-          onHit: (payload) => onHitRef.current(payload as any),
-          getOnWeaponFire: () => onWeaponFireRef.current,
-          getSelectedWeaponId: () => selectedWeaponIdRef.current,
-          streakMultiplier: streakMultiplierRef.current,
-          getSwarm: () => swarmRef.current,
-          syncWeaponEvolutionStates,
-          updateBounds: () => {
-            boundsRef.current = updateLiveCanvasBounds(
-              canvas,
-              boundsRef.current,
-            );
-            return boundsRef.current;
-          },
-          vfxRef,
-        },
+      return setupBugCanvasRenderLoop({
+        animatedStateRef,
+        blackHoleVfxIdRef,
+        boundsRef,
+        canvas,
+        canvasRef,
+        chartFocusRef,
+        currentMouseRef,
+        fireIntervalRef,
+        gamePausedRef,
+        getWeaponTierRef,
+        hammerPositionRef,
+        interactiveModeRef,
+        isFiringRef,
         lastFireTimeRef,
-      );
-
-      const handleInteractivePointerDown = (event: MouseEvent) => {
-        if (
-          !shouldHandlePointerDown(interactiveModeRef.current, event.target)
-        ) {
-          return;
-        }
-
-        handlePointerDown(event);
-      };
-
-      document.addEventListener("visibilitychange", updateActivity);
-      window.addEventListener("focus", updateActivity);
-      window.addEventListener("blur", updateActivity);
-      // Single registration - the useEffect cleanup in React Strict Mode re-runs will
-      // remove the previous listener before re-registering, so no double-fire risk.
-      window.addEventListener("mousedown", handleInteractivePointerDown);
-      animationFrameId = window.requestAnimationFrame(renderFrame);
-
-      return () => {
-        resizeObserver.disconnect();
-        document.removeEventListener("visibilitychange", updateActivity);
-        window.removeEventListener("focus", updateActivity);
-        window.removeEventListener("blur", updateActivity);
-        window.removeEventListener("mousedown", handleInteractivePointerDown);
-        if (blackHoleVfxIdRef.current && currentVfx) {
-          currentVfx.destroyBlackHole(blackHoleVfxIdRef.current);
-          blackHoleVfxIdRef.current = null;
-        }
-        if (animationFrameId) {
-          window.cancelAnimationFrame(animationFrameId);
-        }
-      };
+        lastReportedLiveBugCountRef,
+        latestBugPositionsRef,
+        motionProfileRef,
+        onHitRef,
+        onLiveBugCountChangeRef,
+        onWeaponFireRef,
+        reseedInfoRef,
+        runtimeSpeedMultiplier,
+        selectedWeaponIdRef,
+        setReseedInfo,
+        streakMultiplierRef,
+        swarmRef,
+        syncWeaponEvolutionStates,
+        targetSettingsRef,
+        vfxRef,
+      });
     }, [hammerPositionRef, runtimeSpeedMultiplier, syncWeaponEvolutionStates]);
 
     useEffect(() => {
-      if (!interactiveMode || clearSwarmRequestId === 0) {
-        return;
-      }
-
-      const engine = swarmRef.current as
-        | (Engine & { clearAllBugs?: () => number })
-        | null;
-      if (!engine?.clearAllBugs) {
-        return;
-      }
-
-      engine.clearAllBugs();
-      latestBugPositionsRef.current = [];
-      lastReportedLiveBugCountRef.current = 0;
-      onLiveBugCountChangeRef.current?.(0);
-      updateQaBugPositions([], boundsRef.current);
+      clearInteractiveSwarm({
+        boundsRef,
+        clearSwarmRequestId,
+        interactiveMode,
+        latestBugPositionsRef,
+        lastReportedLiveBugCountRef,
+        onLiveBugCountChange: onLiveBugCountChangeRef.current,
+        swarm: swarmRef.current as (Engine & { clearAllBugs?: () => number }) | null,
+      });
     }, [clearSwarmRequestId, interactiveMode]);
 
     return (

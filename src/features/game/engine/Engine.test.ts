@@ -1,11 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { WEAPON_EVOLVE_THRESHOLDS } from "@config/gameDefaults";
-import { EntityState, WeaponTier } from "@game/types";
+import { EntityState, WeaponTier, isTerminalEntityState } from "@game/types";
 import { WEAPON_REGISTRY } from "@game/weapons";
 import BUG_CODEX, { cloneCodex, setCodex } from "./bugCodex";
 import { BugEntity } from "./BugEntity";
 import { Engine } from "./Engine";
+import { MAX_ACTIVE_BUGS } from "./runtimeSafety";
+import { DEFAULT_GAME_CONFIG } from "./types";
+import type { BugTransitionSnapshotItem } from "@game/components/BackgroundField/types";
 
 function createCanvas() {
   return {
@@ -720,5 +723,297 @@ describe("engine death attribution", () => {
       tier: WeaponTier.TIER_FOUR,
     });
     expect(survivalEvolution).toHaveBeenCalledWith("hammer", WeaponTier.TIER_FOUR);
+  });
+});
+
+describe("engine runtime bounds", () => {
+  beforeEach(() => {
+    setCodex(cloneCodex(BUG_CODEX));
+    vi.spyOn(Math, "random").mockReturnValue(0.5);
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("caps spawnFromCounts to the maximum active bug limit", () => {
+    const engine = new Engine(createCanvas(), {
+      height: 200,
+      width: 200,
+    });
+
+    engine.spawnFromCounts({ low: MAX_ACTIVE_BUGS + 250 });
+
+    expect(engine.getAllBugs()).toHaveLength(MAX_ACTIVE_BUGS);
+  });
+
+  it("caps spawnBurst by remaining entity capacity", () => {
+    const engine = new Engine(createCanvas(), {
+      height: 200,
+      width: 200,
+    });
+
+    engine.spawnFromCounts({ low: MAX_ACTIVE_BUGS - 2 });
+    engine.spawnBurst({ high: 10 });
+
+    expect(engine.getAllBugs()).toHaveLength(MAX_ACTIVE_BUGS);
+  });
+
+  it("sanitizes invalid snapshot items before spawning", () => {
+    const engine = new Engine(createCanvas(), {
+      height: 200,
+      width: 200,
+    });
+
+    engine.spawnFromSnapshot([
+      {
+        heading: Number.NaN,
+        hp: 999999,
+        maxHp: -5,
+        opacity: 4,
+        size: -10,
+        variant: "not-real" as any,
+        vx: Number.POSITIVE_INFINITY,
+        vy: Number.NEGATIVE_INFINITY,
+        x: Number.NaN,
+        y: Number.NaN,
+      },
+    ]);
+
+    const [bug] = engine.getAllBugs() as BugEntity[];
+
+    expect(bug.variant).toBe("low");
+    expect(bug.maxHp).toBeGreaterThanOrEqual(1);
+    expect(bug.hp).toBeLessThanOrEqual(bug.maxHp);
+    expect(bug.size).toBeGreaterThan(0);
+    expect(Number.isFinite(bug.x)).toBe(true);
+    expect(Number.isFinite(bug.y)).toBe(true);
+    expect(Number.isFinite(bug.vx)).toBe(true);
+    expect(Number.isFinite(bug.vy)).toBe(true);
+  });
+
+  it("preserves movement identity when spawning from transition snapshots", () => {
+    const engine = new Engine(createCanvas(), {
+      height: 200,
+      width: 200,
+    });
+
+    engine.spawnFromSnapshot([
+      {
+        cruiseSpeed: 1.13,
+        fleeTimer: 0.42,
+        hasEnteredField: true,
+        heading: 1.1,
+        hp: 2,
+        maxHp: 3,
+        motionTime: 84,
+        movementMood: "startled",
+        nextRoamTargetDelayMs: 640,
+        opacity: 1,
+        roamTargetGeneration: 7,
+        roamTargetLongPath: true,
+        roamTargetWide: true,
+        roamTargetX: 160,
+        roamTargetY: 70,
+        seed: 0.23,
+        size: 10,
+        state: "flee",
+        turnRate: 1.08,
+        variant: "low",
+        vx: 5,
+        vy: -3,
+        wanderAngle: 2.4,
+        x: 100,
+        y: 120,
+      },
+    ]);
+
+    const [bug] = engine.getAllBugs() as BugEntity[];
+
+    expect(bug.seed).toBeCloseTo(0.23);
+    expect(bug.wanderAngle).toBeCloseTo(2.4);
+    expect(bug.cruiseSpeed).toBeCloseTo(1.13);
+    expect(bug.turnRate).toBeCloseTo(1.08);
+    expect(bug.motionTime).toBeCloseTo(84);
+    expect(bug.roamTargetX).toBe(160);
+    expect(bug.roamTargetY).toBe(70);
+    expect(bug.roamTargetWide).toBe(true);
+    expect(bug.roamTargetLongPath).toBe(true);
+    expect(bug.roamTargetGeneration).toBe(7);
+    expect(bug.movementMood).toBe("startled");
+    expect(bug.state).toBe("flee");
+    expect(bug.fleeTimer).toBeCloseTo(0.42);
+  });
+
+  it("matches live movement after snapshot handoff under the same cursor input", () => {
+    const sourceEngine = new Engine(createCanvas(), {
+      height: 240,
+      width: 320,
+    });
+    const sourceBug = new BugEntity({
+      heading: 0.2,
+      size: 10,
+      variant: "urgent",
+      vx: 24,
+      vy: -6,
+      x: 172,
+      y: 116,
+    });
+
+    sourceEngine.entities = [sourceBug];
+
+    for (let frame = 0; frame < 18; frame += 1) {
+      sourceEngine.update(1 / 60, 190, 120);
+    }
+
+    const [liveBugBeforeHandoff] = sourceEngine.getAllBugs() as BugEntity[];
+    const snapshot: BugTransitionSnapshotItem[] = [
+      {
+        cruiseSpeed: liveBugBeforeHandoff.cruiseSpeed,
+        fleeTimer: liveBugBeforeHandoff.fleeTimer,
+        hasEnteredField: liveBugBeforeHandoff.hasEnteredField,
+        heading: liveBugBeforeHandoff.heading,
+        hp: liveBugBeforeHandoff.hp,
+        maxHp: liveBugBeforeHandoff.maxHp,
+        motionTime: liveBugBeforeHandoff.motionTime,
+        movementMood: liveBugBeforeHandoff.movementMood,
+        nextRoamTargetDelayMs: Math.max(
+          0,
+          liveBugBeforeHandoff.nextRoamTargetAt - performance.now(),
+        ),
+        opacity: liveBugBeforeHandoff.opacity,
+        roamTargetGeneration: liveBugBeforeHandoff.roamTargetGeneration,
+        roamTargetLongPath: liveBugBeforeHandoff.roamTargetLongPath,
+        roamTargetWide: liveBugBeforeHandoff.roamTargetWide,
+        roamTargetX: liveBugBeforeHandoff.roamTargetX,
+        roamTargetY: liveBugBeforeHandoff.roamTargetY,
+        seed: liveBugBeforeHandoff.seed,
+        size: liveBugBeforeHandoff.size,
+        state: liveBugBeforeHandoff.state === "flee" ? "flee" : "patrol",
+        turnRate: liveBugBeforeHandoff.turnRate,
+        variant: liveBugBeforeHandoff.variant,
+        vx: liveBugBeforeHandoff.vx,
+        vy: liveBugBeforeHandoff.vy,
+        wanderAngle: liveBugBeforeHandoff.wanderAngle,
+        x: liveBugBeforeHandoff.x,
+        y: liveBugBeforeHandoff.y,
+      },
+    ];
+
+    const handoffEngine = new Engine(createCanvas(), {
+      height: 240,
+      width: 320,
+    });
+    handoffEngine.spawnFromSnapshot(snapshot);
+
+    for (let frame = 0; frame < 60; frame += 1) {
+      sourceEngine.update(1 / 60, 190, 120);
+      handoffEngine.update(1 / 60, 190, 120);
+    }
+
+    const [liveBugAfterHandoff] = sourceEngine.getAllBugs() as BugEntity[];
+    const [respawnedBug] = handoffEngine.getAllBugs() as BugEntity[];
+
+    expect(respawnedBug.state).toBe(liveBugAfterHandoff.state);
+    expect(respawnedBug.movementMood).toBe(liveBugAfterHandoff.movementMood);
+    expect(respawnedBug.x).toBeCloseTo(liveBugAfterHandoff.x, 5);
+    expect(respawnedBug.y).toBeCloseTo(liveBugAfterHandoff.y, 5);
+    expect(respawnedBug.vx).toBeCloseTo(liveBugAfterHandoff.vx, 5);
+    expect(respawnedBug.vy).toBeCloseTo(liveBugAfterHandoff.vy, 5);
+    expect(respawnedBug.heading).toBeCloseTo(liveBugAfterHandoff.heading, 5);
+  });
+
+  it("keeps aggregate swarm motion aligned after a snapshot handoff", () => {
+    const sourceEngine = new Engine(createCanvas(), {
+      height: 240,
+      width: 320,
+    });
+
+    sourceEngine.spawnFromCounts({ high: 8, low: 14, medium: 10, urgent: 6 });
+
+    for (let frame = 0; frame < 24; frame += 1) {
+      sourceEngine.update(1 / 60, 190, 120);
+    }
+
+    const now = performance.now();
+    const snapshot: BugTransitionSnapshotItem[] = (sourceEngine.getAllBugs() as BugEntity[])
+      .filter((bug) => !isTerminalEntityState(bug.state))
+      .map((bug) => ({
+        cruiseSpeed: bug.cruiseSpeed,
+        fleeTimer: bug.fleeTimer,
+        hasEnteredField: bug.hasEnteredField,
+        heading: bug.heading,
+        hp: bug.hp,
+        maxHp: bug.maxHp,
+        motionTime: bug.motionTime,
+        movementMood: bug.movementMood,
+        nextRoamTargetDelayMs: Math.max(0, bug.nextRoamTargetAt - now),
+        opacity: bug.opacity,
+        roamTargetGeneration: bug.roamTargetGeneration,
+        roamTargetLongPath: bug.roamTargetLongPath,
+        roamTargetWide: bug.roamTargetWide,
+        roamTargetX: bug.roamTargetX,
+        roamTargetY: bug.roamTargetY,
+        seed: bug.seed,
+        size: bug.size,
+        state: bug.state === "flee" ? "flee" : "patrol",
+        turnRate: bug.turnRate,
+        variant: bug.variant,
+        vx: bug.vx,
+        vy: bug.vy,
+        wanderAngle: bug.wanderAngle,
+        x: bug.x,
+        y: bug.y,
+      }));
+
+    const handoffEngine = new Engine(createCanvas(), {
+      height: 240,
+      width: 320,
+    });
+    handoffEngine.spawnFromSnapshot(snapshot);
+
+    for (let frame = 0; frame < 60; frame += 1) {
+      sourceEngine.update(1 / 60, 190, 120);
+      handoffEngine.update(1 / 60, 190, 120);
+    }
+
+    const summarize = (bugs: BugEntity[]) => {
+      const liveBugs = bugs.filter((bug) => !isTerminalEntityState(bug.state));
+      const totalSpeed = liveBugs.reduce(
+        (sum, bug) => sum + Math.hypot(bug.vx, bug.vy),
+        0,
+      );
+      const startledCount = liveBugs.filter(
+        (bug) => bug.movementMood === "startled",
+      ).length;
+      return {
+        count: liveBugs.length,
+        meanSpeed: totalSpeed / Math.max(1, liveBugs.length),
+        startledCount,
+      };
+    };
+
+    const liveSummary = summarize(sourceEngine.getAllBugs() as BugEntity[]);
+    const handoffSummary = summarize(handoffEngine.getAllBugs() as BugEntity[]);
+
+    expect(handoffSummary.count).toBe(liveSummary.count);
+    expect(handoffSummary.startledCount).toBe(liveSummary.startledCount);
+    expect(handoffSummary.meanSpeed).toBeCloseTo(liveSummary.meanSpeed, 4);
+  });
+
+  it("clamps extreme config overrides to safe runtime bounds", () => {
+    const engine = new Engine(createCanvas(), {
+      config: {
+        baseSpeed: 10_000,
+        crowdRepathDelay: -100,
+        separationRadius: 0,
+      },
+      height: 200,
+      width: 200,
+    });
+
+    expect(engine.config.baseSpeed).toBeLessThanOrEqual(DEFAULT_GAME_CONFIG.baseSpeed * 10);
+    expect(engine.config.crowdRepathDelay).toBeGreaterThanOrEqual(0.01);
+    expect(engine.config.separationRadius).toBeGreaterThanOrEqual(0.1);
   });
 });

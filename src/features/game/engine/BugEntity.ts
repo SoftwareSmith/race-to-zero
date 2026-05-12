@@ -1,71 +1,26 @@
 import { Entity } from "./Entity";
 import { drawBugSprite } from "@game/utils/bugSprite";
 import type { SiegeStatusId } from "@game/status/statusCatalog";
-import { STATUS_PRIORITY } from "@game/status/statusCatalog";
 import { DEFAULT_GAME_CONFIG } from "./types";
 import { getCodex, type CrawlProfile, type CrawlRegion, type BugType } from "./bugCodex";
+import {
+  clamp,
+  getAngleDelta,
+  getLength,
+  getNormalizedCrowdScore,
+  normalizeAngle,
+  normalizeVector,
+  perlin1D,
+} from "./bugMotionMath";
+import {
+  clearExpiredStatus,
+  tickBurnStatus,
+  tickDotStatus,
+} from "./bugStatusRuntime";
 import { getWrappedDelta, wrapCoordinate } from "./toroidalMath";
 import { EntityState, isTerminalEntityState } from "../types";
 import type { AllyConversionConfig } from "@game/weapons/runtime/types";
-
-function clamp(value: number, min: number, max: number) {
-  return Math.max(min, Math.min(max, value));
-}
-
-function normalizeAngle(angle: number) {
-  while (angle > Math.PI) angle -= Math.PI * 2;
-  while (angle < -Math.PI) angle += Math.PI * 2;
-  return angle;
-}
-
-function getAngleDelta(from: number, to: number) {
-  return normalizeAngle(to - from);
-}
-
-function getLength(x: number, y: number) {
-  return Math.hypot(x, y);
-}
-
-function normalizeVector(x: number, y: number) {
-  const length = getLength(x, y);
-  if (!length) {
-    return { x: 0, y: 0 };
-  }
-
-  return { x: x / length, y: y / length };
-}
-
-function getNormalizedCrowdScore(score: number, count: number) {
-  if (score <= 0 || count <= 0) {
-    return 0;
-  }
-
-  return score / Math.max(1, Math.sqrt(count) * 0.72);
-}
-
-function fade(t: number) {
-  return t * t * t * (t * (t * 6 - 15) + 10);
-}
-
-function lerp(a: number, b: number, t: number) {
-  return a + (b - a) * t;
-}
-
-function gradient1D(index: number, seed: number) {
-  const hashed = Math.sin(index * 127.1 + seed * 311.7) * 43758.5453123;
-  return (hashed - Math.floor(hashed)) * 2 - 1;
-}
-
-function perlin1D(position: number, seed: number) {
-  const left = Math.floor(position);
-  const right = left + 1;
-  const local = position - left;
-  const leftGradient = gradient1D(left, seed);
-  const rightGradient = gradient1D(right, seed);
-  const leftInfluence = leftGradient * local;
-  const rightInfluence = rightGradient * (local - 1);
-  return lerp(leftInfluence, rightInfluence, fade(local)) * 2;
-}
+import { collectActiveSupportStatuses, isStatusActive } from "./bugStatusState";
 
 type BugState = "patrol" | "flee" | EntityState.Dying | EntityState.Dead;
 type BugMovementMood = "patrol" | "startled";
@@ -73,16 +28,6 @@ type BugMovementMood = "patrol" | "startled";
 const ALLY_CONTACT_DAMAGE = 2;
 const ALLY_CONTACT_COOLDOWN_MS = 260;
 const ALLY_INTERCEPT_RADIUS = 196;
-
-function isStatusActive(
-  status:
-    | { expiresAt: number }
-    | { expiresAt: number; dps: number; accumulatedDmg: number }
-    | null,
-  now: number,
-) {
-  return status !== null && now < status.expiresAt;
-}
 
 interface BugUpdateContext {
   getCrowdingAt?: (
@@ -263,23 +208,21 @@ export class BugEntity extends Entity {
   }
 
   private getActiveSupportStatuses(now: number, finisherStatus?: SiegeStatusId | null) {
-    const statuses: SiegeStatusId[] = [];
-
-    if (this.isAllyActive(now)) statuses.push("ally");
-    if (isStatusActive(this.burn, now)) statuses.push("burn");
-    if (isStatusActive(this.charged, now)) statuses.push("charged");
-    if (isStatusActive(this.ensnare, now)) statuses.push("ensnare");
-    if (isStatusActive(this.slow, now)) statuses.push("freeze");
-    if (isStatusActive(this.looped, now)) statuses.push("looped");
-    if (isStatusActive(this.marked, now)) statuses.push("marked");
-    if (isStatusActive(this.poison, now)) statuses.push("poison");
-    if (isStatusActive(this.unstable, now)) statuses.push("unstable");
-
-    const filtered = finisherStatus
-      ? statuses.filter((status) => status !== finisherStatus)
-      : statuses;
-
-    return STATUS_PRIORITY.filter((status) => filtered.includes(status));
+    return collectActiveSupportStatuses(
+      {
+        ally: this.ally,
+        burn: this.burn,
+        charged: this.charged,
+        ensnare: this.ensnare,
+        looped: this.looped,
+        marked: this.marked,
+        poison: this.poison,
+        slow: this.slow,
+        unstable: this.unstable,
+      },
+      now,
+      finisherStatus,
+    );
   }
 
   private enterDyingState(finisherStatus: SiegeStatusId | null, supportStatuses?: SiegeStatusId[]) {
@@ -1329,18 +1272,19 @@ export class BugEntity extends Entity {
     const speedBoost = this.state === "flee"
       ? (1.4 + cursorFleeMultiplier * 0.75) * cursorSpeedBoost
       : cursorSpeedBoost;
-    // Apply status effects
-    if (this.slow && now >= this.slow.expiresAt) this.slow = null;
-    if (this.ensnare && now >= this.ensnare.expiresAt) this.ensnare = null;
-    if (this.poison && now >= this.poison.expiresAt) this.poison = null;
-    if (this.burn && now >= this.burn.expiresAt) this.burn = null;
-    if (this.charged && now >= this.charged.expiresAt) this.charged = null;
-    if (this.marked && now >= this.marked.expiresAt) this.marked = null;
-    if (this.unstable && now >= this.unstable.expiresAt) this.unstable = null;
-    if (this.looped && now >= this.looped.expiresAt) this.looped = null;
-    if (this.ally && now >= this.ally.expiresAt) {
-      const expireBurstRadius = this.ally.expireBurstRadius;
-      const expireBurstDamage = this.ally.expireBurstDamage;
+    const expiredAlly = this.ally !== null && now >= this.ally.expiresAt ? this.ally : null;
+
+    this.slow = clearExpiredStatus(this.slow, now);
+    this.ensnare = clearExpiredStatus(this.ensnare, now);
+    this.poison = clearExpiredStatus(this.poison, now);
+    this.burn = clearExpiredStatus(this.burn, now);
+    this.charged = clearExpiredStatus(this.charged, now);
+    this.marked = clearExpiredStatus(this.marked, now);
+    this.unstable = clearExpiredStatus(this.unstable, now);
+    this.looped = clearExpiredStatus(this.looped, now);
+    if (expiredAlly) {
+      const expireBurstRadius = expiredAlly.expireBurstRadius;
+      const expireBurstDamage = expiredAlly.expireBurstDamage;
       if (expireBurstRadius > 0 && expireBurstDamage > 0) {
         const burstTargets = ctx
           .getNeighbors(this, Math.max(expireBurstRadius, config.separationRadius * 2))
@@ -1365,37 +1309,23 @@ export class BugEntity extends Entity {
       this.fleeTimer = 0.36;
     }
 
-    // Tick poison DOT damage
-    if (this.poison && !isTerminalEntityState(this.state)) {
-      this.poison.accumulatedDmg += this.poison.dps * dt;
-      if (this.poison.accumulatedDmg >= 1) {
-        const dmgToApply = Math.floor(this.poison.accumulatedDmg);
-        this.poison.accumulatedDmg -= dmgToApply;
-        this.applyIncidentalDamage(dmgToApply, "poison");
+    if (!isTerminalEntityState(this.state)) {
+      const poisonTick = tickDotStatus(this.poison, dt);
+      this.poison = poisonTick.status;
+      if (poisonTick.damage > 0) {
+        this.applyIncidentalDamage(poisonTick.damage, "poison");
       }
-    }
 
-    // Tick burn DOT damage with exponential decay so bugs still burn after leaving flame
-    if (this.burn && !isTerminalEntityState(this.state)) {
-      this.burn.dps *= Math.exp(-this.burn.decayPerSecond * dt);
-      this.burn.accumulatedDmg += this.burn.dps * dt;
-      if (this.burn.accumulatedDmg >= 1) {
-        const dmgToApply = Math.floor(this.burn.accumulatedDmg);
-        this.burn.accumulatedDmg -= dmgToApply;
-        this.applyIncidentalDamage(dmgToApply, "burn");
+      const burnTick = tickBurnStatus(this.burn, dt);
+      this.burn = burnTick.status;
+      if (burnTick.damage > 0) {
+        this.applyIncidentalDamage(burnTick.damage, "burn");
       }
-      if (this.burn && this.burn.dps < 0.05) {
-        this.burn = null;
-      }
-    }
 
-    // Tick looped echo DOT damage
-    if (this.looped && !isTerminalEntityState(this.state)) {
-      this.looped.accumulatedDmg += this.looped.dps * dt;
-      if (this.looped.accumulatedDmg >= 1) {
-        const dmgToApply = Math.floor(this.looped.accumulatedDmg);
-        this.looped.accumulatedDmg -= dmgToApply;
-        this.applyIncidentalDamage(dmgToApply, "looped");
+      const loopedTick = tickDotStatus(this.looped, dt);
+      this.looped = loopedTick.status;
+      if (loopedTick.damage > 0) {
+        this.applyIncidentalDamage(loopedTick.damage, "looped");
       }
     }
 

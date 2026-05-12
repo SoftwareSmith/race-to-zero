@@ -24,6 +24,7 @@ describe("weapon executor", () => {
       bounds: { height: 300, left: 10, top: 20, width: 300 },
       canvas: null,
       engine: {
+        getFieldSize: vi.fn(() => ({ height: 300, width: 300 })),
         handleHit,
         getAllBugs: vi.fn(() => [{ x: 100, y: 120, variant: "low" }]),
         hitTest: vi.fn(),
@@ -81,6 +82,7 @@ describe("weapon executor", () => {
       bounds: { height: 300, left: 10, top: 20, width: 300 },
       canvas: null,
       engine: {
+        getFieldSize: vi.fn(() => ({ height: 300, width: 300 })),
         handleHit,
         getAllBugs: vi.fn(() => [{ x: 100, y: 120, variant: "low" }]),
         hitTest: vi.fn(),

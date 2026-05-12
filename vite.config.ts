@@ -25,6 +25,14 @@ export default defineConfig({
       },
       output: {
         manualChunks(id) {
+          if (id.includes("/src/features/dashboard/") || id.includes("/src/features/app/DashboardShell.tsx")) {
+            return "dashboard-core";
+          }
+
+          if (id.includes("/src/features/game/engine/VfxEngine.ts") || id.includes("/src/features/game/components/VfxCanvas.tsx")) {
+            return "siege-vfx-core";
+          }
+
           if (
             id.includes("chart.js") ||
             id.includes("chartjs-plugin-datalabels") ||
@@ -34,7 +42,7 @@ export default defineConfig({
           }
 
           if (id.includes("pixi.js")) {
-            return "siege-vfx";
+            return "pixi-vendor";
           }
 
           if (id.includes("react") || id.includes("scheduler")) {

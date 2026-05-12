@@ -15,6 +15,18 @@ import {
   getWrappedDistance,
   wrapCoordinate,
 } from "./toroidalMath";
+import {
+  EntitySpatialIndex,
+  getEntityDelta,
+  getEntityDeltaFromPoint,
+  isToroidalEntity as isToroidalFieldEntity,
+} from "./spatialIndex";
+import {
+  MAX_ACTIVE_BUGS,
+  normalizeSpawnCounts,
+  sanitizeGameConfig,
+  sanitizeSnapshotItems,
+} from "./runtimeSafety";
 import type {
   BugTransitionSnapshotItem,
   QaBugTelemetryItem,
@@ -54,8 +66,6 @@ function clamp(value: number, min: number, max: number) {
 function fract(value: number) {
   return value - Math.floor(value);
 }
-
-type SpatialCell = Entity[];
 
 interface BugUpdateContextLike {
   bounds: {
@@ -98,20 +108,6 @@ export interface EngineOptions {
       supportStatuses?: SiegeStatusId[];
     },
   ) => void;
-  /** Called when a structure kills a bug — counts toward the player kill tally */
-  onStructureKill?: (structureId: string, x: number, y: number, variant: string) => void;
-  /** Called when the agent starts/finishes/fails absorbing a bug */
-  onAgentAbsorb?: (data: {
-    structureId: string;
-    phase: "absorbing" | "pulling" | "done" | "failed";
-    variant: string;
-    bugX: number;
-    bugY: number;
-    /** Agent canvas position (for lasso VFX during pull phase) */
-    srcX?: number;
-    srcY?: number;
-    processingMs?: number;
-  }) => void;
   /** Called whenever a weapon evolves to a new tier */
   onWeaponEvolution?: (weaponId: SiegeWeaponId, newTier: WeaponTier) => void;
   /** Initial evolution states loaded from localStorage */
@@ -148,17 +144,6 @@ export class Engine {
       supportStatuses?: SiegeStatusId[];
     },
   ) => void;
-  onStructureKill?: (structureId: string, x: number, y: number, variant: string) => void;
-  onAgentAbsorb?: (data: {
-    structureId: string;
-    phase: "absorbing" | "pulling" | "done" | "failed";
-    variant: string;
-    bugX: number;
-    bugY: number;
-    srcX?: number;
-    srcY?: number;
-    processingMs?: number;
-  }) => void;
   private structures: StructureEntry[] = [];
   private elapsedMs = 0;
   private onPerformanceSample?: (sample: EnginePerformanceSample) => void;
@@ -174,13 +159,10 @@ export class Engine {
     expiresAt: number;
     weaponId?: SiegeWeaponId;
   }> = [];
-  private spatialGrid = new Map<string, SpatialCell>();
-  private spatialBucketPool: SpatialCell[] = [];
-  private activeSpatialBuckets: SpatialCell[] = [];
-  private spatialCellSize = Math.max(
+  private spatialIndex = new EntitySpatialIndex(Math.max(
     DEFAULT_GAME_CONFIG.separationRadius * 2,
     56,
-  );
+  ));
 
   /**
    * Black hole state for Void Pulse.
@@ -207,11 +189,10 @@ export class Engine {
     this.ctx = ctx;
     this.width = opts.width ?? canvas.clientWidth;
     this.height = opts.height ?? canvas.clientHeight;
-    this.config = { ...DEFAULT_GAME_CONFIG, ...(opts.config ?? {}) };
+    this.config = sanitizeGameConfig(opts.config);
+    this.spatialIndex.setBounds(this.width, this.height);
     this.onPerformanceSample = opts.onPerformanceSample;
     this.onEntityDeath = opts.onEntityDeath;
-    this.onStructureKill = opts.onStructureKill;
-    this.onAgentAbsorb = opts.onAgentAbsorb;
     this.onWeaponEvolution = opts.onWeaponEvolution;
     this.maxWeaponTier = opts.maxWeaponTier ?? WeaponTier.TIER_THREE;
     this.weaponEvolutionStates = new Map(
@@ -265,45 +246,15 @@ export class Engine {
   setSize(w: number, h: number) {
     this.width = w;
     this.height = h;
-  }
-
-  private getSpatialKey(cellX: number, cellY: number): string {
-    return `${cellX}:${cellY}`;
+    this.spatialIndex.setBounds(w, h);
   }
 
   private isToroidalEntity(entity: Entity | null | undefined): boolean {
-    return Boolean(entity && "hasEnteredField" in entity && (entity as BugEntity).hasEnteredField);
-  }
-
-  private getSpatialColumnCount(): number {
-    return Math.max(1, Math.ceil(this.width / this.spatialCellSize));
-  }
-
-  private getSpatialRowCount(): number {
-    return Math.max(1, Math.ceil(this.height / this.spatialCellSize));
-  }
-
-  private getWrappedCellIndex(index: number, count: number): number {
-    if (count <= 0) {
-      return index;
-    }
-
-    const wrapped = index % count;
-    return wrapped < 0 ? wrapped + count : wrapped;
+    return isToroidalFieldEntity(entity);
   }
 
   private getEntityDeltaFromPoint(x: number, y: number, entity: Entity) {
-    if (this.isToroidalEntity(entity)) {
-      return {
-        dx: getWrappedDelta(x, entity.x, this.width),
-        dy: getWrappedDelta(y, entity.y, this.height),
-      };
-    }
-
-    return {
-      dx: entity.x - x,
-      dy: entity.y - y,
-    };
+    return getEntityDeltaFromPoint(x, y, entity, this.width, this.height);
   }
 
   private getPointNearEntity(x: number, y: number, entity: Entity) {
@@ -315,17 +266,7 @@ export class Engine {
   }
 
   private getEntityDelta(a: Entity, b: Entity) {
-    if (this.isToroidalEntity(a) && this.isToroidalEntity(b)) {
-      return {
-        dx: getWrappedDelta(a.x, b.x, this.width),
-        dy: getWrappedDelta(a.y, b.y, this.height),
-      };
-    }
-
-    return {
-      dx: b.x - a.x,
-      dy: b.y - a.y,
-    };
+    return getEntityDelta(a, b, this.width, this.height);
   }
 
   private getDistanceFromPointToEntity(x: number, y: number, entity: Entity) {
@@ -333,95 +274,11 @@ export class Engine {
     return Math.hypot(dx, dy);
   }
 
-  private rebuildSpatialGrid(): void {
-    for (const bucket of this.activeSpatialBuckets) {
-      bucket.length = 0;
-      this.spatialBucketPool.push(bucket);
-    }
-
-    this.activeSpatialBuckets.length = 0;
-    this.spatialGrid.clear();
-
-    const columnCount = this.getSpatialColumnCount();
-    const rowCount = this.getSpatialRowCount();
-
-    for (const entity of this.entities) {
-      if (isTerminalEntityState((entity as any).state)) {
-        continue;
-      }
-
-      const entityX = this.isToroidalEntity(entity)
-        ? wrapCoordinate(entity.x, this.width)
-        : entity.x;
-      const entityY = this.isToroidalEntity(entity)
-        ? wrapCoordinate(entity.y, this.height)
-        : entity.y;
-      const cellX = this.isToroidalEntity(entity)
-        ? this.getWrappedCellIndex(Math.floor(entityX / this.spatialCellSize), columnCount)
-        : Math.floor(entityX / this.spatialCellSize);
-      const cellY = this.isToroidalEntity(entity)
-        ? this.getWrappedCellIndex(Math.floor(entityY / this.spatialCellSize), rowCount)
-        : Math.floor(entityY / this.spatialCellSize);
-      const key = this.getSpatialKey(cellX, cellY);
-      const bucket = this.spatialGrid.get(key);
-      if (bucket) {
-        bucket.push(entity);
-        continue;
-      }
-
-      const nextBucket = this.spatialBucketPool.pop() ?? [];
-      nextBucket.push(entity);
-      this.spatialGrid.set(key, nextBucket);
-      this.activeSpatialBuckets.push(nextBucket);
-    }
-  }
-
-  private forEachSpatialCandidate(
-    x: number,
-    y: number,
-    radius: number,
-    useToroidal: boolean,
-    visit: (entity: Entity) => void,
-  ): void {
-    const minCellX = Math.floor((x - radius) / this.spatialCellSize);
-    const maxCellX = Math.floor((x + radius) / this.spatialCellSize);
-    const minCellY = Math.floor((y - radius) / this.spatialCellSize);
-    const maxCellY = Math.floor((y + radius) / this.spatialCellSize);
-
-    const columnCount = this.getSpatialColumnCount();
-    const rowCount = this.getSpatialRowCount();
-    const visitedKeys = useToroidal ? new Set<string>() : null;
-
-    for (let cellY = minCellY; cellY <= maxCellY; cellY += 1) {
-      for (let cellX = minCellX; cellX <= maxCellX; cellX += 1) {
-        const lookupCellX = useToroidal
-          ? this.getWrappedCellIndex(cellX, columnCount)
-          : cellX;
-        const lookupCellY = useToroidal
-          ? this.getWrappedCellIndex(cellY, rowCount)
-          : cellY;
-        const key = this.getSpatialKey(lookupCellX, lookupCellY);
-        if (visitedKeys?.has(key)) {
-          continue;
-        }
-        visitedKeys?.add(key);
-
-        const bucket = this.spatialGrid.get(key);
-        if (!bucket?.length) {
-          continue;
-        }
-
-        for (let index = 0; index < bucket.length; index += 1) {
-          visit(bucket[index]);
-        }
-      }
-    }
-  }
-
   spawnFromCounts(
     counts: Record<string, number>,
     spawnZones: SpawnZone[] = [],
   ) {
+    const normalizedCounts = normalizeSpawnCounts(counts, MAX_ACTIVE_BUGS);
     const usableZones = spawnZones.filter(
       (zone) => zone.width > 24 && zone.height > 24,
     );
@@ -468,9 +325,9 @@ export class Engine {
 
     // reuse pool when possible
     this.entities = [];
-    const variants = Object.keys(counts);
+    const variants = Object.keys(normalizedCounts);
     for (const v of variants) {
-      const n = counts[v] ?? 0;
+      const n = normalizedCounts[v] ?? 0;
       for (let i = 0; i < n; i++) {
         let be: BugEntity | undefined = undefined;
         // spawn uniformly across the canvas with random initial headings
@@ -546,15 +403,17 @@ export class Engine {
 
   spawnBurst(counts: Record<string, number>, spawnZones: SpawnZone[] = []) {
     void spawnZones;
-    const variants = Object.keys(counts);
+    const remainingCapacity = Math.max(0, MAX_ACTIVE_BUGS - this.entities.length);
+    const normalizedCounts = normalizeSpawnCounts(counts, remainingCapacity);
+    const variants = Object.keys(normalizedCounts);
     const totalCount = variants.reduce(
-      (total, variant) => total + Math.max(0, counts[variant] ?? 0),
+      (total, variant) => total + Math.max(0, normalizedCounts[variant] ?? 0),
       0,
     );
     let spawnIndex = 0;
 
     for (const variant of variants) {
-      const count = counts[variant] ?? 0;
+      const count = normalizedCounts[variant] ?? 0;
       for (let index = 0; index < count; index += 1) {
         const spawnPoint = this.getEdgeSpawnPoint(spawnIndex, totalCount);
         const targetX = this.width * (0.18 + Math.random() * 0.64);
@@ -602,9 +461,16 @@ export class Engine {
   }
 
   spawnFromSnapshot(snapshot: BugTransitionSnapshotItem[]) {
+    const sanitizedSnapshot = sanitizeSnapshotItems(
+      snapshot,
+      this.width,
+      this.height,
+      MAX_ACTIVE_BUGS,
+    );
     this.entities = [];
+    const now = performance.now();
 
-    for (const item of snapshot) {
+    for (const item of sanitizedSnapshot) {
       let bug = this.pool.pop();
 
       if (bug) {
@@ -620,8 +486,6 @@ export class Engine {
         bug.vy = item.vy;
         bug.heading = item.heading;
         bug.opacity = item.opacity;
-        bug.hasEnteredField =
-          item.x >= 0 && item.x <= this.width && item.y >= 0 && item.y <= this.height;
       } else {
         bug = new BugEntity({
           heading: item.heading,
@@ -636,9 +500,25 @@ export class Engine {
         bug.baseSize = item.size;
         bug.maxHp = item.maxHp;
         bug.hp = item.hp;
-        bug.hasEnteredField =
-          item.x >= 0 && item.x <= this.width && item.y >= 0 && item.y <= this.height;
       }
+
+      bug.seed = item.seed ?? bug.seed;
+      bug.wanderAngle = item.wanderAngle ?? bug.wanderAngle;
+      bug.cruiseSpeed = item.cruiseSpeed ?? bug.cruiseSpeed;
+      bug.turnRate = item.turnRate ?? bug.turnRate;
+      bug.motionTime = item.motionTime ?? bug.motionTime;
+      bug.roamTargetX = item.roamTargetX ?? null;
+      bug.roamTargetY = item.roamTargetY ?? null;
+      bug.roamTargetWide = item.roamTargetWide === true;
+      bug.roamTargetLongPath = item.roamTargetLongPath === true;
+      bug.nextRoamTargetAt = now + (item.nextRoamTargetDelayMs ?? 0);
+      bug.roamTargetGeneration = item.roamTargetGeneration ?? 0;
+      bug.movementMood = item.movementMood === "startled" ? "startled" : "patrol";
+      bug.state = item.state === "flee" ? "flee" : "patrol";
+      bug.fleeTimer = item.state === "flee" ? (item.fleeTimer ?? 0) : null;
+      bug.hasEnteredField =
+        item.hasEnteredField ??
+        (item.x >= 0 && item.x <= this.width && item.y >= 0 && item.y <= this.height);
 
       this.entities.push(bug);
     }
@@ -781,56 +661,11 @@ export class Engine {
   }
 
   getNeighbors(e: Entity, radius: number) {
-    const r2 = radius * radius;
-    const out: Entity[] = [];
-    this.forEachSpatialCandidate(e.x, e.y, radius, this.isToroidalEntity(e), (o) => {
-      if (o === e) return;
-      const { dx, dy } = this.getEntityDelta(e, o);
-      if (dx * dx + dy * dy <= r2) out.push(o);
-    });
-    return out;
+    return this.spatialIndex.getNeighbors(e, radius);
   }
 
   getCrowdingAt(x: number, y: number, radius: number, exclude?: Entity) {
-    const r2 = radius * radius;
-    let count = 0;
-    let weightedCount = 0;
-    let centerX = 0;
-    let centerY = 0;
-
-    const useToroidal = this.isToroidalEntity(exclude);
-
-    this.forEachSpatialCandidate(x, y, radius, useToroidal, (entity) => {
-      if (entity === exclude) return;
-      const { dx, dy } = useToroidal
-        ? {
-            dx: getWrappedDelta(x, entity.x, this.width),
-            dy: getWrappedDelta(y, entity.y, this.height),
-          }
-        : {
-            dx: entity.x - x,
-            dy: entity.y - y,
-          };
-      const distanceSquared = dx * dx + dy * dy;
-      if (distanceSquared > r2) return;
-
-      const distance = Math.max(1, Math.sqrt(distanceSquared));
-      const weight = 1 - distance / radius;
-      count += 1;
-      weightedCount += weight;
-      centerX += (x + dx) * weight;
-      centerY += (y + dy) * weight;
-    });
-
-    const averagedCenterX = weightedCount > 0 ? centerX / weightedCount : x;
-    const averagedCenterY = weightedCount > 0 ? centerY / weightedCount : y;
-
-    return {
-      centerX: useToroidal ? wrapCoordinate(averagedCenterX, this.width) : averagedCenterX,
-      centerY: useToroidal ? wrapCoordinate(averagedCenterY, this.height) : averagedCenterY,
-      count,
-      score: weightedCount,
-    };
+    return this.spatialIndex.getCrowdingAt(x, y, radius, exclude);
   }
 
   update(dt: number, targetX?: number | null, targetY?: number | null) {
@@ -845,7 +680,7 @@ export class Engine {
     const spatialGridStartedAt = this.onPerformanceSample
       ? performance.now()
       : 0;
-    this.rebuildSpatialGrid();
+    this.spatialIndex.rebuild(this.entities);
     const spatialGridMs = this.onPerformanceSample
       ? performance.now() - spatialGridStartedAt
       : 0;

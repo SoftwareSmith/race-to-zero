@@ -76,6 +76,8 @@ const AmbientBackgroundHarness = memo(
         () => ({
           captureTransitionSnapshot: () =>
             backgroundFieldRef.current?.captureTransitionSnapshot() ?? [],
+          detachTransitionSwarm: () =>
+            backgroundFieldRef.current?.detachTransitionSwarm() ?? null,
         }),
         [],
       );

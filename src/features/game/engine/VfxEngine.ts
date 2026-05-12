@@ -8,6 +8,8 @@
  *  - Lightning graphics: live-redrawn per-frame with noise displacement
  */
 
+import "pixi.js/unsafe-eval";
+
 import {
   Application,
   Container,

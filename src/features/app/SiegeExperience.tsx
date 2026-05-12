@@ -22,6 +22,7 @@ import type { SiegePhase, SiegeWeaponId, WeaponTier } from "@game/types";
 import { triggerNamedShake } from "@game/utils/screenShake";
 import { getWeaponTierTitle } from "@game/weapons/progression";
 import type { BugTransitionSnapshotItem } from "@game/components/BackgroundField/types";
+import type { Engine } from "@game/engine/Engine";
 
 interface SiegeExperienceProps {
   dashboardRef: RefObject<HTMLDivElement | null>;
@@ -31,6 +32,7 @@ interface SiegeExperienceProps {
   }) => void;
   startRequestId: number;
   transitionSnapshot?: BugTransitionSnapshotItem[] | null;
+  transitionSwarm?: Engine | null;
 }
 
 const SiegeExperience = memo(function SiegeExperience({
@@ -38,6 +40,7 @@ const SiegeExperience = memo(function SiegeExperience({
   onShellStateChange,
   startRequestId,
   transitionSnapshot = null,
+  transitionSwarm = null,
 }: SiegeExperienceProps) {
   const metrics = useDashboardMetrics();
   const settings = useDashboardSettings();
@@ -232,6 +235,7 @@ const SiegeExperience = memo(function SiegeExperience({
           }
           tone={metrics.deadlineMetrics.statusTone}
           transitionSnapshot={transitionSnapshot}
+          transitionSwarm={transitionSwarm}
         />
       ) : null}
       {siegeGame.siegePhase === "entering" ? (

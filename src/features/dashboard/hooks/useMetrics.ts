@@ -3,6 +3,31 @@ import type { MetricsSource } from "../../../types/dashboard";
 import { isStoredRecord } from "@shared/utils/storage";
 
 const METRICS_PATH = `${import.meta.env.BASE_URL}data/metrics.json`;
+const MAX_METRICS_RESPONSE_CHARS = 8_000_000;
+const MAX_METRICS_BUG_COUNT = 100_000;
+
+function parseMetricsPayload(rawValue: string) {
+  if (rawValue.length > MAX_METRICS_RESPONSE_CHARS) {
+    throw new Error("Metrics payload is too large to load safely");
+  }
+
+  let parsedValue: unknown;
+  try {
+    parsedValue = JSON.parse(rawValue);
+  } catch {
+    throw new Error("Metrics payload is not valid JSON");
+  }
+
+  if (!isMetricsSource(parsedValue)) {
+    throw new Error("Metrics payload has an unexpected shape");
+  }
+
+  if (parsedValue.bugs && parsedValue.bugs.length > MAX_METRICS_BUG_COUNT) {
+    throw new Error("Metrics payload exceeds the supported bug record limit");
+  }
+
+  return parsedValue;
+}
 
 function isMetricsSource(value: unknown): value is MetricsSource {
   if (!isStoredRecord(value)) {
@@ -22,6 +47,10 @@ function isMetricsSource(value: unknown): value is MetricsSource {
   }
 
   if (!Array.isArray(value.bugs)) {
+    return false;
+  }
+
+  if (value.bugs.length > MAX_METRICS_BUG_COUNT) {
     return false;
   }
 
@@ -80,11 +109,17 @@ export function useMetrics() {
           throw new Error(`Failed to load metrics (${response.status})`);
         }
 
-        const nextMetrics: unknown = await response.json();
-
-        if (!isMetricsSource(nextMetrics)) {
-          throw new Error("Metrics payload has an unexpected shape");
+        const contentLengthHeader = response.headers.get("content-length");
+        const declaredLength = contentLengthHeader ? Number(contentLengthHeader) : 0;
+        if (
+          Number.isFinite(declaredLength) &&
+          declaredLength > MAX_METRICS_RESPONSE_CHARS
+        ) {
+          throw new Error("Metrics payload is too large to load safely");
         }
+
+        const rawMetrics = await response.text();
+        const nextMetrics = parseMetricsPayload(rawMetrics);
 
         setMetrics(nextMetrics);
         setError("");

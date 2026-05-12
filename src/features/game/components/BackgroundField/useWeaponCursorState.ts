@@ -2,11 +2,15 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { WeaponTier } from "@game/types";
 import { triggerNamedShake } from "@game/utils/screenShake";
 
+const SHARED_POINTER_POSITION = { x: 0, y: 0 };
+
 export function useWeaponCursorState(interactiveMode: boolean) {
-  const hammerPositionRef = useRef({ x: 0, y: 0 });
+  const hammerPositionRef = useRef({ ...SHARED_POINTER_POSITION });
   const [hammerSwing, setHammerSwing] = useState(false);
 
   const setCursorPosition = useCallback((x: number, y: number) => {
+    SHARED_POINTER_POSITION.x = x;
+    SHARED_POINTER_POSITION.y = y;
     hammerPositionRef.current = { x, y };
   }, []);
 

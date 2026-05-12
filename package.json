@@ -5,8 +5,10 @@
   "type": "module",
   "homepage": "https://SoftwareSmith.github.io/race-to-zero/",
   "scripts": {
+    "check:build-sizes": "tsx scripts/check-build-sizes.ts",
     "dev": "vite",
     "build": "vite build",
+    "build:guard": "npm run build && npm run check:build-sizes",
     "lint": "node --import tsx ./node_modules/eslint/bin/eslint.js .",
     "prettier": "prettier --write .",
     "prettier:check": "prettier --check .",

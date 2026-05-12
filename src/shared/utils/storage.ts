@@ -4,6 +4,9 @@ type StorageParser<T> = (rawValue: string) => T | null;
 type StorageSerializer<T> = (value: T) => string;
 type StorageValidator<T> = (value: unknown) => value is T;
 
+const MAX_STORED_VALUE_CHARS = 1_000_000;
+const UNSAFE_OBJECT_KEYS = new Set(["__proto__", "constructor", "prototype"]);
+
 function isBrowserEnvironment() {
   return typeof window !== "undefined";
 }
@@ -17,7 +20,12 @@ export function readStorageValue<T>(
     return fallbackValue;
   }
 
-  const rawValue = window.localStorage.getItem(key);
+  let rawValue: string | null = null;
+  try {
+    rawValue = window.localStorage.getItem(key);
+  } catch {
+    return fallbackValue;
+  }
   if (rawValue == null) {
     return fallbackValue;
   }
@@ -32,10 +40,27 @@ export function setStorageValue<T>(
   serializer: StorageSerializer<T>,
 ) {
   if (!isBrowserEnvironment()) {
-    return;
+    return false;
   }
 
-  window.localStorage.setItem(key, serializer(value));
+  let serializedValue = "";
+
+  try {
+    serializedValue = serializer(value);
+  } catch {
+    return false;
+  }
+
+  if (serializedValue.length > MAX_STORED_VALUE_CHARS) {
+    return false;
+  }
+
+  try {
+    window.localStorage.setItem(key, serializedValue);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 export function parseStoredString(rawValue: string) {
@@ -45,7 +70,16 @@ export function parseStoredString(rawValue: string) {
 export function isStoredRecord(
   value: unknown,
 ): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    return false;
+  }
+
+  const prototype = Object.getPrototypeOf(value);
+  if (prototype !== Object.prototype && prototype !== null) {
+    return false;
+  }
+
+  return Object.keys(value).every((key) => !UNSAFE_OBJECT_KEYS.has(key));
 }
 
 export function createStoredJsonParser<T>(
@@ -85,6 +119,19 @@ export function parseStoredPositiveNumber(rawValue: string) {
   }
 
   return numericValue;
+}
+
+export function parseStoredNumberInRange(
+  rawValue: string,
+  min: number,
+  max: number,
+) {
+  const numericValue = Number(rawValue);
+  if (!Number.isFinite(numericValue)) {
+    return null;
+  }
+
+  return Math.min(max, Math.max(min, numericValue));
 }
 
 export function serializeStoredValue<T>(value: T) {

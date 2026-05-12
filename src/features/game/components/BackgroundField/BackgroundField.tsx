@@ -40,6 +40,7 @@ import type {
   BugHitPayload,
   BugTransitionSnapshotItem,
 } from "./types";
+import type { Engine } from "@game/engine/Engine";
 import { getSplatClassName } from "./splat";
 import { getBackgroundSceneConfig } from "./sceneConfig";
 import { useWeaponCursorState } from "./useWeaponCursorState";
@@ -90,6 +91,7 @@ interface BackgroundFieldProps {
     Record<SiegeWeaponId, import("@game/types").WeaponEvolutionState>
   >;
   transitionSnapshot?: BugTransitionSnapshotItem[] | null;
+  transitionSwarm?: Engine | null;
 }
 
 const BackgroundField = memo(
@@ -124,6 +126,7 @@ const BackgroundField = memo(
         onLiveBugCountChange,
         initialEvolutionStates,
         transitionSnapshot = null,
+        transitionSwarm = null,
       }: BackgroundFieldProps,
       ref,
     ) {
@@ -172,6 +175,8 @@ const BackgroundField = memo(
         () => ({
           captureTransitionSnapshot: () =>
             bugCanvasRef.current?.captureTransitionSnapshot() ?? [],
+          detachTransitionSwarm: () =>
+            bugCanvasRef.current?.detachTransitionSwarm() ?? null,
         }),
         [],
       );
@@ -320,6 +325,7 @@ const BackgroundField = memo(
             onWeaponEvolution={onWeaponEvolution}
             initialEvolutionStates={initialEvolutionStates}
             transitionSnapshot={transitionSnapshot}
+            transitionSwarm={transitionSwarm}
           />
           {effectiveBugCount === 0 ? (
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_35%,rgba(187,247,208,0.12),transparent_28%),radial-gradient(circle_at_60%_68%,rgba(125,211,252,0.08),transparent_34%)] [animation:all-clear-breathe_6s_ease-in-out_infinite]" />
