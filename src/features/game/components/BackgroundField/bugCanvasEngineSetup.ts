@@ -87,6 +87,7 @@ export interface SetupBugCanvasEngineOptions {
   onLiveBugCountChange?: (count: number) => void;
   reseedSpeedMultiplier: number;
   syncWeaponEvolutionStates: () => void;
+  consumeTransitionSwarm?: () => Engine | null;
   transitionSnapshot?: BugTransitionSnapshotItem[] | null;
   transitionSwarm?: Engine | null;
   width: number;
@@ -104,8 +105,11 @@ export async function setupBugCanvasEngine(
   const physicsAdapter = await createPreferredPhysicsAdapter(options.interactiveMode);
   options.notifyPhysicsBackendChange?.(physicsAdapter.id);
 
-  if (options.transitionSwarm) {
-    const engine = options.transitionSwarm;
+  const transitionSwarm =
+    options.consumeTransitionSwarm?.() ?? options.transitionSwarm ?? null;
+
+  if (transitionSwarm) {
+    const engine = transitionSwarm;
 
     engine.canvas = options.canvas;
     const context = options.canvas.getContext("2d", { alpha: true });

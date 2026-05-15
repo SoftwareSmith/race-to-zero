@@ -33,10 +33,7 @@ import type {
   BugTransitionSnapshotItem,
   RenderedBugPosition,
 } from "./types";
-import {
-  type CanvasBounds,
-  type ReseedInfo,
-} from "./canvasState";
+import { type CanvasBounds, type ReseedInfo } from "./canvasState";
 import {
   clearBugCanvasQaBindings,
   installBugCanvasQaBindings,
@@ -133,8 +130,8 @@ export interface BugCanvasProps {
   initialEvolutionStates?: Partial<
     Record<SiegeWeaponId, import("@game/types").WeaponEvolutionState>
   >;
+  consumeTransitionSwarm?: () => Engine | null;
   transitionSnapshot?: BugTransitionSnapshotItem[] | null;
-  transitionSwarm?: Engine | null;
 }
 
 const BugCanvas = memo(
@@ -170,8 +167,8 @@ const BugCanvas = memo(
       onLiveBugCountChange,
       onPhysicsBackendChange,
       initialEvolutionStates,
+      consumeTransitionSwarm,
       transitionSnapshot = null,
-      transitionSwarm = null,
     }: BugCanvasProps,
     ref,
   ) {
@@ -194,8 +191,8 @@ const BugCanvas = memo(
     const onPhysicsBackendChangeRef = useRef(onPhysicsBackendChange);
     const gameConfigRef = useRef(gameConfig);
     const initialEvolutionStatesRef = useRef(initialEvolutionStates);
+    const consumeTransitionSwarmRef = useRef(consumeTransitionSwarm);
     const transitionSnapshotRef = useRef(transitionSnapshot);
-    const transitionSwarmRef = useRef<Engine | null>(transitionSwarm);
     const vfxRef = useRef<VfxEngine | null>(null);
     const blackHoleVfxIdRef = useRef<string | null>(null);
     const streakMultiplierRef = useRef(streakMultiplier);
@@ -251,7 +248,9 @@ const BugCanvas = memo(
             .filter((bug) => !isTerminalEntityState(bug.state))
             .map((bug) => ({
               cruiseSpeed:
-                typeof bug.cruiseSpeed === "number" ? bug.cruiseSpeed : undefined,
+                typeof bug.cruiseSpeed === "number"
+                  ? bug.cruiseSpeed
+                  : undefined,
               fleeTimer:
                 typeof bug.fleeTimer === "number" ? bug.fleeTimer : null,
               hasEnteredField: bug.hasEnteredField === true,
@@ -270,6 +269,8 @@ const BugCanvas = memo(
                   ? Math.max(0, bug.nextRoamTargetAt - performance.now())
                   : undefined,
               opacity: bug.opacity ?? 1,
+              prevX: typeof bug.prevX === "number" ? bug.prevX : bug.x,
+              prevY: typeof bug.prevY === "number" ? bug.prevY : bug.y,
               roamTargetGeneration:
                 typeof bug.roamTargetGeneration === "number"
                   ? bug.roamTargetGeneration
@@ -289,7 +290,9 @@ const BugCanvas = memo(
               vx: bug.vx ?? 0,
               vy: bug.vy ?? 0,
               wanderAngle:
-                typeof bug.wanderAngle === "number" ? bug.wanderAngle : undefined,
+                typeof bug.wanderAngle === "number"
+                  ? bug.wanderAngle
+                  : undefined,
               x: bug.x,
               y: bug.y,
             }));
@@ -320,8 +323,8 @@ const BugCanvas = memo(
       onPhysicsBackendChangeRef.current = onPhysicsBackendChange;
       gameConfigRef.current = gameConfig;
       initialEvolutionStatesRef.current = initialEvolutionStates;
+      consumeTransitionSwarmRef.current = consumeTransitionSwarm;
       transitionSnapshotRef.current = transitionSnapshot;
-      transitionSwarmRef.current = transitionSwarm;
       streakMultiplierRef.current = streakMultiplier;
       motionProfileRef.current = motionProfile;
       sceneProfileRef.current = sceneProfile;
@@ -359,6 +362,7 @@ const BugCanvas = memo(
       siegeZones,
       streakMultiplier,
       transitionSnapshot,
+      consumeTransitionSwarm,
       interactiveMode,
       gamePaused,
     ]);
@@ -461,8 +465,9 @@ const BugCanvas = memo(
           onLiveBugCountChange: onLiveBugCountChangeRef.current ?? undefined,
           reseedSpeedMultiplier: targetSettingsRef.current.speedMultiplier,
           syncWeaponEvolutionStates,
+          consumeTransitionSwarm: () =>
+            consumeTransitionSwarmRef.current?.() ?? null,
           transitionSnapshot: transitionSnapshotRef.current,
-          transitionSwarm: transitionSwarmRef.current,
           width: w,
         });
         if (cancelled) {
@@ -471,9 +476,6 @@ const BugCanvas = memo(
         }
 
         swarmRef.current = result.engine;
-        if (transitionSwarmRef.current === result.engine) {
-          transitionSwarmRef.current = null;
-        }
         disposePhysicsAdapter = () => result.physicsAdapter.dispose?.();
         installBugCanvasQaBindings({
           bounds: boundsRef.current,
@@ -571,7 +573,9 @@ const BugCanvas = memo(
         latestBugPositionsRef,
         lastReportedLiveBugCountRef,
         onLiveBugCountChange: onLiveBugCountChangeRef.current,
-        swarm: swarmRef.current as (Engine & { clearAllBugs?: () => number }) | null,
+        swarm: swarmRef.current as
+          | (Engine & { clearAllBugs?: () => number })
+          | null,
       });
     }, [clearSwarmRequestId, interactiveMode]);
 

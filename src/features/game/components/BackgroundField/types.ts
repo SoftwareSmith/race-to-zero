@@ -12,6 +12,8 @@ export interface BugTransitionSnapshotItem {
   movementMood?: "patrol" | "startled";
   nextRoamTargetDelayMs?: number;
   opacity: number;
+  prevX?: number;
+  prevY?: number;
   roamTargetGeneration?: number;
   roamTargetLongPath?: boolean;
   roamTargetWide?: boolean;

@@ -810,6 +810,8 @@ describe("engine runtime bounds", () => {
         movementMood: "startled",
         nextRoamTargetDelayMs: 640,
         opacity: 1,
+        prevX: 96,
+        prevY: 118,
         roamTargetGeneration: 7,
         roamTargetLongPath: true,
         roamTargetWide: true,
@@ -835,6 +837,8 @@ describe("engine runtime bounds", () => {
     expect(bug.cruiseSpeed).toBeCloseTo(1.13);
     expect(bug.turnRate).toBeCloseTo(1.08);
     expect(bug.motionTime).toBeCloseTo(84);
+    expect(bug.prevX).toBeCloseTo(96);
+    expect(bug.prevY).toBeCloseTo(118);
     expect(bug.roamTargetX).toBe(160);
     expect(bug.roamTargetY).toBe(70);
     expect(bug.roamTargetWide).toBe(true);
@@ -882,6 +886,8 @@ describe("engine runtime bounds", () => {
           liveBugBeforeHandoff.nextRoamTargetAt - performance.now(),
         ),
         opacity: liveBugBeforeHandoff.opacity,
+        prevX: liveBugBeforeHandoff.prevX,
+        prevY: liveBugBeforeHandoff.prevY,
         roamTargetGeneration: liveBugBeforeHandoff.roamTargetGeneration,
         roamTargetLongPath: liveBugBeforeHandoff.roamTargetLongPath,
         roamTargetWide: liveBugBeforeHandoff.roamTargetWide,
@@ -949,6 +955,8 @@ describe("engine runtime bounds", () => {
         movementMood: bug.movementMood,
         nextRoamTargetDelayMs: Math.max(0, bug.nextRoamTargetAt - now),
         opacity: bug.opacity,
+        prevX: bug.prevX,
+        prevY: bug.prevY,
         roamTargetGeneration: bug.roamTargetGeneration,
         roamTargetLongPath: bug.roamTargetLongPath,
         roamTargetWide: bug.roamTargetWide,

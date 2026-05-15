@@ -104,6 +104,16 @@ export function sanitizeSnapshotItems(
         10000,
       ),
       opacity: clamp(normalizeFiniteNumber(item.opacity, 1), 0, 1),
+      prevX: clamp(
+        normalizeFiniteNumber(item.prevX, item.x),
+        -width,
+        width * 2,
+      ),
+      prevY: clamp(
+        normalizeFiniteNumber(item.prevY, item.y),
+        -height,
+        height * 2,
+      ),
       roamTargetGeneration: Math.max(
         0,
         Math.floor(normalizeFiniteNumber(item.roamTargetGeneration, 0)),

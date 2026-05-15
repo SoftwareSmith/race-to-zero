@@ -25,6 +25,7 @@ import type { BugTransitionSnapshotItem } from "@game/components/BackgroundField
 import type { Engine } from "@game/engine/Engine";
 
 interface SiegeExperienceProps {
+  consumeTransitionSwarm?: () => Engine | null;
   dashboardRef: RefObject<HTMLDivElement | null>;
   onShellStateChange: (state: {
     interactiveMode: boolean;
@@ -32,15 +33,14 @@ interface SiegeExperienceProps {
   }) => void;
   startRequestId: number;
   transitionSnapshot?: BugTransitionSnapshotItem[] | null;
-  transitionSwarm?: Engine | null;
 }
 
 const SiegeExperience = memo(function SiegeExperience({
+  consumeTransitionSwarm,
   dashboardRef,
   onShellStateChange,
   startRequestId,
   transitionSnapshot = null,
-  transitionSwarm = null,
 }: SiegeExperienceProps) {
   const metrics = useDashboardMetrics();
   const settings = useDashboardSettings();
@@ -234,8 +234,8 @@ const SiegeExperience = memo(function SiegeExperience({
             siegeGame.interactiveMode ? siegeGame.survivalSpawnPlan : null
           }
           tone={metrics.deadlineMetrics.statusTone}
+          consumeTransitionSwarm={consumeTransitionSwarm}
           transitionSnapshot={transitionSnapshot}
-          transitionSwarm={transitionSwarm}
         />
       ) : null}
       {siegeGame.siegePhase === "entering" ? (

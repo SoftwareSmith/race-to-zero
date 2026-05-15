@@ -90,8 +90,8 @@ interface BackgroundFieldProps {
   initialEvolutionStates?: Partial<
     Record<SiegeWeaponId, import("@game/types").WeaponEvolutionState>
   >;
+  consumeTransitionSwarm?: () => Engine | null;
   transitionSnapshot?: BugTransitionSnapshotItem[] | null;
-  transitionSwarm?: Engine | null;
 }
 
 const BackgroundField = memo(
@@ -125,8 +125,8 @@ const BackgroundField = memo(
         clearSwarmRequestId = 0,
         onLiveBugCountChange,
         initialEvolutionStates,
+        consumeTransitionSwarm,
         transitionSnapshot = null,
-        transitionSwarm = null,
       }: BackgroundFieldProps,
       ref,
     ) {
@@ -258,17 +258,26 @@ const BackgroundField = memo(
         }
 
         const now = performance.now();
-        const nextCleanupDelay = weaponEffects.reduce((soonestExpiry, effect) => {
-          const remainingMs =
-            EFFECT_DURATION[effect.weapon] - (now - effect.startedAt);
-          return Math.min(soonestExpiry, Math.max(0, remainingMs));
-        }, Number.POSITIVE_INFINITY);
-        const timeoutId = window.setTimeout(() => {
-          const cleanupNow = performance.now();
-          setWeaponEffects((previous) =>
-            previous.filter((effect) => isEffectAlive(effect, cleanupNow)),
-          );
-        }, Math.max(16, Number.isFinite(nextCleanupDelay) ? nextCleanupDelay : 16));
+        const nextCleanupDelay = weaponEffects.reduce(
+          (soonestExpiry, effect) => {
+            const remainingMs =
+              EFFECT_DURATION[effect.weapon] - (now - effect.startedAt);
+            return Math.min(soonestExpiry, Math.max(0, remainingMs));
+          },
+          Number.POSITIVE_INFINITY,
+        );
+        const timeoutId = window.setTimeout(
+          () => {
+            const cleanupNow = performance.now();
+            setWeaponEffects((previous) =>
+              previous.filter((effect) => isEffectAlive(effect, cleanupNow)),
+            );
+          },
+          Math.max(
+            16,
+            Number.isFinite(nextCleanupDelay) ? nextCleanupDelay : 16,
+          ),
+        );
 
         return () => {
           window.clearTimeout(timeoutId);
@@ -324,8 +333,8 @@ const BackgroundField = memo(
             onWeaponEvolutionStatesChange={onWeaponEvolutionStatesChange}
             onWeaponEvolution={onWeaponEvolution}
             initialEvolutionStates={initialEvolutionStates}
+            consumeTransitionSwarm={consumeTransitionSwarm}
             transitionSnapshot={transitionSnapshot}
-            transitionSwarm={transitionSwarm}
           />
           {effectiveBugCount === 0 ? (
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_35%,rgba(187,247,208,0.12),transparent_28%),radial-gradient(circle_at_60%_68%,rgba(125,211,252,0.08),transparent_34%)] [animation:all-clear-breathe_6s_ease-in-out_infinite]" />

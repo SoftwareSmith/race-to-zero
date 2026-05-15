@@ -16,12 +16,18 @@ import type { BackgroundFieldHandle } from "@game/components/BackgroundField/typ
 
 interface AmbientBackgroundHarnessProps {
   fullDensity?: boolean;
+  revealAmbient?: boolean;
+  slowReveal?: boolean;
 }
 
 const AmbientBackgroundHarness = memo(
   forwardRef<BackgroundFieldHandle, AmbientBackgroundHarnessProps>(
     function AmbientBackgroundHarness(
-      { fullDensity = false }: AmbientBackgroundHarnessProps,
+      {
+        fullDensity = false,
+        revealAmbient = true,
+        slowReveal = false,
+      }: AmbientBackgroundHarnessProps,
       ref,
     ) {
       const metrics = useDashboardMetrics();
@@ -39,7 +45,14 @@ const AmbientBackgroundHarness = memo(
       const [revealedKey, setRevealedKey] = useState(
         fullDensity ? visibilityKey : "",
       );
-      const isVisible = fullDensity || revealedKey === visibilityKey;
+      const isPrepared = fullDensity || revealedKey === visibilityKey;
+      const isVisible = revealAmbient && isPrepared;
+      const fadeClassName = slowReveal
+        ? "z-0 transition-opacity duration-700 ease-out opacity-100"
+        : "z-0 transition-opacity duration-300 ease-out opacity-100";
+      const hiddenClassName = slowReveal
+        ? "z-0 transition-opacity duration-700 ease-out opacity-0"
+        : "z-0 transition-opacity duration-300 ease-out opacity-0";
 
       useEffect(() => {
         let firstFrame = 0;
@@ -88,11 +101,7 @@ const AmbientBackgroundHarness = memo(
           bugCounts={bugCounts}
           bugVisualSettings={settings.bugVisualSettings}
           chartFocus={null}
-          className={
-            isVisible
-              ? "z-0 transition-opacity duration-300 ease-out opacity-100"
-              : "z-0 transition-opacity duration-300 ease-out opacity-0"
-          }
+          className={isVisible ? fadeClassName : hiddenClassName}
           interactiveMode={false}
           openBugCount={metrics.currentBugCount}
           tone={metrics.deadlineMetrics.statusTone}

@@ -482,6 +482,8 @@ export class Engine {
         bug.hp = item.hp;
         bug.x = item.x;
         bug.y = item.y;
+        bug.prevX = item.prevX ?? item.x;
+        bug.prevY = item.prevY ?? item.y;
         bug.vx = item.vx;
         bug.vy = item.vy;
         bug.heading = item.heading;
@@ -500,6 +502,8 @@ export class Engine {
         bug.baseSize = item.size;
         bug.maxHp = item.maxHp;
         bug.hp = item.hp;
+        bug.prevX = item.prevX ?? item.x;
+        bug.prevY = item.prevY ?? item.y;
       }
 
       bug.seed = item.seed ?? bug.seed;
