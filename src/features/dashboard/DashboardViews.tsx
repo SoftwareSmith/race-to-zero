@@ -417,12 +417,7 @@ export const OverviewView = memo(function OverviewView({
     [deadlineMetrics],
   );
   const metricCards = useMemo(
-    () =>
-      buildOverviewMetricCards(
-        summary,
-        deadlineMetrics,
-        isWorkdayMode,
-      ),
+    () => buildOverviewMetricCards(summary, deadlineMetrics, isWorkdayMode),
     [deadlineMetrics, isWorkdayMode, summary],
   );
   const statusSummary = useMemo(

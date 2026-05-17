@@ -102,21 +102,21 @@ const CommandCenter = memo(function CommandCenter({
       (historyMetrics!.previousWindow?.completionRate ??
         historyMetrics!.currentWindow.completionRate)
     : isInsights
-    ? insightsMetrics!.eligibleCompleted > 0
-      ? insightsMetrics!.slaHitRate - 85
-      : 0
-    : isPeriods
-      ? comparisonMetrics!.currentWindow.fixRate -
-        comparisonMetrics!.currentWindow.addRate
-      : summary.currentFixRate - summary.bugsPerDayRequired;
+      ? insightsMetrics!.eligibleCompleted > 0
+        ? insightsMetrics!.slaHitRate - 85
+        : 0
+      : isPeriods
+        ? comparisonMetrics!.currentWindow.fixRate -
+          comparisonMetrics!.currentWindow.addRate
+        : summary.currentFixRate - summary.bugsPerDayRequired;
 
   const statusTone = isInsights
     ? insightsMetrics!.tone
     : isHistory
       ? historyMetrics!.tone
-    : isPeriods
-      ? comparisonMetrics!.tone
-      : deadlineMetrics.statusTone;
+      : isPeriods
+        ? comparisonMetrics!.tone
+        : deadlineMetrics.statusTone;
   const statusLabel =
     activeTab === "overview"
       ? deadlineMetrics.statusSignal
