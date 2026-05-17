@@ -1,58 +1,23 @@
 import type { ChangeEvent } from "react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { format } from "date-fns";
-import {
-  getBugCountsFromPriorityDistribution,
-  getBugTotal,
-} from "../../constants/bugs";
-import { STORAGE_KEYS } from "../../constants/storageKeys";
-import { useStoredState } from "../../hooks/useStoredState";
+import { useCallback, useMemo } from "react";
 import { useCompareRange } from "./hooks/useCompareRange";
-import { useDeadlineRange } from "./hooks/useDeadlineRange";
-import { useGameSettings } from "./hooks/useGameSettings";
-import { useMetrics } from "./hooks/useMetrics";
-import { useWorkdaySettings } from "./hooks/useWorkdaySettings";
-import { parseStoredString } from "@shared/utils/storage";
-import type {
-  ActiveTab,
-  ChartFocusState,
-  CompareRangeKey,
-  HistoryTeamOption,
-  MenuSettingsState,
-  SettingToggleKey,
-  TopMenuKey,
-} from "../../types/dashboard";
+import {
+  useDashboardBootstrapMetrics,
+  useDashboardBootstrapSettings,
+  useDashboardBootstrapUi,
+} from "./context/DashboardBootstrapContext";
+import type { CompareRangeKey } from "../../types/dashboard";
 import {
   getComparisonMetrics,
-  getDeadlineMetrics,
   getHistoryMetrics,
   getInsightsMetrics,
   getSummaryMetrics,
 } from "@dashboard/utils/metrics";
 
 export function useDashboardController() {
-  const { metrics, error } = useMetrics();
-  const [activeTab, setActiveTab] = useState<ActiveTab>("overview");
-  const {
-    deadlineDate,
-    deadlineFromDate,
-    setDeadlineDate,
-    setDeadlineFromDate,
-  } = useDeadlineRange();
-  const {
-    excludePublicHolidays,
-    excludeWeekends,
-    setExcludePublicHolidays,
-    setExcludeWeekends,
-    workdaySettings,
-  } = useWorkdaySettings();
-  const {
-    bugVisualSettings,
-    gameConfig,
-    showBugParticleCount,
-    toggleShowBugParticleCount,
-  } = useGameSettings();
-  const [openTopMenu, setOpenTopMenu] = useState<TopMenuKey>(null);
+  const bootstrapMetrics = useDashboardBootstrapMetrics();
+  const bootstrapSettings = useDashboardBootstrapSettings();
+  const bootstrapUi = useDashboardBootstrapUi();
   const {
     compareRangeKey,
     customFromDate,
@@ -61,252 +26,86 @@ export function useDashboardController() {
     setCustomFromDate,
     setCustomToDate,
   } = useCompareRange();
-  const [teamFilterKey, setTeamFilterKey] = useStoredState(
-    STORAGE_KEYS.dashboardTeamFilter,
-    "all",
-    { parse: parseStoredString },
-  );
-  const [chartFocus, setChartFocus] = useState<ChartFocusState | null>(null);
-  const settingsMenuRef = useRef<HTMLDivElement | null>(null);
-  const codexMenuRef = useRef<HTMLDivElement | null>(null);
-  const teamFilterOptions = useMemo<HistoryTeamOption[]>(() => {
-    const teamKeys = [...new Set(
-      (metrics?.bugs ?? [])
-        .map((bug) => bug.teamKey?.trim() ?? "")
-        .filter((teamKey) => teamKey.length > 0),
-    )].sort((left, right) => left.localeCompare(right));
 
-    return [
-      { label: "All teams", value: "all" },
-      ...teamKeys.map((teamKey) => ({ label: teamKey, value: teamKey })),
-    ];
-  }, [metrics]);
-  const selectedTeamKey = teamFilterKey === "all" ? null : teamFilterKey;
-
-  const deadlineMetrics = useMemo(
-    () =>
-      getDeadlineMetrics(metrics, {
-        deadlineDate,
-        teamKey: selectedTeamKey,
-        trackingStartDate: deadlineFromDate,
-        workdaySettings,
-      }),
-    [deadlineDate, deadlineFromDate, metrics, selectedTeamKey, workdaySettings],
-  );
   const comparisonMetrics = useMemo(
     () =>
-      getComparisonMetrics(metrics, {
+      getComparisonMetrics(bootstrapMetrics.metricsSource, {
         rangeKey: compareRangeKey,
         customFromDate,
         customToDate,
-        teamKey: selectedTeamKey,
+        teamKey: bootstrapMetrics.selectedTeamKey,
       }),
-    [compareRangeKey, customFromDate, customToDate, metrics, selectedTeamKey],
+    [
+      bootstrapMetrics.metricsSource,
+      bootstrapMetrics.selectedTeamKey,
+      compareRangeKey,
+      customFromDate,
+      customToDate,
+    ],
   );
+
   const insightsMetrics = useMemo(
     () =>
-      getInsightsMetrics(metrics, {
+      getInsightsMetrics(bootstrapMetrics.metricsSource, {
         rangeKey: compareRangeKey,
         customFromDate,
         customToDate,
-        teamKey: selectedTeamKey,
+        teamKey: bootstrapMetrics.selectedTeamKey,
       }),
-    [compareRangeKey, customFromDate, customToDate, metrics, selectedTeamKey],
+    [
+      bootstrapMetrics.metricsSource,
+      bootstrapMetrics.selectedTeamKey,
+      compareRangeKey,
+      customFromDate,
+      customToDate,
+    ],
   );
+
   const historyMetrics = useMemo(
     () =>
-      getHistoryMetrics(metrics, {
+      getHistoryMetrics(bootstrapMetrics.metricsSource, {
         rangeKey: compareRangeKey,
         customFromDate,
         customToDate,
-        teamKey: selectedTeamKey,
+        teamKey: bootstrapMetrics.selectedTeamKey,
       }),
-    [compareRangeKey, customFromDate, customToDate, metrics, selectedTeamKey],
+    [
+      bootstrapMetrics.metricsSource,
+      bootstrapMetrics.selectedTeamKey,
+      compareRangeKey,
+      customFromDate,
+      customToDate,
+    ],
   );
+
   const summary = useMemo(
-    () => getSummaryMetrics(deadlineMetrics),
-    [deadlineMetrics],
-  );
-  const currentBugCounts = useMemo(
-    () =>
-      getBugCountsFromPriorityDistribution(
-        deadlineMetrics.priorityDistribution,
-      ),
-    [deadlineMetrics.priorityDistribution],
-  );
-  const currentBugCount = useMemo(
-    () => getBugTotal(currentBugCounts),
-    [currentBugCounts],
-  );
-  const todayDate = format(new Date(), "yyyy-MM-dd");
-
-  const settings = useMemo<MenuSettingsState>(
-    () => ({
-      excludePublicHolidays,
-      excludeWeekends,
-
-    }),
-    [excludePublicHolidays, excludeWeekends],
+    () => getSummaryMetrics(bootstrapMetrics.deadlineMetrics),
+    [bootstrapMetrics.deadlineMetrics],
   );
 
-  const handleToggleSetting = useCallback(
-    (settingKey: SettingToggleKey) => {
-      switch (settingKey) {
-        case "excludeWeekends":
-          setExcludeWeekends((currentValue) => !currentValue);
-          break;
-        case "excludePublicHolidays":
-          setExcludePublicHolidays((currentValue) => !currentValue);
-          break;
-        default:
-          break;
-      }
+  const handleCompareRangeChange = useCallback(
+    (value: CompareRangeKey) => {
+      bootstrapUi.closeMenus();
+      setCompareRangeKey(value);
     },
-    [setExcludePublicHolidays, setExcludeWeekends],
+    [bootstrapUi, setCompareRangeKey],
   );
-
-  const handleTopMenuToggle = useCallback(
-    (menuKey: Exclude<TopMenuKey, null>) => {
-      setOpenTopMenu((currentValue) =>
-        currentValue === menuKey ? null : menuKey,
-      );
-    },
-    [],
-  );
-
-  const closeMenus = useCallback(() => {
-    setOpenTopMenu(null);
-  }, []);
-
-  const handleTopNavInteract = useCallback(() => {
-    setOpenTopMenu(null);
-  }, []);
-
-  const handleCompareRangeChange = useCallback((value: CompareRangeKey) => {
-    setOpenTopMenu(null);
-    setCompareRangeKey(value);
-  }, [setCompareRangeKey]);
-
-  const handleTeamFilterChange = useCallback((value: string) => {
-    setOpenTopMenu(null);
-    setTeamFilterKey(value);
-  }, [setTeamFilterKey]);
 
   const handleCustomFromDateChange = useCallback(
     (event: ChangeEvent<HTMLInputElement>) => {
-      setOpenTopMenu(null);
+      bootstrapUi.closeMenus();
       setCustomFromDate(event.target.value);
     },
-    [setCustomFromDate],
+    [bootstrapUi, setCustomFromDate],
   );
 
   const handleCustomToDateChange = useCallback(
     (event: ChangeEvent<HTMLInputElement>) => {
-      setOpenTopMenu(null);
+      bootstrapUi.closeMenus();
       setCustomToDate(event.target.value);
     },
-    [setCustomToDate],
+    [bootstrapUi, setCustomToDate],
   );
-
-  const handleDeadlineDateChange = useCallback(
-    (event: ChangeEvent<HTMLInputElement>) => {
-      setOpenTopMenu(null);
-      setDeadlineDate(event.target.value);
-    },
-    [setDeadlineDate],
-  );
-
-  const handleDeadlineFromDateChange = useCallback(
-    (event: ChangeEvent<HTMLInputElement>) => {
-      setOpenTopMenu(null);
-      setDeadlineFromDate(event.target.value);
-    },
-    [setDeadlineFromDate],
-  );
-
-  const handleTabChange = useCallback((tabId: ActiveTab) => {
-    setOpenTopMenu(null);
-    setActiveTab(tabId);
-  }, []);
-
-  // avoid thrashing chart focus state from rapid Chart.js hover events
-  const lastChartFocusRef = useRef<ChartFocusState | null>(null);
-  const handleChartFocusChange = useCallback(
-    (nextFocus: ChartFocusState | null) => {
-      const prev = lastChartFocusRef.current;
-      const same =
-        (prev === null && nextFocus === null) ||
-        (prev !== null && nextFocus !== null &&
-          prev.chartKey === nextFocus.chartKey &&
-          prev.dataIndex === nextFocus.dataIndex &&
-          prev.datasetIndex === nextFocus.datasetIndex);
-
-      if (same) {
-        return;
-      }
-
-      lastChartFocusRef.current = nextFocus;
-      setChartFocus(nextFocus);
-    },
-    [],
-  );
-
-  useEffect(() => {
-    if (!metrics) {
-      return;
-    }
-
-    if (
-      teamFilterKey !== "all" &&
-      !teamFilterOptions.some((option) => option.value === teamFilterKey)
-    ) {
-      setTeamFilterKey("all");
-    }
-  }, [metrics, teamFilterKey, teamFilterOptions, setTeamFilterKey]);
-
-  useEffect(() => {
-    if (!openTopMenu) {
-      return undefined;
-    }
-
-    const activeMenuRef =
-      openTopMenu === "codex" ? codexMenuRef : settingsMenuRef;
-
-    const handlePointerDown = (
-      event: globalThis.MouseEvent | globalThis.TouchEvent,
-    ) => {
-      const targetNode = event.target;
-
-      if (!(targetNode instanceof Node)) {
-        return;
-      }
-
-      const targetElement =
-        targetNode instanceof Element ? targetNode : targetNode.parentElement;
-      const clickedInsideCodexModal =
-        openTopMenu === "codex" &&
-        targetElement?.closest("[data-codex-modal-root='true']");
-
-      if (clickedInsideCodexModal) {
-        return;
-      }
-
-      if (
-        activeMenuRef.current &&
-        !activeMenuRef.current.contains(targetNode)
-      ) {
-        setOpenTopMenu(null);
-      }
-    };
-
-    document.addEventListener("mousedown", handlePointerDown);
-    document.addEventListener("touchstart", handlePointerDown);
-
-    return () => {
-      document.removeEventListener("mousedown", handlePointerDown);
-      document.removeEventListener("touchstart", handlePointerDown);
-    };
-  }, [openTopMenu]);
 
   const headerEyebrow =
     summary.bugCount === 0 ? "All clear" : "Operations dashboard";
@@ -316,47 +115,47 @@ export function useDashboardController() {
       : "Current pace against the zero-bug deadline.";
 
   return {
-    activeTab,
-    bugVisualSettings,
-    chartFocus,
-    closeMenus,
-    codexMenuRef,
+    activeTab: bootstrapUi.activeTab,
+    bugVisualSettings: bootstrapSettings.bugVisualSettings,
+    chartFocus: bootstrapUi.chartFocus,
+    closeMenus: bootstrapUi.closeMenus,
+    codexMenuRef: bootstrapUi.codexMenuRef,
     comparisonMetrics,
     compareRangeKey,
-    currentBugCount,
-    currentBugCounts,
+    currentBugCount: bootstrapMetrics.currentBugCount,
+    currentBugCounts: bootstrapMetrics.currentBugCounts,
     customFromDate,
     customToDate,
-    deadlineDate,
-    deadlineFromDate,
-    deadlineMetrics,
-    error,
-    gameConfig,
-    showBugParticleCount,
-    handleChartFocusChange,
+    deadlineDate: bootstrapUi.deadlineDate,
+    deadlineFromDate: bootstrapUi.deadlineFromDate,
+    deadlineMetrics: bootstrapMetrics.deadlineMetrics,
+    error: bootstrapMetrics.error,
+    gameConfig: bootstrapSettings.gameConfig,
+    showBugParticleCount: bootstrapSettings.showBugParticleCount,
+    handleChartFocusChange: bootstrapUi.handleChartFocusChange,
     handleCompareRangeChange,
     handleCustomFromDateChange,
     handleCustomToDateChange,
-    handleDeadlineDateChange,
-    handleDeadlineFromDateChange,
-    handleTeamFilterChange,
-    handleTabChange,
-    handleToggleSetting,
-    handleTopMenuToggle,
-    handleTopNavInteract,
-    toggleShowBugParticleCount,
+    handleDeadlineDateChange: bootstrapUi.handleDeadlineDateChange,
+    handleDeadlineFromDateChange: bootstrapUi.handleDeadlineFromDateChange,
+    handleTabChange: bootstrapUi.handleTabChange,
+    handleTeamFilterChange: bootstrapUi.handleTeamFilterChange,
+    handleToggleSetting: bootstrapSettings.handleToggleSetting,
+    handleTopMenuToggle: bootstrapUi.handleTopMenuToggle,
+    handleTopNavInteract: bootstrapUi.handleTopNavInteract,
+    toggleShowBugParticleCount: bootstrapSettings.toggleShowBugParticleCount,
     headerEyebrow,
     headerSubtitle,
-    teamFilterKey,
-    teamFilterOptions,
+    teamFilterKey: bootstrapUi.teamFilterKey,
+    teamFilterOptions: bootstrapUi.teamFilterOptions,
     historyMetrics,
     insightsMetrics,
-    openTopMenu,
-    settings,
-    settingsMenuRef,
-    setChartFocus,
+    openTopMenu: bootstrapUi.openTopMenu,
+    settings: bootstrapSettings.settings,
+    settingsMenuRef: bootstrapUi.settingsMenuRef,
+    setChartFocus: bootstrapUi.setChartFocus,
     summary,
-    todayDate,
-    workdaySettings,
+    todayDate: bootstrapUi.todayDate,
+    workdaySettings: bootstrapSettings.workdaySettings,
   };
 }

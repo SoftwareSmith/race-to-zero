@@ -13,7 +13,7 @@ import type {
   BugTransitionSnapshotItem,
 } from "@game/components/BackgroundField/types";
 import { preloadVfxEngine } from "@game/components/VfxCanvas";
-import { DashboardProvider } from "./features/dashboard/context/DashboardContext";
+import { DashboardBootstrapProvider } from "./features/dashboard/context/DashboardBootstrapContext";
 
 const loadDashboardShell = () => import("./features/app/DashboardShell");
 const loadSiegeExperience = () => import("./features/app/SiegeExperience");
@@ -152,8 +152,8 @@ function AppContent() {
 
 export default function App() {
   return (
-    <DashboardProvider>
+    <DashboardBootstrapProvider>
       <AppContent />
-    </DashboardProvider>
+    </DashboardBootstrapProvider>
   );
 }

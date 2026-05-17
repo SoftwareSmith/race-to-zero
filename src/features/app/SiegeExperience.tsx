@@ -7,10 +7,10 @@ import {
   type RefObject,
 } from "react";
 import {
-  useDashboardMetrics,
-  useDashboardSettings,
-  useDashboardUi,
-} from "@dashboard/context/DashboardContext";
+  useDashboardBootstrapMetrics,
+  useDashboardBootstrapSettings,
+  useDashboardBootstrapUi,
+} from "@dashboard/context/DashboardBootstrapContext";
 import { WEAPON_DEFS } from "@config/weaponConfig";
 import BackgroundField from "@game/components/BackgroundField";
 import SiegeHud from "@game/components/SiegeHud";
@@ -42,9 +42,9 @@ const SiegeExperience = memo(function SiegeExperience({
   startRequestId,
   transitionSnapshot = null,
 }: SiegeExperienceProps) {
-  const metrics = useDashboardMetrics();
-  const settings = useDashboardSettings();
-  const ui = useDashboardUi();
+  const metrics = useDashboardBootstrapMetrics();
+  const settings = useDashboardBootstrapSettings();
+  const ui = useDashboardBootstrapUi();
   const {
     evolutionStates,
     onEvolution,

@@ -8,9 +8,9 @@ import {
   useState,
 } from "react";
 import {
-  useDashboardMetrics,
-  useDashboardSettings,
-} from "@dashboard/context/DashboardContext";
+  useDashboardBootstrapMetrics,
+  useDashboardBootstrapSettings,
+} from "@dashboard/context/DashboardBootstrapContext";
 import BackgroundField from "@game/components/BackgroundField";
 import type { BackgroundFieldHandle } from "@game/components/BackgroundField/types";
 
@@ -30,8 +30,8 @@ const AmbientBackgroundHarness = memo(
       }: AmbientBackgroundHarnessProps,
       ref,
     ) {
-      const metrics = useDashboardMetrics();
-      const settings = useDashboardSettings();
+      const metrics = useDashboardBootstrapMetrics();
+      const settings = useDashboardBootstrapSettings();
       const backgroundFieldRef = useRef<BackgroundFieldHandle | null>(null);
       const bugCounts = useMemo(
         () => metrics.currentBugCounts,

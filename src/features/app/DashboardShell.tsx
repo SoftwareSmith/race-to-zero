@@ -6,6 +6,7 @@ import {
   useState,
   type RefObject,
 } from "react";
+import { DashboardProvider } from "@dashboard/context/DashboardContext";
 import CommandCenter from "@dashboard/components/CommandCenter";
 import SettingsMenu from "@dashboard/components/SettingsMenu";
 import TopNav from "@dashboard/components/TopNav";
@@ -41,7 +42,7 @@ interface DashboardShellProps {
   siegePhase: SiegePhase;
 }
 
-const DashboardShell = memo(function DashboardShell({
+const DashboardShellContent = memo(function DashboardShellContent({
   dashboardRef,
   interactiveMode,
   onEnterInteractiveMode,
@@ -360,4 +361,10 @@ const DashboardShell = memo(function DashboardShell({
   );
 });
 
-export default DashboardShell;
+export default function DashboardShell(props: DashboardShellProps) {
+  return (
+    <DashboardProvider>
+      <DashboardShellContent {...props} />
+    </DashboardProvider>
+  );
+}
