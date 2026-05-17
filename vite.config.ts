@@ -5,6 +5,30 @@ import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const dashboardShellPath = path.resolve(
+  __dirname,
+  "src/features/app/DashboardShell.tsx",
+);
+const dashboardViewsPath = path.resolve(
+  __dirname,
+  "src/features/dashboard/DashboardViews.tsx",
+);
+const overviewChartsPath = path.resolve(
+  __dirname,
+  "src/features/dashboard/components/OverviewCharts.tsx",
+);
+const chartCardPath = path.resolve(
+  __dirname,
+  "src/features/dashboard/components/ChartCard.tsx",
+);
+const chartConfigPath = path.resolve(
+  __dirname,
+  "src/features/dashboard/utils/chartConfig.ts",
+);
+const chartMetricsPath = path.resolve(
+  __dirname,
+  "src/features/dashboard/utils/chartMetrics.ts",
+);
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],
@@ -25,13 +49,9 @@ export default defineConfig({
       },
       output: {
         manualChunks(id) {
-          if (id.includes("/src/features/dashboard/DashboardAnalyticsViews.tsx")) {
-            return "dashboard-analytics";
-          }
-
           if (
-            id.includes("/src/features/app/DashboardShell.tsx") ||
-            id.includes("/src/features/dashboard/DashboardViews.tsx") ||
+            id === dashboardShellPath ||
+            id === dashboardViewsPath ||
             id.includes("/src/features/dashboard/context/") ||
             id.includes("/src/features/dashboard/useDashboardController.ts") ||
             id.includes("/src/features/dashboard/useDashboardBootstrapController.ts") ||
@@ -52,6 +72,10 @@ export default defineConfig({
           }
 
           if (
+            id === overviewChartsPath ||
+            id === chartCardPath ||
+            id === chartConfigPath ||
+            id === chartMetricsPath ||
             id.includes("chart.js") ||
             id.includes("chartjs-plugin-datalabels") ||
             id.includes("react-chartjs-2")

@@ -27,7 +27,7 @@ import {
   buildSlaHitRateChartData,
   buildSlaOutcomeChartData,
   buildSlaTrendChartData,
-} from "@dashboard/utils/metrics";
+} from "@dashboard/utils/chartMetrics";
 import type {
   ChartFocusState,
   ComparisonMetrics,

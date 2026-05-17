@@ -1,17 +1,19 @@
 import { describe, expect, it } from "vitest";
 import {
-  buildDeadlineBurndownChartData,
-  buildComparisonWindowHistoryChartData,
-  buildOpenAgeChartData,
-  buildComparisonRateHistoryChartData,
-  buildSlaHitRateChartData,
-  buildSlaOutcomeChartData,
-  buildStatusChartData,
   getComparisonMetrics,
   getDeadlineMetrics,
   getInsightsMetrics,
   getSummaryMetrics,
 } from "./metrics";
+import {
+  buildComparisonRateHistoryChartData,
+  buildComparisonWindowHistoryChartData,
+  buildDeadlineBurndownChartData,
+  buildOpenAgeChartData,
+  buildSlaHitRateChartData,
+  buildSlaOutcomeChartData,
+  buildStatusChartData,
+} from "./chartMetrics";
 
 function withFrozenDate<T>(isoString: string, callback: () => T): T {
   const RealDate = Date;

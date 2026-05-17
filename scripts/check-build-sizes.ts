@@ -10,7 +10,16 @@ type ChunkBudget = {
 const CHUNK_BUDGETS: ChunkBudget[] = [
   { name: "main", pattern: /^main-.*\.js$/, maxKb: 10 },
   { name: "dashboard-core", pattern: /^dashboard-core-.*\.js$/, maxKb: 175 },
-  { name: "dashboard-analytics", pattern: /^dashboard-analytics-.*\.js$/, maxKb: 300 },
+  {
+    name: "DashboardAnalyticsViews",
+    pattern: /^DashboardAnalyticsViews-.*\.js$/,
+    maxKb: 20,
+  },
+  {
+    name: "dashboard-charts",
+    pattern: /^dashboard-charts-.*\.js$/,
+    maxKb: 275,
+  },
   { name: "BackgroundField", pattern: /^BackgroundField-.*\.js$/, maxKb: 100 },
   { name: "SiegeExperience", pattern: /^SiegeExperience-.*\.js$/, maxKb: 85 },
   { name: "siege-vfx-core", pattern: /^siege-vfx-core-.*\.js$/, maxKb: 35 },

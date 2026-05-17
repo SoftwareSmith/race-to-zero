@@ -2,7 +2,6 @@ import {
   memo,
   useEffect,
   useLayoutEffect,
-  useMemo,
   useRef,
   useState,
   type RefObject,
@@ -16,10 +15,7 @@ import {
   useDashboardSettings,
   useDashboardUi,
 } from "@dashboard/context/DashboardContext";
-import {
-  OverviewView,
-  StatusBanner,
-} from "@dashboard/DashboardViews";
+import { OverviewView, StatusBanner } from "@dashboard/DashboardViews";
 import {
   HistoryView,
   InsightsView,
@@ -46,8 +42,6 @@ interface DashboardShellProps {
 }
 
 type SkeletonChartVariant = "bar" | "line";
-type AnalyticsTabId = "periods" | "insights" | "history";
-
 function SkeletonBlock({ className = "" }: { className?: string }) {
   return (
     <div
@@ -71,11 +65,7 @@ function MetricCardSkeleton() {
   );
 }
 
-function ChartPlotSkeleton({
-  variant,
-}: {
-  variant: SkeletonChartVariant;
-}) {
+function ChartPlotSkeleton({ variant }: { variant: SkeletonChartVariant }) {
   if (variant === "bar") {
     return (
       <div className="absolute inset-0 flex items-end gap-2 px-2 pb-2 pt-5 sm:gap-2.5 sm:px-3 sm:pb-3">
@@ -137,11 +127,7 @@ function ChartPlotSkeleton({
   );
 }
 
-function ChartCardSkeleton({
-  variant,
-}: {
-  variant: SkeletonChartVariant;
-}) {
+function ChartCardSkeleton({ variant }: { variant: SkeletonChartVariant }) {
   return (
     <article className="group relative flex min-h-0 flex-col overflow-hidden rounded-[18px] border border-white/10 bg-[linear-gradient(180deg,rgba(10,12,18,0.96),rgba(19,23,32,0.96))] p-2.5 text-stone-50 shadow-[0_14px_28px_rgba(0,0,0,0.24)] sm:rounded-[20px] sm:p-3">
       <div className="absolute inset-x-0 top-0 h-24 bg-[radial-gradient(circle_at_top,rgba(56,189,248,0.08),transparent_60%)]" />
@@ -203,7 +189,10 @@ function AnalyticsTabSkeleton({
   chartVariants: SkeletonChartVariant[];
 }) {
   return (
-    <AnalyticsPanelFallback cardCount={cardCount} chartVariants={chartVariants} />
+    <AnalyticsPanelFallback
+      cardCount={cardCount}
+      chartVariants={chartVariants}
+    />
   );
 }
 
@@ -226,8 +215,6 @@ const HISTORY_CHART_VARIANTS: SkeletonChartVariant[] = [
   "bar",
 ];
 
-const ANALYTICS_TAB_IDS: AnalyticsTabId[] = ["periods", "insights", "history"];
-
 const DashboardShellContent = memo(function DashboardShellContent({
   dashboardRef,
   interactiveMode,
@@ -246,37 +233,7 @@ const DashboardShellContent = memo(function DashboardShellContent({
   const shellFrameRef = useRef<HTMLDivElement | null>(null);
   const [bugFieldMenuOpen, setBugFieldMenuOpen] = useState(false);
   const [autoFitScale, setAutoFitScale] = useState(1);
-  const [visitedAnalyticsTabs, setVisitedAnalyticsTabs] = useState<
-    Record<AnalyticsTabId, boolean>
-  >({
-    history: false,
-    insights: false,
-    periods: false,
-  });
-
-  useEffect(() => {
-    if (!ANALYTICS_TAB_IDS.includes(ui.activeTab as AnalyticsTabId)) {
-      return;
-    }
-
-    const nextTab = ui.activeTab as AnalyticsTabId;
-    setVisitedAnalyticsTabs((current) =>
-      current[nextTab] ? current : { ...current, [nextTab]: true },
-    );
-  }, [ui.activeTab]);
-
-  const shouldRenderPeriods =
-    ui.activeTab === "periods" || visitedAnalyticsTabs.periods;
-  const shouldRenderInsights =
-    ui.activeTab === "insights" || visitedAnalyticsTabs.insights;
-  const shouldRenderHistory =
-    ui.activeTab === "history" || visitedAnalyticsTabs.history;
-
-  const periodsPanel = useMemo(() => {
-    if (!shouldRenderPeriods) {
-      return null;
-    }
-
+  const periodsPanel = (() => {
     if (metrics.isComparisonLoading) {
       return (
         <AnalyticsTabSkeleton
@@ -302,19 +259,9 @@ const DashboardShellContent = memo(function DashboardShellContent({
         siegeMode={interactiveMode}
       />
     );
-  }, [
-    chartFocusHandler,
-    interactiveMode,
-    metrics.comparisonMetrics,
-    metrics.isComparisonLoading,
-    shouldRenderPeriods,
-  ]);
+  })();
 
-  const insightsPanel = useMemo(() => {
-    if (!shouldRenderInsights) {
-      return null;
-    }
-
+  const insightsPanel = (() => {
     if (metrics.isInsightsLoading) {
       return (
         <AnalyticsTabSkeleton
@@ -340,19 +287,9 @@ const DashboardShellContent = memo(function DashboardShellContent({
         siegeMode={interactiveMode}
       />
     );
-  }, [
-    chartFocusHandler,
-    interactiveMode,
-    metrics.insightsMetrics,
-    metrics.isInsightsLoading,
-    shouldRenderInsights,
-  ]);
+  })();
 
-  const historyPanel = useMemo(() => {
-    if (!shouldRenderHistory) {
-      return null;
-    }
-
+  const historyPanel = (() => {
     if (metrics.isHistoryLoading) {
       return (
         <AnalyticsTabSkeleton
@@ -378,13 +315,7 @@ const DashboardShellContent = memo(function DashboardShellContent({
         siegeMode={interactiveMode}
       />
     );
-  }, [
-    chartFocusHandler,
-    interactiveMode,
-    metrics.historyMetrics,
-    metrics.isHistoryLoading,
-    shouldRenderHistory,
-  ]);
+  })();
 
   useLayoutEffect(() => {
     const frame = shellFrameRef.current;

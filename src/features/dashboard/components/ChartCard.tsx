@@ -1,4 +1,4 @@
-import { memo, useMemo } from "react";
+import { memo, useEffect, useMemo, useState } from "react";
 import {
   type ActiveElement,
   BarElement,
@@ -58,6 +58,18 @@ const ChartCard = memo(function ChartCard({
   className = "",
   onHoverStateChange,
 }: ChartCardProps) {
+  const [isChartVisible, setIsChartVisible] = useState(false);
+
+  useEffect(() => {
+    const frameId = window.requestAnimationFrame(() => {
+      setIsChartVisible(true);
+    });
+
+    return () => {
+      window.cancelAnimationFrame(frameId);
+    };
+  }, []);
+
   const options = useMemo(
     () => ({
       ...getLineChartOptions(variant, chartKey),
@@ -120,7 +132,8 @@ const ChartCard = memo(function ChartCard({
 
         <div
           className={cn(
-            "mt-2 h-[156px] shrink-0 sm:h-[184px] xl:h-[198px]",
+            "mt-2 h-[156px] shrink-0 transition-opacity duration-200 ease-out sm:h-[184px] xl:h-[198px]",
+            isChartVisible ? "opacity-100" : "opacity-0",
             description ? "sm:mt-2.5" : "",
           )}
         >

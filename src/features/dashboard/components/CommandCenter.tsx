@@ -1,11 +1,9 @@
 import { memo } from "react";
 import StatusTag from "@shared/components/StatusTag";
-import { cn } from "@shared/utils/cn";
 import {
   formatNumber,
   formatPercent,
   formatSignedNumber,
-  getDeltaTone,
   getStatusTagText,
 } from "../utils/dashboard";
 import type {
@@ -63,10 +61,10 @@ function buildOutcomeSentence(
   if (activeTab === "insights" && insightsMetrics) {
     const { openOverdue, openPending, eligibleCompleted } = insightsMetrics;
     if (eligibleCompleted === 0) {
-      return "No due-dated bugs completed yet — SLA coverage is building.";
+      return "No due-dated bugs completed yet - SLA coverage is building.";
     }
     if (openOverdue > 0) {
-      return `${formatNumber(openOverdue)} overdue and ${formatNumber(openPending)} pending — review open SLA risk.`;
+      return `${formatNumber(openOverdue)} overdue and ${formatNumber(openPending)} pending - review open SLA risk.`;
     }
     return `${formatNumber(openPending)} bugs pending due dates. No currently overdue open items.`;
   }
@@ -86,13 +84,12 @@ function buildOutcomeSentence(
     return `Backlog held flat this period. Completion rate ${formatPercent(completionRate, 0)}.`;
   }
 
-  // Overview / Target
   const gap = summary.currentFixRate - summary.bugsPerDayRequired;
   const absBugs = formatNumber(deadlineMetrics.remainingBugs);
   if (gap >= 0) {
-    return `${absBugs} open — current burn is ${formatSignedNumber(gap, 2)}/day ahead of target pace.`;
+    return `${absBugs} open - current burn is ${formatSignedNumber(gap, 2)}/day ahead of target pace.`;
   }
-  return `${absBugs} open — ${formatNumber(Math.abs(gap), 2)}/day below target pace to close by deadline.`;
+  return `${absBugs} open - ${formatNumber(Math.abs(gap), 2)}/day below target pace to close by deadline.`;
 }
 
 const CommandCenter = memo(function CommandCenter({
@@ -109,19 +106,6 @@ const CommandCenter = memo(function CommandCenter({
   const isPeriods = activeTab === "periods" && comparisonMetrics;
   const isInsights = activeTab === "insights" && insightsMetrics;
 
-  const paceGap = isHistory
-    ? historyMetrics!.currentWindow.completionRate -
-      (historyMetrics!.previousWindow?.completionRate ??
-        historyMetrics!.currentWindow.completionRate)
-    : isInsights
-      ? insightsMetrics!.eligibleCompleted > 0
-        ? insightsMetrics!.slaHitRate - 85
-        : 0
-      : isPeriods
-        ? comparisonMetrics!.currentWindow.fixRate -
-          comparisonMetrics!.currentWindow.addRate
-        : summary.currentFixRate - summary.bugsPerDayRequired;
-
   const statusTone = isInsights
     ? insightsMetrics!.tone
     : isHistory
@@ -133,8 +117,6 @@ const CommandCenter = memo(function CommandCenter({
     activeTab === "overview"
       ? deadlineMetrics.statusSignal
       : getStatusTagText(statusTone);
-
-  void getDeltaTone;
 
   const outcomeSentence = buildOutcomeSentence(
     activeTab,

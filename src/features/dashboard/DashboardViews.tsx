@@ -15,7 +15,7 @@ import {
   buildOpenAgeChartData,
   buildPriorityChartData,
   buildStatusChartData,
-} from "@dashboard/utils/metrics";
+} from "@dashboard/utils/chartMetrics";
 import type {
   ChartFocusState,
   DeadlineMetrics,
@@ -115,7 +115,7 @@ function getStatusDistributionSummary(deadlineMetrics: DeadlineMetrics) {
     return "No workflow states are currently represented in the snapshot.";
   }
 
-  return `${leadingStatus.label} is currently the largest active workflow state with ${formatNumber(leadingStatus.count)} bugs in it. Closed states like Done, Cancelled, and Duplicated are excluded from this chart. Done currently contains ${formatNumber(deadlineMetrics.doneCount)} bugs.`;
+  return `${leadingStatus.label} is currently the largest Linear column with ${formatNumber(leadingStatus.count)} bugs assigned to it. Done is ignored in the chart because its size would dominate the rest of the workflow view (${formatNumber(deadlineMetrics.doneCount)} bugs).`;
 }
 
 function getOpenAgeSummary(deadlineMetrics: DeadlineMetrics) {
@@ -211,7 +211,7 @@ export const OverviewView = memo(function OverviewView({
           chartKey="priority-breakdown"
           className="h-full"
           data={priorityChartData}
-          description="Open backlog by priority — highest risk at a glance."
+          description="Open backlog by priority - highest risk at a glance."
           onHoverStateChange={onChartFocusChange}
           siegeMode={siegeMode}
           title="Open bugs by priority"
@@ -232,7 +232,7 @@ export const OverviewView = memo(function OverviewView({
           chartKey="open-age-breakdown"
           className="h-full"
           data={openAgeChartData}
-          description="Open backlog by age — separates fresh intake from stale work."
+          description="Open backlog by age - separates fresh intake from stale work."
           onHoverStateChange={onChartFocusChange}
           siegeMode={siegeMode}
           summary={openAgeSummary}
