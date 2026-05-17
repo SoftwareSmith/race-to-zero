@@ -9,6 +9,9 @@
  */
 
 import "pixi.js/unsafe-eval";
+import "pixi.js/app";
+import "pixi.js/graphics";
+import "pixi.js/text";
 
 import {
   Application,
@@ -17,7 +20,7 @@ import {
   Text,
   TextStyle,
   type ColorSource,
-} from "pixi.js";
+} from "./pixiModules";
 // ── Particle types ────────────────────────────────────────────────────────────
 
 const enum PType {

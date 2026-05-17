@@ -412,7 +412,8 @@ const BugCanvas = memo(
       qaBindingOwnerRef.current = installBugCanvasQaBindings({
         bounds: boundsRef.current,
         engine: swarmRef.current,
-        height: canvasRef.current?.clientHeight || boundsRef.current.height || 600,
+        height:
+          canvasRef.current?.clientHeight || boundsRef.current.height || 600,
         latestBugPositionsRef,
         onLiveBugCountChange: onLiveBugCountChangeRef.current ?? undefined,
         width: canvasRef.current?.clientWidth || boundsRef.current.width || 800,
