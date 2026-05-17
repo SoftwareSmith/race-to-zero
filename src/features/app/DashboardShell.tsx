@@ -493,7 +493,7 @@ const DashboardShellContent = memo(function DashboardShellContent({
                 <Tooltip content="Start the interactive bug game.">
                   <button
                     aria-label="Open interactive bug game"
-                    className="inline-flex min-h-10 min-w-10 items-center justify-center rounded-[14px] border border-white/10 bg-zinc-950/86 px-2.5 text-stone-300 shadow-[0_8px_18px_rgba(0,0,0,0.22)] transition duration-200 hover:-translate-y-0.5 hover:bg-zinc-900 hover:text-stone-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300/40"
+                    className="inline-flex min-h-10 min-w-10 cursor-pointer items-center justify-center rounded-[14px] border border-white/10 bg-zinc-950/86 px-2.5 text-stone-300 shadow-[0_8px_18px_rgba(0,0,0,0.22)] transition duration-200 hover:-translate-y-0.5 hover:bg-zinc-900 hover:text-stone-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300/40"
                     onClick={onEnterInteractiveMode}
                     onFocus={onPrefetchSiege}
                     onMouseEnter={onPrefetchSiege}

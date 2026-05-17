@@ -37,9 +37,11 @@ interface SiegeHudProps {
   onExit: () => void;
   onEndSurvival?: () => void;
   onKillAllBugs?: () => void;
+  onTogglePause?: () => void;
   onToggleCodex?: () => void;
   onSelectWeapon: (id: SiegeWeaponId) => void;
   onToggleDebugMode?: () => void;
+  manuallyPaused?: boolean;
   selectedWeaponId: SiegeWeaponId;
   streakMultiplier: number;
   survivalStatus?: {
@@ -79,9 +81,11 @@ export default function SiegeHud({
   onEndSurvival,
   onExit,
   onKillAllBugs,
+  onTogglePause,
   onToggleCodex,
   onSelectWeapon,
   onToggleDebugMode,
+  manuallyPaused = false,
   selectedWeaponId,
   streakMultiplier,
   survivalStatus,
@@ -295,10 +299,12 @@ export default function SiegeHud({
             onExit={onExit}
             onEndSurvival={onEndSurvival}
             onKillAllBugs={onKillAllBugs}
+            onTogglePause={onTogglePause}
             onToggleCodex={onToggleCodex}
             onToggleDebugMode={onToggleDebugMode}
             onPointerEnterHud={showSystemCursor}
             onPointerLeaveHud={hideSystemCursor}
+            manuallyPaused={manuallyPaused}
           />
         </HudShell>
       </div>

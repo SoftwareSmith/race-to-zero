@@ -125,6 +125,7 @@ interface BugCanvasRenderLoopOptions {
   canvasRef: RefObject<HTMLCanvasElement | null>;
   chartFocusRef: MutableRefObject<ChartFocusState | null>;
   currentMouseRef: MutableRefObject<{ x: number; y: number } | null>;
+  ensureQaBindings?: () => void;
   fireIntervalRef: MutableRefObject<number | null>;
   gamePausedRef: MutableRefObject<boolean>;
   getWeaponTierRef: MutableRefObject<
@@ -185,6 +186,7 @@ export function setupBugCanvasRenderLoop({
   canvasRef,
   chartFocusRef,
   currentMouseRef,
+  ensureQaBindings,
   fireIntervalRef,
   gamePausedRef,
   getWeaponTierRef,
@@ -275,6 +277,10 @@ export function setupBugCanvasRenderLoop({
       0.2,
       6,
     );
+
+    if (isQaEnabled() && swarmRef.current) {
+      ensureQaBindings?.();
+    }
 
     if (swarmRef.current && !gamePausedRef.current) {
       if ((swarmRef.current as any).config) {

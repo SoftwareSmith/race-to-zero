@@ -5,6 +5,7 @@ import type { ActiveTab, TabItem } from "../../types/dashboard";
 
 interface TabsProps {
   activeTab: ActiveTab;
+  hudPointer?: boolean;
   onChange: (tabId: ActiveTab) => void;
   size?: "default" | "compact";
   tabs: TabItem[];
@@ -13,6 +14,7 @@ interface TabsProps {
 const Tabs = memo(function Tabs({
   tabs,
   activeTab,
+  hudPointer = false,
   onChange,
   size = "default",
 }: TabsProps) {
@@ -48,10 +50,11 @@ const Tabs = memo(function Tabs({
           <button
             key={tab.id}
             aria-selected={isActive}
+            data-hud-cursor={hudPointer ? "pointer" : undefined}
             className={cn(
               size === "compact"
-                ? "rounded-full px-2.5 py-[0.32rem] text-[0.66rem] font-semibold transition duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300/40 sm:text-[0.7rem]"
-                : "rounded-full px-3 py-1.5 text-[0.72rem] font-semibold transition duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300/40 sm:text-[0.76rem]",
+                ? "cursor-pointer rounded-full px-2.5 py-[0.32rem] text-[0.66rem] font-semibold transition duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300/40 sm:text-[0.7rem]"
+                : "cursor-pointer rounded-full px-3 py-1.5 text-[0.72rem] font-semibold transition duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300/40 sm:text-[0.76rem]",
               isActive
                 ? "bg-sky-400/8 text-sky-100 shadow-[inset_0_0_0_1px_rgba(56,189,248,0.14)]"
                 : "text-stone-400 hover:bg-white/4 hover:text-stone-100",

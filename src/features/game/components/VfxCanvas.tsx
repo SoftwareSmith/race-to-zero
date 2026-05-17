@@ -13,8 +13,9 @@ import { forwardRef, useEffect, useImperativeHandle, useRef } from "react";
 import type { VfxEngine } from "../engine/VfxEngine";
 import { recordQaDurationSample } from "./BackgroundField/qa";
 
-let vfxEngineModulePromise: Promise<typeof import("../engine/VfxEngine")> | null =
-  null;
+let vfxEngineModulePromise: Promise<
+  typeof import("../engine/VfxEngine")
+> | null = null;
 
 export function preloadVfxEngine() {
   vfxEngineModulePromise ??= import("../engine/VfxEngine");

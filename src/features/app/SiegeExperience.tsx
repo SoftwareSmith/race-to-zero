@@ -265,7 +265,6 @@ const SiegeExperience = memo(function SiegeExperience({
           onTogglePause={siegeGame.togglePause}
           onToggleCodex={() => ui.handleTopMenuToggle("codex")}
           onToggleDebugMode={siegeGame.toggleDebugMode}
-          focusPaused={siegeGame.isFocusPaused}
           manuallyPaused={siegeGame.isManuallyPaused}
           selectedWeaponId={siegeGame.selectedWeaponId}
           streakMultiplier={siegeGame.streakMultiplier}

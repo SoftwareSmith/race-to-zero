@@ -26,7 +26,7 @@ function MetricCard({
     <article
       data-siege-panel={label.toLowerCase().replace(/[^a-z0-9]+/g, "-")}
       className={cn(
-        "group relative flex h-full min-h-[68px] flex-col overflow-hidden rounded-[16px] border px-2.5 py-[0.4375rem] shadow-[0_8px_18px_rgba(0,0,0,0.16)] transition duration-200 hover:border-white/16 hover:shadow-[0_12px_24px_rgba(0,0,0,0.2)] sm:min-h-[76px] sm:rounded-[18px] sm:py-2",
+        "group relative flex h-full min-h-[68px] cursor-default flex-col overflow-hidden rounded-[16px] border px-2.5 py-[0.4375rem] shadow-[0_8px_18px_rgba(0,0,0,0.16)] transition duration-200 hover:border-white/16 hover:shadow-[0_12px_24px_rgba(0,0,0,0.2)] sm:min-h-[76px] sm:rounded-[18px] sm:py-2",
         styles.card,
         className,
       )}

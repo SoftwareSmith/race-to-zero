@@ -1085,6 +1085,7 @@ export default function CodexPanel({
                     >
                       <Tabs
                         activeTab={activeView as any}
+                        hudPointer
                         onChange={handleTabChange}
                         tabs={CODEX_TABS as any}
                       />

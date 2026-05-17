@@ -217,6 +217,7 @@ const BugCanvas = memo(
     });
     const latestBugPositionsRef = useRef<RenderedBugPosition[]>([]);
     const lastReportedLiveBugCountRef = useRef<number | null>(null);
+    const qaBindingOwnerRef = useRef<object | null>(null);
     const lastAppliedSpawnPlanRef = useRef(0);
     const gamePausedRef = useRef(gamePaused);
     const targetSettingsRef = useRef({
@@ -304,7 +305,8 @@ const BugCanvas = memo(
             return null;
           }
 
-          clearBugCanvasQaBindings();
+          clearBugCanvasQaBindings(qaBindingOwnerRef.current ?? undefined);
+          qaBindingOwnerRef.current = null;
           swarmRef.current = null;
           latestBugPositionsRef.current = [];
           lastReportedLiveBugCountRef.current = null;
@@ -371,6 +373,51 @@ const BugCanvas = memo(
       () => computeLocalSiegeZones(canvasRef, boundsRef, siegeZonesRef),
       [],
     );
+
+    const ensureQaBindings = useCallback(() => {
+      if (typeof window === "undefined") {
+        return;
+      }
+
+      const qaState = (
+        window as Window & {
+          __RTZ_QA__?: {
+            clearLiveBugs?: () => number;
+            enabled?: boolean;
+            getLiveBugCount?: () => number;
+            repositionLiveBug?: (request: {
+              heading?: number;
+              index: number;
+              vx?: number;
+              vy?: number;
+              x: number;
+              y: number;
+            }) => boolean;
+          };
+        }
+      ).__RTZ_QA__;
+
+      if (!qaState?.enabled || !swarmRef.current) {
+        return;
+      }
+
+      if (
+        typeof qaState.repositionLiveBug === "function" &&
+        typeof qaState.getLiveBugCount === "function" &&
+        typeof qaState.clearLiveBugs === "function"
+      ) {
+        return;
+      }
+
+      qaBindingOwnerRef.current = installBugCanvasQaBindings({
+        bounds: boundsRef.current,
+        engine: swarmRef.current,
+        height: canvasRef.current?.clientHeight || boundsRef.current.height || 600,
+        latestBugPositionsRef,
+        onLiveBugCountChange: onLiveBugCountChangeRef.current ?? undefined,
+        width: canvasRef.current?.clientWidth || boundsRef.current.width || 800,
+      });
+    }, []);
 
     useEffect(() => {
       applySurvivalSpawnPlan({
@@ -477,7 +524,7 @@ const BugCanvas = memo(
 
         swarmRef.current = result.engine;
         disposePhysicsAdapter = () => result.physicsAdapter.dispose?.();
-        installBugCanvasQaBindings({
+        qaBindingOwnerRef.current = installBugCanvasQaBindings({
           bounds: boundsRef.current,
           engine: result.engine,
           height: h,
@@ -511,7 +558,8 @@ const BugCanvas = memo(
           }
         }
         disposePhysicsAdapter?.();
-        clearBugCanvasQaBindings();
+        clearBugCanvasQaBindings(qaBindingOwnerRef.current ?? undefined);
+        qaBindingOwnerRef.current = null;
         swarmRef.current = null;
       };
     }, [
@@ -540,6 +588,7 @@ const BugCanvas = memo(
         canvasRef,
         chartFocusRef,
         currentMouseRef,
+        ensureQaBindings,
         fireIntervalRef,
         gamePausedRef,
         getWeaponTierRef,
@@ -563,7 +612,12 @@ const BugCanvas = memo(
         targetSettingsRef,
         vfxRef,
       });
-    }, [hammerPositionRef, runtimeSpeedMultiplier, syncWeaponEvolutionStates]);
+    }, [
+      ensureQaBindings,
+      hammerPositionRef,
+      runtimeSpeedMultiplier,
+      syncWeaponEvolutionStates,
+    ]);
 
     useEffect(() => {
       clearInteractiveSwarm({

@@ -1,4 +1,4 @@
-import { memo, useEffect, useMemo, useState } from "react";
+import { memo, useEffect, useMemo, useRef, useState } from "react";
 import {
   type ActiveElement,
   BarElement,
@@ -17,7 +17,12 @@ import {
 } from "chart.js";
 import ChartDataLabels from "chartjs-plugin-datalabels";
 import { Bar, Line } from "react-chartjs-2";
-import { getLineChartOptions } from "@dashboard/utils/chartConfig";
+import {
+  getLineChartOptions,
+  hideCustomChartTooltip,
+  showUnifiedAllValuesTooltip,
+  usesUnifiedAllValuesTooltip,
+} from "@dashboard/utils/chartConfig";
 import { cn } from "@shared/utils/cn";
 import type { ChartFocusState } from "../../../types/dashboard";
 
@@ -58,6 +63,17 @@ const ChartCard = memo(function ChartCard({
   onHoverStateChange,
 }: ChartCardProps) {
   const [isChartVisible, setIsChartVisible] = useState(false);
+  const barChartRef = useRef<ChartJS<"bar", number[], string> | null>(null);
+  const lineChartRef = useRef<ChartJS<
+    "line",
+    Array<number | null>,
+    string
+  > | null>(null);
+  const useUnifiedTooltip = usesUnifiedAllValuesTooltip(
+    variant,
+    chartKey,
+    data.datasets.length,
+  );
 
   useEffect(() => {
     const frameId = window.requestAnimationFrame(() => {
@@ -112,14 +128,46 @@ const ChartCard = memo(function ChartCard({
     [chartKey, data.datasets.length, onHoverStateChange],
   );
 
+  const handleUnifiedTooltipEnter = (
+    event: React.MouseEvent<HTMLDivElement>,
+  ) => {
+    if (!useUnifiedTooltip) {
+      return;
+    }
+
+    const chart =
+      variant === "bar" ? barChartRef.current : lineChartRef.current;
+    if (!chart) {
+      return;
+    }
+
+    showUnifiedAllValuesTooltip(
+      chart,
+      event.currentTarget.getBoundingClientRect(),
+    );
+  };
+
+  const handleUnifiedTooltipLeave = () => {
+    if (!useUnifiedTooltip) {
+      return;
+    }
+
+    const chart =
+      variant === "bar" ? barChartRef.current : lineChartRef.current;
+    hideCustomChartTooltip(chart);
+  };
+
   return (
     <article
       data-siege-panel={chartKey}
       className={cn(
-        "group relative flex min-h-0 flex-col overflow-hidden rounded-[18px] border border-white/10 bg-[linear-gradient(180deg,rgba(10,12,18,0.96),rgba(19,23,32,0.96))] p-2.5 text-stone-50 shadow-[0_14px_28px_rgba(0,0,0,0.24)] transition duration-200 hover:border-white/16 hover:shadow-[0_18px_34px_rgba(0,0,0,0.3)] sm:rounded-[20px] sm:p-3",
+        "group relative flex min-h-0 cursor-default flex-col overflow-hidden rounded-[18px] border border-white/10 bg-[linear-gradient(180deg,rgba(10,12,18,0.96),rgba(19,23,32,0.96))] p-2.5 text-stone-50 shadow-[0_14px_28px_rgba(0,0,0,0.24)] transition duration-200 hover:border-white/16 hover:shadow-[0_18px_34px_rgba(0,0,0,0.3)] sm:rounded-[20px] sm:p-3",
         className,
       )}
-      onMouseLeave={() => onHoverStateChange?.(null)}
+      onMouseLeave={() => {
+        onHoverStateChange?.(null);
+        handleUnifiedTooltipLeave();
+      }}
     >
       <div className="pointer-events-none absolute inset-0 opacity-0 transition duration-200 group-hover:opacity-100">
         <div className="absolute -left-6 top-8 h-28 w-28 rounded-full bg-sky-400/12 blur-3xl" />
@@ -145,11 +193,21 @@ const ChartCard = memo(function ChartCard({
             isChartVisible ? "opacity-100" : "opacity-0",
             description ? "sm:mt-2.5" : "",
           )}
+          onMouseEnter={handleUnifiedTooltipEnter}
+          onMouseLeave={handleUnifiedTooltipLeave}
         >
           {variant === "bar" ? (
-            <Bar data={data as BarChartData} options={barOptions} />
+            <Bar
+              ref={barChartRef}
+              data={data as BarChartData}
+              options={barOptions}
+            />
           ) : (
-            <Line data={data as LineChartData} options={lineOptions} />
+            <Line
+              ref={lineChartRef}
+              data={data as LineChartData}
+              options={lineOptions}
+            />
           )}
         </div>
       </div>

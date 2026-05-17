@@ -104,4 +104,45 @@ test.describe("dashboard core QA", () => {
 
     await clientErrors.expectNoClientErrors();
   });
+
+  test("uses pointer only for actionable dashboard controls", async ({ page }) => {
+    const clientErrors = createConsoleCollectors(page);
+
+    await gotoDashboard(page);
+
+    await expect(page.getByRole("tab", { name: "Target" })).toHaveCSS(
+      "cursor",
+      "pointer",
+    );
+    await expect(page.getByRole("button", { name: "Open settings" })).toHaveCSS(
+      "cursor",
+      "pointer",
+    );
+    await expect(page.getByLabel("Team filter")).toHaveCSS("cursor", "pointer");
+    await expect(page.getByLabel("Tracking start date")).toHaveCSS(
+      "cursor",
+      "pointer",
+    );
+    await expect(page.locator('[data-siege-panel="open-bugs"]')).toHaveCSS(
+      "cursor",
+      "default",
+    );
+
+    await page.getByRole("tab", { name: "Trend" }).click();
+    await expect(page.getByRole("button", { name: "30D" })).toHaveCSS(
+      "cursor",
+      "pointer",
+    );
+
+    await page.getByRole("button", { name: "Open settings" }).click();
+    await expect(page.getByText("Settings", { exact: true })).toHaveCSS(
+      "cursor",
+      "default",
+    );
+    await expect(
+      page.locator('label:has-text("Exclude weekends")'),
+    ).toHaveCSS("cursor", "pointer");
+
+    await clientErrors.expectNoClientErrors();
+  });
 });

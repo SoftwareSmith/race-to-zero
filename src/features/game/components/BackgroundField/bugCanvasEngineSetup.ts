@@ -32,6 +32,7 @@ import type { SiegeZoneRect } from "@game/types";
 type SiegeZoneLocalRect = Pick<SiegeZoneRect, "height" | "left" | "top" | "width">;
 
 type QaWindowState = {
+  __bugCanvasBindingOwner?: object;
   bugTelemetry?: Array<any>;
   clearLiveBugs?: () => number;
   enabled?: boolean;
@@ -239,16 +240,19 @@ export function installBugCanvasQaBindings({
   onLiveBugCountChange?: (count: number) => void;
   width: number;
 }) {
+  const bindingOwner = {};
+
   if (typeof window === "undefined") {
-    return;
+    return bindingOwner;
   }
 
   const qaState = (window as QaWindow).__RTZ_QA__;
 
   if (!qaState?.enabled) {
-    return;
+    return bindingOwner;
   }
 
+  qaState.__bugCanvasBindingOwner = bindingOwner;
   qaState.getLiveBugCount = () =>
     getActiveBugCount(engine.getAllBugs() as Array<any>);
   qaState.getLiveBugTelemetry = () => qaState.bugTelemetry ?? [];
@@ -270,6 +274,8 @@ export function installBugCanvasQaBindings({
 
     bug.x = x;
     bug.y = y;
+    bug.prevX = x;
+    bug.prevY = y;
 
     if (typeof vx === "number") {
       bug.vx = vx;
@@ -279,7 +285,15 @@ export function installBugCanvasQaBindings({
     }
     if (typeof heading === "number") {
       bug.heading = heading;
+      bug.wanderAngle = heading;
     }
+
+    bug.motionTime = 0;
+    bug.cruiseSpeed = 0;
+    bug.roamTargetX = x;
+    bug.roamTargetY = y;
+    bug.nextRoamTargetAt = performance.now() + 500;
+    bug.movementMood = "patrol";
 
     if (x >= 0 && x <= width && y >= 0 && y <= height) {
       bug.hasEnteredField = true;
@@ -295,14 +309,24 @@ export function installBugCanvasQaBindings({
     syncQaBugTelemetryFromEngine(engine, bounds);
     return true;
   };
+
+  return bindingOwner;
 }
 
-export function clearBugCanvasQaBindings() {
+export function clearBugCanvasQaBindings(bindingOwner?: object) {
   if (typeof window === "undefined") {
     return;
   }
 
   const qaState = (window as QaWindow).__RTZ_QA__;
+
+  if (!qaState) {
+    return;
+  }
+
+  if (bindingOwner && qaState.__bugCanvasBindingOwner !== bindingOwner) {
+    return;
+  }
 
   if (qaState?.clearLiveBugs) {
     delete qaState.clearLiveBugs;
@@ -315,5 +339,8 @@ export function clearBugCanvasQaBindings() {
   }
   if (qaState?.repositionLiveBug) {
     delete qaState.repositionLiveBug;
+  }
+  if (qaState.__bugCanvasBindingOwner) {
+    delete qaState.__bugCanvasBindingOwner;
   }
 }

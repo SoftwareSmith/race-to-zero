@@ -41,6 +41,14 @@ function shouldUseUnifiedAllValuesTooltip(
   );
 }
 
+export function usesUnifiedAllValuesTooltip(
+  variant: ChartVariant,
+  chartKey?: string,
+  datasetCount = 1,
+) {
+  return shouldUseUnifiedAllValuesTooltip(variant, chartKey, datasetCount);
+}
+
 function getTooltipRowColor(dataset: any, index: number) {
   const backgroundColor = dataset?.backgroundColor;
 
@@ -65,7 +73,7 @@ function getOrCreateTooltipElement(chart: any) {
   tooltipEl.dataset.chartId = String(chart.id);
   tooltipEl.style.position = "fixed";
   tooltipEl.style.pointerEvents = "none";
-  tooltipEl.style.transform = "translate(-50%, calc(-100% - 10px))";
+  tooltipEl.style.transform = "none";
   tooltipEl.style.transition = "opacity 120ms ease";
   tooltipEl.style.opacity = "0";
   tooltipEl.style.zIndex = "20";
@@ -82,11 +90,56 @@ function getOrCreateTooltipElement(chart: any) {
   return tooltipEl;
 }
 
+export function hideCustomChartTooltip(chart: any) {
+  if (!chart) {
+    return;
+  }
+
+  const tooltipEl = getOrCreateTooltipElement(chart);
+  if (!tooltipEl) {
+    return;
+  }
+
+  tooltipEl.style.opacity = "0";
+}
+
+function positionTooltipAtPoint(
+  tooltipEl: HTMLDivElement,
+  left: number,
+  top: number,
+) {
+  const viewportPadding = 12;
+
+  tooltipEl.style.left = "0px";
+  tooltipEl.style.top = "0px";
+  tooltipEl.style.opacity = "0";
+
+  const tooltipRect = tooltipEl.getBoundingClientRect();
+  const tooltipWidth = tooltipRect.width;
+  const tooltipHeight = tooltipRect.height;
+
+  const clampedLeft = Math.min(
+    Math.max(viewportPadding, left),
+    window.innerWidth - tooltipWidth - viewportPadding,
+  );
+  const clampedTop = Math.min(
+    Math.max(viewportPadding, top),
+    window.innerHeight - tooltipHeight - viewportPadding,
+  );
+
+  tooltipEl.style.left = `${clampedLeft}px`;
+  tooltipEl.style.top = `${clampedTop}px`;
+  tooltipEl.style.opacity = "1";
+}
+
 function positionTooltipElement(chart: any, tooltip: any, tooltipEl: HTMLDivElement) {
   const canvasRect = chart.canvas.getBoundingClientRect();
-  tooltipEl.style.left = `${canvasRect.left + tooltip.caretX}px`;
-  tooltipEl.style.top = `${canvasRect.top + tooltip.caretY}px`;
-  tooltipEl.style.opacity = "1";
+  const tooltipRect = tooltipEl.getBoundingClientRect();
+  positionTooltipAtPoint(
+    tooltipEl,
+    canvasRect.left + tooltip.caretX,
+    canvasRect.top + tooltip.caretY - tooltipRect.height - 10,
+  );
 }
 
 function renderTooltipRows(rows: string, title: string) {
@@ -176,6 +229,53 @@ function renderAllValuesTooltip(context: any) {
   positionTooltipElement(chart, tooltip, tooltipEl);
 }
 
+export function showUnifiedAllValuesTooltip(chart: any, anchorRect: DOMRect) {
+  if (!chart) {
+    return;
+  }
+
+  const tooltipEl = getOrCreateTooltipElement(chart);
+  if (!tooltipEl) {
+    return;
+  }
+
+  const labels = chart.data.labels ?? [];
+  const dataset = chart.data.datasets?.[0];
+  const values = dataset?.data ?? [];
+
+  const rows = labels
+    .map((label: unknown, index: number) => {
+      const color = getTooltipRowColor(dataset, index);
+      const value = values[index] ?? 0;
+
+      return `
+        <div style="display:grid;grid-template-columns:10px minmax(0,1fr) auto;align-items:center;column-gap:8px;">
+          <span style="width:10px;height:10px;border-radius:2px;background:${String(color)};display:block;"></span>
+          <span style="color:#dbeafe;font-size:12px;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${String(label)}</span>
+          <span style="color:#f8fafc;font-size:12px;line-height:1.2;font-weight:700;text-align:right;">${String(value)}</span>
+        </div>
+      `;
+    })
+    .join("");
+
+  tooltipEl.innerHTML = renderTooltipRows(rows, "All values");
+  const canvasRect = chart.canvas.getBoundingClientRect();
+  const chartArea = chart.chartArea;
+  const tooltipRect = tooltipEl.getBoundingClientRect();
+  const anchorLeft = chartArea
+    ? canvasRect.left + chartArea.right - tooltipRect.width
+    : anchorRect.right - tooltipRect.width;
+  const anchorTop = chartArea
+    ? canvasRect.top + chartArea.top - tooltipRect.height - 10
+    : anchorRect.top - tooltipRect.height - 10;
+
+  positionTooltipAtPoint(
+    tooltipEl,
+    anchorLeft,
+    anchorTop,
+  );
+}
+
 export function getLineChartOptions<TVariant extends ChartVariant>(
   variant: TVariant,
   chartKey?: string,
@@ -238,7 +338,7 @@ export function getLineChartOptions<TVariant extends ChartVariant>(
       tooltip: {
         enabled: false,
         external: useUnifiedAllValuesTooltip
-          ? renderAllValuesTooltip
+          ? undefined
           : renderStandardTooltip,
         backgroundColor: "#0f172a",
         titleColor: "#fafaf9",

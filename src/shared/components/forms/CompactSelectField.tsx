@@ -48,7 +48,7 @@ export default function CompactSelectField({
         <select
           aria-label={`${label} filter`}
           className={cn(
-            "max-w-[7rem] appearance-none bg-transparent focus:outline-none",
+            "max-w-[7rem] cursor-pointer appearance-none bg-transparent focus:outline-none",
             size === "compact" ? "text-[0.68rem]" : "text-[0.76rem]",
           )}
           onChange={onChange}

@@ -155,26 +155,26 @@ function toHex(r: number, g: number, b: number): number {
   return ((r & 0xff) << 16) | ((g & 0xff) << 8) | (b & 0xff);
 }
 
-function compactActiveItemsInPlace<T>(
+function retainActiveItems<T>(
   items: T[],
-  shouldKeep: (item: T) => boolean,
+  expiredItems: Set<T>,
   onExpire: (item: T) => void,
 ) {
-  let nextIndex = 0;
+  if (expiredItems.size === 0) {
+    return items;
+  }
 
-  for (let index = 0; index < items.length; index += 1) {
-    const item = items[index];
-    if (!shouldKeep(item)) {
+  const activeItems: T[] = [];
+  for (const item of items) {
+    if (expiredItems.has(item)) {
       onExpire(item);
       continue;
     }
 
-    items[nextIndex] = item;
-    nextIndex += 1;
+    activeItems.push(item);
   }
 
-  items.length = nextIndex;
-  return items;
+  return activeItems;
 }
 
 // ── VfxEngine ────────────────────────────────────────────────────────────────
@@ -1380,12 +1380,12 @@ export class VfxEngine {
     const now = performance.now();
 
     // Update particles
-    compactActiveItemsInPlace(
-      this.particles,
-      (p) => {
+    const deadParticles: Particle[] = [];
+    for (const p of this.particles) {
       p.life -= dtMs;
       if (p.life <= 0) {
-          return false;
+        deadParticles.push(p);
+        continue;
       }
       p.x += p.vx * (dtMs / 1000);
       p.y += p.vy * (dtMs / 1000);
@@ -1493,71 +1493,75 @@ export class VfxEngine {
         gfx.roundRect(-sz * 0.55, -sz * 0.4, sz * 1.1, sz * 0.8, sz * 0.14);
         gfx.fill({ color: toHex(r, g, b), alpha: 1 });
       }
-        return true;
-      },
+    }
+    this.particles = retainActiveItems(
+      this.particles,
+      new Set(deadParticles),
       (particle) => this.releaseParticle(particle),
     );
 
     // Update decals (fade out)
-    compactActiveItemsInPlace(
+    const deadDecals: Decal[] = [];
+    for (const d of this.decals) {
+      const age = now - d.createdAt;
+      if (age >= d.lifetime) {
+        deadDecals.push(d);
+        continue;
+      }
+      const progress = age / d.lifetime;
+      d.gfx.alpha = d.initialAlpha * (1 - progress);
+      // Animate binary-burst bits position
+      const bvx = (d.gfx as any).__bvx;
+      if (bvx !== undefined) {
+        const bvy = (d.gfx as any).__bvy;
+        d.gfx.x += bvx * (dtMs / 1000);
+        d.gfx.y += bvy * (dtMs / 1000);
+      }
+    }
+    this.decals = retainActiveItems(
       this.decals,
-      (d) => {
-        const age = now - d.createdAt;
-        if (age >= d.lifetime) {
-          return false;
-        }
-
-        const progress = age / d.lifetime;
-        d.gfx.alpha = d.initialAlpha * (1 - progress);
-        const bvx = (d.gfx as any).__bvx;
-        if (bvx !== undefined) {
-          const bvy = (d.gfx as any).__bvy;
-          d.gfx.x += bvx * (dtMs / 1000);
-          d.gfx.y += bvy * (dtMs / 1000);
-        }
-
-        return true;
-      },
+      new Set(deadDecals),
       (decal) => this.releaseDecal(decal),
     );
 
     // Update lightning arcs (redraw per frame for flicker)
     this.lightningGfx.clear();
-    compactActiveItemsInPlace(
+    const deadArcs: LightningArc[] = [];
+    for (const arc of this.lightningArcs) {
+      const age = now - arc.createdAt;
+      if (age >= arc.lifetime) {
+        deadArcs.push(arc);
+        continue;
+      }
+      const progress = age / arc.lifetime;
+      const alpha = progress < 0.2 ? progress / 0.2 : 1 - (progress - 0.2) / 0.8;
+      this._drawLightningArc(arc, alpha * 0.9, now);
+    }
+    this.lightningArcs = retainActiveItems(
       this.lightningArcs,
-      (arc) => {
-        const age = now - arc.createdAt;
-        if (age >= arc.lifetime) {
-          return false;
-        }
-
-        const progress = age / arc.lifetime;
-        const alpha =
-          progress < 0.2 ? progress / 0.2 : 1 - (progress - 0.2) / 0.8;
-        this._drawLightningArc(arc, alpha * 0.9, now);
-        return true;
-      },
+      new Set(deadArcs),
       () => undefined,
     );
 
-    compactActiveItemsInPlace(
+    const deadLabels: FloatingLabel[] = [];
+    for (const label of this.floatingLabels) {
+      label.age += dtMs;
+      if (label.age >= label.maxAge) {
+        deadLabels.push(label);
+        continue;
+      }
+      const progress = label.age / label.maxAge;
+      const alpha = 1 - progress * progress;
+      label.y -= label.vy * (dtMs / 1000);
+      label.text.x = label.x;
+      label.text.y = label.y;
+      label.text.alpha = alpha;
+      const scale = label.scaleFrom + progress * 0.08;
+      label.text.scale.set(scale);
+    }
+    this.floatingLabels = retainActiveItems(
       this.floatingLabels,
-      (label) => {
-        label.age += dtMs;
-        if (label.age >= label.maxAge) {
-          return false;
-        }
-
-        const progress = label.age / label.maxAge;
-        const alpha = 1 - progress * progress;
-        label.y -= label.vy * (dtMs / 1000);
-        label.text.x = label.x;
-        label.text.y = label.y;
-        label.text.alpha = alpha;
-        const scale = label.scaleFrom + progress * 0.08;
-        label.text.scale.set(scale);
-        return true;
-      },
+      new Set(deadLabels),
       (label) => {
         label.text.removeFromParent();
         label.text.destroy();

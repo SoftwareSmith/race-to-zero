@@ -13,12 +13,14 @@ interface SiegeHudControlsProps {
   codexOpen: boolean;
   debugMode: boolean;
   gameMode: SiegeGameMode;
+  manuallyPaused?: boolean;
   onChangeGameMode?: (mode: SiegeGameMode) => void;
   onExit: () => void;
   onEndSurvival?: () => void;
   onKillAllBugs?: () => void;
   onToggleCodex?: () => void;
   onToggleDebugMode?: () => void;
+  onTogglePause?: () => void;
   onPointerEnterHud: () => void;
   onPointerLeaveHud: () => void;
 }
@@ -39,12 +41,14 @@ const SiegeHudControls = memo(function SiegeHudControls({
   codexOpen,
   debugMode,
   gameMode,
+  manuallyPaused = false,
   onChangeGameMode,
   onEndSurvival,
   onExit,
   onKillAllBugs,
   onToggleCodex,
   onToggleDebugMode,
+  onTogglePause,
   onPointerEnterHud,
   onPointerLeaveHud,
 }: SiegeHudControlsProps) {
@@ -73,6 +77,41 @@ const SiegeHudControls = memo(function SiegeHudControls({
     </Tooltip>
   ) : null;
   const controlActions: HudControlAction[] = [
+    ...(onTogglePause && gameMode === "outbreak"
+      ? [
+          {
+            active: manuallyPaused,
+            ariaLabel: manuallyPaused ? "Resume survival" : "Pause survival",
+            icon: manuallyPaused ? (
+              <svg
+                aria-hidden="true"
+                className="h-3.5 w-3.5"
+                fill="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path d="M8 5.14v13.72a1 1 0 0 0 1.52.86l10.96-6.86a1 1 0 0 0 0-1.72L9.52 4.28A1 1 0 0 0 8 5.14Z" />
+              </svg>
+            ) : (
+              <svg
+                aria-hidden="true"
+                className="h-3.5 w-3.5"
+                fill="none"
+                stroke="currentColor"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth="1.8"
+                viewBox="0 0 24 24"
+              >
+                <path d="M9 5h2v14H9zM13 5h2v14h-2z" />
+              </svg>
+            ),
+            key: "pause",
+            onClick: onTogglePause,
+            tone: "info" as const,
+            tooltip: manuallyPaused ? "Resume survival" : "Pause survival",
+          },
+        ]
+      : []),
     ...(onToggleDebugMode
       ? [
           {
@@ -201,8 +240,9 @@ const SiegeHudControls = memo(function SiegeHudControls({
                 <Tooltip key={mode} content={meta.description}>
                   <button
                     aria-selected={selected}
+                    data-hud-cursor="pointer"
                     className={cn(
-                      "rounded-full px-3 py-1.5 text-[0.74rem] font-semibold transition duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300/40",
+                      "!cursor-pointer rounded-full px-3 py-1.5 text-[0.74rem] font-semibold transition duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300/40",
                       selected
                         ? "bg-sky-400/8 text-sky-100 shadow-[inset_0_0_0_1px_rgba(56,189,248,0.14)]"
                         : "text-stone-400 hover:bg-white/4 hover:text-stone-100",

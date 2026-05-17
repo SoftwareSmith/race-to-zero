@@ -281,3 +281,36 @@ test("codex shows weapon and structure grids with drill-down detail views", asyn
   await codexModal.getByRole("button", { name: "Back" }).click();
   await expect(page.getByTestId("codex-tabs")).toBeVisible();
 });
+
+test("uses consistent cursor affordances in siege HUD and codex menus", async ({ page }) => {
+  await page.goto("./");
+  await page.getByRole("button", { name: "Open interactive bug game" }).click();
+
+  const survivalTab = page.getByRole("tab", { name: "Survival" });
+  await expect(survivalTab).toHaveAttribute("data-hud-cursor", "pointer");
+  await expect(survivalTab).toHaveCSS("cursor", "pointer");
+  await expect(page.getByRole("button", { name: "Open codex" })).toHaveCSS(
+    "cursor",
+    "pointer",
+  );
+
+  await page.getByRole("button", { name: "Open codex" }).click();
+
+  const codexModal = page.getByTestId("codex-modal");
+  await expect(codexModal).toBeVisible();
+  await expect(codexModal.getByRole("heading", { name: "Bug Codex" })).toHaveCSS(
+    "cursor",
+    "default",
+  );
+  await expect(codexModal.getByRole("tab", { name: "Bugs" })).toHaveCSS(
+    "cursor",
+    "pointer",
+  );
+
+  const closeButton = codexModal.getByRole("button", {
+    name: "Close",
+    exact: true,
+  });
+  await expect(closeButton).toHaveAttribute("data-hud-cursor", "pointer");
+  await expect(closeButton).toHaveCSS("cursor", "pointer");
+});

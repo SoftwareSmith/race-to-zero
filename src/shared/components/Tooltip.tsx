@@ -21,7 +21,7 @@ interface TooltipProps {
 function Tooltip({
   content,
   children,
-  triggerClassName = "inline-flex !cursor-pointer",
+  triggerClassName = "inline-flex",
 }: TooltipProps) {
   const triggerRef = useRef<HTMLSpanElement | null>(null);
   const tooltipRef = useRef<HTMLSpanElement | null>(null);
