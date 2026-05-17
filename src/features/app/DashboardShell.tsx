@@ -2,6 +2,7 @@ import {
   memo,
   useEffect,
   useLayoutEffect,
+  useMemo,
   useRef,
   useState,
   type RefObject,
@@ -16,12 +17,14 @@ import {
   useDashboardUi,
 } from "@dashboard/context/DashboardContext";
 import {
-  HistoryView,
-  InsightsView,
   OverviewView,
-  PeriodsView,
   StatusBanner,
 } from "@dashboard/DashboardViews";
+import {
+  HistoryView,
+  InsightsView,
+  PeriodsView,
+} from "@dashboard/DashboardAnalyticsViews";
 import {
   MenuIconButton,
   MenuPanel,
@@ -42,6 +45,189 @@ interface DashboardShellProps {
   siegePhase: SiegePhase;
 }
 
+type SkeletonChartVariant = "bar" | "line";
+type AnalyticsTabId = "periods" | "insights" | "history";
+
+function SkeletonBlock({ className = "" }: { className?: string }) {
+  return (
+    <div
+      className={cn(
+        "dashboard-skeleton-shell rounded-full bg-[rgba(255,255,255,0.06)]",
+        className,
+      )}
+    />
+  );
+}
+
+function MetricCardSkeleton() {
+  return (
+    <article className="relative flex h-full min-h-[68px] flex-col overflow-hidden rounded-[16px] border border-white/10 bg-[linear-gradient(180deg,rgba(14,18,28,0.96),rgba(18,23,34,0.96))] px-2.5 py-[0.4375rem] shadow-[0_8px_18px_rgba(0,0,0,0.16)] sm:min-h-[76px] sm:rounded-[18px] sm:py-2">
+      <div className="absolute inset-x-5 top-0 h-px bg-gradient-to-r from-transparent via-white/12 to-transparent" />
+      <div className="relative flex items-start gap-3">
+        <SkeletonBlock className="mt-0.5 h-2.5 w-20 sm:h-2.5 sm:w-24" />
+      </div>
+      <SkeletonBlock className="mt-3 h-7 w-[58%] rounded-[10px] sm:mt-3.5 sm:h-8" />
+    </article>
+  );
+}
+
+function ChartPlotSkeleton({
+  variant,
+}: {
+  variant: SkeletonChartVariant;
+}) {
+  if (variant === "bar") {
+    return (
+      <div className="absolute inset-0 flex items-end gap-2 px-2 pb-2 pt-5 sm:gap-2.5 sm:px-3 sm:pb-3">
+        {[34, 62, 48, 78, 56, 70, 44].map((height, index) => (
+          <div
+            key={`bar-skeleton-${index}`}
+            className="dashboard-skeleton-shell flex-1 rounded-t-[8px] bg-[rgba(255,255,255,0.06)]"
+            style={{ height: `${height}%` }}
+          />
+        ))}
+      </div>
+    );
+  }
+
+  const points = [
+    { left: "4%", top: "66%" },
+    { left: "20%", top: "54%" },
+    { left: "38%", top: "59%" },
+    { left: "56%", top: "32%" },
+    { left: "74%", top: "43%" },
+    { left: "92%", top: "24%" },
+  ];
+
+  return (
+    <div className="absolute inset-0">
+      <div className="absolute inset-x-2 bottom-2 top-5 rounded-[14px] border border-white/6 bg-[linear-gradient(180deg,rgba(255,255,255,0.02),rgba(255,255,255,0.01))] sm:inset-x-3 sm:bottom-3" />
+      {points.slice(0, -1).map((point, index) => {
+        const nextPoint = points[index + 1];
+        const x1 = Number.parseFloat(point.left);
+        const y1 = Number.parseFloat(point.top);
+        const x2 = Number.parseFloat(nextPoint.left);
+        const y2 = Number.parseFloat(nextPoint.top);
+        const dx = x2 - x1;
+        const dy = y2 - y1;
+        const length = Math.sqrt(dx * dx + dy * dy);
+        const angle = (Math.atan2(dy, dx) * 180) / Math.PI;
+
+        return (
+          <div
+            key={`line-skeleton-segment-${index}`}
+            className="absolute h-[2px] origin-left rounded-full bg-white/12"
+            style={{
+              left: point.left,
+              top: point.top,
+              transform: `rotate(${angle}deg)`,
+              width: `${length}%`,
+            }}
+          />
+        );
+      })}
+      {points.map((point, index) => (
+        <div
+          key={`line-skeleton-point-${index}`}
+          className="dashboard-skeleton-shell absolute h-2.5 w-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/10 bg-zinc-800"
+          style={{ left: point.left, top: point.top }}
+        />
+      ))}
+    </div>
+  );
+}
+
+function ChartCardSkeleton({
+  variant,
+}: {
+  variant: SkeletonChartVariant;
+}) {
+  return (
+    <article className="group relative flex min-h-0 flex-col overflow-hidden rounded-[18px] border border-white/10 bg-[linear-gradient(180deg,rgba(10,12,18,0.96),rgba(19,23,32,0.96))] p-2.5 text-stone-50 shadow-[0_14px_28px_rgba(0,0,0,0.24)] sm:rounded-[20px] sm:p-3">
+      <div className="absolute inset-x-0 top-0 h-24 bg-[radial-gradient(circle_at_top,rgba(56,189,248,0.08),transparent_60%)]" />
+      <div className="relative flex h-full flex-col">
+        <div className="shrink-0">
+          <SkeletonBlock className="mt-1 h-4.5 w-40 rounded-[8px] sm:h-5 sm:w-48" />
+          <SkeletonBlock className="mt-[0.5rem] h-2.5 w-[92%] sm:w-[88%]" />
+          <SkeletonBlock className="mt-2 h-2.5 w-[68%]" />
+        </div>
+        <div className="relative mt-2 h-[156px] shrink-0 overflow-hidden sm:mt-2.5 sm:h-[184px] xl:h-[198px]">
+          <div className="dashboard-skeleton-shell absolute inset-0 rounded-[14px] border border-white/6 bg-[linear-gradient(180deg,rgba(255,255,255,0.025),rgba(255,255,255,0.01))]" />
+          <ChartPlotSkeleton variant={variant} />
+        </div>
+      </div>
+    </article>
+  );
+}
+
+function AnalyticsPanelFallback({
+  cardCount,
+  chartVariants,
+}: {
+  cardCount: number;
+  chartVariants: SkeletonChartVariant[];
+}) {
+  return (
+    <div aria-hidden="true" className="grid content-start gap-1.5 sm:gap-2">
+      <div
+        className={cn(
+          "grid gap-1.5 sm:gap-2",
+          cardCount <= 4
+            ? "sm:grid-cols-2 xl:grid-cols-4"
+            : cardCount === 5
+              ? "sm:grid-cols-2 xl:grid-cols-5"
+              : "sm:grid-cols-2 xl:grid-cols-6",
+        )}
+      >
+        {Array.from({ length: cardCount }, (_, index) => (
+          <MetricCardSkeleton key={`tab-skeleton-card-${index}`} />
+        ))}
+      </div>
+      <div className="grid items-stretch gap-1.5 md:grid-cols-2 sm:gap-2">
+        {chartVariants.map((variant, index) => (
+          <ChartCardSkeleton
+            key={`tab-skeleton-chart-${index}`}
+            variant={variant}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function AnalyticsTabSkeleton({
+  cardCount,
+  chartVariants,
+}: {
+  cardCount: number;
+  chartVariants: SkeletonChartVariant[];
+}) {
+  return (
+    <AnalyticsPanelFallback cardCount={cardCount} chartVariants={chartVariants} />
+  );
+}
+
+const PERIODS_CHART_VARIANTS: SkeletonChartVariant[] = [
+  "line",
+  "bar",
+  "bar",
+  "line",
+];
+const INSIGHTS_CHART_VARIANTS: SkeletonChartVariant[] = [
+  "bar",
+  "bar",
+  "line",
+  "bar",
+];
+const HISTORY_CHART_VARIANTS: SkeletonChartVariant[] = [
+  "bar",
+  "line",
+  "bar",
+  "bar",
+];
+
+const ANALYTICS_TAB_IDS: AnalyticsTabId[] = ["periods", "insights", "history"];
+
 const DashboardShellContent = memo(function DashboardShellContent({
   dashboardRef,
   interactiveMode,
@@ -60,6 +246,145 @@ const DashboardShellContent = memo(function DashboardShellContent({
   const shellFrameRef = useRef<HTMLDivElement | null>(null);
   const [bugFieldMenuOpen, setBugFieldMenuOpen] = useState(false);
   const [autoFitScale, setAutoFitScale] = useState(1);
+  const [visitedAnalyticsTabs, setVisitedAnalyticsTabs] = useState<
+    Record<AnalyticsTabId, boolean>
+  >({
+    history: false,
+    insights: false,
+    periods: false,
+  });
+
+  useEffect(() => {
+    if (!ANALYTICS_TAB_IDS.includes(ui.activeTab as AnalyticsTabId)) {
+      return;
+    }
+
+    const nextTab = ui.activeTab as AnalyticsTabId;
+    setVisitedAnalyticsTabs((current) =>
+      current[nextTab] ? current : { ...current, [nextTab]: true },
+    );
+  }, [ui.activeTab]);
+
+  const shouldRenderPeriods =
+    ui.activeTab === "periods" || visitedAnalyticsTabs.periods;
+  const shouldRenderInsights =
+    ui.activeTab === "insights" || visitedAnalyticsTabs.insights;
+  const shouldRenderHistory =
+    ui.activeTab === "history" || visitedAnalyticsTabs.history;
+
+  const periodsPanel = useMemo(() => {
+    if (!shouldRenderPeriods) {
+      return null;
+    }
+
+    if (metrics.isComparisonLoading) {
+      return (
+        <AnalyticsTabSkeleton
+          cardCount={4}
+          chartVariants={PERIODS_CHART_VARIANTS}
+        />
+      );
+    }
+
+    if (!metrics.comparisonMetrics) {
+      return (
+        <AnalyticsPanelFallback
+          cardCount={4}
+          chartVariants={PERIODS_CHART_VARIANTS}
+        />
+      );
+    }
+
+    return (
+      <PeriodsView
+        comparisonMetrics={metrics.comparisonMetrics}
+        onChartFocusChange={chartFocusHandler}
+        siegeMode={interactiveMode}
+      />
+    );
+  }, [
+    chartFocusHandler,
+    interactiveMode,
+    metrics.comparisonMetrics,
+    metrics.isComparisonLoading,
+    shouldRenderPeriods,
+  ]);
+
+  const insightsPanel = useMemo(() => {
+    if (!shouldRenderInsights) {
+      return null;
+    }
+
+    if (metrics.isInsightsLoading) {
+      return (
+        <AnalyticsTabSkeleton
+          cardCount={5}
+          chartVariants={INSIGHTS_CHART_VARIANTS}
+        />
+      );
+    }
+
+    if (!metrics.insightsMetrics) {
+      return (
+        <AnalyticsPanelFallback
+          cardCount={5}
+          chartVariants={INSIGHTS_CHART_VARIANTS}
+        />
+      );
+    }
+
+    return (
+      <InsightsView
+        insightsMetrics={metrics.insightsMetrics}
+        onChartFocusChange={chartFocusHandler}
+        siegeMode={interactiveMode}
+      />
+    );
+  }, [
+    chartFocusHandler,
+    interactiveMode,
+    metrics.insightsMetrics,
+    metrics.isInsightsLoading,
+    shouldRenderInsights,
+  ]);
+
+  const historyPanel = useMemo(() => {
+    if (!shouldRenderHistory) {
+      return null;
+    }
+
+    if (metrics.isHistoryLoading) {
+      return (
+        <AnalyticsTabSkeleton
+          cardCount={6}
+          chartVariants={HISTORY_CHART_VARIANTS}
+        />
+      );
+    }
+
+    if (!metrics.historyMetrics) {
+      return (
+        <AnalyticsPanelFallback
+          cardCount={6}
+          chartVariants={HISTORY_CHART_VARIANTS}
+        />
+      );
+    }
+
+    return (
+      <HistoryView
+        historyMetrics={metrics.historyMetrics}
+        onChartFocusChange={chartFocusHandler}
+        siegeMode={interactiveMode}
+      />
+    );
+  }, [
+    chartFocusHandler,
+    interactiveMode,
+    metrics.historyMetrics,
+    metrics.isHistoryLoading,
+    shouldRenderHistory,
+  ]);
 
   useLayoutEffect(() => {
     const frame = shellFrameRef.current;
@@ -326,29 +651,17 @@ const DashboardShellContent = memo(function DashboardShellContent({
                 />
               ) : null}
 
-              {ui.activeTab === "periods" ? (
-                <PeriodsView
-                  comparisonMetrics={metrics.comparisonMetrics}
-                  onChartFocusChange={chartFocusHandler}
-                  siegeMode={interactiveMode}
-                />
-              ) : null}
+              <div className={ui.activeTab === "periods" ? "block" : "hidden"}>
+                {periodsPanel}
+              </div>
 
-              {ui.activeTab === "insights" ? (
-                <InsightsView
-                  insightsMetrics={metrics.insightsMetrics}
-                  onChartFocusChange={chartFocusHandler}
-                  siegeMode={interactiveMode}
-                />
-              ) : null}
+              <div className={ui.activeTab === "insights" ? "block" : "hidden"}>
+                {insightsPanel}
+              </div>
 
-              {ui.activeTab === "history" ? (
-                <HistoryView
-                  historyMetrics={metrics.historyMetrics}
-                  onChartFocusChange={chartFocusHandler}
-                  siegeMode={interactiveMode}
-                />
-              ) : null}
+              <div className={ui.activeTab === "history" ? "block" : "hidden"}>
+                {historyPanel}
+              </div>
             </div>
 
             {metrics.error ? (

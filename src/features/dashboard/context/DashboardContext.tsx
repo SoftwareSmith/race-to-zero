@@ -48,6 +48,9 @@ type DashboardMetricsValue = Pick<
   | "headerEyebrow"
   | "headerSubtitle"
   | "historyMetrics"
+  | "isComparisonLoading"
+  | "isHistoryLoading"
+  | "isInsightsLoading"
   | "insightsMetrics"
   | "summary"
 >;
@@ -138,6 +141,9 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
       headerEyebrow: value.headerEyebrow,
       headerSubtitle: value.headerSubtitle,
       historyMetrics: value.historyMetrics,
+      isComparisonLoading: value.isComparisonLoading,
+      isHistoryLoading: value.isHistoryLoading,
+      isInsightsLoading: value.isInsightsLoading,
       insightsMetrics: value.insightsMetrics,
       summary: value.summary,
     }),
@@ -150,6 +156,9 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
       value.headerEyebrow,
       value.headerSubtitle,
       value.historyMetrics,
+      value.isComparisonLoading,
+      value.isHistoryLoading,
+      value.isInsightsLoading,
       value.insightsMetrics,
       value.summary,
     ],

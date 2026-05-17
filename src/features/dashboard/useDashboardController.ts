@@ -1,18 +1,46 @@
 import type { ChangeEvent } from "react";
-import { useCallback, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useCompareRange } from "./hooks/useCompareRange";
+import { useAnalyticsMetrics } from "./hooks/useMetrics";
 import {
   useDashboardBootstrapMetrics,
   useDashboardBootstrapSettings,
   useDashboardBootstrapUi,
 } from "./context/DashboardBootstrapContext";
-import type { CompareRangeKey } from "../../types/dashboard";
-import {
-  getComparisonMetrics,
-  getHistoryMetrics,
-  getInsightsMetrics,
-  getSummaryMetrics,
-} from "@dashboard/utils/metrics";
+import type {
+  CompareRangeKey,
+  ComparisonMetrics,
+  HistoryMetrics,
+  InsightsMetrics,
+} from "../../types/dashboard";
+
+let dashboardAnalyticsLoader:
+  | Promise<{
+      getComparisonMetrics: typeof import("@dashboard/utils/metrics").getComparisonMetrics;
+      getHistoryMetrics: typeof import("@dashboard/utils/metrics").getHistoryMetrics;
+      getInsightsMetrics: typeof import("@dashboard/utils/metrics").getInsightsMetrics;
+    }>
+  | null = null;
+
+type DashboardAnalyticsModule = Awaited<ReturnType<typeof loadDashboardAnalytics>>;
+
+function loadDashboardAnalytics() {
+  if (!dashboardAnalyticsLoader) {
+    dashboardAnalyticsLoader = import("@dashboard/utils/metrics").then(
+      ({
+        getComparisonMetrics,
+        getHistoryMetrics,
+        getInsightsMetrics,
+      }) => ({
+        getComparisonMetrics,
+        getHistoryMetrics,
+        getInsightsMetrics,
+      }),
+    );
+  }
+
+  return dashboardAnalyticsLoader;
+}
 
 export function useDashboardController() {
   const bootstrapMetrics = useDashboardBootstrapMetrics();
@@ -26,62 +54,124 @@ export function useDashboardController() {
     setCustomFromDate,
     setCustomToDate,
   } = useCompareRange();
-
-  const comparisonMetrics = useMemo(
-    () =>
-      getComparisonMetrics(bootstrapMetrics.metricsSource, {
-        rangeKey: compareRangeKey,
-        customFromDate,
-        customToDate,
-        teamKey: bootstrapMetrics.selectedTeamKey,
-      }),
-    [
-      bootstrapMetrics.metricsSource,
-      bootstrapMetrics.selectedTeamKey,
-      compareRangeKey,
-      customFromDate,
-      customToDate,
-    ],
-  );
-
-  const insightsMetrics = useMemo(
-    () =>
-      getInsightsMetrics(bootstrapMetrics.metricsSource, {
-        rangeKey: compareRangeKey,
-        customFromDate,
-        customToDate,
-        teamKey: bootstrapMetrics.selectedTeamKey,
-      }),
-    [
-      bootstrapMetrics.metricsSource,
-      bootstrapMetrics.selectedTeamKey,
-      compareRangeKey,
-      customFromDate,
-      customToDate,
-    ],
-  );
-
-  const historyMetrics = useMemo(
-    () =>
-      getHistoryMetrics(bootstrapMetrics.metricsSource, {
-        rangeKey: compareRangeKey,
-        customFromDate,
-        customToDate,
-        teamKey: bootstrapMetrics.selectedTeamKey,
-      }),
-    [
-      bootstrapMetrics.metricsSource,
-      bootstrapMetrics.selectedTeamKey,
-      compareRangeKey,
-      customFromDate,
-      customToDate,
-    ],
-  );
+  const shouldLoadAnalytics = true;
+  const [analyticsModule, setAnalyticsModule] =
+    useState<DashboardAnalyticsModule | null>(null);
+  const {
+    metrics: analyticsMetricsSource,
+    isLoading: isAnalyticsSourceLoading,
+  } = useAnalyticsMetrics(shouldLoadAnalytics);
 
   const summary = useMemo(
-    () => getSummaryMetrics(bootstrapMetrics.deadlineMetrics),
+    () => ({
+      bugCount: bootstrapMetrics.deadlineMetrics.remainingBugs,
+      bugsPerDayRequired: bootstrapMetrics.deadlineMetrics.bugsPerDayRequired,
+      currentAddRate: bootstrapMetrics.deadlineMetrics.currentAddRate,
+      currentFixRate: bootstrapMetrics.deadlineMetrics.currentFixRate,
+      currentNetBurnRate: bootstrapMetrics.deadlineMetrics.currentNetBurnRate,
+      daysUntilDeadline: bootstrapMetrics.deadlineMetrics.daysUntilDeadline,
+      deadlineLabel: bootstrapMetrics.deadlineMetrics.deadlineLabel,
+      likelihoodScore: bootstrapMetrics.deadlineMetrics.likelihoodScore,
+      onTrack: bootstrapMetrics.deadlineMetrics.onTrack,
+      statusSignal: bootstrapMetrics.deadlineMetrics.statusSignal,
+      trackingStartLabel: bootstrapMetrics.deadlineMetrics.trackingStartLabel,
+    }),
     [bootstrapMetrics.deadlineMetrics],
   );
+
+  useEffect(() => {
+    let cancelled = false;
+
+    if (!shouldLoadAnalytics || analyticsModule) {
+      return undefined;
+    }
+
+    loadDashboardAnalytics()
+      .then((module) => {
+        if (!cancelled) {
+          setAnalyticsModule(module);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setAnalyticsModule(null);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [analyticsModule, shouldLoadAnalytics]);
+
+  const comparisonMetrics = useMemo<ComparisonMetrics | null>(() => {
+    if (!analyticsMetricsSource || !analyticsModule) {
+      return null;
+    }
+
+    return analyticsModule.getComparisonMetrics(analyticsMetricsSource, {
+      rangeKey: compareRangeKey,
+      customFromDate,
+      customToDate,
+      teamKey: bootstrapMetrics.selectedTeamKey,
+    });
+  }, [
+    analyticsMetricsSource,
+    analyticsModule,
+    bootstrapMetrics.selectedTeamKey,
+    compareRangeKey,
+    customFromDate,
+    customToDate,
+  ]);
+
+  const insightsMetrics = useMemo<InsightsMetrics | null>(() => {
+    if (!analyticsMetricsSource || !analyticsModule) {
+      return null;
+    }
+
+    return analyticsModule.getInsightsMetrics(analyticsMetricsSource, {
+      rangeKey: compareRangeKey,
+      customFromDate,
+      customToDate,
+      teamKey: bootstrapMetrics.selectedTeamKey,
+    });
+  }, [
+    analyticsMetricsSource,
+    analyticsModule,
+    bootstrapMetrics.selectedTeamKey,
+    compareRangeKey,
+    customFromDate,
+    customToDate,
+  ]);
+
+  const historyMetrics = useMemo<HistoryMetrics | null>(() => {
+    if (!analyticsMetricsSource || !analyticsModule) {
+      return null;
+    }
+
+    return analyticsModule.getHistoryMetrics(analyticsMetricsSource, {
+      rangeKey: compareRangeKey,
+      customFromDate,
+      customToDate,
+      teamKey: bootstrapMetrics.selectedTeamKey,
+    });
+  }, [
+    analyticsMetricsSource,
+    analyticsModule,
+    bootstrapMetrics.selectedTeamKey,
+    compareRangeKey,
+    customFromDate,
+    customToDate,
+  ]);
+
+  const isComparisonLoading =
+    bootstrapUi.activeTab === "periods" &&
+    (isAnalyticsSourceLoading || analyticsModule == null);
+  const isInsightsLoading =
+    bootstrapUi.activeTab === "insights" &&
+    (isAnalyticsSourceLoading || analyticsModule == null);
+  const isHistoryLoading =
+    bootstrapUi.activeTab === "history" &&
+    (isAnalyticsSourceLoading || analyticsModule == null);
 
   const handleCompareRangeChange = useCallback(
     (value: CompareRangeKey) => {
@@ -149,6 +239,9 @@ export function useDashboardController() {
     teamFilterKey: bootstrapUi.teamFilterKey,
     teamFilterOptions: bootstrapUi.teamFilterOptions,
     historyMetrics,
+    isComparisonLoading,
+    isHistoryLoading,
+    isInsightsLoading,
     insightsMetrics,
     openTopMenu: bootstrapUi.openTopMenu,
     settings: bootstrapSettings.settings,

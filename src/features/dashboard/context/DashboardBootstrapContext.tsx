@@ -9,7 +9,9 @@ import {
 } from "react";
 import { useDashboardBootstrapController } from "../useDashboardBootstrapController";
 
-type DashboardBootstrapValue = ReturnType<typeof useDashboardBootstrapController>;
+type DashboardBootstrapValue = ReturnType<
+  typeof useDashboardBootstrapController
+>;
 type DashboardBootstrapUiValue = Pick<
   DashboardBootstrapValue,
   | "activeTab"

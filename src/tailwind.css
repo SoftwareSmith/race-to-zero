@@ -6,6 +6,37 @@
   --font-mono: "IBM Plex Mono", monospace;
   --font-display: "Fraunces", serif;
 }
+
+@keyframes dashboard-skeleton-shimmer {
+  0% {
+    transform: translateX(-120%);
+  }
+
+  100% {
+    transform: translateX(220%);
+  }
+}
+
+.dashboard-skeleton-shell {
+  position: relative;
+  overflow: hidden;
+}
+
+.dashboard-skeleton-shell::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.03) 22%,
+    rgba(255, 255, 255, 0.14) 50%,
+    rgba(255, 255, 255, 0.03) 78%,
+    transparent 100%
+  );
+  animation: dashboard-skeleton-shimmer 1.45s ease-in-out infinite;
+  pointer-events: none;
+}
 @keyframes evolve-toast {
   0% { opacity: 0; transform: translateY(10px); }
   12% { opacity: 1; transform: translateY(0); }

@@ -161,6 +161,31 @@ export interface MetricsSource {
   lastUpdated?: string;
 }
 
+export interface OpenAgeDistributionEntry {
+  count: number;
+  label: string;
+}
+
+export interface BootstrapMetricsSnapshot {
+  completedSeries: DailyCountEntry[];
+  createdSeries: DailyCountEntry[];
+  doneCount: number;
+  firstBugDate: string | null;
+  openAgeDistribution: OpenAgeDistributionEntry[];
+  priorityDistribution: PriorityDistributionEntry[];
+  remainingBugs: number;
+  remainingSeries: DailyCountEntry[];
+  statusDistribution: StatusDistributionEntry[];
+}
+
+export interface BootstrapMetricsSource {
+  all: BootstrapMetricsSnapshot;
+  byTeam: Record<string, BootstrapMetricsSnapshot>;
+  generatedAt?: string;
+  lastUpdated?: string;
+  teamKeys: string[];
+}
+
 export interface PriorityDistributionEntry {
   count: number;
   label: string;
@@ -192,7 +217,6 @@ export interface SummaryMetrics {
 
 export interface DeadlineMetrics {
   allRemainingPerDay: DailyCountEntry[];
-  bugs: MetricsBug[];
   bugsPerDayRequired: number;
   currentAddRate: number;
   currentFixRate: number;
@@ -200,9 +224,11 @@ export interface DeadlineMetrics {
   daysUntilDeadline: number;
   deadline: Date;
   deadlineLabel: string;
+  doneCount: number;
   likelihoodScore: number;
   neededNetBurnRate: number;
   onTrack: boolean;
+  openAgeDistribution: OpenAgeDistributionEntry[];
   priorityDistribution: PriorityDistributionEntry[];
   remainingBugs: number;
   statusBody: string;

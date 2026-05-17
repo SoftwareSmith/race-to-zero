@@ -2,11 +2,13 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import type { MetricsBug, MetricsSource } from "../src/types/dashboard.js";
+import { buildBootstrapMetricsSource } from "../src/features/dashboard/utils/bootstrapMetrics.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const ROOT_DIR = path.resolve(__dirname, "..");
-const OUTPUT_PATH = path.join(ROOT_DIR, "public", "data", "metrics.json");
+const BOOTSTRAP_OUTPUT_PATH = path.join(ROOT_DIR, "public", "data", "metrics.json");
+const ANALYTICS_OUTPUT_PATH = path.join(ROOT_DIR, "public", "data", "metrics-analytics.json");
 const LINEAR_API_URL = "https://api.linear.app/graphql";
 const BUG_LABEL_NAMES = new Set(["bug", "cs bug", "cs bugs"]);
 const BUG_PARENT_NAMES = new Set(["bug reason"]);
@@ -202,15 +204,20 @@ function buildMetrics(issues: LinearIssue[]): MetricsSource {
 }
 
 async function writeMetrics(metrics: MetricsSource) {
-  await fs.mkdir(path.dirname(OUTPUT_PATH), { recursive: true });
-  await fs.writeFile(OUTPUT_PATH, JSON.stringify(metrics, null, 2));
+  await fs.mkdir(path.dirname(BOOTSTRAP_OUTPUT_PATH), { recursive: true });
+  await fs.writeFile(
+    BOOTSTRAP_OUTPUT_PATH,
+    JSON.stringify(buildBootstrapMetricsSource(metrics), null, 2),
+  );
+  await fs.writeFile(ANALYTICS_OUTPUT_PATH, JSON.stringify(metrics, null, 2));
 }
 
 async function main() {
   const issues = await fetchBugIssues();
   const metrics = buildMetrics(issues);
   await writeMetrics(metrics);
-  console.log(`Wrote ${OUTPUT_PATH}`);
+  console.log(`Wrote ${BOOTSTRAP_OUTPUT_PATH}`);
+  console.log(`Wrote ${ANALYTICS_OUTPUT_PATH}`);
 }
 
 main().catch((error) => {

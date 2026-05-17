@@ -1287,7 +1287,6 @@ export function getDeadlineMetrics(
   });
 
   return {
-    bugs: preparedSource.bugs,
     allRemainingPerDay: backlogHistorySource.remainingSeries,
     remainingBugs,
     trackingStartDate: trackingStart,
@@ -1304,6 +1303,7 @@ export function getDeadlineMetrics(
     daysUntilDeadline,
     deadline,
     deadlineLabel: format(deadline, "MMM d, yyyy"),
+    doneCount: preparedSource.bugs.filter((bug) => getLinearStatusLabel(bug) === "Done").length,
     trendWindowLabel: getDisplayRangeLabel(trackingStart, today),
     statusTone: status.tone,
     statusSignal: status.signal,
@@ -1316,6 +1316,7 @@ export function getDeadlineMetrics(
       neededNetBurnRate,
       daysUntilDeadline,
     }),
+    openAgeDistribution: buildOpenAgeDistribution(preparedSource.bugs, today),
     priorityDistribution: preparedSource.priorityDistribution,
     statusDistribution: preparedSource.statusDistribution,
     today,
@@ -1472,10 +1473,7 @@ export function buildStatusChartData(
 export function buildOpenAgeChartData(
   deadlineMetrics: DeadlineMetrics,
 ): ChartData<"bar", number[], string> {
-  const ageDistribution = buildOpenAgeDistribution(
-    deadlineMetrics.bugs,
-    deadlineMetrics.today,
-  );
+  const ageDistribution = deadlineMetrics.openAgeDistribution;
 
   return {
     labels: ageDistribution.map((entry) => entry.label),

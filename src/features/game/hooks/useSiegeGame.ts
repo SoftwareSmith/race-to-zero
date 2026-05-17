@@ -420,6 +420,7 @@ export function useSiegeGame({
   const { clearSwarmRequestId, debugMode, killAllBugs, toggleDebugMode, triggerSurvivalOverrun } = useSiegeGameDebug({
     interactiveInitialBugCounts,
     interactiveMode,
+    interactiveRemainingBugs: effectiveInteractiveRemainingBugs,
     lastKillAtRef,
     onClearComplete,
     onEndSurvival,

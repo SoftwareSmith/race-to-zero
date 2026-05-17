@@ -54,13 +54,9 @@ export function useDashboardBootstrapController() {
   const settingsMenuRef = useRef<HTMLDivElement | null>(null);
   const codexMenuRef = useRef<HTMLDivElement | null>(null);
   const teamFilterOptions = useMemo<HistoryTeamOption[]>(() => {
-    const teamKeys = [
-      ...new Set(
-        (metricsSource?.bugs ?? [])
-          .map((bug) => bug.teamKey?.trim() ?? "")
-          .filter((candidate) => candidate.length > 0),
-      ),
-    ].sort((left, right) => left.localeCompare(right));
+    const teamKeys = [...(metricsSource?.teamKeys ?? [])].sort((left, right) =>
+      left.localeCompare(right),
+    );
 
     return [
       { label: "All teams", value: "all" },

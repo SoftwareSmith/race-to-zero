@@ -10,16 +10,19 @@ import {
   subDays,
 } from "date-fns";
 import type {
+  BootstrapMetricsSnapshot,
+  BootstrapMetricsSource,
   DailyCountEntry,
   DeadlineMetrics,
   MetricsBug,
   MetricsSource,
+  OpenAgeDistributionEntry,
   PriorityDistributionEntry,
   StatusDistributionEntry,
   Tone,
   WorkdaySettings,
-} from "../../../types/dashboard";
-import { countConfiguredDays } from "@shared/utils/workCalendar";
+} from "../../../types/dashboard.js";
+import { countConfiguredDays } from "../../../shared/utils/workCalendar.js";
 
 const DEADLINE_TREND_WINDOW_DAYS = 30;
 const PRIORITY_ORDER = [
@@ -47,19 +50,15 @@ interface SeriesIndex {
 }
 
 interface PreparedBootstrapSource {
-  bugs: MetricsBug[];
+  completedSeries: DailyCountEntry[];
+  createdSeries: DailyCountEntry[];
+  doneCount: number;
   firstBugDate: Date | null;
+  openAgeDistribution: OpenAgeDistributionEntry[];
   priorityDistribution: PriorityDistributionEntry[];
   remainingBugs: number;
-  statusDistribution: StatusDistributionEntry[];
-}
-
-interface BacklogHistorySource {
-  completedIndex: SeriesIndex;
-  createdIndex: SeriesIndex;
-  firstBugDate: Date | null;
-  remainingIndex: SeriesIndex;
   remainingSeries: DailyCountEntry[];
+  statusDistribution: StatusDistributionEntry[];
 }
 
 function normalizeBugRecords(
@@ -374,15 +373,63 @@ function getSeriesValueBefore(seriesIndex: SeriesIndex, date: Date | string) {
   return seriesIndex.values[index] ?? 0;
 }
 
-function createPreparedSourceFromBugs(
+function buildOpenAgeDistribution(
   bugs: MetricsBug[],
-): PreparedBootstrapSource {
+  today: Date,
+): OpenAgeDistributionEntry[] {
+  const bucketCounts = new Map<string, number>([
+    ["0-7d", 0],
+    ["8-30d", 0],
+    ["31-90d", 0],
+    ["91-180d", 0],
+    ["181d+", 0],
+  ]);
+
+  for (const bug of bugs) {
+    if (getBugClosureDate(bug) != null) {
+      continue;
+    }
+
+    if (isTerminalStatusLabel(getLinearStatusLabel(bug))) {
+      continue;
+    }
+
+    const createdAt = parseISO(bug.createdAt);
+    const ageInDays = Math.max(differenceInCalendarDays(today, createdAt), 0);
+    const label =
+      ageInDays <= 7
+        ? "0-7d"
+        : ageInDays <= 30
+          ? "8-30d"
+          : ageInDays <= 90
+            ? "31-90d"
+            : ageInDays <= 180
+              ? "91-180d"
+              : "181d+";
+
+    bucketCounts.set(label, (bucketCounts.get(label) ?? 0) + 1);
+  }
+
+  return ["0-7d", "8-30d", "31-90d", "91-180d", "181d+"] .map((label) => ({
+    count: bucketCounts.get(label) ?? 0,
+    label,
+  }));
+}
+
+function createBootstrapSnapshotFromBugs(
+  bugs: MetricsBug[],
+): BootstrapMetricsSnapshot {
   const priorityCounts = new Map<string, number>();
   const statusCounts = new Map<string, number>();
+  let doneCount = 0;
   let remainingBugs = 0;
 
   for (const bug of bugs) {
     const statusLabel = getLinearStatusLabel(bug);
+    if (statusLabel === "Done") {
+      doneCount += 1;
+    }
+
     if (!isTerminalStatusLabel(statusLabel) && statusLabel !== "Done") {
       statusCounts.set(statusLabel, (statusCounts.get(statusLabel) ?? 0) + 1);
     }
@@ -394,42 +441,81 @@ function createPreparedSourceFromBugs(
     }
   }
 
+  const createdSeries = buildSeriesFromField(bugs, "createdAt");
+  const completedSeries = buildClosureSeries(bugs);
+  const remainingSeries = buildRemainingSeries(createdSeries, completedSeries);
+  const today = startOfDay(new Date());
+
   return {
-    bugs,
-    firstBugDate: bugs[0]?.createdAt ? parseISO(bugs[0].createdAt) : null,
+    completedSeries,
+    createdSeries,
+    doneCount,
+    firstBugDate: bugs[0]?.createdAt ?? null,
+    openAgeDistribution: buildOpenAgeDistribution(bugs, today),
     priorityDistribution: buildPriorityDistributionFromCounts(priorityCounts),
     remainingBugs,
+    remainingSeries,
     statusDistribution: buildStatusDistributionFromCounts(statusCounts),
   };
 }
 
-function getPreparedSourceForTeam(
+export function buildBootstrapMetricsSource(
   source: MetricsSource | null | undefined,
-  teamKey?: string | null,
-) {
+): BootstrapMetricsSource {
   const bugs = normalizeBugRecords(source);
-
-  if (!teamKey) {
-    return createPreparedSourceFromBugs(bugs);
-  }
-
-  return createPreparedSourceFromBugs(
-    bugs.filter((bug) => bug.teamKey === teamKey),
+  const teamKeys = [
+    ...new Set(
+      bugs
+        .map((bug) => bug.teamKey?.trim() ?? "")
+        .filter((teamKey) => teamKey.length > 0),
+    ),
+  ].sort((left, right) => left.localeCompare(right));
+  const byTeam = Object.fromEntries(
+    teamKeys.map((teamKey) => [
+      teamKey,
+      createBootstrapSnapshotFromBugs(
+        bugs.filter((bug) => bug.teamKey === teamKey),
+      ),
+    ]),
   );
-}
-
-function buildBacklogHistorySource(bugs: MetricsBug[]): BacklogHistorySource {
-  const createdSeries = buildSeriesFromField(bugs, "createdAt");
-  const completedSeries = buildClosureSeries(bugs);
-  const remainingSeries = buildRemainingSeries(createdSeries, completedSeries);
 
   return {
-    completedIndex: buildSeriesIndex(completedSeries),
-    createdIndex: buildSeriesIndex(createdSeries),
-    firstBugDate: bugs[0]?.createdAt ? parseISO(bugs[0].createdAt) : null,
-    remainingIndex: buildSeriesIndex(remainingSeries, { usePrefixSums: false }),
-    remainingSeries,
+    all: createBootstrapSnapshotFromBugs(bugs),
+    byTeam,
+    generatedAt: source?.generatedAt,
+    lastUpdated: source?.lastUpdated,
+    teamKeys,
   };
+}
+
+function isBootstrapMetricsSource(
+  source: BootstrapMetricsSource | MetricsSource | null | undefined,
+): source is BootstrapMetricsSource {
+  return Boolean(source && "all" in source && "byTeam" in source);
+}
+
+function getPreparedSourceForTeam(
+  source: BootstrapMetricsSource | MetricsSource | null | undefined,
+  teamKey?: string | null,
+) {
+  if (isBootstrapMetricsSource(source)) {
+    const snapshot = (teamKey ? source.byTeam[teamKey] : source.all) ?? source.all;
+
+    return {
+      completedSeries: snapshot.completedSeries,
+      createdSeries: snapshot.createdSeries,
+      doneCount: snapshot.doneCount,
+      firstBugDate: snapshot.firstBugDate ? parseISO(snapshot.firstBugDate) : null,
+      openAgeDistribution: snapshot.openAgeDistribution,
+      priorityDistribution: snapshot.priorityDistribution,
+      remainingBugs: snapshot.remainingBugs,
+      remainingSeries: snapshot.remainingSeries,
+      statusDistribution: snapshot.statusDistribution,
+    } satisfies PreparedBootstrapSource;
+  }
+
+  const bootstrapSource = buildBootstrapMetricsSource(source);
+  return getPreparedSourceForTeam(bootstrapSource, teamKey);
 }
 
 function getDeadlineDate(referenceDate = new Date()) {
@@ -534,7 +620,7 @@ function getLikelihoodScore({
 }
 
 export function getBootstrapDeadlineMetrics(
-  source: MetricsSource | null,
+  source: BootstrapMetricsSource | MetricsSource | null,
   {
     deadlineDate,
     teamKey,
@@ -548,26 +634,30 @@ export function getBootstrapDeadlineMetrics(
   } = {},
 ): DeadlineMetrics {
   const preparedSource = getPreparedSourceForTeam(source, teamKey);
-  const backlogHistorySource = buildBacklogHistorySource(preparedSource.bugs);
+  const createdIndex = buildSeriesIndex(preparedSource.createdSeries);
+  const completedIndex = buildSeriesIndex(preparedSource.completedSeries);
+  const remainingIndex = buildSeriesIndex(preparedSource.remainingSeries, {
+    usePrefixSums: false,
+  });
   const remainingBugs = preparedSource.remainingBugs;
   const today = startOfDay(new Date());
   const defaultDeadline = getDeadlineDate(today);
   const deadline = getValidDate(deadlineDate, defaultDeadline);
-  const firstBugDate = backlogHistorySource.firstBugDate ?? today;
-  const requestedTrackingStartDate = getValidDate(
+  const firstBugDate: Date = preparedSource.firstBugDate ?? today;
+  const requestedTrackingStartDate: Date = getValidDate(
     trackingStartDate,
     subDays(today, DEADLINE_TREND_WINDOW_DAYS - 1),
   );
-  const trackingStart = isBefore(requestedTrackingStartDate, firstBugDate)
+  const trackingStart: Date = isBefore(requestedTrackingStartDate, firstBugDate)
     ? firstBugDate
     : requestedTrackingStartDate;
   const recentCreatedPerDay = filterSeriesByDateRange(
-    backlogHistorySource.createdIndex,
+    createdIndex,
     trackingStart,
     today,
   );
   const recentCompletedPerDay = filterSeriesByDateRange(
-    backlogHistorySource.completedIndex,
+    completedIndex,
     trackingStart,
     today,
   );
@@ -606,8 +696,7 @@ export function getBootstrapDeadlineMetrics(
   });
 
   return {
-    allRemainingPerDay: backlogHistorySource.remainingSeries,
-    bugs: preparedSource.bugs,
+    allRemainingPerDay: preparedSource.remainingSeries,
     bugsPerDayRequired,
     currentAddRate,
     currentFixRate,
@@ -615,6 +704,7 @@ export function getBootstrapDeadlineMetrics(
     daysUntilDeadline,
     deadline,
     deadlineLabel: format(deadline, "MMM d, yyyy"),
+    doneCount: preparedSource.doneCount,
     likelihoodScore: getLikelihoodScore({
       currentNetBurnRate,
       daysUntilDeadline,
@@ -623,6 +713,7 @@ export function getBootstrapDeadlineMetrics(
     }),
     neededNetBurnRate,
     onTrack: status.tone === "positive",
+    openAgeDistribution: preparedSource.openAgeDistribution,
     priorityDistribution: preparedSource.priorityDistribution,
     remainingBugs,
     statusBody: status.body,
@@ -631,10 +722,7 @@ export function getBootstrapDeadlineMetrics(
     statusSignal: status.signal,
     statusTone: status.tone,
     today,
-    trackingStartBacklog: getSeriesValueBefore(
-      backlogHistorySource.remainingIndex,
-      trackingStart,
-    ),
+    trackingStartBacklog: getSeriesValueBefore(remainingIndex, trackingStart),
     trackingStartDate: trackingStart,
     trackingStartLabel: format(trackingStart, "MMM d, yyyy"),
     trendWindowLabel: `${format(trackingStart, "MMM d")} - ${format(today, "MMM d")}`,

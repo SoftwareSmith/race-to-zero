@@ -35,6 +35,10 @@ function buildOutcomeSentence(
   historyMetrics: HistoryMetrics | null,
   insightsMetrics: InsightsMetrics | null,
 ): string {
+  if (activeTab === "history" && !historyMetrics) {
+    return "Loading terminal outcome metrics for the selected period.";
+  }
+
   if (activeTab === "history" && historyMetrics) {
     const {
       totalClosed,
@@ -52,6 +56,10 @@ function buildOutcomeSentence(
     return `${formatNumber(completed)} completed for ${historyMetrics.teamLabel}, ${formatNumber(cancelled + duplicated)} cancelled or duplicated, median cycle ${formatNumber(medianCycleDays, 1)}d, P75 ${formatNumber(p75CycleDays, 1)}d.`;
   }
 
+  if (activeTab === "insights" && !insightsMetrics) {
+    return "Loading SLA and resolution metrics for the selected period.";
+  }
+
   if (activeTab === "insights" && insightsMetrics) {
     const { openOverdue, openPending, eligibleCompleted } = insightsMetrics;
     if (eligibleCompleted === 0) {
@@ -61,6 +69,10 @@ function buildOutcomeSentence(
       return `${formatNumber(openOverdue)} overdue and ${formatNumber(openPending)} pending — review open SLA risk.`;
     }
     return `${formatNumber(openPending)} bugs pending due dates. No currently overdue open items.`;
+  }
+
+  if (activeTab === "periods" && !comparisonMetrics) {
+    return "Loading intake and closure trends for the selected period.";
   }
 
   if (activeTab === "periods" && comparisonMetrics) {

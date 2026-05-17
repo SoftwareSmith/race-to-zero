@@ -11,6 +11,7 @@ import {
   formatPercent,
   formatSignedNumber,
 } from "../../../src/features/dashboard/utils/dashboard";
+import { buildBootstrapMetricsSource } from "../../../src/features/dashboard/utils/bootstrapMetrics";
 import {
   getComparisonMetrics,
   getDeadlineMetrics,
@@ -26,7 +27,7 @@ export const QA_DEADLINE_DATE = "2026-12-31";
 export const QA_CUSTOM_FROM = "2026-03-01";
 export const QA_CUSTOM_TO = "2026-03-31";
 
-const metricsPath = new URL("../../../public/data/metrics.json", import.meta.url);
+const metricsPath = new URL("../../../public/data/metrics-analytics.json", import.meta.url);
 const metricsText = readFileSync(metricsPath, "utf8");
 
 export const qaMetrics = JSON.parse(metricsText) as MetricsSource;
@@ -391,6 +392,14 @@ export async function seedDashboardState(
 
 export async function mockMetrics(page: Page, metrics: MetricsSource) {
   await page.route("**/data/metrics.json**", async (route) => {
+    await route.fulfill({
+      body: JSON.stringify(buildBootstrapMetricsSource(metrics)),
+      contentType: "application/json",
+      status: 200,
+    });
+  });
+
+  await page.route("**/data/metrics-analytics.json**", async (route) => {
     await route.fulfill({
       body: JSON.stringify(metrics),
       contentType: "application/json",

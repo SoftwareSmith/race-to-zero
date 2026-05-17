@@ -25,7 +25,25 @@ export default defineConfig({
       },
       output: {
         manualChunks(id) {
-          if (id.includes("/src/features/dashboard/") || id.includes("/src/features/app/DashboardShell.tsx")) {
+          if (id.includes("/src/features/dashboard/DashboardAnalyticsViews.tsx")) {
+            return "dashboard-analytics";
+          }
+
+          if (
+            id.includes("/src/features/app/DashboardShell.tsx") ||
+            id.includes("/src/features/dashboard/DashboardViews.tsx") ||
+            id.includes("/src/features/dashboard/context/") ||
+            id.includes("/src/features/dashboard/useDashboardController.ts") ||
+            id.includes("/src/features/dashboard/useDashboardBootstrapController.ts") ||
+            id.includes("/src/features/dashboard/hooks/") ||
+            id.includes("/src/features/dashboard/components/CommandCenter.tsx") ||
+            id.includes("/src/features/dashboard/components/CompareRangePicker.tsx") ||
+            id.includes("/src/features/dashboard/components/MetricCard.tsx") ||
+            id.includes("/src/features/dashboard/components/SettingsMenu.tsx") ||
+            id.includes("/src/features/dashboard/components/TopNav.tsx") ||
+            id.includes("/src/features/dashboard/utils/bootstrapMetrics.ts") ||
+            id.includes("/src/features/dashboard/utils/dashboard.ts")
+          ) {
             return "dashboard-core";
           }
 

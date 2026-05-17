@@ -1,10 +1,16 @@
-import { useCallback, useEffect, useState, type MutableRefObject } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type MutableRefObject,
+} from "react";
 import type { BugCounts } from "../../../types/dashboard";
+import type { QaWindowState } from "@game/components/BackgroundField/types";
 import type { SiegeWeaponId } from "@game/types";
 import type { SiegeRuntimeSnapshotLike } from "./useSiegeRunCompletion";
 
-interface SiegeQaState {
-  enabled?: boolean;
+interface SiegeQaState extends QaWindowState {
   setSiegeProgress?: (progress: {
     kills: number;
     points?: number;
@@ -15,6 +21,7 @@ interface SiegeQaState {
 interface UseSiegeGameDebugOptions {
   interactiveInitialBugCounts: BugCounts;
   interactiveMode: boolean;
+  interactiveRemainingBugs: number;
   lastKillAtRef: MutableRefObject<number | null>;
   onClearComplete: () => void;
   onEndSurvival: () => void;
@@ -44,6 +51,7 @@ function getInitialDebugMode() {
 export function useSiegeGameDebug({
   interactiveInitialBugCounts,
   interactiveMode,
+  interactiveRemainingBugs,
   lastKillAtRef,
   onClearComplete,
   onEndSurvival,
@@ -51,6 +59,9 @@ export function useSiegeGameDebug({
 }: UseSiegeGameDebugOptions) {
   const [debugMode, setDebugMode] = useState(getInitialDebugMode);
   const [clearSwarmRequestId, setClearSwarmRequestId] = useState(0);
+  const liveBugCountRef = useRef(0);
+
+  liveBugCountRef.current = interactiveMode ? interactiveRemainingBugs : 0;
 
   useEffect(() => {
     if (typeof window === "undefined") {
@@ -131,6 +142,44 @@ export function useSiegeGameDebug({
     // Bypass the rAF pre-paint overwrite race: synchronously finalize the run
     onClearComplete();
   }, [interactiveMode, lastKillAtRef, onClearComplete, updateRuntimeSnapshot]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return undefined;
+    }
+
+    const qaState = (window as Window & { __RTZ_QA__?: SiegeQaState }).__RTZ_QA__;
+    if (!qaState?.enabled) {
+      return undefined;
+    }
+
+    const fallbackGetLiveBugCount = () => liveBugCountRef.current;
+    const fallbackClearLiveBugs = () => {
+      const clearedCount = liveBugCountRef.current;
+
+      if (clearedCount > 0) {
+        killAllBugs();
+      }
+
+      return clearedCount;
+    };
+
+    if (!qaState.getLiveBugCount) {
+      qaState.getLiveBugCount = fallbackGetLiveBugCount;
+    }
+    if (!qaState.clearLiveBugs) {
+      qaState.clearLiveBugs = fallbackClearLiveBugs;
+    }
+
+    return () => {
+      if (qaState.getLiveBugCount === fallbackGetLiveBugCount) {
+        delete qaState.getLiveBugCount;
+      }
+      if (qaState.clearLiveBugs === fallbackClearLiveBugs) {
+        delete qaState.clearLiveBugs;
+      }
+    };
+  }, [interactiveMode, killAllBugs]);
 
   const triggerSurvivalOverrun = useCallback(() => {
     if (!interactiveMode) {
