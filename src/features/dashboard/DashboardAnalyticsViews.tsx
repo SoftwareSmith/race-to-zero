@@ -168,81 +168,6 @@ function buildHistoryMetricCards(
   ];
 }
 
-function getHistoricalWindowSummary(comparisonMetrics: ComparisonMetrics) {
-  const improvingWindows = comparisonMetrics.historicalWindows.filter(
-    (window) => window.netChange < 0,
-  ).length;
-  const regressingWindows = comparisonMetrics.historicalWindows.filter(
-    (window) => window.netChange > 0,
-  ).length;
-
-  return `Each bar is one ${comparisonMetrics.currentWindow.dayCount}-day window of backlog movement. ${formatNumber(improvingWindows)} windows reduced the queue while ${formatNumber(regressingWindows)} increased it.`;
-}
-
-function getRateHistorySummary(comparisonMetrics: ComparisonMetrics) {
-  return `This trend compares historical fix velocity with intake velocity over matching ${comparisonMetrics.currentWindow.dayCount}-day windows so it is easier to see when throughput actually overtakes incoming bugs.`;
-}
-
-function getSlaHitRateSummary(insightsMetrics: InsightsMetrics) {
-  if (insightsMetrics.eligibleCompleted === 0) {
-    return "No completed bugs in this period have Linear due dates yet, so SLA hit rate is waiting on more due-date coverage.";
-  }
-
-  return `${formatNumber(insightsMetrics.onTimeCompleted)} of ${formatNumber(insightsMetrics.eligibleCompleted)} completed bugs with due dates landed on time in ${insightsMetrics.rangeLabel}.`;
-}
-
-function getSlaOutcomeSummary(insightsMetrics: InsightsMetrics) {
-  return `${formatNumber(insightsMetrics.totalCompleted)} bugs were completed in ${insightsMetrics.rangeLabel}, split between on-time, overdue, and missing due-date outcomes.`;
-}
-
-function getSlaTrendSummary(insightsMetrics: InsightsMetrics) {
-  if (!insightsMetrics.trendSeries.length) {
-    return "No completed bugs were found in the selected period.";
-  }
-
-  return "Daily SLA outcomes show whether overdue completions are clustered on a few delivery days or spread across the period.";
-}
-
-function getResolutionTimeSummary(insightsMetrics: InsightsMetrics) {
-  return `Median resolution time is ${formatNumber(insightsMetrics.medianResolutionDays, 1)} days, and overdue completions ran ${formatNumber(insightsMetrics.medianOverdueDays, 1)} days late at the median.`;
-}
-
-function getHistoryOutcomeSummary(historyMetrics: HistoryMetrics) {
-  if (historyMetrics.currentWindow.totalClosed === 0) {
-    return `No bugs for ${historyMetrics.teamLabel} reached a terminal outcome in the selected period.`;
-  }
-
-  const leadingOutcome = [...historyMetrics.outcomeMetrics].sort(
-    (left, right) => right.count - left.count,
-  )[0];
-
-  if (!leadingOutcome) {
-    return "No closed work was found in the selected period.";
-  }
-
-  return `${leadingOutcome.label} is the largest terminal outcome for ${historyMetrics.teamLabel} in ${historyMetrics.rangeLabel} at ${formatNumber(leadingOutcome.count)} bugs.`;
-}
-
-function getHistoryTrendSummary(historyMetrics: HistoryMetrics) {
-  if (!historyMetrics.trendSeries.length) {
-    return `Outcome history for ${historyMetrics.teamLabel} will populate when bugs start reaching terminal states in the selected range.`;
-  }
-
-  return `This timeline separates completed work from the non-completion outcomes for ${historyMetrics.teamLabel} so closure quality is visible, not just closure volume.`;
-}
-
-function getHistoryCycleTimeSummary(historyMetrics: HistoryMetrics) {
-  return `Median cycle time for ${historyMetrics.teamLabel} is ${formatNumber(historyMetrics.currentWindow.medianCycleDays, 1)} days, the 75th percentile is ${formatNumber(historyMetrics.currentWindow.p75CycleDays, 1)} days, and the 90th percentile is ${formatNumber(historyMetrics.currentWindow.p90CycleDays, 1)} days.`;
-}
-
-function getHistoryCycleBucketSummary(historyMetrics: HistoryMetrics) {
-  const olderClosures = historyMetrics.cycleBuckets
-    .filter((bucket) => bucket.label === "31-60d" || bucket.label === "61d+")
-    .reduce((sum, bucket) => sum + bucket.count, 0);
-
-  return `${formatNumber(olderClosures)} closures for ${historyMetrics.teamLabel} took longer than 30 days, which helps separate steady throughput from long-tail cleanup.`;
-}
-
 interface PeriodsViewProps {
   comparisonMetrics: ComparisonMetrics;
   onChartFocusChange?: (nextFocus: ChartFocusState | null) => void;
@@ -272,14 +197,6 @@ export const PeriodsView = memo(function PeriodsView({
   );
   const metricCards = useMemo(
     () => buildPeriodsMetricCards(comparisonMetrics),
-    [comparisonMetrics],
-  );
-  const historicalWindowSummary = useMemo(
-    () => getHistoricalWindowSummary(comparisonMetrics),
-    [comparisonMetrics],
-  );
-  const rateHistorySummary = useMemo(
-    () => getRateHistorySummary(comparisonMetrics),
     [comparisonMetrics],
   );
 
@@ -322,10 +239,9 @@ export const PeriodsView = memo(function PeriodsView({
           chartKey="period-window-history"
           className="h-full"
           data={comparisonWindowHistoryData}
-          description="Historical windows colored by whether backlog grew or shrank."
+          description={`Each bar is one ${comparisonMetrics.currentWindow.dayCount}-day window. Green bars reduced backlog, red bars increased it.`}
           onHoverStateChange={onChartFocusChange}
           siegeMode={siegeMode}
-          summary={historicalWindowSummary}
           title="Period-by-period net change"
           variant="bar"
         />
@@ -333,10 +249,9 @@ export const PeriodsView = memo(function PeriodsView({
           chartKey="period-rate-history"
           className="h-full"
           data={comparisonRateHistoryData}
-          description="Historical intake vs closure rates across matching windows."
+          description={`Historical intake rate versus fix rate across matching ${comparisonMetrics.currentWindow.dayCount}-day windows.`}
           onHoverStateChange={onChartFocusChange}
           siegeMode={siegeMode}
-          summary={rateHistorySummary}
           title="Closure vs intake trend"
         />
       </div>
@@ -375,22 +290,6 @@ export const InsightsView = memo(function InsightsView({
     () => buildInsightsMetricCards(insightsMetrics),
     [insightsMetrics],
   );
-  const slaHitRateSummary = useMemo(
-    () => getSlaHitRateSummary(insightsMetrics),
-    [insightsMetrics],
-  );
-  const slaOutcomeSummary = useMemo(
-    () => getSlaOutcomeSummary(insightsMetrics),
-    [insightsMetrics],
-  );
-  const slaTrendSummary = useMemo(
-    () => getSlaTrendSummary(insightsMetrics),
-    [insightsMetrics],
-  );
-  const resolutionTimeSummary = useMemo(
-    () => getResolutionTimeSummary(insightsMetrics),
-    [insightsMetrics],
-  );
 
   return (
     <div className="grid content-start gap-1.5 sm:gap-2">
@@ -412,10 +311,9 @@ export const InsightsView = memo(function InsightsView({
           chartKey="sla-hit-rate-by-priority"
           className="h-full"
           data={slaHitRateData}
-          description="Completed bugs grouped by Linear priority, using due date as the SLA target."
+          description={`On-time share of due-dated completions in ${insightsMetrics.rangeLabel}, grouped by severity.`}
           onHoverStateChange={onChartFocusChange}
           siegeMode={siegeMode}
-          summary={slaHitRateSummary}
           title="SLA hit rate by severity"
           variant="bar"
         />
@@ -423,10 +321,9 @@ export const InsightsView = memo(function InsightsView({
           chartKey="sla-outcomes-by-priority"
           className="h-full"
           data={slaOutcomeData}
-          description="Shows on-time completions versus overdue completions for each severity group."
+          description={`On-time, breached, and missing due-date completions in ${insightsMetrics.rangeLabel}, grouped by severity.`}
           onHoverStateChange={onChartFocusChange}
           siegeMode={siegeMode}
-          summary={slaOutcomeSummary}
           title="SLA outcomes by severity"
           variant="bar"
         />
@@ -434,20 +331,18 @@ export const InsightsView = memo(function InsightsView({
           chartKey="sla-outcome-trend"
           className="h-full"
           data={slaTrendData}
-          description="Daily completed bugs split by whether they landed on time or overdue against the Linear due date."
+          description={`Daily on-time versus overdue completions across ${insightsMetrics.rangeLabel}.`}
           onHoverStateChange={onChartFocusChange}
           siegeMode={siegeMode}
-          summary={slaTrendSummary}
           title="SLA outcome trend"
         />
         <ChartCard
           chartKey="resolution-time-by-priority"
           className="h-full"
           data={resolutionTimeData}
-          description="Average completion time and average overdue size by severity."
+          description={`Average resolution days versus average overdue days for completions in ${insightsMetrics.rangeLabel}.`}
           onHoverStateChange={onChartFocusChange}
           siegeMode={siegeMode}
-          summary={resolutionTimeSummary}
           title="Resolution time by severity"
           variant="bar"
         />
@@ -487,22 +382,6 @@ export const HistoryView = memo(function HistoryView({
     () => buildHistoryMetricCards(historyMetrics),
     [historyMetrics],
   );
-  const outcomeSummary = useMemo(
-    () => getHistoryOutcomeSummary(historyMetrics),
-    [historyMetrics],
-  );
-  const trendSummary = useMemo(
-    () => getHistoryTrendSummary(historyMetrics),
-    [historyMetrics],
-  );
-  const cycleTimeSummary = useMemo(
-    () => getHistoryCycleTimeSummary(historyMetrics),
-    [historyMetrics],
-  );
-  const cycleBucketSummary = useMemo(
-    () => getHistoryCycleBucketSummary(historyMetrics),
-    [historyMetrics],
-  );
 
   return (
     <div className="grid content-start gap-1.5 sm:gap-2">
@@ -524,10 +403,9 @@ export const HistoryView = memo(function HistoryView({
           chartKey="history-outcome-breakdown"
           className="h-full"
           data={outcomeChartData}
-          description="How closed work ended in the selected period across completed and non-completion outcomes."
+          description={`Completed, cancelled, duplicated, auto-closed, and archived outcomes in ${historyMetrics.rangeLabel}.`}
           onHoverStateChange={onChartFocusChange}
           siegeMode={siegeMode}
-          summary={outcomeSummary}
           title="Terminal outcomes"
           variant="bar"
         />
@@ -535,20 +413,18 @@ export const HistoryView = memo(function HistoryView({
           chartKey="history-outcome-trend"
           className="h-full"
           data={trendChartData}
-          description="Daily terminal outcomes over time so completion quality is visible alongside closure volume."
+          description={`Daily completed and non-completion outcomes across ${historyMetrics.rangeLabel}.`}
           onHoverStateChange={onChartFocusChange}
           siegeMode={siegeMode}
-          summary={trendSummary}
           title="Closed outcomes over time"
         />
         <ChartCard
           chartKey="history-cycle-time"
           className="h-full"
           data={cycleTimeChartData}
-          description="Median, P75, and P90 cycle time by priority for bugs that reached a terminal outcome in the selected period."
+          description={`Median, P75, and P90 cycle time by priority for work closed in ${historyMetrics.rangeLabel}.`}
           onHoverStateChange={onChartFocusChange}
           siegeMode={siegeMode}
-          summary={cycleTimeSummary}
           title="Cycle time by priority"
           variant="bar"
         />
@@ -556,10 +432,9 @@ export const HistoryView = memo(function HistoryView({
           chartKey="history-cycle-buckets"
           className="h-full"
           data={cycleBucketChartData}
-          description="Distribution of closure times from creation to terminal outcome."
+          description={`Distribution of closure times from creation to terminal outcome in ${historyMetrics.rangeLabel}.`}
           onHoverStateChange={onChartFocusChange}
           siegeMode={siegeMode}
-          summary={cycleBucketSummary}
           title="Cycle time distribution"
           variant="bar"
         />

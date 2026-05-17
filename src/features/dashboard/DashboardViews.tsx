@@ -31,21 +31,6 @@ interface MetricCardDefinition {
   value: string;
 }
 
-function getBacklogSummary(
-  summary: SummaryMetrics,
-  deadlineMetrics: DeadlineMetrics,
-) {
-  if (summary.currentNetBurnRate <= 0) {
-    return `The backlog is growing by ${formatNumber(Math.abs(summary.currentNetBurnRate), 2)}/day right now, against ${formatNumber(deadlineMetrics.neededNetBurnRate, 2)}/day reduction needed.`;
-  }
-
-  if (summary.currentNetBurnRate >= deadlineMetrics.neededNetBurnRate) {
-    return `The backlog is shrinking by ${formatNumber(summary.currentNetBurnRate, 2)}/day, which is ahead of the ${formatNumber(deadlineMetrics.neededNetBurnRate, 2)}/day reduction needed.`;
-  }
-
-  return `The backlog is shrinking by ${formatNumber(summary.currentNetBurnRate, 2)}/day, but that is still below the ${formatNumber(deadlineMetrics.neededNetBurnRate, 2)}/day reduction needed to hit the target path.`;
-}
-
 function getWorkdayLabelAndHint(
   isWorkdayMode: boolean,
   deadlineLabel: string,
@@ -107,31 +92,6 @@ function buildOverviewMetricCards(
   ];
 }
 
-function getStatusDistributionSummary(deadlineMetrics: DeadlineMetrics) {
-  const leadingStatus = [...deadlineMetrics.statusDistribution].sort(
-    (left, right) => right.count - left.count,
-  )[0];
-  if (!leadingStatus) {
-    return "No workflow states are currently represented in the snapshot.";
-  }
-
-  return `${leadingStatus.label} is currently the largest Linear column with ${formatNumber(leadingStatus.count)} bugs assigned to it. Done is ignored in the chart because its size would dominate the rest of the workflow view (${formatNumber(deadlineMetrics.doneCount)} bugs).`;
-}
-
-function getOpenAgeSummary(deadlineMetrics: DeadlineMetrics) {
-  const ageChartData = buildOpenAgeDistributionSummary(deadlineMetrics);
-  return ageChartData;
-}
-
-function buildOpenAgeDistributionSummary(deadlineMetrics: DeadlineMetrics) {
-  const ageDistribution =
-    buildOpenAgeChartData(deadlineMetrics).datasets[0]?.data ?? [];
-  const olderThanNinety =
-    Number(ageDistribution[3] ?? 0) + Number(ageDistribution[4] ?? 0);
-
-  return `${formatNumber(olderThanNinety)} open bugs are older than 90 days, which helps separate fresh intake from long-running backlog.`;
-}
-
 export { default as StatusBanner } from "@shared/components/StatusBanner";
 
 interface OverviewViewProps {
@@ -151,7 +111,6 @@ export const OverviewView = memo(function OverviewView({
 }: OverviewViewProps) {
   const isWorkdayMode =
     workdaySettings.excludeWeekends || workdaySettings.excludePublicHolidays;
-  const backlogSummary = getBacklogSummary(summary, deadlineMetrics);
   const deadlineBurndownData = useMemo(
     () => buildDeadlineBurndownChartData(deadlineMetrics),
     [deadlineMetrics],
@@ -171,14 +130,6 @@ export const OverviewView = memo(function OverviewView({
   const metricCards = useMemo(
     () => buildOverviewMetricCards(summary, deadlineMetrics, isWorkdayMode),
     [deadlineMetrics, isWorkdayMode, summary],
-  );
-  const statusSummary = useMemo(
-    () => getStatusDistributionSummary(deadlineMetrics),
-    [deadlineMetrics],
-  );
-  const openAgeSummary = useMemo(
-    () => getOpenAgeSummary(deadlineMetrics),
-    [deadlineMetrics],
   );
 
   return (
@@ -201,10 +152,9 @@ export const OverviewView = memo(function OverviewView({
           chartKey="deadline-burndown"
           className="h-full"
           data={deadlineBurndownData}
-          description="Remaining backlog against the ideal path to zero by the selected deadline."
+          description="Remaining backlog versus the ideal path to zero by the selected deadline."
           onHoverStateChange={onChartFocusChange}
           siegeMode={siegeMode}
-          summary={backlogSummary}
           title="Bug burndown"
         />
         <ChartCard
@@ -221,10 +171,9 @@ export const OverviewView = memo(function OverviewView({
           chartKey="status-breakdown"
           className="h-full"
           data={statusChartData}
-          description="Active bugs by workflow state. Closed states excluded."
+          description="Active bugs by workflow state. Done, Cancelled, and Duplicated are excluded."
           onHoverStateChange={onChartFocusChange}
           siegeMode={siegeMode}
-          summary={statusSummary}
           title="Active bugs by status"
           variant="bar"
         />
@@ -235,7 +184,6 @@ export const OverviewView = memo(function OverviewView({
           description="Open backlog by age - separates fresh intake from stale work."
           onHoverStateChange={onChartFocusChange}
           siegeMode={siegeMode}
-          summary={openAgeSummary}
           title="Active bug age"
           variant="bar"
         />

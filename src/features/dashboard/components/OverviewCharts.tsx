@@ -1,6 +1,5 @@
 import { memo, useMemo } from "react";
 import ChartCard from "@dashboard/components/ChartCard";
-import { formatNumber } from "@dashboard/utils/dashboard";
 import {
   buildDeadlineBurndownChartData,
   buildOpenAgeChartData,
@@ -13,34 +12,12 @@ import type {
 } from "../../../types/dashboard";
 
 interface OverviewChartsProps {
-  backlogSummary: string;
   deadlineMetrics: DeadlineMetrics;
   onChartFocusChange?: (nextFocus: ChartFocusState | null) => void;
   siegeMode?: boolean;
 }
 
-function getStatusDistributionSummary(deadlineMetrics: DeadlineMetrics) {
-  const leadingStatus = [...deadlineMetrics.statusDistribution].sort(
-    (left, right) => right.count - left.count,
-  )[0];
-
-  if (!leadingStatus) {
-    return "No workflow states are currently represented in the snapshot.";
-  }
-
-  return `${leadingStatus.label} is currently the largest active workflow state with ${formatNumber(leadingStatus.count)} bugs in it. Closed states like Done, Cancelled, and Duplicated are excluded from this chart. Done currently contains ${formatNumber(deadlineMetrics.doneCount)} bugs.`;
-}
-
-function getOpenAgeSummary(deadlineMetrics: DeadlineMetrics) {
-  const olderThanNinety = deadlineMetrics.openAgeDistribution
-    .filter((entry) => entry.label === "91-180d" || entry.label === "181d+")
-    .reduce((sum, entry) => sum + entry.count, 0);
-
-  return `${formatNumber(olderThanNinety)} open bugs are older than 90 days, which helps separate fresh intake from long-running backlog.`;
-}
-
 const OverviewCharts = memo(function OverviewCharts({
-  backlogSummary,
   deadlineMetrics,
   onChartFocusChange,
   siegeMode = false,
@@ -61,14 +38,6 @@ const OverviewCharts = memo(function OverviewCharts({
     () => buildOpenAgeChartData(deadlineMetrics),
     [deadlineMetrics],
   );
-  const statusSummary = useMemo(
-    () => getStatusDistributionSummary(deadlineMetrics),
-    [deadlineMetrics],
-  );
-  const openAgeSummary = useMemo(
-    () => getOpenAgeSummary(deadlineMetrics),
-    [deadlineMetrics],
-  );
 
   return (
     <div className="grid items-stretch gap-1.5 md:grid-cols-2 sm:gap-2">
@@ -76,10 +45,9 @@ const OverviewCharts = memo(function OverviewCharts({
         chartKey="deadline-burndown"
         className="h-full"
         data={deadlineBurndownData}
-        description="Remaining backlog against the ideal path to zero by the selected deadline."
+        description="Remaining backlog versus the ideal path to zero by the selected deadline."
         onHoverStateChange={onChartFocusChange}
         siegeMode={siegeMode}
-        summary={backlogSummary}
         title="Bug burndown"
       />
       <ChartCard
@@ -96,10 +64,9 @@ const OverviewCharts = memo(function OverviewCharts({
         chartKey="status-breakdown"
         className="h-full"
         data={statusChartData}
-        description="Active bugs by workflow state. Closed states excluded."
+        description="Active bugs by workflow state. Done, Cancelled, and Duplicated are excluded."
         onHoverStateChange={onChartFocusChange}
         siegeMode={siegeMode}
-        summary={statusSummary}
         title="Active bugs by status"
         variant="bar"
       />
@@ -107,10 +74,9 @@ const OverviewCharts = memo(function OverviewCharts({
         chartKey="open-age-breakdown"
         className="h-full"
         data={openAgeChartData}
-        description="Open backlog by age — separates fresh intake from stale work."
+        description="Open backlog by age, separating fresh intake from stale work."
         onHoverStateChange={onChartFocusChange}
         siegeMode={siegeMode}
-        summary={openAgeSummary}
         title="Active bug age"
         variant="bar"
       />

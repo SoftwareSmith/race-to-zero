@@ -5,6 +5,7 @@ import {
   CategoryScale,
   type ChartData,
   type ChartEvent,
+  type ChartOptions,
   type ChartType,
   Chart as ChartJS,
   Filler,
@@ -43,7 +44,6 @@ interface ChartCardProps {
   description?: string;
   onHoverStateChange?: (nextFocus: ChartFocusState | null) => void;
   siegeMode?: boolean;
-  summary?: string;
   title: string;
   variant?: ChartVariant;
 }
@@ -51,7 +51,6 @@ interface ChartCardProps {
 const ChartCard = memo(function ChartCard({
   title,
   description,
-  summary,
   data,
   variant = "line",
   chartKey,
@@ -70,37 +69,47 @@ const ChartCard = memo(function ChartCard({
     };
   }, []);
 
-  const options = useMemo(
+  const handleHover = (
+    _event: ChartEvent,
+    elements: ActiveElement[],
+    chart: ChartJS<ChartType>,
+  ) => {
+    if (!onHoverStateChange) {
+      return;
+    }
+
+    const activePoint = elements?.[0];
+    if (!activePoint) {
+      onHoverStateChange(null);
+      return;
+    }
+
+    const labelCount = chart.data.labels?.length ?? 0;
+    const relativeIndex =
+      labelCount > 1 ? activePoint.index / (labelCount - 1) : 0.5;
+    onHoverStateChange({
+      chartKey,
+      dataIndex: activePoint.index,
+      datasetIndex: activePoint.datasetIndex,
+      label: String(chart.data.labels?.[activePoint.index] ?? ""),
+      relativeIndex,
+    });
+  };
+
+  const barOptions = useMemo<ChartOptions<"bar">>(
     () => ({
-      ...getLineChartOptions(variant, chartKey),
-      onHover: (
-        _event: ChartEvent,
-        elements: ActiveElement[],
-        chart: ChartJS<ChartType>,
-      ) => {
-        if (!onHoverStateChange) {
-          return;
-        }
-
-        const activePoint = elements?.[0];
-        if (!activePoint) {
-          onHoverStateChange(null);
-          return;
-        }
-
-        const labelCount = chart.data.labels?.length ?? 0;
-        const relativeIndex =
-          labelCount > 1 ? activePoint.index / (labelCount - 1) : 0.5;
-        onHoverStateChange({
-          chartKey,
-          dataIndex: activePoint.index,
-          datasetIndex: activePoint.datasetIndex,
-          label: String(chart.data.labels?.[activePoint.index] ?? ""),
-          relativeIndex,
-        });
-      },
+      ...getLineChartOptions("bar", chartKey, data.datasets.length),
+      onHover: handleHover,
     }),
-    [chartKey, onHoverStateChange, variant],
+    [chartKey, data.datasets.length, onHoverStateChange],
+  );
+
+  const lineOptions = useMemo<ChartOptions<"line">>(
+    () => ({
+      ...getLineChartOptions("line", chartKey, data.datasets.length),
+      onHover: handleHover,
+    }),
+    [chartKey, data.datasets.length, onHoverStateChange],
   );
 
   return (
@@ -132,23 +141,17 @@ const ChartCard = memo(function ChartCard({
 
         <div
           className={cn(
-            "mt-2 h-[156px] shrink-0 transition-opacity duration-200 ease-out sm:h-[184px] xl:h-[198px]",
+            "relative mt-2 h-[156px] shrink-0 transition-opacity duration-200 ease-out sm:h-[184px] xl:h-[198px]",
             isChartVisible ? "opacity-100" : "opacity-0",
             description ? "sm:mt-2.5" : "",
           )}
         >
           {variant === "bar" ? (
-            <Bar data={data as BarChartData} options={options} />
+            <Bar data={data as BarChartData} options={barOptions} />
           ) : (
-            <Line data={data as LineChartData} options={options} />
+            <Line data={data as LineChartData} options={lineOptions} />
           )}
         </div>
-
-        {!description && summary ? (
-          <p className="mt-[0.4375rem] shrink-0 max-w-2xl text-[0.64rem] leading-[1.05rem] text-stone-400 sm:text-[0.68rem] sm:leading-[1.1rem]">
-            {summary}
-          </p>
-        ) : null}
       </div>
     </article>
   );
