@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-05-16T00:23:54.909Z",
-  "lastUpdated": "2026-05-16T00:23:54.909Z",
+  "generatedAt": "2026-05-17T00:25:09.117Z",
+  "lastUpdated": "2026-05-17T00:25:09.117Z",
   "bugs": [
     {
       "archivedAt": null,
@@ -224,7 +224,7 @@
       "updatedAt": "2025-06-20"
     },
     {
-      "archivedAt": null,
+      "archivedAt": "2026-05-16",
       "autoClosedAt": null,
       "canceledAt": "2026-04-16",
       "createdAt": "2024-02-14",
@@ -728,7 +728,7 @@
       "stateName": "Backlog",
       "stateType": "backlog",
       "teamKey": "CP",
-      "updatedAt": "2026-05-11"
+      "updatedAt": "2026-05-16"
     },
     {
       "archivedAt": null,
@@ -30420,7 +30420,7 @@
       "stateName": "Backlog",
       "stateType": "backlog",
       "teamKey": "TA",
-      "updatedAt": "2026-05-15"
+      "updatedAt": "2026-05-16"
     },
     {
       "archivedAt": null,
@@ -30446,7 +30446,7 @@
       "stateName": "Backlog",
       "stateType": "backlog",
       "teamKey": "TA",
-      "updatedAt": "2026-05-15"
+      "updatedAt": "2026-05-16"
     },
     {
       "archivedAt": null,
