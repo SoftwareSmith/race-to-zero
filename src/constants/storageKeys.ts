@@ -4,6 +4,7 @@ export const STORAGE_KEYS = {
   bugSizeMultiplier: "race-to-zero:bug-size-multiplier",
   deadlineDate: "race-to-zero:deadline-date",
   deadlineFromDate: "race-to-zero:deadline-from-date",
+  dashboardTeamFilter: "race-to-zero:dashboard-team-filter",
   excludePublicHolidays: "race-to-zero:exclude-holidays-awst",
   excludeWeekends: "race-to-zero:exclude-weekends",
   gameConfig: "race-to-zero:game-config",

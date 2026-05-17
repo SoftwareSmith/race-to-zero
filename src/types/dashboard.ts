@@ -3,8 +3,14 @@ export type StatusBannerKind = "error" | "info";
 export type TopMenuKey = "codex" | "settings" | null;
 export type SettingToggleKey = "excludePublicHolidays" | "excludeWeekends";
 export type BugVisualSettingKey = "chaosMultiplier" | "sizeMultiplier";
-export type ActiveTab = "overview" | "periods" | "insights";
+export type ActiveTab = "overview" | "periods" | "insights" | "history";
 export type CompareRangeKey = "7" | "30" | "90" | "all" | "custom";
+export type HistoryOutcomeKey =
+  | "completed"
+  | "cancelled"
+  | "duplicated"
+  | "autoClosed"
+  | "archived";
 
 export interface TabItem {
   id: ActiveTab;
@@ -76,6 +82,77 @@ export interface InsightsMetrics {
   tone: Tone;
   totalCompleted: number;
   trendSeries: InsightsTrendEntry[];
+}
+
+export interface HistoryOutcomeMetric {
+  count: number;
+  key: HistoryOutcomeKey;
+  label: string;
+  percent: number;
+}
+
+export interface HistoryTrendEntry {
+  archived: number;
+  autoClosed: number;
+  cancelled: number;
+  completed: number;
+  date: string;
+  duplicated: number;
+  total: number;
+}
+
+export interface HistoryPriorityMetrics {
+  archived: number;
+  autoClosed: number;
+  averageCycleDays: number;
+  cancelled: number;
+  completed: number;
+  duplicated: number;
+  label: string;
+  medianCycleDays: number;
+  p75CycleDays: number;
+  p90CycleDays: number;
+  totalClosed: number;
+}
+
+export interface HistoryCycleBucketEntry {
+  count: number;
+  label: string;
+}
+
+export interface HistoryWindowMetrics {
+  archived: number;
+  autoClosed: number;
+  averageCycleDays: number;
+  cancellationRate: number;
+  cancelled: number;
+  completionRate: number;
+  completed: number;
+  duplicated: number;
+  medianCycleDays: number;
+  p75CycleDays: number;
+  p90CycleDays: number;
+  totalClosed: number;
+}
+
+export interface HistoryMetrics {
+  body: string;
+  currentWindow: HistoryWindowMetrics;
+  cycleBuckets: HistoryCycleBucketEntry[];
+  headline: string;
+  outcomeMetrics: HistoryOutcomeMetric[];
+  previousWindow: HistoryWindowMetrics | null;
+  priorityMetrics: HistoryPriorityMetrics[];
+  rangeLabel: string;
+  teamLabel: string;
+  teamKey: string | null;
+  tone: Tone;
+  trendSeries: HistoryTrendEntry[];
+}
+
+export interface HistoryTeamOption {
+  label: string;
+  value: string;
 }
 
 export interface MetricsSource {

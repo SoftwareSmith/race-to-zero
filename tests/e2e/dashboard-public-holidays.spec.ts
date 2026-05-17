@@ -48,7 +48,7 @@ test.describe("dashboard public holiday QA", () => {
     );
     await expectMetricValue(
       page,
-      "Required net burn",
+      "Required reduction",
       holidayAdjustedMetrics.viewMetrics.requiredNetBurn,
     );
 

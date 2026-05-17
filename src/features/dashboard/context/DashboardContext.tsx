@@ -27,9 +27,12 @@ type DashboardUiValue = Pick<
   | "handleCustomToDateChange"
   | "handleDeadlineDateChange"
   | "handleDeadlineFromDateChange"
+  | "handleTeamFilterChange"
   | "handleTabChange"
   | "handleTopMenuToggle"
   | "handleTopNavInteract"
+  | "teamFilterKey"
+  | "teamFilterOptions"
   | "openTopMenu"
   | "setChartFocus"
   | "settingsMenuRef"
@@ -44,6 +47,7 @@ type DashboardMetricsValue = Pick<
   | "error"
   | "headerEyebrow"
   | "headerSubtitle"
+  | "historyMetrics"
   | "insightsMetrics"
   | "summary"
 >;
@@ -85,9 +89,12 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
       handleCustomToDateChange: value.handleCustomToDateChange,
       handleDeadlineDateChange: value.handleDeadlineDateChange,
       handleDeadlineFromDateChange: value.handleDeadlineFromDateChange,
+      handleTeamFilterChange: value.handleTeamFilterChange,
       handleTabChange: value.handleTabChange,
       handleTopMenuToggle: value.handleTopMenuToggle,
       handleTopNavInteract: value.handleTopNavInteract,
+      teamFilterKey: value.teamFilterKey,
+      teamFilterOptions: value.teamFilterOptions,
       openTopMenu: value.openTopMenu,
       setChartFocus: value.setChartFocus,
       settingsMenuRef: value.settingsMenuRef,
@@ -109,9 +116,12 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
       value.handleCustomToDateChange,
       value.handleDeadlineDateChange,
       value.handleDeadlineFromDateChange,
+      value.handleTeamFilterChange,
       value.handleTabChange,
       value.handleTopMenuToggle,
       value.handleTopNavInteract,
+      value.teamFilterKey,
+      value.teamFilterOptions,
       value.openTopMenu,
       value.setChartFocus,
       value.settingsMenuRef,
@@ -127,6 +137,7 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
       error: value.error,
       headerEyebrow: value.headerEyebrow,
       headerSubtitle: value.headerSubtitle,
+      historyMetrics: value.historyMetrics,
       insightsMetrics: value.insightsMetrics,
       summary: value.summary,
     }),
@@ -138,6 +149,7 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
       value.error,
       value.headerEyebrow,
       value.headerSubtitle,
+      value.historyMetrics,
       value.insightsMetrics,
       value.summary,
     ],

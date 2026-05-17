@@ -5,8 +5,18 @@ import {
   formatNumber,
   formatPercent,
   formatSignedNumber,
-  getMetricTone,
+  getHistoryCancelledShareTone,
+  getHistoryClosedWorkTone,
+  getHistoryCompletedShareTone,
+  getHistoryCycleTone,
   getNetChangeTone,
+  getTargetConfidenceTone,
+  getTargetCurrentNetBurnTone,
+  getTargetDaysLeftTone,
+  getTargetOpenBugsTone,
+  getTrendBugsClosedTone,
+  getTrendBugsCreatedTone,
+  getTrendClosureRateTone,
 } from "./utils/dashboard";
 import {
   buildComparisonRateHistoryChartData,
@@ -14,6 +24,10 @@ import {
   buildComparisonSummaryChartData,
   buildComparisonTimelineChartData,
   buildDeadlineBurndownChartData,
+  buildHistoryCycleBucketChartData,
+  buildHistoryCycleTimeChartData,
+  buildHistoryOutcomeChartData,
+  buildHistoryTrendChartData,
   buildOpenAgeChartData,
   buildPriorityChartData,
   buildResolutionTimeChartData,
@@ -26,6 +40,7 @@ import type {
   ChartFocusState,
   ComparisonMetrics,
   DeadlineMetrics,
+  HistoryMetrics,
   InsightsMetrics,
   SummaryMetrics,
   Tone,
@@ -46,14 +61,14 @@ function getBacklogSummary(
   deadlineMetrics: DeadlineMetrics,
 ) {
   if (summary.currentNetBurnRate <= 0) {
-    return `The backlog is not trending downward right now. Current net burn is ${formatNumber(summary.currentNetBurnRate, 2)}/day against ${formatNumber(deadlineMetrics.neededNetBurnRate, 2)}/day needed.`;
+    return `The backlog is growing by ${formatNumber(Math.abs(summary.currentNetBurnRate), 2)}/day right now, against ${formatNumber(deadlineMetrics.neededNetBurnRate, 2)}/day reduction needed.`;
   }
 
   if (summary.currentNetBurnRate >= deadlineMetrics.neededNetBurnRate) {
-    return `The backlog is trending downward, and current net burn of ${formatNumber(summary.currentNetBurnRate, 2)}/day is holding ahead of the target path.`;
+    return `The backlog is shrinking by ${formatNumber(summary.currentNetBurnRate, 2)}/day, which is ahead of the ${formatNumber(deadlineMetrics.neededNetBurnRate, 2)}/day reduction needed.`;
   }
 
-  return `The backlog is trending downward, but current net burn of ${formatNumber(summary.currentNetBurnRate, 2)}/day is still below the ${formatNumber(deadlineMetrics.neededNetBurnRate, 2)}/day needed to close the gap to the target path.`;
+  return `The backlog is shrinking by ${formatNumber(summary.currentNetBurnRate, 2)}/day, but that is still below the ${formatNumber(deadlineMetrics.neededNetBurnRate, 2)}/day reduction needed to hit the target path.`;
 }
 
 function getWorkdayLabelAndHint(
@@ -76,7 +91,6 @@ function getWorkdayLabelAndHint(
 function buildOverviewMetricCards(
   summary: SummaryMetrics,
   deadlineMetrics: DeadlineMetrics,
-  metricTone: Tone,
   isWorkdayMode: boolean,
 ): MetricCardDefinition[] {
   const dayMetric = getWorkdayLabelAndHint(
@@ -88,104 +102,62 @@ function buildOverviewMetricCards(
     {
       hint: "Current open backlog size. This same number drives the animated bug field in the background.",
       label: "Open bugs",
-      tone: metricTone,
+      tone: getTargetOpenBugsTone(deadlineMetrics),
       value: formatNumber(summary.bugCount),
     },
     {
-      hint: "Confidence rises when current net burn stays above the required burn.",
+      hint: "Confidence is based on how much of the required daily reduction rate you are currently achieving. Green means at least 80% of target, blue means some real progress, red means very little or no reduction.",
       label: "Confidence",
-      tone: metricTone,
+      tone: getTargetConfidenceTone(summary, deadlineMetrics),
       value: formatPercent(summary.likelihoodScore),
     },
     {
-      hint: "Required daily net backlog reduction to hit zero by the selected deadline.",
-      label: "Required net burn",
-      tone: metricTone,
+      hint: "Required daily backlog reduction to hit zero by the selected deadline.",
+      label: "Required reduction",
+      tone: "neutral",
       value: `${formatNumber(deadlineMetrics.neededNetBurnRate, 2)}/day`,
     },
     {
-      hint: "Recent fixes per day minus recent created bugs per day.",
-      label: "Current net burn",
-      tone: metricTone,
-      value: `${formatNumber(summary.currentNetBurnRate, 2)}/day`,
+      hint: "Recent backlog change per day across all backlog exits. Negative means the backlog is shrinking; positive means it is growing.",
+      label: "Net backlog change",
+      tone: getTargetCurrentNetBurnTone(deadlineMetrics),
+      value: `${formatSignedNumber(-summary.currentNetBurnRate, 2)}/day`,
     },
     {
       hint: dayMetric.hint,
       label: dayMetric.label,
-      tone: metricTone,
+      tone: getTargetDaysLeftTone(deadlineMetrics),
       value: formatNumber(summary.daysUntilDeadline),
     },
   ];
 }
 
-function getCompletedTone(comparisonMetrics: ComparisonMetrics): Tone {
-  if (
-    comparisonMetrics.currentWindow.fixed >
-    comparisonMetrics.currentWindow.created
-  ) {
-    return "positive";
-  }
-
-  if (
-    comparisonMetrics.currentWindow.fixed ===
-    comparisonMetrics.currentWindow.created
-  ) {
-    return "neutral";
-  }
-
-  return getMetricTone(
-    comparisonMetrics.currentWindow.fixed,
-    comparisonMetrics.previousWindow?.fixed ?? null,
-    true,
-  );
-}
-
-function getCompletionRateTone(comparisonMetrics: ComparisonMetrics): Tone {
-  if (comparisonMetrics.currentWindow.completionRate > 100) {
-    return "positive";
-  }
-
-  if (Math.abs(comparisonMetrics.currentWindow.completionRate - 100) < 0.01) {
-    return "neutral";
-  }
-
-  return getMetricTone(
-    comparisonMetrics.currentWindow.completionRate,
-    comparisonMetrics.previousWindow?.completionRate ?? null,
-    true,
-  );
-}
-
 function buildPeriodsMetricCards(
   comparisonMetrics: ComparisonMetrics,
-  createdTone: Tone,
-  completedTone: Tone,
-  netChangeTone: Tone,
-  completionRateTone: Tone,
 ): MetricCardDefinition[] {
   return [
     {
       hint: "Created minus closed during the selected period.",
       label: "Net change",
-      tone: netChangeTone,
+      tone: getNetChangeTone(comparisonMetrics.currentWindow.netChange),
       value: formatSignedNumber(comparisonMetrics.currentWindow.netChange),
     },
     {
       hint: "Closure rate helps normalize periods with different intake volume.",
       label: "Closure rate",
-      tone: completionRateTone,
+      tone: getTrendClosureRateTone(comparisonMetrics),
       value: formatPercent(comparisonMetrics.currentWindow.completionRate, 1),
     },
     {
       hint: "Bugs that left the active backlog during the selected period, including completed, canceled, duplicate, and archived terminal work.",
       label: "Bugs closed",
-      tone: completedTone,
+      tone: getTrendBugsClosedTone(comparisonMetrics),
       value: formatNumber(comparisonMetrics.currentWindow.fixed),
     },
     {
       hint: "New bugs added during the selected period. Lower is better.",
       label: "Bugs created",
-      tone: createdTone,
+      tone: getTrendBugsCreatedTone(comparisonMetrics),
       value: formatNumber(comparisonMetrics.currentWindow.created),
     },
   ];
@@ -203,33 +175,18 @@ function getInsightsOverdueTone(insightsMetrics: InsightsMetrics): Tone {
   return "negative";
 }
 
-function getInsightsOnTimeTone(insightsMetrics: InsightsMetrics): Tone {
-  if (insightsMetrics.onTimeCompleted === 0) {
-    return "neutral";
-  }
-
-  return "positive";
-}
-
-function getInsightsOpenOverdueTone(insightsMetrics: InsightsMetrics): Tone {
-  if (insightsMetrics.openOverdue === 0) {
-    return insightsMetrics.eligibleCompleted > 0 ? "positive" : "neutral";
-  }
-  return "negative";
-}
-
 function buildInsightsMetricCards(
   insightsMetrics: InsightsMetrics,
 ): MetricCardDefinition[] {
   return [
     {
-      hint: "Open bugs that have passed their Linear due date and are not yet resolved.",
-      label: "Open SLA risk",
-      tone: getInsightsOpenOverdueTone(insightsMetrics),
-      value: formatNumber(insightsMetrics.openOverdue),
+      hint: "Bugs completed in the selected period, regardless of whether they landed on time or overdue.",
+      label: "Resolved in period",
+      tone: "neutral",
+      value: formatNumber(insightsMetrics.totalCompleted),
     },
     {
-      hint: "Completed bugs with due dates that closed on or before their Linear due date.",
+      hint: "Share of due-dated completed bugs that landed on time. Green at 90%+, blue at 75-89.9%, red below 75%.",
       label: "SLA hit rate",
       tone: getInsightsHitRateTone(insightsMetrics),
       value: formatPercent(insightsMetrics.slaHitRate, 1),
@@ -237,7 +194,7 @@ function buildInsightsMetricCards(
     {
       hint: "Completed bugs with due dates that closed on or before their Linear due date.",
       label: "On time",
-      tone: getInsightsOnTimeTone(insightsMetrics),
+      tone: "neutral",
       value: formatNumber(insightsMetrics.onTimeCompleted),
     },
     {
@@ -251,6 +208,51 @@ function buildInsightsMetricCards(
       label: "Median resolve time",
       tone: "neutral",
       value: `${formatNumber(insightsMetrics.medianResolutionDays, 1)}d`,
+    },
+  ];
+}
+
+function buildHistoryMetricCards(
+  historyMetrics: HistoryMetrics,
+): MetricCardDefinition[] {
+  const { currentWindow } = historyMetrics;
+
+  return [
+    {
+      hint: "All bugs that reached a terminal outcome in the selected period, including completed, cancelled, duplicated, archived, and auto-closed work.",
+      label: "Closed work",
+      tone: getHistoryClosedWorkTone(),
+      value: formatNumber(currentWindow.totalClosed),
+    },
+    {
+      hint: "Share of closed work that ended as completed. Green at 75%+, blue at 60-74.9%, red below 60%.",
+      label: "Completed share",
+      tone: getHistoryCompletedShareTone(currentWindow),
+      value: formatPercent(currentWindow.completionRate, 1),
+    },
+    {
+      hint: "Share of closed work that ended as cancelled. Green at 10% or lower, blue at 10-20%, red above 20%.",
+      label: "Cancelled share",
+      tone: getHistoryCancelledShareTone(currentWindow),
+      value: formatPercent(currentWindow.cancellationRate, 1),
+    },
+    {
+      hint: "Median time from bug creation to terminal outcome for all work closed in the selected period.",
+      label: "Median cycle",
+      tone: getHistoryCycleTone(),
+      value: `${formatNumber(currentWindow.medianCycleDays, 1)}d`,
+    },
+    {
+      hint: "75th percentile cycle time shows the upper-middle band of closure time without jumping all the way to the tail.",
+      label: "P75 cycle",
+      tone: getHistoryCycleTone(),
+      value: `${formatNumber(currentWindow.p75CycleDays, 1)}d`,
+    },
+    {
+      hint: "90th percentile cycle time helps show how painful the slowest closures are even when the median looks acceptable.",
+      label: "P90 cycle",
+      tone: getHistoryCycleTone(),
+      value: `${formatNumber(currentWindow.p90CycleDays, 1)}d`,
     },
   ];
 }
@@ -316,7 +318,7 @@ function getSlaHitRateSummary(insightsMetrics: InsightsMetrics) {
 }
 
 function getSlaOutcomeSummary(insightsMetrics: InsightsMetrics) {
-  return `${formatNumber(insightsMetrics.totalCompleted)} due-dated bugs were completed in ${insightsMetrics.rangeLabel}, split between on-time and overdue completion.`;
+  return `${formatNumber(insightsMetrics.totalCompleted)} bugs were completed in ${insightsMetrics.rangeLabel}, split between on-time, overdue, and missing due-date outcomes.`;
 }
 
 function getSlaTrendSummary(insightsMetrics: InsightsMetrics) {
@@ -329,6 +331,42 @@ function getSlaTrendSummary(insightsMetrics: InsightsMetrics) {
 
 function getResolutionTimeSummary(insightsMetrics: InsightsMetrics) {
   return `Median resolution time is ${formatNumber(insightsMetrics.medianResolutionDays, 1)} days, and overdue completions ran ${formatNumber(insightsMetrics.medianOverdueDays, 1)} days late at the median.`;
+}
+
+function getHistoryOutcomeSummary(historyMetrics: HistoryMetrics) {
+  if (historyMetrics.currentWindow.totalClosed === 0) {
+    return `No bugs for ${historyMetrics.teamLabel} reached a terminal outcome in the selected period.`;
+  }
+
+  const leadingOutcome = [...historyMetrics.outcomeMetrics].sort(
+    (left, right) => right.count - left.count,
+  )[0];
+
+  if (!leadingOutcome) {
+    return "No closed work was found in the selected period.";
+  }
+
+  return `${leadingOutcome.label} is the largest terminal outcome for ${historyMetrics.teamLabel} in ${historyMetrics.rangeLabel} at ${formatNumber(leadingOutcome.count)} bugs.`;
+}
+
+function getHistoryTrendSummary(historyMetrics: HistoryMetrics) {
+  if (!historyMetrics.trendSeries.length) {
+    return `Outcome history for ${historyMetrics.teamLabel} will populate when bugs start reaching terminal states in the selected range.`;
+  }
+
+  return `This timeline separates completed work from the non-completion outcomes for ${historyMetrics.teamLabel} so closure quality is visible, not just closure volume.`;
+}
+
+function getHistoryCycleTimeSummary(historyMetrics: HistoryMetrics) {
+  return `Median cycle time for ${historyMetrics.teamLabel} is ${formatNumber(historyMetrics.currentWindow.medianCycleDays, 1)} days, the 75th percentile is ${formatNumber(historyMetrics.currentWindow.p75CycleDays, 1)} days, and the 90th percentile is ${formatNumber(historyMetrics.currentWindow.p90CycleDays, 1)} days.`;
+}
+
+function getHistoryCycleBucketSummary(historyMetrics: HistoryMetrics) {
+  const olderClosures = historyMetrics.cycleBuckets
+    .filter((bucket) => bucket.label === "31-60d" || bucket.label === "61d+")
+    .reduce((sum, bucket) => sum + bucket.count, 0);
+
+  return `${formatNumber(olderClosures)} closures for ${historyMetrics.teamLabel} took longer than 30 days, which helps separate steady throughput from long-tail cleanup.`;
 }
 
 function ChartFallback({ className = "" }: { className?: string }) {
@@ -359,7 +397,6 @@ export const OverviewView = memo(function OverviewView({
   summary,
   workdaySettings,
 }: OverviewViewProps) {
-  const metricTone = deadlineMetrics.statusTone;
   const isWorkdayMode =
     workdaySettings.excludeWeekends || workdaySettings.excludePublicHolidays;
   const backlogSummary = getBacklogSummary(summary, deadlineMetrics);
@@ -384,10 +421,9 @@ export const OverviewView = memo(function OverviewView({
       buildOverviewMetricCards(
         summary,
         deadlineMetrics,
-        metricTone,
         isWorkdayMode,
       ),
-    [deadlineMetrics, isWorkdayMode, metricTone, summary],
+    [deadlineMetrics, isWorkdayMode, summary],
   );
   const statusSummary = useMemo(
     () => getStatusDistributionSummary(deadlineMetrics),
@@ -479,16 +515,6 @@ export const PeriodsView = memo(function PeriodsView({
   onChartFocusChange,
   siegeMode = false,
 }: PeriodsViewProps) {
-  const createdTone = getMetricTone(
-    comparisonMetrics.currentWindow.created,
-    comparisonMetrics.previousWindow?.created ?? null,
-    false,
-  );
-  const completedTone = getCompletedTone(comparisonMetrics);
-  const netChangeTone = getNetChangeTone(
-    comparisonMetrics.currentWindow.netChange,
-  );
-  const completionRateTone = getCompletionRateTone(comparisonMetrics);
   const comparisonTimelineData = useMemo(
     () => buildComparisonTimelineChartData(comparisonMetrics),
     [comparisonMetrics],
@@ -506,21 +532,8 @@ export const PeriodsView = memo(function PeriodsView({
     [comparisonMetrics],
   );
   const metricCards = useMemo(
-    () =>
-      buildPeriodsMetricCards(
-        comparisonMetrics,
-        createdTone,
-        completedTone,
-        netChangeTone,
-        completionRateTone,
-      ),
-    [
-      comparisonMetrics,
-      completionRateTone,
-      completedTone,
-      createdTone,
-      netChangeTone,
-    ],
+    () => buildPeriodsMetricCards(comparisonMetrics),
+    [comparisonMetrics],
   );
   const historicalWindowSummary = useMemo(
     () => getHistoricalWindowSummary(comparisonMetrics),
@@ -712,6 +725,126 @@ export const InsightsView = memo(function InsightsView({
             siegeMode={siegeMode}
             summary={resolutionTimeSummary}
             title="Resolution time by severity"
+            variant="bar"
+          />
+        </Suspense>
+      </div>
+    </div>
+  );
+});
+
+interface HistoryViewProps {
+  historyMetrics: HistoryMetrics;
+  onChartFocusChange?: (nextFocus: ChartFocusState | null) => void;
+  siegeMode?: boolean;
+}
+
+export const HistoryView = memo(function HistoryView({
+  historyMetrics,
+  onChartFocusChange,
+  siegeMode = false,
+}: HistoryViewProps) {
+  const outcomeChartData = useMemo(
+    () => buildHistoryOutcomeChartData(historyMetrics),
+    [historyMetrics],
+  );
+  const trendChartData = useMemo(
+    () => buildHistoryTrendChartData(historyMetrics),
+    [historyMetrics],
+  );
+  const cycleTimeChartData = useMemo(
+    () => buildHistoryCycleTimeChartData(historyMetrics),
+    [historyMetrics],
+  );
+  const cycleBucketChartData = useMemo(
+    () => buildHistoryCycleBucketChartData(historyMetrics),
+    [historyMetrics],
+  );
+  const metricCards = useMemo(
+    () => buildHistoryMetricCards(historyMetrics),
+    [historyMetrics],
+  );
+  const outcomeSummary = useMemo(
+    () => getHistoryOutcomeSummary(historyMetrics),
+    [historyMetrics],
+  );
+  const trendSummary = useMemo(
+    () => getHistoryTrendSummary(historyMetrics),
+    [historyMetrics],
+  );
+  const cycleTimeSummary = useMemo(
+    () => getHistoryCycleTimeSummary(historyMetrics),
+    [historyMetrics],
+  );
+  const cycleBucketSummary = useMemo(
+    () => getHistoryCycleBucketSummary(historyMetrics),
+    [historyMetrics],
+  );
+
+  return (
+    <div className="grid content-start gap-1.5 sm:gap-2">
+      <div className="grid gap-1.5 sm:grid-cols-2 sm:gap-2 xl:grid-cols-6">
+        {metricCards.map((metricCard) => (
+          <MetricCard
+            key={metricCard.label}
+            hint={metricCard.hint}
+            label={metricCard.label}
+            siegeMode={siegeMode}
+            tone={metricCard.tone}
+            value={metricCard.value}
+          />
+        ))}
+      </div>
+
+      <div className="grid items-stretch gap-1.5 md:grid-cols-2 sm:gap-2">
+        <Suspense fallback={<ChartFallback />}>
+          <ChartCard
+            chartKey="history-outcome-breakdown"
+            className="h-full"
+            data={outcomeChartData}
+            description="How closed work ended in the selected period across completed and non-completion outcomes."
+            onHoverStateChange={onChartFocusChange}
+            siegeMode={siegeMode}
+            summary={outcomeSummary}
+            title="Terminal outcomes"
+            variant="bar"
+          />
+        </Suspense>
+        <Suspense fallback={<ChartFallback />}>
+          <ChartCard
+            chartKey="history-outcome-trend"
+            className="h-full"
+            data={trendChartData}
+            description="Daily terminal outcomes over time so completion quality is visible alongside closure volume."
+            onHoverStateChange={onChartFocusChange}
+            siegeMode={siegeMode}
+            summary={trendSummary}
+            title="Closed outcomes over time"
+          />
+        </Suspense>
+        <Suspense fallback={<ChartFallback />}>
+          <ChartCard
+            chartKey="history-cycle-time"
+            className="h-full"
+            data={cycleTimeChartData}
+            description="Median, P75, and P90 cycle time by priority for bugs that reached a terminal outcome in the selected period."
+            onHoverStateChange={onChartFocusChange}
+            siegeMode={siegeMode}
+            summary={cycleTimeSummary}
+            title="Cycle time by priority"
+            variant="bar"
+          />
+        </Suspense>
+        <Suspense fallback={<ChartFallback />}>
+          <ChartCard
+            chartKey="history-cycle-buckets"
+            className="h-full"
+            data={cycleBucketChartData}
+            description="Distribution of closure times from creation to terminal outcome."
+            onHoverStateChange={onChartFocusChange}
+            siegeMode={siegeMode}
+            summary={cycleBucketSummary}
+            title="Cycle time distribution"
             variant="bar"
           />
         </Suspense>

@@ -9,17 +9,19 @@ import {
   getStatusTagText,
 } from "../utils/dashboard";
 import type {
-  DeadlineMetrics,
-  SummaryMetrics,
   ActiveTab,
   ComparisonMetrics,
+  DeadlineMetrics,
+  HistoryMetrics,
   InsightsMetrics,
+  SummaryMetrics,
 } from "../../../types/dashboard";
 
 interface CommandCenterProps {
   activeTab: ActiveTab;
   comparisonMetrics?: ComparisonMetrics | null;
   deadlineMetrics: DeadlineMetrics;
+  historyMetrics?: HistoryMetrics | null;
   insightsMetrics?: InsightsMetrics | null;
   siegeMode?: boolean;
   summary: SummaryMetrics;
@@ -30,8 +32,26 @@ function buildOutcomeSentence(
   summary: SummaryMetrics,
   deadlineMetrics: DeadlineMetrics,
   comparisonMetrics: ComparisonMetrics | null,
+  historyMetrics: HistoryMetrics | null,
   insightsMetrics: InsightsMetrics | null,
 ): string {
+  if (activeTab === "history" && historyMetrics) {
+    const {
+      totalClosed,
+      completed,
+      cancelled,
+      duplicated,
+      medianCycleDays,
+      p75CycleDays,
+    } = historyMetrics.currentWindow;
+
+    if (totalClosed === 0) {
+      return `No terminal bug outcomes for ${historyMetrics.teamLabel} in the selected period yet.`;
+    }
+
+    return `${formatNumber(completed)} completed for ${historyMetrics.teamLabel}, ${formatNumber(cancelled + duplicated)} cancelled or duplicated, median cycle ${formatNumber(medianCycleDays, 1)}d, P75 ${formatNumber(p75CycleDays, 1)}d.`;
+  }
+
   if (activeTab === "insights" && insightsMetrics) {
     const { openOverdue, openPending, eligibleCompleted } = insightsMetrics;
     if (eligibleCompleted === 0) {
@@ -67,15 +87,21 @@ const CommandCenter = memo(function CommandCenter({
   activeTab,
   comparisonMetrics = null,
   deadlineMetrics,
+  historyMetrics = null,
   insightsMetrics = null,
   siegeMode = false,
   summary,
 }: CommandCenterProps) {
   void siegeMode;
+  const isHistory = activeTab === "history" && historyMetrics;
   const isPeriods = activeTab === "periods" && comparisonMetrics;
   const isInsights = activeTab === "insights" && insightsMetrics;
 
-  const paceGap = isInsights
+  const paceGap = isHistory
+    ? historyMetrics!.currentWindow.completionRate -
+      (historyMetrics!.previousWindow?.completionRate ??
+        historyMetrics!.currentWindow.completionRate)
+    : isInsights
     ? insightsMetrics!.eligibleCompleted > 0
       ? insightsMetrics!.slaHitRate - 85
       : 0
@@ -86,9 +112,15 @@ const CommandCenter = memo(function CommandCenter({
 
   const statusTone = isInsights
     ? insightsMetrics!.tone
+    : isHistory
+      ? historyMetrics!.tone
     : isPeriods
       ? comparisonMetrics!.tone
       : deadlineMetrics.statusTone;
+  const statusLabel =
+    activeTab === "overview"
+      ? deadlineMetrics.statusSignal
+      : getStatusTagText(statusTone);
 
   void getDeltaTone;
 
@@ -97,6 +129,7 @@ const CommandCenter = memo(function CommandCenter({
     summary,
     deadlineMetrics,
     comparisonMetrics,
+    historyMetrics,
     insightsMetrics,
   );
 
@@ -106,7 +139,7 @@ const CommandCenter = memo(function CommandCenter({
       className="flex flex-wrap items-center gap-2 rounded-[16px] border border-white/8 bg-zinc-950/60 px-3 py-2 sm:rounded-[18px] sm:px-3.5 sm:py-2.5"
     >
       <StatusTag size="compact" tone={statusTone}>
-        {getStatusTagText(statusTone)}
+        {statusLabel}
       </StatusTag>
       <p className="text-[0.72rem] leading-snug text-stone-300 sm:text-[0.76rem]">
         {outcomeSentence}

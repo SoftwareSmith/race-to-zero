@@ -5,6 +5,7 @@ import {
   chooseCustomPeriod,
   createConsoleCollectors,
   expectMetricValue,
+  getExpectedHistoryMetrics,
   getExpectedInsightsMetrics,
   getExpectedOverviewMetrics,
   getExpectedPeriodsMetrics,
@@ -12,13 +13,16 @@ import {
 } from "./support/dashboardQa";
 
 test.describe("dashboard navigation QA", () => {
-  test("supports switching between overview, periods, and a deterministic custom range", async ({ page }) => {
+  test("supports switching between dashboard tabs with a deterministic custom range", async ({ page }) => {
     const clientErrors = createConsoleCollectors(page);
-    const overview = getExpectedOverviewMetrics();
-    const custom = getExpectedPeriodsMetrics("custom");
-    const insights = getExpectedInsightsMetrics("custom");
+    const overview = getExpectedOverviewMetrics({ teamKey: "CP" });
+    const custom = getExpectedPeriodsMetrics("custom", "CP");
+    const insights = getExpectedInsightsMetrics("custom", "CP");
+    const history = getExpectedHistoryMetrics("custom", "CP");
 
     await gotoDashboard(page);
+    await page.getByLabel("Team filter").selectOption("CP");
+    await expect(page.getByLabel("Team filter")).toHaveValue("CP");
     await expectMetricValue(page, "Open bugs", overview.viewMetrics.openBugs);
 
     await page.getByRole("tab", { name: "Trend" }).click();
@@ -44,8 +48,8 @@ test.describe("dashboard navigation QA", () => {
     await expectMetricValue(page, "Net change", custom.viewMetrics.netChange);
     await expectMetricValue(page, "Closure rate", custom.viewMetrics.completionRate);
 
-    await page.getByRole("tab", { name: "Risk" }).click();
-    await expect(page.getByRole("tab", { name: "Risk" })).toHaveAttribute(
+    await page.getByRole("tab", { name: "SLAs" }).click();
+    await expect(page.getByRole("tab", { name: "SLAs" })).toHaveAttribute(
       "aria-selected",
       "true",
     );
@@ -68,13 +72,64 @@ test.describe("dashboard navigation QA", () => {
       insights.viewMetrics.overdue,
     );
 
+    await page.getByRole("tab", { name: "History" }).click();
+    await expect(page.getByRole("tab", { name: "History" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+    await expect(
+      page.getByRole("button", { name: "Custom" }),
+    ).toHaveAttribute("aria-selected", "true");
+    await expectMetricValue(
+      page,
+      "Closed work",
+      history.viewMetrics.closedWork,
+    );
+    await expectMetricValue(
+      page,
+      "Completed share",
+      history.viewMetrics.completedShare,
+    );
+    await expectMetricValue(
+      page,
+      "Cancelled share",
+      history.viewMetrics.cancelledShare,
+    );
+    await expectMetricValue(
+      page,
+      "Median cycle",
+      history.viewMetrics.medianCycle,
+    );
+    await expectMetricValue(
+      page,
+      "P75 cycle",
+      history.viewMetrics.p75Cycle,
+    );
+    await expectMetricValue(
+      page,
+      "P90 cycle",
+      history.viewMetrics.p90Cycle,
+    );
+
+    await expect(page.getByLabel("Team filter")).toHaveValue("CP");
+    await expectMetricValue(
+      page,
+      "Closed work",
+      history.viewMetrics.closedWork,
+    );
+
     await page.getByRole("tab", { name: "Target" }).click();
     await expect(page.getByRole("tab", { name: "Target" })).toHaveAttribute(
       "aria-selected",
       "true",
     );
+    await expect(page.getByLabel("Team filter")).toHaveValue("CP");
     await expectMetricValue(page, "Open bugs", overview.viewMetrics.openBugs);
     await expect(page.getByText(overview.overlayLabel)).toBeVisible();
+
+    await page.reload();
+    await expect(page.getByLabel("Team filter")).toHaveValue("CP");
+    await expectMetricValue(page, "Open bugs", overview.viewMetrics.openBugs);
 
     await clientErrors.expectNoClientErrors();
   });

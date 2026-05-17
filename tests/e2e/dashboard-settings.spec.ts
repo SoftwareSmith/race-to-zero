@@ -36,7 +36,7 @@ test.describe("dashboard settings QA", () => {
     await expectMetricValue(page, "Workdays left", workdayMetrics.viewMetrics.daysLeft);
     await expectMetricValue(
       page,
-      "Required net burn",
+      "Required reduction",
       workdayMetrics.viewMetrics.requiredNetBurn,
     );
 

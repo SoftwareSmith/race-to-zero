@@ -22,17 +22,22 @@ test.describe("dashboard core QA", () => {
       "aria-selected",
       "false",
     );
+    await expect(page.getByRole("tab", { name: "History" })).toHaveAttribute(
+      "aria-selected",
+      "false",
+    );
+    await expect(page.getByLabel("Team filter")).toBeVisible();
 
     await expectMetricValue(page, "Open bugs", expected.viewMetrics.openBugs);
     await expectMetricValue(page, "Days left", expected.viewMetrics.daysLeft);
     await expectMetricValue(
       page,
-      "Current net burn",
+      "Net backlog change",
       expected.viewMetrics.currentNetBurn,
     );
     await expectMetricValue(
       page,
-      "Required net burn",
+      "Required reduction",
       expected.viewMetrics.requiredNetBurn,
     );
     await expectMetricValue(page, "Confidence", expected.viewMetrics.confidence);
@@ -89,6 +94,8 @@ test.describe("dashboard core QA", () => {
     await gotoDashboard(page);
 
     await expect(page.getByRole("tab", { name: "Target" })).toBeVisible();
+    await expect(page.getByRole("tab", { name: "History" })).toBeVisible();
+    await expect(page.getByLabel("Team filter")).toBeVisible();
     await expect(page.getByLabel("Tracking start date")).toBeVisible();
     await expect(page.getByLabel("Target deadline date")).toBeVisible();
     await expect(page.getByText("Bug burndown")).toBeVisible();

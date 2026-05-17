@@ -15,6 +15,7 @@ import {
   useDashboardUi,
 } from "@dashboard/context/DashboardContext";
 import {
+  HistoryView,
   InsightsView,
   OverviewView,
   PeriodsView,
@@ -278,11 +279,14 @@ const DashboardShell = memo(function DashboardShell({
               customToDate={ui.customToDate}
               deadlineDate={ui.deadlineDate}
               deadlineFromDate={ui.deadlineFromDate}
+              teamFilterKey={ui.teamFilterKey}
+              teamFilterOptions={ui.teamFilterOptions}
               onCompareRangeChange={ui.handleCompareRangeChange}
               onCustomFromDateChange={ui.handleCustomFromDateChange}
               onCustomToDateChange={ui.handleCustomToDateChange}
               onDeadlineDateChange={ui.handleDeadlineDateChange}
               onDeadlineFromDateChange={ui.handleDeadlineFromDateChange}
+              onTeamFilterChange={ui.handleTeamFilterChange}
               onInteract={ui.handleTopNavInteract}
               onTabChange={ui.handleTabChange}
               todayDate={ui.todayDate}
@@ -302,6 +306,7 @@ const DashboardShell = memo(function DashboardShell({
               activeTab={ui.activeTab}
               comparisonMetrics={metrics.comparisonMetrics}
               deadlineMetrics={metrics.deadlineMetrics}
+              historyMetrics={metrics.historyMetrics}
               insightsMetrics={metrics.insightsMetrics}
               siegeMode={interactiveMode}
               summary={metrics.summary}
@@ -331,6 +336,14 @@ const DashboardShell = memo(function DashboardShell({
               {ui.activeTab === "insights" ? (
                 <InsightsView
                   insightsMetrics={metrics.insightsMetrics}
+                  onChartFocusChange={chartFocusHandler}
+                  siegeMode={interactiveMode}
+                />
+              ) : null}
+
+              {ui.activeTab === "history" ? (
+                <HistoryView
+                  historyMetrics={metrics.historyMetrics}
                   onChartFocusChange={chartFocusHandler}
                   siegeMode={interactiveMode}
                 />

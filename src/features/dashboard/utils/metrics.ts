@@ -18,6 +18,13 @@ import type {
   ComparisonWindowMetrics,
   DailyCountEntry,
   DeadlineMetrics,
+  HistoryCycleBucketEntry,
+  HistoryMetrics,
+  HistoryOutcomeKey,
+  HistoryOutcomeMetric,
+  HistoryPriorityMetrics,
+  HistoryTrendEntry,
+  HistoryWindowMetrics,
   InsightsMetrics,
   InsightsPriorityMetrics,
   InsightsTrendEntry,
@@ -55,6 +62,21 @@ const OPEN_AGE_BUCKETS = [
   { label: "91-180d", maxDays: 180 },
   { label: "181d+", maxDays: Number.POSITIVE_INFINITY },
 ] as const;
+const HISTORY_OUTCOME_ORDER = [
+  "completed",
+  "cancelled",
+  "duplicated",
+  "autoClosed",
+  "archived",
+] as const satisfies readonly HistoryOutcomeKey[];
+const HISTORY_CYCLE_BUCKETS = [
+  { label: "0-3d", maxDays: 3 },
+  { label: "4-7d", maxDays: 7 },
+  { label: "8-14d", maxDays: 14 },
+  { label: "15-30d", maxDays: 30 },
+  { label: "31-60d", maxDays: 60 },
+  { label: "61d+", maxDays: Number.POSITIVE_INFINITY },
+] as const;
 const PREPARED_SOURCE_CACHE = new WeakMap<
   MetricsSource,
   PreparedMetricsSource
@@ -87,9 +109,16 @@ interface BurndownSeriesSource {
 }
 
 interface BacklogHistorySource {
+  completedIndex: SeriesIndex;
+  createdIndex: SeriesIndex;
   firstBugDate: Date | null;
   remainingIndex: SeriesIndex;
   remainingSeries: DailyCountEntry[];
+}
+
+interface TerminalHistoryEvent {
+  date: string;
+  outcome: HistoryOutcomeKey;
 }
 
 function normalizeBugRecords(
@@ -212,6 +241,23 @@ function getLinearStatusLabel(bug: MetricsBug) {
   return "Other";
 }
 
+function getHistoryOutcomeLabel(outcome: HistoryOutcomeKey) {
+  switch (outcome) {
+    case "completed":
+      return "Completed";
+    case "cancelled":
+      return "Cancelled";
+    case "duplicated":
+      return "Duplicated";
+    case "autoClosed":
+      return "Auto-closed";
+    case "archived":
+      return "Archived";
+    default:
+      return "Closed";
+  }
+}
+
 function buildStatusDistributionFromCounts(
   counts: Map<string, number>,
 ): StatusDistributionEntry[] {
@@ -225,17 +271,66 @@ function isTerminalStatusLabel(statusLabel: string) {
   return statusLabel === "Cancelled" || statusLabel === "Duplicated";
 }
 
-function getBugClosureDate(bug: MetricsBug) {
+function getBugTerminalEvent(bug: MetricsBug): TerminalHistoryEvent | null {
   if (bug.completedAt) {
-    return bug.completedAt;
+    return {
+      date: bug.completedAt,
+      outcome: "completed",
+    };
   }
 
   const statusLabel = getLinearStatusLabel(bug);
-  if (!isTerminalStatusLabel(statusLabel)) {
-    return null;
+
+  if (statusLabel === "Cancelled") {
+    const date =
+      bug.canceledAt ?? bug.updatedAt ?? bug.autoClosedAt ?? bug.archivedAt;
+
+    return date
+      ? {
+          date,
+          outcome: "cancelled",
+        }
+      : null;
   }
 
-  return bug.canceledAt ?? bug.autoClosedAt ?? bug.archivedAt ?? bug.updatedAt ?? null;
+  if (statusLabel === "Duplicated") {
+    const date =
+      bug.canceledAt ?? bug.autoClosedAt ?? bug.archivedAt ?? bug.updatedAt;
+
+    return date
+      ? {
+          date,
+          outcome: "duplicated",
+        }
+      : null;
+  }
+
+  if (bug.autoClosedAt) {
+    return {
+      date: bug.autoClosedAt,
+      outcome: "autoClosed",
+    };
+  }
+
+  if (bug.archivedAt) {
+    return {
+      date: bug.archivedAt,
+      outcome: "archived",
+    };
+  }
+
+  if (bug.canceledAt) {
+    return {
+      date: bug.canceledAt,
+      outcome: "cancelled",
+    };
+  }
+
+  return null;
+}
+
+function getBugClosureDate(bug: MetricsBug) {
+  return getBugTerminalEvent(bug)?.date ?? null;
 }
 
 function buildOpenAgeDistribution(
@@ -338,6 +433,8 @@ function buildBacklogHistorySource(bugs: MetricsBug[]): BacklogHistorySource {
   const remainingSeries = buildRemainingSeries(createdSeries, completedSeries);
 
   return {
+    completedIndex: buildSeriesIndex(completedSeries),
+    createdIndex: buildSeriesIndex(createdSeries),
     firstBugDate: bugs[0]?.createdAt ? parseISO(bugs[0].createdAt) : null,
     remainingIndex: buildSeriesIndex(remainingSeries, { usePrefixSums: false }),
     remainingSeries,
@@ -540,6 +637,58 @@ function prepareMetricsSource(
   return preparedSource;
 }
 
+function createPreparedSourceFromBugs(bugs: MetricsBug[]): PreparedMetricsSource {
+  const priorityCounts = new Map<string, number>();
+  const statusCounts = new Map<string, number>();
+  let remainingBugs = 0;
+
+  for (const bug of bugs) {
+    const statusLabel = getLinearStatusLabel(bug);
+    if (!isTerminalStatusLabel(statusLabel) && statusLabel !== "Done") {
+      statusCounts.set(statusLabel, (statusCounts.get(statusLabel) ?? 0) + 1);
+    }
+
+    if (getBugClosureDate(bug) == null && !isTerminalStatusLabel(statusLabel)) {
+      remainingBugs += 1;
+      const label = getPriorityLabel(bug.priority);
+      priorityCounts.set(label, (priorityCounts.get(label) ?? 0) + 1);
+    }
+  }
+
+  const createdSeries = buildSeriesFromField(bugs, "createdAt");
+  const completedSeries = buildClosureSeries(bugs);
+  const remainingSeries = buildRemainingSeries(createdSeries, completedSeries);
+
+  return {
+    bugs,
+    completedIndex: buildSeriesIndex(completedSeries),
+    completedSeries,
+    createdIndex: buildSeriesIndex(createdSeries),
+    createdSeries,
+    firstBugDate: bugs[0]?.createdAt ? parseISO(bugs[0].createdAt) : null,
+    priorityDistribution: buildPriorityDistributionFromCounts(priorityCounts),
+    remainingBugs,
+    remainingIndex: buildSeriesIndex(remainingSeries, { usePrefixSums: false }),
+    remainingSeries,
+    statusDistribution: buildStatusDistributionFromCounts(statusCounts),
+  };
+}
+
+function getPreparedSourceForTeam(
+  source: MetricsSource | null | undefined,
+  teamKey?: string | null,
+) {
+  const preparedSource = prepareMetricsSource(source);
+
+  if (!teamKey) {
+    return preparedSource;
+  }
+
+  return createPreparedSourceFromBugs(
+    preparedSource.bugs.filter((bug) => bug.teamKey === teamKey),
+  );
+}
+
 function getDeadlineDate(referenceDate = new Date()) {
   return endOfYear(referenceDate);
 }
@@ -725,6 +874,21 @@ function getMedian(values: number[]) {
   );
 }
 
+function getPercentile(values: number[], percentile: number) {
+  if (!values.length) {
+    return 0;
+  }
+
+  const sortedValues = [...values].sort((left, right) => left - right);
+  const clampedPercentile = Math.max(0, Math.min(percentile, 100));
+  const index = Math.min(
+    sortedValues.length - 1,
+    Math.max(0, Math.ceil((clampedPercentile / 100) * sortedValues.length) - 1),
+  );
+
+  return sortedValues[index] ?? 0;
+}
+
 function getResolutionDays(bug: MetricsBug) {
   if (!bug.completedAt) {
     return 0;
@@ -734,6 +898,149 @@ function getResolutionDays(bug: MetricsBug) {
     differenceInCalendarDays(parseISO(bug.completedAt), parseISO(bug.createdAt)),
     0,
   );
+}
+
+function getLifecycleDays(bug: MetricsBug, terminalDate: string) {
+  return Math.max(
+    differenceInCalendarDays(parseISO(terminalDate), parseISO(bug.createdAt)),
+    0,
+  );
+}
+
+function createEmptyHistoryWindowMetrics(): HistoryWindowMetrics {
+  return {
+    archived: 0,
+    autoClosed: 0,
+    averageCycleDays: 0,
+    cancellationRate: 0,
+    cancelled: 0,
+    completionRate: 0,
+    completed: 0,
+    duplicated: 0,
+    medianCycleDays: 0,
+    p75CycleDays: 0,
+    p90CycleDays: 0,
+    totalClosed: 0,
+  };
+}
+
+function createEmptyHistoryPriorityMetrics(
+  label: string,
+): HistoryPriorityMetrics {
+  return {
+    archived: 0,
+    autoClosed: 0,
+    averageCycleDays: 0,
+    cancelled: 0,
+    completed: 0,
+    duplicated: 0,
+    label,
+    medianCycleDays: 0,
+    p75CycleDays: 0,
+    p90CycleDays: 0,
+    totalClosed: 0,
+  };
+}
+
+function createEmptyHistoryTrendEntry(date: string): HistoryTrendEntry {
+  return {
+    archived: 0,
+    autoClosed: 0,
+    cancelled: 0,
+    completed: 0,
+    date,
+    duplicated: 0,
+    total: 0,
+  };
+}
+
+function finalizeHistoryWindowMetrics(
+  metrics: HistoryWindowMetrics,
+  cycleDays: number[],
+): HistoryWindowMetrics {
+  return {
+    ...metrics,
+    averageCycleDays: getAverage(cycleDays),
+    cancellationRate:
+      metrics.totalClosed > 0
+        ? (metrics.cancelled / metrics.totalClosed) * 100
+        : 0,
+    completionRate:
+      metrics.totalClosed > 0
+        ? (metrics.completed / metrics.totalClosed) * 100
+        : 0,
+    medianCycleDays: getMedian(cycleDays),
+    p75CycleDays: getPercentile(cycleDays, 75),
+    p90CycleDays: getPercentile(cycleDays, 90),
+  };
+}
+
+function getHistoryTone(
+  currentWindow: HistoryWindowMetrics,
+  previousWindow: HistoryWindowMetrics | null,
+): Tone {
+  void previousWindow;
+
+  if (currentWindow.totalClosed === 0) {
+    return "neutral";
+  }
+
+  if (currentWindow.completionRate >= 75 && currentWindow.cancellationRate <= 10) {
+    return "positive";
+  }
+
+  if (currentWindow.completionRate >= 60 && currentWindow.cancellationRate <= 20) {
+    return "neutral";
+  }
+
+  return "negative";
+}
+
+function getHistoryWindowStats(
+  preparedSource: PreparedMetricsSource,
+  startDate: Date,
+  endDate: Date,
+  teamKey?: string | null,
+): HistoryWindowMetrics {
+  const cycleDays: number[] = [];
+  const metrics = createEmptyHistoryWindowMetrics();
+
+  for (const bug of preparedSource.bugs) {
+    if (teamKey && bug.teamKey !== teamKey) {
+      continue;
+    }
+
+    const terminalEvent = getBugTerminalEvent(bug);
+    if (!terminalEvent || !isDateInRange(terminalEvent.date, startDate, endDate)) {
+      continue;
+    }
+
+    const lifecycleDays = getLifecycleDays(bug, terminalEvent.date);
+    cycleDays.push(lifecycleDays);
+    metrics.totalClosed += 1;
+
+    switch (terminalEvent.outcome) {
+      case "completed":
+        metrics.completed += 1;
+        break;
+      case "cancelled":
+        metrics.cancelled += 1;
+        break;
+      case "duplicated":
+        metrics.duplicated += 1;
+        break;
+      case "autoClosed":
+        metrics.autoClosed += 1;
+        break;
+      case "archived":
+        metrics.archived += 1;
+        break;
+      default:
+        break;
+    }
+  }
+
+  return finalizeHistoryWindowMetrics(metrics, cycleDays);
 }
 
 function createEmptyInsightsPriorityMetrics(
@@ -770,16 +1077,19 @@ function finalizeInsightsPriorityMetrics(
   };
 }
 
+const SLA_HIT_RATE_POSITIVE_THRESHOLD = 90;
+const SLA_HIT_RATE_NEUTRAL_THRESHOLD = 75;
+
 function getInsightsTone(slaHitRate: number, eligibleCompleted: number): Tone {
   if (eligibleCompleted === 0) {
     return "neutral";
   }
 
-  if (slaHitRate >= 85) {
+  if (slaHitRate >= SLA_HIT_RATE_POSITIVE_THRESHOLD) {
     return "positive";
   }
 
-  if (slaHitRate >= 70) {
+  if (slaHitRate >= SLA_HIT_RATE_NEUTRAL_THRESHOLD) {
     return "neutral";
   }
 
@@ -824,6 +1134,15 @@ function getDeadlineStatus({
     };
   }
 
+  if (currentNetBurnRate > 0 && currentNetBurnRate / neededNetBurnRate >= 0.5) {
+    return {
+      tone: "neutral" as Tone,
+      signal: "Watch",
+      headline: "Backlog is improving but off pace",
+      body: "Recent fix velocity is still reducing the backlog, but not quickly enough to reach zero by the selected deadline without more throughput or less intake.",
+    };
+  }
+
   return {
     tone: "negative" as Tone,
     signal: "Behind",
@@ -855,8 +1174,14 @@ function getLikelihoodScore({
     return currentNetBurnRate > 0 ? 100 : 0;
   }
 
-  const ratio = currentNetBurnRate / neededNetBurnRate;
-  return Math.max(0, Math.min(100, Math.round(ratio * 100)));
+  if (currentNetBurnRate <= 0) {
+    return 0;
+  }
+
+  return Math.max(
+    0,
+    Math.min(100, Math.round((currentNetBurnRate / neededNetBurnRate) * 100)),
+  );
 }
 
 function createLabelSeries(
@@ -893,16 +1218,17 @@ export function getDeadlineMetrics(
   source: MetricsSource | null,
   {
     deadlineDate,
+    teamKey,
     trackingStartDate,
     workdaySettings,
   }: {
     deadlineDate?: string;
+    teamKey?: string | null;
     trackingStartDate?: string;
     workdaySettings?: WorkdaySettings;
   } = {},
 ): DeadlineMetrics {
-  const preparedSource = prepareMetricsSource(source);
-  const burndownSource = buildBurndownSeriesSource(preparedSource.bugs);
+  const preparedSource = getPreparedSourceForTeam(source, teamKey);
   const backlogHistorySource = buildBacklogHistorySource(preparedSource.bugs);
   const remainingBugs = preparedSource.remainingBugs;
   const today = startOfDay(new Date());
@@ -917,12 +1243,12 @@ export function getDeadlineMetrics(
     ? firstBugDate
     : requestedTrackingStartDate;
   const recentCreatedPerDay = filterSeriesByDateRange(
-    burndownSource.createdIndex,
+    backlogHistorySource.createdIndex,
     trackingStart,
     today,
   );
   const recentCompletedPerDay = filterSeriesByDateRange(
-    burndownSource.completedIndex,
+    backlogHistorySource.completedIndex,
     trackingStart,
     today,
   );
@@ -1178,13 +1504,15 @@ export function getComparisonMetrics(
     rangeKey = "30",
     customFromDate,
     customToDate,
+    teamKey,
   }: {
     customFromDate?: string;
     customToDate?: string;
     rangeKey?: CompareRangeKey;
+    teamKey?: string | null;
   } = {},
 ): ComparisonMetrics {
-  const preparedSource = prepareMetricsSource(source);
+  const preparedSource = getPreparedSourceForTeam(source, teamKey);
   const today = startOfDay(new Date());
   const earliestDate = preparedSource.firstBugDate ?? today;
   const isAllTime = rangeKey === "all";
@@ -1298,13 +1626,15 @@ export function getInsightsMetrics(
     rangeKey = "30",
     customFromDate,
     customToDate,
+    teamKey,
   }: {
     customFromDate?: string;
     customToDate?: string;
     rangeKey?: CompareRangeKey;
+    teamKey?: string | null;
   } = {},
 ): InsightsMetrics {
-  const preparedSource = prepareMetricsSource(source);
+  const preparedSource = getPreparedSourceForTeam(source, teamKey);
   const { startDate, endDate, rangeLabel, today } = getSelectedRangeDates(
     preparedSource,
     { rangeKey, customFromDate, customToDate },
@@ -1434,16 +1764,16 @@ export function getInsightsMetrics(
         : `${onTimeCompleted} of ${eligibleCompleted} completed bugs with due dates landed on or before SLA in ${rangeLabel}. ${overdueCompleted} completed after their due date and ${missingDueDate} completed bugs were missing due dates.`;
 
   return {
-      averageOverdueDays: getAverage(overdueDays),
+    averageOverdueDays: getAverage(overdueDays),
     averageResolutionDays: getAverage(resolutionDays),
     body,
-      overdueCompleted,
+    overdueCompleted,
     currentWindow,
-      openPending,
+    openPending,
     eligibleCompleted,
     headline,
-      medianOverdueDays: getMedian(overdueDays),
-      medianResolutionDays: getMedian(resolutionDays),
+    medianOverdueDays: getMedian(overdueDays),
+    medianResolutionDays: getMedian(resolutionDays),
     missingDueDate,
     onTimeCompleted,
     openOverdue,
@@ -1455,6 +1785,218 @@ export function getInsightsMetrics(
     trendSeries: [...trendCounts.values()].sort((left, right) =>
       left.date.localeCompare(right.date),
     ),
+  };
+}
+
+export function getHistoryMetrics(
+  source: MetricsSource | null,
+  {
+    rangeKey = "30",
+    customFromDate,
+    customToDate,
+    teamKey,
+  }: {
+    customFromDate?: string;
+    customToDate?: string;
+    rangeKey?: CompareRangeKey;
+    teamKey?: string | null;
+  } = {},
+): HistoryMetrics {
+  const preparedSource = getPreparedSourceForTeam(source, teamKey);
+  const { startDate, endDate, isAllTime, rangeLabel, today } = getSelectedRangeDates(
+    preparedSource,
+    { rangeKey, customFromDate, customToDate },
+  );
+  const historyTeamLabel = teamKey ?? "All teams";
+  const dayCount = Math.max(differenceInCalendarDays(endDate, startDate) + 1, 1);
+  const previousWindow = isAllTime
+    ? null
+    : getHistoryWindowStats(
+        preparedSource,
+        subDays(startDate, dayCount),
+        subDays(startDate, 1),
+        teamKey,
+      );
+
+  const cycleDays: number[] = [];
+  const outcomeCounts = new Map<HistoryOutcomeKey, number>(
+    HISTORY_OUTCOME_ORDER.map((outcome) => [outcome, 0]),
+  );
+  const cycleBucketCounts = new Map<string, number>(
+    HISTORY_CYCLE_BUCKETS.map((bucket) => [bucket.label, 0]),
+  );
+  const trendCounts = new Map<string, HistoryTrendEntry>();
+  const priorityBuckets = new Map(
+    PRIORITY_ORDER.map((label) => [
+      label,
+      {
+        cycleDays: [] as number[],
+        metrics: createEmptyHistoryPriorityMetrics(label),
+      },
+    ]),
+  );
+
+  for (const bug of preparedSource.bugs) {
+    if (teamKey && bug.teamKey !== teamKey) {
+      continue;
+    }
+
+    const terminalEvent = getBugTerminalEvent(bug);
+    if (!terminalEvent || !isDateInRange(terminalEvent.date, startDate, endDate)) {
+      continue;
+    }
+
+    const lifecycleDays = getLifecycleDays(bug, terminalEvent.date);
+    const priorityLabel = getPriorityLabel(bug.priority);
+    const priorityBucket = priorityBuckets.get(priorityLabel);
+    const trendEntry =
+      trendCounts.get(terminalEvent.date) ??
+      createEmptyHistoryTrendEntry(terminalEvent.date);
+    const cycleBucket = HISTORY_CYCLE_BUCKETS.find(
+      (bucket) => lifecycleDays <= bucket.maxDays,
+    );
+
+    cycleDays.push(lifecycleDays);
+    outcomeCounts.set(
+      terminalEvent.outcome,
+      (outcomeCounts.get(terminalEvent.outcome) ?? 0) + 1,
+    );
+    trendEntry.total += 1;
+
+    if (priorityBucket) {
+      priorityBucket.metrics.totalClosed += 1;
+      priorityBucket.cycleDays.push(lifecycleDays);
+    }
+
+    if (cycleBucket) {
+      cycleBucketCounts.set(
+        cycleBucket.label,
+        (cycleBucketCounts.get(cycleBucket.label) ?? 0) + 1,
+      );
+    }
+
+    switch (terminalEvent.outcome) {
+      case "completed":
+        trendEntry.completed += 1;
+        if (priorityBucket) {
+          priorityBucket.metrics.completed += 1;
+        }
+        break;
+      case "cancelled":
+        trendEntry.cancelled += 1;
+        if (priorityBucket) {
+          priorityBucket.metrics.cancelled += 1;
+        }
+        break;
+      case "duplicated":
+        trendEntry.duplicated += 1;
+        if (priorityBucket) {
+          priorityBucket.metrics.duplicated += 1;
+        }
+        break;
+      case "autoClosed":
+        trendEntry.autoClosed += 1;
+        if (priorityBucket) {
+          priorityBucket.metrics.autoClosed += 1;
+        }
+        break;
+      case "archived":
+        trendEntry.archived += 1;
+        if (priorityBucket) {
+          priorityBucket.metrics.archived += 1;
+        }
+        break;
+      default:
+        break;
+    }
+
+    trendCounts.set(terminalEvent.date, trendEntry);
+  }
+
+  const currentWindow = finalizeHistoryWindowMetrics(
+    {
+      archived: outcomeCounts.get("archived") ?? 0,
+      autoClosed: outcomeCounts.get("autoClosed") ?? 0,
+      averageCycleDays: 0,
+      cancellationRate: 0,
+      cancelled: outcomeCounts.get("cancelled") ?? 0,
+      completionRate: 0,
+      completed: outcomeCounts.get("completed") ?? 0,
+      duplicated: outcomeCounts.get("duplicated") ?? 0,
+      medianCycleDays: 0,
+      p75CycleDays: 0,
+      p90CycleDays: 0,
+      totalClosed: cycleDays.length,
+    },
+    cycleDays,
+  );
+  const tone = getHistoryTone(currentWindow, previousWindow);
+  const outcomeMetrics: HistoryOutcomeMetric[] = HISTORY_OUTCOME_ORDER.map(
+    (outcome) => {
+      const count = outcomeCounts.get(outcome) ?? 0;
+
+      return {
+        count,
+        key: outcome,
+        label: getHistoryOutcomeLabel(outcome),
+        percent: currentWindow.totalClosed > 0 ? (count / currentWindow.totalClosed) * 100 : 0,
+      };
+    },
+  );
+  const priorityMetrics: HistoryPriorityMetrics[] = PRIORITY_ORDER.map((label) => {
+    const bucket = priorityBuckets.get(label);
+    if (!bucket) {
+      return createEmptyHistoryPriorityMetrics(label);
+    }
+
+    return {
+      ...bucket.metrics,
+      averageCycleDays: getAverage(bucket.cycleDays),
+      medianCycleDays: getMedian(bucket.cycleDays),
+      p75CycleDays: getPercentile(bucket.cycleDays, 75),
+      p90CycleDays: getPercentile(bucket.cycleDays, 90),
+    };
+  });
+  const cycleBuckets: HistoryCycleBucketEntry[] = HISTORY_CYCLE_BUCKETS.map(
+    (bucket) => ({
+      count: cycleBucketCounts.get(bucket.label) ?? 0,
+      label: bucket.label,
+    }),
+  );
+  const trendSeries = [...trendCounts.values()].sort((left, right) =>
+    left.date.localeCompare(right.date),
+  );
+  const olderClosures = cycleBuckets
+    .filter((bucket) => bucket.label === "31-60d" || bucket.label === "61d+")
+    .reduce((sum, bucket) => sum + bucket.count, 0);
+  const headline =
+    currentWindow.totalClosed === 0
+      ? `No closed work for ${historyTeamLabel} in this period`
+      : tone === "positive"
+        ? `Closed work is landing mostly as completed for ${historyTeamLabel}`
+        : tone === "neutral"
+          ? `Closed work is mixed across outcomes for ${historyTeamLabel}`
+          : `Closed work is leaning away from completion for ${historyTeamLabel}`;
+  const body =
+    currentWindow.totalClosed === 0
+      ? `No bugs for ${historyTeamLabel} reached a terminal state in ${rangeLabel}.`
+      : `${currentWindow.completed} of ${currentWindow.totalClosed} closed bugs for ${historyTeamLabel} landed as completed in ${rangeLabel}. Median cycle time was ${Number(currentWindow.medianCycleDays.toFixed(1))} days, the 75th percentile was ${Number(currentWindow.p75CycleDays.toFixed(1))} days, and ${olderClosures} closures took longer than 30 days.`;
+
+  void today;
+
+  return {
+    body,
+    currentWindow,
+    cycleBuckets,
+    headline,
+    outcomeMetrics,
+    previousWindow,
+    priorityMetrics,
+    rangeLabel,
+    teamKey: teamKey ?? null,
+    teamLabel: historyTeamLabel,
+    tone,
+    trendSeries,
   };
 }
 
@@ -1579,6 +2121,161 @@ export function buildResolutionTimeChartData(
         ),
         backgroundColor: "rgba(251, 191, 36, 0.7)",
         borderColor: "#fbbf24",
+        borderWidth: 1,
+        borderRadius: 8,
+      },
+    ],
+  };
+}
+
+export function buildHistoryOutcomeChartData(
+  historyMetrics: HistoryMetrics,
+): ChartData<"bar", number[], string> {
+  return {
+    labels: historyMetrics.outcomeMetrics.map((entry) => entry.label),
+    datasets: [
+      {
+        label: "Closed bugs",
+        data: historyMetrics.outcomeMetrics.map((entry) => entry.count),
+        backgroundColor: [
+          "rgba(45, 212, 191, 0.72)",
+          "rgba(248, 113, 113, 0.72)",
+          "rgba(249, 168, 212, 0.7)",
+          "rgba(251, 191, 36, 0.7)",
+          "rgba(148, 163, 184, 0.72)",
+        ],
+        borderColor: ["#2dd4bf", "#f87171", "#f9a8d4", "#fbbf24", "#94a3b8"],
+        borderWidth: 1,
+        borderRadius: 8,
+      },
+    ],
+  };
+}
+
+export function buildHistoryTrendChartData(
+  historyMetrics: HistoryMetrics,
+): ChartData<"line", number[], string> {
+  const trendSeries = historyMetrics.trendSeries.length
+    ? historyMetrics.trendSeries
+    : [createEmptyHistoryTrendEntry("")];
+
+  return {
+    labels: trendSeries.map((entry) =>
+      entry.date ? formatLabel(entry.date) : "No closures",
+    ),
+    datasets: [
+      {
+        label: "Completed",
+        data: trendSeries.map((entry) => entry.completed),
+        borderColor: "#2dd4bf",
+        backgroundColor: "rgba(45, 212, 191, 0.14)",
+        tension: 0.25,
+        borderWidth: 3,
+        pointRadius: 2,
+        pointHoverRadius: 4,
+      },
+      {
+        label: "Cancelled",
+        data: trendSeries.map((entry) => entry.cancelled),
+        borderColor: "#f87171",
+        backgroundColor: "rgba(248, 113, 113, 0.14)",
+        tension: 0.25,
+        borderWidth: 3,
+        pointRadius: 2,
+        pointHoverRadius: 4,
+      },
+      {
+        label: "Duplicated",
+        data: trendSeries.map((entry) => entry.duplicated),
+        borderColor: "#f9a8d4",
+        backgroundColor: "rgba(249, 168, 212, 0.14)",
+        tension: 0.25,
+        borderWidth: 3,
+        pointRadius: 2,
+        pointHoverRadius: 4,
+      },
+      {
+        label: "Auto-closed",
+        data: trendSeries.map((entry) => entry.autoClosed),
+        borderColor: "#fbbf24",
+        backgroundColor: "rgba(251, 191, 36, 0.14)",
+        tension: 0.25,
+        borderWidth: 3,
+        pointRadius: 2,
+        pointHoverRadius: 4,
+      },
+      {
+        label: "Archived",
+        data: trendSeries.map((entry) => entry.archived),
+        borderColor: "#94a3b8",
+        backgroundColor: "rgba(148, 163, 184, 0.14)",
+        tension: 0.25,
+        borderWidth: 3,
+        pointRadius: 2,
+        pointHoverRadius: 4,
+      },
+    ],
+  };
+}
+
+export function buildHistoryCycleTimeChartData(
+  historyMetrics: HistoryMetrics,
+): ChartData<"bar", number[], string> {
+  return {
+    labels: historyMetrics.priorityMetrics.map((entry) => entry.label),
+    datasets: [
+      {
+        label: "Median cycle days",
+        data: historyMetrics.priorityMetrics.map((entry) =>
+          Number(entry.medianCycleDays.toFixed(1)),
+        ),
+        backgroundColor: "rgba(125, 211, 252, 0.72)",
+        borderColor: "#7dd3fc",
+        borderWidth: 1,
+        borderRadius: 8,
+      },
+      {
+        label: "P75 cycle days",
+        data: historyMetrics.priorityMetrics.map((entry) =>
+          Number(entry.p75CycleDays.toFixed(1)),
+        ),
+        backgroundColor: "rgba(94, 234, 212, 0.68)",
+        borderColor: "#5eead4",
+        borderWidth: 1,
+        borderRadius: 8,
+      },
+      {
+        label: "P90 cycle days",
+        data: historyMetrics.priorityMetrics.map((entry) =>
+          Number(entry.p90CycleDays.toFixed(1)),
+        ),
+        backgroundColor: "rgba(251, 191, 36, 0.7)",
+        borderColor: "#fbbf24",
+        borderWidth: 1,
+        borderRadius: 8,
+      },
+    ],
+  };
+}
+
+export function buildHistoryCycleBucketChartData(
+  historyMetrics: HistoryMetrics,
+): ChartData<"bar", number[], string> {
+  return {
+    labels: historyMetrics.cycleBuckets.map((entry) => entry.label),
+    datasets: [
+      {
+        label: "Closed bugs",
+        data: historyMetrics.cycleBuckets.map((entry) => entry.count),
+        backgroundColor: [
+          "rgba(56, 189, 248, 0.72)",
+          "rgba(45, 212, 191, 0.72)",
+          "rgba(125, 211, 252, 0.72)",
+          "rgba(251, 191, 36, 0.72)",
+          "rgba(249, 115, 22, 0.72)",
+          "rgba(248, 113, 113, 0.72)",
+        ],
+        borderColor: ["#38bdf8", "#2dd4bf", "#7dd3fc", "#fbbf24", "#f97316", "#f87171"],
         borderWidth: 1,
         borderRadius: 8,
       },

@@ -2,9 +2,14 @@ import type { ChangeEventHandler } from "react";
 import { memo } from "react";
 import Tabs from "@shared/components/Tabs";
 import CompactDateField from "@shared/components/forms/CompactDateField";
+import CompactSelectField from "@shared/components/forms/CompactSelectField";
 import CompareRangePicker from "@dashboard/components/CompareRangePicker";
 import { TAB_ITEMS } from "../utils/dashboard";
-import type { ActiveTab, CompareRangeKey } from "../../../types/dashboard";
+import type {
+  ActiveTab,
+  CompareRangeKey,
+  HistoryTeamOption,
+} from "../../../types/dashboard";
 
 interface TopNavProps {
   activeTab: ActiveTab;
@@ -13,11 +18,14 @@ interface TopNavProps {
   customToDate: string;
   deadlineDate: string;
   deadlineFromDate: string;
+  teamFilterKey: string;
+  teamFilterOptions: HistoryTeamOption[];
   onCompareRangeChange: (rangeKey: CompareRangeKey) => void;
   onCustomFromDateChange: ChangeEventHandler<HTMLInputElement>;
   onCustomToDateChange: ChangeEventHandler<HTMLInputElement>;
   onDeadlineDateChange: ChangeEventHandler<HTMLInputElement>;
   onDeadlineFromDateChange: ChangeEventHandler<HTMLInputElement>;
+  onTeamFilterChange: (teamKey: string) => void;
   onInteract: () => void;
   onTabChange: (tabId: ActiveTab) => void;
   todayDate: string;
@@ -30,15 +38,24 @@ const TopNav = memo(function TopNav({
   customToDate,
   deadlineDate,
   deadlineFromDate,
+  teamFilterKey,
+  teamFilterOptions,
   onInteract,
   onCompareRangeChange,
   onCustomFromDateChange,
   onCustomToDateChange,
   onDeadlineDateChange,
   onDeadlineFromDateChange,
+  onTeamFilterChange,
   onTabChange,
   todayDate,
 }: TopNavProps) {
+  const handleTeamFilterSelect: ChangeEventHandler<HTMLSelectElement> = (
+    event,
+  ) => {
+    onTeamFilterChange(event.target.value);
+  };
+
   return (
     <div
       className="flex flex-col gap-[0.3125rem] sm:flex-row sm:items-center sm:justify-between"
@@ -68,6 +85,15 @@ const TopNav = memo(function TopNav({
             size="compact"
             value={deadlineDate}
           />
+          {teamFilterOptions.length > 1 ? (
+            <CompactSelectField
+              label="Team"
+              onChange={handleTeamFilterSelect}
+              options={teamFilterOptions}
+              size="compact"
+              value={teamFilterKey}
+            />
+          ) : null}
         </div>
       ) : (
         <div className="flex w-full flex-wrap items-center gap-[0.3125rem] lg:w-auto lg:justify-end">
@@ -92,6 +118,15 @@ const TopNav = memo(function TopNav({
                 value={customToDate}
               />
             </>
+          ) : null}
+          {teamFilterOptions.length > 1 ? (
+            <CompactSelectField
+              label="Team"
+              onChange={handleTeamFilterSelect}
+              options={teamFilterOptions}
+              size="compact"
+              value={teamFilterKey}
+            />
           ) : null}
         </div>
       )}

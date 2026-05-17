@@ -14,6 +14,7 @@ import {
 import {
   getComparisonMetrics,
   getDeadlineMetrics,
+  getHistoryMetrics,
   getInsightsMetrics,
   getSummaryMetrics,
 } from "../../../src/features/dashboard/utils/metrics";
@@ -39,6 +40,7 @@ interface DashboardSeedOptions {
   clearStorage?: boolean;
   deadlineDate?: string;
   deadlineFromDate?: string;
+  dashboardTeamFilter?: string;
   excludePublicHolidays?: boolean;
   excludeWeekends?: boolean;
   frozenDateIso?: string;
@@ -128,6 +130,7 @@ interface EnableCanvasQaOptions {
 interface OverviewMetricOptions {
   deadlineDate?: string;
   deadlineFromDate?: string;
+  teamKey?: string;
   workdaySettings?: WorkdaySettings;
 }
 
@@ -166,12 +169,14 @@ export function getExpectedOverviewMetrics(
   const {
     deadlineDate = QA_DEADLINE_DATE,
     deadlineFromDate = QA_DEADLINE_FROM,
+    teamKey,
     workdaySettings = qaWorkdaySettings,
   } = options;
 
   return withFrozenDate(QA_TODAY_ISO, () => {
     const deadlineMetrics = getDeadlineMetrics(qaMetrics, {
       deadlineDate,
+      teamKey,
       trackingStartDate: deadlineFromDate,
       workdaySettings,
     });
@@ -189,7 +194,7 @@ export function getExpectedOverviewMetrics(
       summary,
       viewMetrics: {
         confidence: formatPercent(summary.likelihoodScore),
-        currentNetBurn: `${formatNumber(summary.currentNetBurnRate, 2)}/day`,
+        currentNetBurn: `${formatSignedNumber(-summary.currentNetBurnRate, 2)}/day`,
         daysLeft: formatNumber(summary.daysUntilDeadline),
         openBugs: formatNumber(summary.bugCount),
         requiredNetBurn: `${formatNumber(deadlineMetrics.neededNetBurnRate, 2)}/day`,
@@ -198,12 +203,16 @@ export function getExpectedOverviewMetrics(
   });
 }
 
-export function getExpectedPeriodsMetrics(rangeKey: "7" | "30" | "90" | "all" | "custom" = "30") {
+export function getExpectedPeriodsMetrics(
+  rangeKey: "7" | "30" | "90" | "all" | "custom" = "30",
+  teamKey?: string,
+) {
   return withFrozenDate(QA_TODAY_ISO, () => {
     const comparisonMetrics = getComparisonMetrics(qaMetrics, {
       customFromDate: QA_CUSTOM_FROM,
       customToDate: QA_CUSTOM_TO,
       rangeKey,
+      teamKey,
     });
 
     return {
@@ -218,12 +227,16 @@ export function getExpectedPeriodsMetrics(rangeKey: "7" | "30" | "90" | "all" | 
   });
 }
 
-export function getExpectedInsightsMetrics(rangeKey: "7" | "30" | "90" | "all" | "custom" = "30") {
+export function getExpectedInsightsMetrics(
+  rangeKey: "7" | "30" | "90" | "all" | "custom" = "30",
+  teamKey?: string,
+) {
   return withFrozenDate(QA_TODAY_ISO, () => {
     const insightsMetrics = getInsightsMetrics(qaMetrics, {
       customFromDate: QA_CUSTOM_FROM,
       customToDate: QA_CUSTOM_TO,
       rangeKey,
+      teamKey,
     });
 
     return {
@@ -231,7 +244,34 @@ export function getExpectedInsightsMetrics(rangeKey: "7" | "30" | "90" | "all" |
       viewMetrics: {
         onTime: formatNumber(insightsMetrics.onTimeCompleted),
         overdue: formatNumber(insightsMetrics.overdueCompleted),
+        resolvedInPeriod: formatNumber(insightsMetrics.totalCompleted),
         slaHitRate: formatPercent(insightsMetrics.slaHitRate, 1),
+      },
+    };
+  });
+}
+
+export function getExpectedHistoryMetrics(
+  rangeKey: "7" | "30" | "90" | "all" | "custom" = "30",
+  teamKey?: string,
+) {
+  return withFrozenDate(QA_TODAY_ISO, () => {
+    const historyMetrics = getHistoryMetrics(qaMetrics, {
+      customFromDate: QA_CUSTOM_FROM,
+      customToDate: QA_CUSTOM_TO,
+      rangeKey,
+      teamKey,
+    });
+
+    return {
+      historyMetrics,
+      viewMetrics: {
+        cancelledShare: formatPercent(historyMetrics.currentWindow.cancellationRate, 1),
+        closedWork: formatNumber(historyMetrics.currentWindow.totalClosed),
+        completedShare: formatPercent(historyMetrics.currentWindow.completionRate, 1),
+        medianCycle: `${formatNumber(historyMetrics.currentWindow.medianCycleDays, 1)}d`,
+        p75Cycle: `${formatNumber(historyMetrics.currentWindow.p75CycleDays, 1)}d`,
+        p90Cycle: `${formatNumber(historyMetrics.currentWindow.p90CycleDays, 1)}d`,
       },
     };
   });
@@ -244,6 +284,7 @@ export async function seedDashboardState(
   const {
     deadlineDate = QA_DEADLINE_DATE,
     deadlineFromDate = QA_DEADLINE_FROM,
+    dashboardTeamFilter,
     excludePublicHolidays = false,
     excludeWeekends = false,
     frozenDateIso = QA_TODAY_ISO,
@@ -257,6 +298,7 @@ export async function seedDashboardState(
       clearStorage,
       deadlineDate,
       deadlineFromDate,
+      dashboardTeamFilter,
       excludePublicHolidays,
       excludeWeekends,
       frozenDateIso,
@@ -264,6 +306,7 @@ export async function seedDashboardState(
       storageKeys,
       terminatorMode,
     }) => {
+      const qaStorageSeededKey = "__rtz_qa_storage_seeded__";
       const NativeDate = Date;
       const frozenTimestamp = new NativeDate(frozenDateIso).valueOf();
 
@@ -283,9 +326,10 @@ export async function seedDashboardState(
       }
 
       window.Date = FrozenDate as DateConstructor;
-      if (clearStorage) {
+      if (clearStorage && !window.sessionStorage.getItem(qaStorageSeededKey)) {
         window.localStorage.clear();
         window.sessionStorage.clear();
+        window.sessionStorage.setItem(qaStorageSeededKey, "true");
       }
 
       if (!window.localStorage.getItem(storageKeys.deadlineDate)) {
@@ -294,6 +338,16 @@ export async function seedDashboardState(
 
       if (!window.localStorage.getItem(storageKeys.deadlineFromDate)) {
         window.localStorage.setItem(storageKeys.deadlineFromDate, deadlineFromDate);
+      }
+
+      if (
+        dashboardTeamFilter &&
+        !window.localStorage.getItem(storageKeys.dashboardTeamFilter)
+      ) {
+        window.localStorage.setItem(
+          storageKeys.dashboardTeamFilter,
+          dashboardTeamFilter,
+        );
       }
 
       if (!window.localStorage.getItem(storageKeys.excludePublicHolidays)) {
@@ -324,6 +378,7 @@ export async function seedDashboardState(
       clearStorage,
       deadlineDate,
       deadlineFromDate,
+      dashboardTeamFilter,
       excludePublicHolidays,
       excludeWeekends,
       frozenDateIso,

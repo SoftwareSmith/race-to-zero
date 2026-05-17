@@ -6,15 +6,18 @@ import {
   getBugTotal,
 } from "../../constants/bugs";
 import { STORAGE_KEYS } from "../../constants/storageKeys";
+import { useStoredState } from "../../hooks/useStoredState";
 import { useCompareRange } from "./hooks/useCompareRange";
 import { useDeadlineRange } from "./hooks/useDeadlineRange";
 import { useGameSettings } from "./hooks/useGameSettings";
 import { useMetrics } from "./hooks/useMetrics";
 import { useWorkdaySettings } from "./hooks/useWorkdaySettings";
+import { parseStoredString } from "@shared/utils/storage";
 import type {
   ActiveTab,
   ChartFocusState,
   CompareRangeKey,
+  HistoryTeamOption,
   MenuSettingsState,
   SettingToggleKey,
   TopMenuKey,
@@ -22,6 +25,7 @@ import type {
 import {
   getComparisonMetrics,
   getDeadlineMetrics,
+  getHistoryMetrics,
   getInsightsMetrics,
   getSummaryMetrics,
 } from "@dashboard/utils/metrics";
@@ -57,18 +61,37 @@ export function useDashboardController() {
     setCustomFromDate,
     setCustomToDate,
   } = useCompareRange();
+  const [teamFilterKey, setTeamFilterKey] = useStoredState(
+    STORAGE_KEYS.dashboardTeamFilter,
+    "all",
+    { parse: parseStoredString },
+  );
   const [chartFocus, setChartFocus] = useState<ChartFocusState | null>(null);
   const settingsMenuRef = useRef<HTMLDivElement | null>(null);
   const codexMenuRef = useRef<HTMLDivElement | null>(null);
+  const teamFilterOptions = useMemo<HistoryTeamOption[]>(() => {
+    const teamKeys = [...new Set(
+      (metrics?.bugs ?? [])
+        .map((bug) => bug.teamKey?.trim() ?? "")
+        .filter((teamKey) => teamKey.length > 0),
+    )].sort((left, right) => left.localeCompare(right));
+
+    return [
+      { label: "All teams", value: "all" },
+      ...teamKeys.map((teamKey) => ({ label: teamKey, value: teamKey })),
+    ];
+  }, [metrics]);
+  const selectedTeamKey = teamFilterKey === "all" ? null : teamFilterKey;
 
   const deadlineMetrics = useMemo(
     () =>
       getDeadlineMetrics(metrics, {
         deadlineDate,
+        teamKey: selectedTeamKey,
         trackingStartDate: deadlineFromDate,
         workdaySettings,
       }),
-    [deadlineDate, deadlineFromDate, metrics, workdaySettings],
+    [deadlineDate, deadlineFromDate, metrics, selectedTeamKey, workdaySettings],
   );
   const comparisonMetrics = useMemo(
     () =>
@@ -76,8 +99,9 @@ export function useDashboardController() {
         rangeKey: compareRangeKey,
         customFromDate,
         customToDate,
+        teamKey: selectedTeamKey,
       }),
-    [compareRangeKey, customFromDate, customToDate, metrics],
+    [compareRangeKey, customFromDate, customToDate, metrics, selectedTeamKey],
   );
   const insightsMetrics = useMemo(
     () =>
@@ -85,8 +109,19 @@ export function useDashboardController() {
         rangeKey: compareRangeKey,
         customFromDate,
         customToDate,
+        teamKey: selectedTeamKey,
       }),
-    [compareRangeKey, customFromDate, customToDate, metrics],
+    [compareRangeKey, customFromDate, customToDate, metrics, selectedTeamKey],
+  );
+  const historyMetrics = useMemo(
+    () =>
+      getHistoryMetrics(metrics, {
+        rangeKey: compareRangeKey,
+        customFromDate,
+        customToDate,
+        teamKey: selectedTeamKey,
+      }),
+    [compareRangeKey, customFromDate, customToDate, metrics, selectedTeamKey],
   );
   const summary = useMemo(
     () => getSummaryMetrics(deadlineMetrics),
@@ -152,6 +187,11 @@ export function useDashboardController() {
     setCompareRangeKey(value);
   }, [setCompareRangeKey]);
 
+  const handleTeamFilterChange = useCallback((value: string) => {
+    setOpenTopMenu(null);
+    setTeamFilterKey(value);
+  }, [setTeamFilterKey]);
+
   const handleCustomFromDateChange = useCallback(
     (event: ChangeEvent<HTMLInputElement>) => {
       setOpenTopMenu(null);
@@ -210,6 +250,19 @@ export function useDashboardController() {
     },
     [],
   );
+
+  useEffect(() => {
+    if (!metrics) {
+      return;
+    }
+
+    if (
+      teamFilterKey !== "all" &&
+      !teamFilterOptions.some((option) => option.value === teamFilterKey)
+    ) {
+      setTeamFilterKey("all");
+    }
+  }, [metrics, teamFilterKey, teamFilterOptions, setTeamFilterKey]);
 
   useEffect(() => {
     if (!openTopMenu) {
@@ -286,6 +339,7 @@ export function useDashboardController() {
     handleCustomToDateChange,
     handleDeadlineDateChange,
     handleDeadlineFromDateChange,
+    handleTeamFilterChange,
     handleTabChange,
     handleToggleSetting,
     handleTopMenuToggle,
@@ -293,6 +347,9 @@ export function useDashboardController() {
     toggleShowBugParticleCount,
     headerEyebrow,
     headerSubtitle,
+    teamFilterKey,
+    teamFilterOptions,
+    historyMetrics,
     insightsMetrics,
     openTopMenu,
     settings,

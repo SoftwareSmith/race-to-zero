@@ -28,7 +28,7 @@ test.describe("dashboard date input QA", () => {
     await expectMetricValue(page, "Days left", expected.viewMetrics.daysLeft);
     await expectMetricValue(
       page,
-      "Required net burn",
+      "Required reduction",
       expected.viewMetrics.requiredNetBurn,
     );
 
