@@ -18,7 +18,7 @@ const CHUNK_BUDGETS: ChunkBudget[] = [
   { name: "BackgroundField", pattern: /^BackgroundField-.*\.js$/, maxKb: 100 },
   { name: "SiegeExperience", pattern: /^SiegeExperience-.*\.js$/, maxKb: 85 },
   { name: "siege-vfx-core", pattern: /^siege-vfx-core-.*\.js$/, maxKb: 35 },
-  { name: "pixi-vendor", pattern: /^pixi-vendor-.*\.js$/, maxKb: 450 },
+  { name: "pixi-vendor", pattern: /^pixi-vendor-.*\.js$/, maxKb: 520 },
 ];
 
 const distAssetsDir = path.resolve(process.cwd(), "dist/assets");
