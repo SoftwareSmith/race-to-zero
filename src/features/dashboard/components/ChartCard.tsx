@@ -1,4 +1,4 @@
-import { memo, useEffect, useMemo, useRef, useState } from "react";
+import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
   type ActiveElement,
   BarElement,
@@ -61,6 +61,7 @@ const ChartCard = memo(function ChartCard({
   chartKey,
   className = "",
   onHoverStateChange,
+  siegeMode = false,
 }: ChartCardProps) {
   const [isChartVisible, setIsChartVisible] = useState(false);
   const barChartRef = useRef<ChartJS<"bar", number[], string> | null>(null);
@@ -75,14 +76,21 @@ const ChartCard = memo(function ChartCard({
     data.datasets.length,
   );
 
-  useEffect(() => {
-    const frameId = window.requestAnimationFrame(() => {
-      setIsChartVisible(true);
-    });
+  const clearChartTooltipState = <TType extends ChartType>(
+    chart: ChartJS<TType> | null,
+  ) => {
+    if (!chart) {
+      return;
+    }
 
-    return () => {
-      window.cancelAnimationFrame(frameId);
-    };
+    chart.setActiveElements([]);
+    chart.tooltip?.setActiveElements([], { x: 0, y: 0 });
+    hideCustomChartTooltip(chart);
+    chart.update();
+  };
+
+  useLayoutEffect(() => {
+    setIsChartVisible(true);
   }, []);
 
   useEffect(() => {
@@ -91,6 +99,16 @@ const ChartCard = memo(function ChartCard({
       hideCustomChartTooltip(lineChartRef.current);
     };
   }, []);
+
+  useEffect(() => {
+    if (!siegeMode) {
+      return;
+    }
+
+    clearChartTooltipState(barChartRef.current);
+    clearChartTooltipState(lineChartRef.current);
+    onHoverStateChange?.(null);
+  }, [onHoverStateChange, siegeMode]);
 
   const handleHover = (
     _event: ChartEvent,

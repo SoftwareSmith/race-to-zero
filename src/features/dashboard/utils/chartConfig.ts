@@ -59,10 +59,14 @@ function getTooltipRowColor(dataset: any, index: number) {
   return backgroundColor ?? dataset?.borderColor ?? "#7dd3fc";
 }
 
-function getOrCreateTooltipElement(chart: any) {
-  let tooltipEl = document.body.querySelector(
+function getTooltipElement(chart: any) {
+  return document.body.querySelector(
     `[data-chart-tooltip="custom"][data-chart-id="${String(chart.id)}"]`,
   ) as HTMLDivElement | null;
+}
+
+function getOrCreateTooltipElement(chart: any) {
+  let tooltipEl = getTooltipElement(chart);
 
   if (tooltipEl) {
     return tooltipEl;
@@ -95,7 +99,7 @@ export function hideCustomChartTooltip(chart: any) {
     return;
   }
 
-  const tooltipEl = getOrCreateTooltipElement(chart);
+  const tooltipEl = getTooltipElement(chart);
   if (!tooltipEl) {
     return;
   }
@@ -112,6 +116,16 @@ export function hideAllCustomChartTooltips() {
     if (tooltipNode instanceof HTMLDivElement) {
       tooltipNode.style.opacity = "0";
     }
+  });
+}
+
+export function removeAllCustomChartTooltips() {
+  const tooltipNodes = document.body.querySelectorAll(
+    '[data-chart-tooltip="custom"]',
+  );
+
+  tooltipNodes.forEach((tooltipNode) => {
+    tooltipNode.remove();
   });
 }
 

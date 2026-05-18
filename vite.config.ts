@@ -71,6 +71,10 @@ export default defineConfig({
             return "siege-vfx-core";
           }
 
+          if (id.includes("/src/features/game/components/BackgroundField/qa.ts")) {
+            return "siege-qa";
+          }
+
           if (
             id === overviewChartsPath ||
             id === chartCardPath ||

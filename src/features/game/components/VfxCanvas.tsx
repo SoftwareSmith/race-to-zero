@@ -11,7 +11,10 @@
 
 import { forwardRef, useEffect, useImperativeHandle, useRef } from "react";
 import type { VfxEngine } from "../engine/VfxEngine";
-import { recordQaDurationSample } from "./BackgroundField/qa";
+import {
+  isQaSessionEnabled,
+  recordQaDurationSample,
+} from "./BackgroundField/qaLoader";
 
 let vfxEngineModulePromise: Promise<
   typeof import("../engine/VfxEngine")
@@ -48,6 +51,7 @@ const VfxCanvas = forwardRef<VfxEngine | null, Props>(function VfxCanvas(
     (async () => {
       const w = wrapper.clientWidth || window.innerWidth;
       const h = wrapper.clientHeight || window.innerHeight;
+      const qaEnabled = isQaSessionEnabled();
 
       const { VfxEngine } = await preloadVfxEngine();
       const engine = new VfxEngine();
@@ -72,7 +76,9 @@ const VfxCanvas = forwardRef<VfxEngine | null, Props>(function VfxCanvas(
         prevTimeRef.current = now;
         const tickStartedAt = performance.now();
         engine.tick(dt);
-        recordQaDurationSample("vfxMs", performance.now() - tickStartedAt);
+        if (qaEnabled) {
+          recordQaDurationSample("vfxMs", performance.now() - tickStartedAt);
+        }
         rafRef.current = requestAnimationFrame(loop);
       };
       prevTimeRef.current = performance.now();

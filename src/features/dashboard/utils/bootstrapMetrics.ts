@@ -1,5 +1,4 @@
 import {
-  compareAsc,
   differenceInCalendarDays,
   endOfYear,
   format,

@@ -1,4 +1,6 @@
 import {
+  Suspense,
+  lazy,
   memo,
   useEffect,
   useLayoutEffect,
@@ -10,18 +12,17 @@ import { DashboardProvider } from "@dashboard/context/DashboardContext";
 import CommandCenter from "@dashboard/components/CommandCenter";
 import SettingsMenu from "@dashboard/components/SettingsMenu";
 import TopNav from "@dashboard/components/TopNav";
-import { hideAllCustomChartTooltips } from "@dashboard/utils/chartConfig";
+import {
+  hideAllCustomChartTooltips,
+  removeAllCustomChartTooltips,
+} from "@dashboard/utils/chartConfig";
 import {
   useDashboardMetrics,
   useDashboardSettings,
   useDashboardUi,
 } from "@dashboard/context/DashboardContext";
-import { OverviewView, StatusBanner } from "@dashboard/DashboardViews";
-import {
-  HistoryView,
-  InsightsView,
-  PeriodsView,
-} from "@dashboard/DashboardAnalyticsViews";
+import { OverviewView } from "@dashboard/DashboardViews";
+import StatusBanner from "@shared/components/StatusBanner";
 import {
   MenuIconButton,
   MenuPanel,
@@ -33,6 +34,22 @@ import { cn } from "@shared/utils/cn";
 
 const CHROME_TRANSITION_CLASSNAME =
   "transition-[opacity,transform,filter] duration-450 ease-[cubic-bezier(0.22,1,0.36,1)]";
+
+const PeriodsView = lazy(() =>
+  import("@dashboard/DashboardAnalyticsViews").then((module) => ({
+    default: module.PeriodsView,
+  })),
+);
+const InsightsView = lazy(() =>
+  import("@dashboard/DashboardAnalyticsViews").then((module) => ({
+    default: module.InsightsView,
+  })),
+);
+const HistoryView = lazy(() =>
+  import("@dashboard/DashboardAnalyticsViews").then((module) => ({
+    default: module.HistoryView,
+  })),
+);
 
 interface DashboardShellProps {
   dashboardRef: RefObject<HTMLDivElement | null>;
@@ -254,11 +271,20 @@ const DashboardShellContent = memo(function DashboardShellContent({
     }
 
     return (
-      <PeriodsView
-        comparisonMetrics={metrics.comparisonMetrics}
-        onChartFocusChange={chartFocusHandler}
-        siegeMode={interactiveMode}
-      />
+      <Suspense
+        fallback={
+          <AnalyticsTabSkeleton
+            cardCount={4}
+            chartVariants={PERIODS_CHART_VARIANTS}
+          />
+        }
+      >
+        <PeriodsView
+          comparisonMetrics={metrics.comparisonMetrics}
+          onChartFocusChange={chartFocusHandler}
+          siegeMode={interactiveMode}
+        />
+      </Suspense>
     );
   })();
 
@@ -282,11 +308,20 @@ const DashboardShellContent = memo(function DashboardShellContent({
     }
 
     return (
-      <InsightsView
-        insightsMetrics={metrics.insightsMetrics}
-        onChartFocusChange={chartFocusHandler}
-        siegeMode={interactiveMode}
-      />
+      <Suspense
+        fallback={
+          <AnalyticsTabSkeleton
+            cardCount={5}
+            chartVariants={INSIGHTS_CHART_VARIANTS}
+          />
+        }
+      >
+        <InsightsView
+          insightsMetrics={metrics.insightsMetrics}
+          onChartFocusChange={chartFocusHandler}
+          siegeMode={interactiveMode}
+        />
+      </Suspense>
     );
   })();
 
@@ -310,11 +345,20 @@ const DashboardShellContent = memo(function DashboardShellContent({
     }
 
     return (
-      <HistoryView
-        historyMetrics={metrics.historyMetrics}
-        onChartFocusChange={chartFocusHandler}
-        siegeMode={interactiveMode}
-      />
+      <Suspense
+        fallback={
+          <AnalyticsTabSkeleton
+            cardCount={6}
+            chartVariants={HISTORY_CHART_VARIANTS}
+          />
+        }
+      >
+        <HistoryView
+          historyMetrics={metrics.historyMetrics}
+          onChartFocusChange={chartFocusHandler}
+          siegeMode={interactiveMode}
+        />
+      </Suspense>
     );
   })();
 
@@ -367,6 +411,10 @@ const DashboardShellContent = memo(function DashboardShellContent({
       resizeObserver.disconnect();
     };
   }, [dashboardRef, ui.activeTab]);
+
+  useEffect(() => {
+    removeAllCustomChartTooltips();
+  }, []);
 
   useEffect(() => {
     if (!bugFieldMenuOpen) {

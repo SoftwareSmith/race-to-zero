@@ -19,13 +19,15 @@ import {
   type ReseedInfo,
 } from "./canvasState";
 import {
+  isQaSessionEnabled,
+  preloadQaRuntime,
   recordQaDurationSample,
   stabilizeQaEngine,
   syncQaBugPositionsFromEngine,
   syncQaBugTelemetryFromEngine,
   updateQaBugPositions,
   updateQaBugTelemetry,
-} from "./qa";
+} from "./qaLoader";
 import type { BugTransitionSnapshotItem, RenderedBugPosition } from "./types";
 import type { SiegeZoneRect } from "@game/types";
 
@@ -103,7 +105,10 @@ export interface SetupBugCanvasEngineResult {
 export async function setupBugCanvasEngine(
   options: SetupBugCanvasEngineOptions,
 ): Promise<SetupBugCanvasEngineResult> {
+  const qaEnabled = isQaSessionEnabled();
+  const qaPreloadPromise = qaEnabled ? preloadQaRuntime() : null;
   const physicsAdapter = await createPreferredPhysicsAdapter(options.interactiveMode);
+  await qaPreloadPromise;
   options.notifyPhysicsBackendChange?.(physicsAdapter.id);
 
   const transitionSwarm =
@@ -130,10 +135,12 @@ export async function setupBugCanvasEngine(
       spatialGridMs: number;
       totalMs: number;
     }) => {
-      recordQaDurationSample("engineUpdateMs", sample.totalMs);
-      recordQaDurationSample("engineGridMs", sample.spatialGridMs);
-      recordQaDurationSample("engineEntityMs", sample.entityUpdateMs);
-      recordQaDurationSample("engineEvolutionMs", sample.evolutionMs);
+      if (qaEnabled) {
+        recordQaDurationSample("engineUpdateMs", sample.totalMs);
+        recordQaDurationSample("engineGridMs", sample.spatialGridMs);
+        recordQaDurationSample("engineEntityMs", sample.entityUpdateMs);
+        recordQaDurationSample("engineEvolutionMs", sample.evolutionMs);
+      }
     };
     if (options.maxWeaponTier != null) {
       (engine as any).maxWeaponTier = options.maxWeaponTier;
@@ -155,9 +162,11 @@ export async function setupBugCanvasEngine(
       void 0;
     }
 
-    stabilizeQaEngine(engine, options.width, options.height);
-    syncQaBugPositionsFromEngine(engine, options.bounds);
-    syncQaBugTelemetryFromEngine(engine, options.bounds);
+    if (qaEnabled) {
+      stabilizeQaEngine(engine, options.width, options.height);
+      syncQaBugPositionsFromEngine(engine, options.bounds);
+      syncQaBugTelemetryFromEngine(engine, options.bounds);
+    }
     options.syncWeaponEvolutionStates();
 
     return {
@@ -173,10 +182,12 @@ export async function setupBugCanvasEngine(
     config: options.gameConfig,
     maxWeaponTier: options.maxWeaponTier,
     onPerformanceSample: (sample) => {
-      recordQaDurationSample("engineUpdateMs", sample.totalMs);
-      recordQaDurationSample("engineGridMs", sample.spatialGridMs);
-      recordQaDurationSample("engineEntityMs", sample.entityUpdateMs);
-      recordQaDurationSample("engineEvolutionMs", sample.evolutionMs);
+      if (qaEnabled) {
+        recordQaDurationSample("engineUpdateMs", sample.totalMs);
+        recordQaDurationSample("engineGridMs", sample.spatialGridMs);
+        recordQaDurationSample("engineEntityMs", sample.entityUpdateMs);
+        recordQaDurationSample("engineEvolutionMs", sample.evolutionMs);
+      }
     },
     onEntityDeath: options.onEntityDeath,
     onWeaponEvolution: (weaponId, newTier) => {
@@ -200,9 +211,11 @@ export async function setupBugCanvasEngine(
     );
   }
 
-  stabilizeQaEngine(engine, options.width, options.height);
-  syncQaBugPositionsFromEngine(engine, options.bounds);
-  syncQaBugTelemetryFromEngine(engine, options.bounds);
+  if (qaEnabled) {
+    stabilizeQaEngine(engine, options.width, options.height);
+    syncQaBugPositionsFromEngine(engine, options.bounds);
+    syncQaBugTelemetryFromEngine(engine, options.bounds);
+  }
 
   const reseedInfo = reseedClusteredBugs(
     engine.getAllBugs() as Array<any>,

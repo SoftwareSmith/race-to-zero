@@ -1,7 +1,7 @@
 import { isTerminalEntityState, type SiegeZoneRect } from "@game/types";
 import type { SurvivalSpawnPlan } from "@game/sim/survivalDirector";
 import type { MutableRefObject, RefObject } from "react";
-import { updateQaBugPositions } from "./qa";
+import { isQaSessionEnabled, updateQaBugPositions } from "./qaLoader";
 import type { CanvasBounds } from "./canvasState";
 import type { RenderedBugPosition } from "./types";
 
@@ -97,5 +97,7 @@ export function clearInteractiveSwarm({
   latestBugPositionsRef.current = [];
   lastReportedLiveBugCountRef.current = 0;
   onLiveBugCountChange?.(0);
-  updateQaBugPositions([], boundsRef.current);
+  if (isQaSessionEnabled()) {
+    updateQaBugPositions([], boundsRef.current);
+  }
 }

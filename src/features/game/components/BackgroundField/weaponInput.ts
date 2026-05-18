@@ -8,7 +8,7 @@ import type {
   PersistentFireSession,
   WeaponContext,
 } from "@game/weapons/runtime/types";
-import { updateQaLastHit } from "./qa";
+import { isQaSessionEnabled, updateQaLastHit } from "./qaLoader";
 import type { CanvasBounds } from "./canvasState";
 import type { VfxEngine } from "@game/engine/VfxEngine";
 import type { SiegeWeaponId } from "@game/types";
@@ -108,7 +108,11 @@ function createExecutionContext(
         options.syncWeaponEvolutionStates();
       }
     },
-    updateQaLastHit: (payload) => updateQaLastHit(payload as any),
+    updateQaLastHit: (payload) => {
+      if (isQaSessionEnabled()) {
+        updateQaLastHit(payload as any);
+      }
+    },
     enqueueOverlay: (wid, x, y, extras) =>
       options.getOnWeaponFire()?.(wid, x, y, extras as any),
     blackHoleVfxIdRef: options.blackHoleVfxIdRef,

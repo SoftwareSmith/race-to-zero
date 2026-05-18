@@ -16,12 +16,12 @@ import {
   type ReseedInfo,
 } from "./canvasState";
 import {
-  isQaEnabled,
+  isQaSessionEnabled,
   recordQaDurationSample,
   recordQaFrameTiming,
   syncQaBugTelemetryFromEngine,
   updateQaBugPositions,
-} from "./qa";
+} from "./qaLoader";
 import type { BugHitPayload, RenderedBugPosition } from "./types";
 import { createPointerDownHandler } from "./weaponInput";
 import type { VfxEngine } from "@game/engine/VfxEngine";
@@ -246,6 +246,7 @@ export function setupBugCanvasRenderLoop({
 
   const renderFrame = (timestamp: number) => {
     const frameStart = performance.now();
+    const qaEnabled = isQaSessionEnabled();
 
     if (!isActive) {
       animationFrameId = 0;
@@ -278,7 +279,7 @@ export function setupBugCanvasRenderLoop({
       6,
     );
 
-    if (isQaEnabled() && swarmRef.current) {
+    if (qaEnabled && swarmRef.current) {
       ensureQaBindings?.();
     }
 
@@ -331,12 +332,14 @@ export function setupBugCanvasRenderLoop({
       interactiveMode: interactiveModeRef.current,
       motionProfile: motionProfileRef.current,
       particles: activeParticles,
-      qaEnabled: isQaEnabled(),
+      qaEnabled,
       reusablePositions: latestBugPositionsRef.current,
       sizeMultiplier,
       width,
     });
-    recordQaDurationSample("drawMs", performance.now() - drawStartedAt);
+    if (qaEnabled) {
+      recordQaDurationSample("drawMs", performance.now() - drawStartedAt);
+    }
     latestBugPositionsRef.current = nextBugPositions;
     if (interactiveModeRef.current) {
       const liveBugCount = getActiveBugCount(activeParticles as Array<any>);
@@ -347,9 +350,14 @@ export function setupBugCanvasRenderLoop({
     } else {
       lastReportedLiveBugCountRef.current = null;
     }
-    updateQaBugPositions(nextBugPositions, boundsRef.current);
-    syncQaBugTelemetryFromEngine(swarmRef.current, boundsRef.current);
-    recordQaFrameTiming(performance.now() - frameStart, nextBugPositions.length);
+    if (qaEnabled) {
+      updateQaBugPositions(nextBugPositions, boundsRef.current);
+      syncQaBugTelemetryFromEngine(swarmRef.current, boundsRef.current);
+      recordQaFrameTiming(
+        performance.now() - frameStart,
+        nextBugPositions.length,
+      );
+    }
 
     if (
       swarmRef.current &&

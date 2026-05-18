@@ -54,7 +54,10 @@ export function useDashboardController() {
     setCustomFromDate,
     setCustomToDate,
   } = useCompareRange();
-  const shouldLoadAnalytics = true;
+  const shouldLoadAnalytics =
+    bootstrapUi.activeTab === "periods" ||
+    bootstrapUi.activeTab === "insights" ||
+    bootstrapUi.activeTab === "history";
   const [analyticsModule, setAnalyticsModule] =
     useState<DashboardAnalyticsModule | null>(null);
   const {

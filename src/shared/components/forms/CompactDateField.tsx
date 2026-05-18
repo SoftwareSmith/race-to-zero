@@ -1,6 +1,5 @@
 import type { ChangeEventHandler, KeyboardEvent } from "react";
 import { useMemo, useRef } from "react";
-import { format, parseISO } from "date-fns";
 import { cn } from "@shared/utils/cn";
 import { getDateInputBounds } from "@dashboard/utils/dashboard";
 
@@ -12,6 +11,16 @@ interface CompactDateFieldProps {
   onChange: ChangeEventHandler<HTMLInputElement>;
   size?: "default" | "compact";
   value: string;
+}
+
+function formatIsoDateValue(value: string) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (!match) {
+    return value;
+  }
+
+  const [, year, month, day] = match;
+  return `${day}/${month}/${year}`;
 }
 
 export default function CompactDateField({
@@ -30,12 +39,7 @@ export default function CompactDateField({
       return "";
     }
 
-    const parsed = parseISO(value);
-    if (Number.isNaN(parsed.getTime())) {
-      return value;
-    }
-
-    return format(parsed, "dd/MM/yyyy");
+    return formatIsoDateValue(value);
   }, [value]);
 
   const openPicker = () => {
