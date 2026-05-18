@@ -10,6 +10,7 @@ import { DashboardProvider } from "@dashboard/context/DashboardContext";
 import CommandCenter from "@dashboard/components/CommandCenter";
 import SettingsMenu from "@dashboard/components/SettingsMenu";
 import TopNav from "@dashboard/components/TopNav";
+import { hideAllCustomChartTooltips } from "@dashboard/utils/chartConfig";
 import {
   useDashboardMetrics,
   useDashboardSettings,
@@ -394,6 +395,14 @@ const DashboardShellContent = memo(function DashboardShellContent({
       document.removeEventListener("touchstart", handlePointerDown);
     };
   }, [bugFieldMenuOpen]);
+
+  useEffect(() => {
+    if (!interactiveMode) {
+      return;
+    }
+
+    hideAllCustomChartTooltips();
+  }, [interactiveMode]);
 
   return (
     <div

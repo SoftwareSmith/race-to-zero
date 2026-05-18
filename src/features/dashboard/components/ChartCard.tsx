@@ -85,6 +85,13 @@ const ChartCard = memo(function ChartCard({
     };
   }, []);
 
+  useEffect(() => {
+    return () => {
+      hideCustomChartTooltip(barChartRef.current);
+      hideCustomChartTooltip(lineChartRef.current);
+    };
+  }, []);
+
   const handleHover = (
     _event: ChartEvent,
     elements: ActiveElement[],

@@ -103,6 +103,18 @@ export function hideCustomChartTooltip(chart: any) {
   tooltipEl.style.opacity = "0";
 }
 
+export function hideAllCustomChartTooltips() {
+  const tooltipNodes = document.body.querySelectorAll(
+    '[data-chart-tooltip="custom"]',
+  );
+
+  tooltipNodes.forEach((tooltipNode) => {
+    if (tooltipNode instanceof HTMLDivElement) {
+      tooltipNode.style.opacity = "0";
+    }
+  });
+}
+
 function positionTooltipAtPoint(
   tooltipEl: HTMLDivElement,
   left: number,

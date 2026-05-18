@@ -155,4 +155,27 @@ test.describe("dashboard navigation QA", () => {
 
     await clientErrors.expectNoClientErrors();
   });
+
+  test("hides dashboard chart tooltips when siege mode opens", async ({ page }) => {
+    const clientErrors = createConsoleCollectors(page);
+
+    await gotoDashboard(page);
+
+    const chartCanvas = page.locator('[data-siege-panel="priority-breakdown"] canvas');
+    const customTooltip = page.locator('[data-chart-tooltip="custom"]').first();
+
+    await chartCanvas.hover();
+    await expect(customTooltip).toHaveCSS("opacity", "1");
+
+    await page
+      .getByRole("button", { name: "Open interactive bug game" })
+      .evaluate((button: HTMLButtonElement) => {
+        button.click();
+      });
+
+    await expect(page.getByTestId("siege-hud")).toBeVisible();
+    await expect(customTooltip).toHaveCSS("opacity", "0");
+
+    await clientErrors.expectNoClientErrors();
+  });
 });
