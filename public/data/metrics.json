@@ -3644,19 +3644,19 @@
         "label": "0-7d"
       },
       {
-        "count": 30,
+        "count": 28,
         "label": "8-30d"
       },
       {
-        "count": 57,
+        "count": 59,
         "label": "31-90d"
       },
       {
-        "count": 39,
+        "count": 38,
         "label": "91-180d"
       },
       {
-        "count": 198,
+        "count": 199,
         "label": "181d+"
       }
     ],
@@ -5847,7 +5847,7 @@
     ],
     "statusDistribution": [
       {
-        "count": 260,
+        "count": 259,
         "label": "Backlog"
       },
       {
@@ -5859,11 +5859,11 @@
         "label": "Todo"
       },
       {
-        "count": 9,
+        "count": 8,
         "label": "In progress"
       },
       {
-        "count": 10,
+        "count": 12,
         "label": "In review"
       },
       {
@@ -10269,7 +10269,7 @@
       ],
       "statusDistribution": [
         {
-          "count": 114,
+          "count": 113,
           "label": "Backlog"
         },
         {
@@ -10281,11 +10281,11 @@
           "label": "Todo"
         },
         {
-          "count": 3,
+          "count": 2,
           "label": "In progress"
         },
         {
-          "count": 0,
+          "count": 2,
           "label": "In review"
         },
         {
@@ -11211,11 +11211,11 @@
           "label": "31-90d"
         },
         {
-          "count": 5,
+          "count": 4,
           "label": "91-180d"
         },
         {
-          "count": 7,
+          "count": 8,
           "label": "181d+"
         }
       ],
@@ -13364,11 +13364,11 @@
           "label": "0-7d"
         },
         {
-          "count": 8,
+          "count": 7,
           "label": "8-30d"
         },
         {
-          "count": 7,
+          "count": 8,
           "label": "31-90d"
         },
         {
@@ -16041,11 +16041,11 @@
           "label": "0-7d"
         },
         {
-          "count": 14,
+          "count": 13,
           "label": "8-30d"
         },
         {
-          "count": 29,
+          "count": 30,
           "label": "31-90d"
         },
         {
@@ -17190,8 +17190,8 @@
       ]
     }
   },
-  "generatedAt": "2026-05-17T00:25:09.117Z",
-  "lastUpdated": "2026-05-17T00:25:09.117Z",
+  "generatedAt": "2026-05-18T00:26:13.572Z",
+  "lastUpdated": "2026-05-18T00:26:13.572Z",
   "teamKeys": [
     "CP",
     "PF",
