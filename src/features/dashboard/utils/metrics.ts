@@ -1,6 +1,5 @@
 import type { ChartData } from "chart.js";
 import {
-  addDays,
   compareAsc,
   differenceInCalendarDays,
   eachDayOfInterval,
@@ -101,11 +100,6 @@ interface PreparedMetricsSource {
   remainingIndex: SeriesIndex;
   remainingSeries: DailyCountEntry[];
   statusDistribution: StatusDistributionEntry[];
-}
-
-interface BurndownSeriesSource {
-  completedIndex: SeriesIndex;
-  createdIndex: SeriesIndex;
 }
 
 interface BacklogHistorySource {
@@ -412,19 +406,6 @@ function buildClosureSeries(bugs: MetricsBug[]): DailyCountEntry[] {
   return [...countsByDay.entries()]
     .sort(([left], [right]) => left.localeCompare(right))
     .map(([date, count]) => ({ date, count }));
-}
-
-function buildBurndownSeriesSource(bugs: MetricsBug[]): BurndownSeriesSource {
-  const burndownBugs = bugs.filter(
-    (bug) => !isTerminalStatusLabel(getLinearStatusLabel(bug)),
-  );
-  const createdSeries = buildSeriesFromField(burndownBugs, "createdAt");
-  const completedSeries = buildSeriesFromField(burndownBugs, "completedAt");
-
-  return {
-    completedIndex: buildSeriesIndex(completedSeries),
-    createdIndex: buildSeriesIndex(createdSeries),
-  };
 }
 
 function buildBacklogHistorySource(bugs: MetricsBug[]): BacklogHistorySource {

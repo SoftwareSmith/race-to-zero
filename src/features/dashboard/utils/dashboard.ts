@@ -100,6 +100,8 @@ export function getTargetConfidenceTone(
   summary: SummaryMetrics,
   deadlineMetrics: DeadlineMetrics,
 ): Tone {
+  void deadlineMetrics;
+
   if (summary.likelihoodScore >= CONFIDENCE_POSITIVE_THRESHOLD) {
     return "positive";
   }

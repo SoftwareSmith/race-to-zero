@@ -6,22 +6,22 @@ import SiegeHudControls from "./SiegeHudControls";
 function renderControls(
   overrides: Partial<Parameters<typeof SiegeHudControls>[0]> = {},
 ) {
-  const onTogglePause = vi.fn();
+  const onEndSurvival = vi.fn();
 
   render(
     <SiegeHudControls
       codexOpen={false}
       debugMode={false}
       gameMode="outbreak"
+      onEndSurvival={onEndSurvival}
       onExit={vi.fn()}
       onPointerEnterHud={vi.fn()}
       onPointerLeaveHud={vi.fn()}
-      onTogglePause={onTogglePause}
       {...overrides}
     />,
   );
 
-  return { onTogglePause };
+  return { onEndSurvival };
 }
 
 describe("SiegeHudControls", () => {
@@ -29,33 +29,36 @@ describe("SiegeHudControls", () => {
     cleanup();
   });
 
-  it("renders a Survival pause button next to the codex control", () => {
-    const { onTogglePause } = renderControls({ onToggleCodex: vi.fn() });
+  it("renders the codex control when a codex toggle is available", () => {
+    renderControls({ onToggleCodex: vi.fn() });
 
-    const pauseButton = screen.getByRole("button", {
-      name: "Pause survival",
-    });
-
-    expect(pauseButton).toBeInTheDocument();
-
-    fireEvent.click(pauseButton);
-
-    expect(onTogglePause).toHaveBeenCalledTimes(1);
+    expect(
+      screen.getByRole("button", { name: "Open codex" }),
+    ).toBeInTheDocument();
   });
 
-  it("does not render the pause button outside Survival", () => {
-    renderControls({ gameMode: "purge" });
+  it("does not render the removed pause button in Survival", () => {
+    renderControls();
 
     expect(
       screen.queryByRole("button", { name: /pause survival|resume survival/i }),
     ).toBeNull();
   });
 
-  it("switches the control label to resume while paused", () => {
-    renderControls({ manuallyPaused: true });
+  it("renders the survival overrun control in outbreak debug mode", () => {
+    const { onEndSurvival } = renderControls({
+      debugMode: true,
+      onToggleDebugMode: vi.fn(),
+    });
 
-    expect(
-      screen.getByRole("button", { name: "Resume survival" }),
-    ).toBeInTheDocument();
+    const overrunButton = screen.getByRole("button", {
+      name: "Force survival overrun",
+    });
+
+    expect(overrunButton).toBeInTheDocument();
+
+    fireEvent.click(overrunButton);
+
+    expect(onEndSurvival).toHaveBeenCalledTimes(1);
   });
 });

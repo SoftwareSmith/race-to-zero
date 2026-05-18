@@ -790,7 +790,7 @@ function SummaryCard({
         "border-white/24 bg-gradient-to-br shadow-[0_0_20px_rgba(0,0,0,0.16)] ring-white/12",
         accent.iconPanel,
       )}
-      onActivate={undefined}
+      onActivate={() => onSelect(id)}
       overlay={
         <>
           <div

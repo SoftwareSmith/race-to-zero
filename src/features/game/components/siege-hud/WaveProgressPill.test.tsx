@@ -26,7 +26,7 @@ describe("WaveProgressPill", () => {
     cleanup();
   });
 
-  it("renders wave timing, spawn rate, and fill width", () => {
+  it("renders wave timing and fill width", () => {
     renderPill();
 
     expect(screen.getByTestId("siege-wave-loader-pill")).toHaveTextContent("3");
@@ -34,7 +34,7 @@ describe("WaveProgressPill", () => {
       "12s",
     );
     expect(screen.getByTestId("siege-wave-loader-pill")).toHaveTextContent(
-      "2.4/s",
+      "Wave",
     );
     expect(screen.getByTestId("siege-wave-loader-fill")).toHaveStyle({
       width: "37%",

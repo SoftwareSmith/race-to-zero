@@ -219,42 +219,6 @@ function renderStandardTooltip(context: any) {
   positionTooltipElement(chart, tooltip, tooltipEl);
 }
 
-function renderAllValuesTooltip(context: any) {
-  const { chart, tooltip } = context;
-  const tooltipEl = getOrCreateTooltipElement(chart);
-
-  if (!tooltipEl) {
-    return;
-  }
-
-  if (tooltip.opacity === 0) {
-    tooltipEl.style.opacity = "0";
-    return;
-  }
-
-  const labels = chart.data.labels ?? [];
-  const dataset = chart.data.datasets?.[0];
-  const values = dataset?.data ?? [];
-
-  const rows = labels
-    .map((label: unknown, index: number) => {
-      const color = getTooltipRowColor(dataset, index);
-      const value = values[index] ?? 0;
-
-      return `
-        <div style="display:grid;grid-template-columns:10px minmax(0,1fr) auto;align-items:center;column-gap:8px;">
-          <span style="width:10px;height:10px;border-radius:2px;background:${String(color)};display:block;"></span>
-          <span style="color:#dbeafe;font-size:12px;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${String(label)}</span>
-          <span style="color:#f8fafc;font-size:12px;line-height:1.2;font-weight:700;text-align:right;">${String(value)}</span>
-        </div>
-      `;
-    })
-    .join("");
-
-  tooltipEl.innerHTML = renderTooltipRows(rows, "All values");
-  positionTooltipElement(chart, tooltip, tooltipEl);
-}
-
 export function showUnifiedAllValuesTooltip(chart: any, anchorRect: DOMRect) {
   if (!chart) {
     return;

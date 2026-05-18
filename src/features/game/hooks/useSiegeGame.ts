@@ -15,7 +15,6 @@ import {
   calculateWaveProgress,
   createSurvivalBurstCounts,
   getSurvivalPressure,
-  getSurvivalRuntimeSpeedMultiplier,
   getSurvivalRuntimeSpeedMultiplierForPressure,
   getSurvivalWavePlan,
   type SurvivalSpawnPlan,
@@ -729,7 +728,7 @@ export function useSiegeGame({
       cancelTimeout(survivalPressureTimerRef.current);
       survivalPressureTimerRef.current = null;
     };
-  }, [completionSummary, gameMode, interactiveMode, siegePhase, startSurvivalWave, survivalStatus.offlineReason, updateRuntimeSnapshot]);
+  }, [completionSummary, finalizeRun, gameMode, interactiveMode, siegePhase, startSurvivalWave, survivalStatus.offlineReason, updateRuntimeSnapshot]);
 
   useEffect(() => {
     if (
@@ -799,7 +798,7 @@ export function useSiegeGame({
       cancelTimeout(survivalSpawnTimerRef.current);
       survivalSpawnTimerRef.current = null;
     };
-  }, [completionSummary, gameMode, interactiveMode, queueSurvivalSpawn, siegePhase, survivalStatus.offlineReason]);
+  }, [completionSummary, gameMode, interactiveMode, queueSurvivalSpawn, siegePhase, startSurvivalWave, survivalStatus.offlineReason]);
 
   useEffect(() => {
     if (
@@ -868,7 +867,7 @@ export function useSiegeGame({
         delete qaState.setSurvivalState;
       }
     };
-  }, [startSurvivalWave, updateRuntimeSnapshot]);
+  }, [finalizeRun, startSurvivalWave, updateRuntimeSnapshot]);
 
   const displayedBugCounts = interactiveMode
     ? interactiveInitialBugCounts

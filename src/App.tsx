@@ -12,7 +12,7 @@ import type {
   BackgroundFieldHandle,
   BugTransitionSnapshotItem,
 } from "@game/components/BackgroundField/types";
-import { preloadVfxEngine } from "@game/components/VfxCanvas";
+import { preloadVfxEngine } from "@game/components/vfxEngineLoader";
 import { DashboardBootstrapProvider } from "./features/dashboard/context/DashboardBootstrapContext";
 
 const loadDashboardShell = () => import("./features/app/DashboardShell");

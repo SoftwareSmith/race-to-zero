@@ -246,11 +246,17 @@ const BackgroundField = memo(
 
       useEffect(() => {
         if (!interactiveMode) {
-          if (weaponEffects.length > 0) {
-            setWeaponEffects([]);
+          if (weaponEffects.length === 0) {
+            return undefined;
           }
 
-          return undefined;
+          const timeoutId = window.setTimeout(() => {
+            setWeaponEffects([]);
+          }, 0);
+
+          return () => {
+            window.clearTimeout(timeoutId);
+          };
         }
 
         if (weaponEffects.length === 0) {

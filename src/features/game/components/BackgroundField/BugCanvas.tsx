@@ -43,7 +43,6 @@ import { setupBugCanvasRenderLoop } from "./bugCanvasRenderLoop";
 import {
   applySurvivalSpawnPlan,
   clearInteractiveSwarm,
-  getActiveBugCount,
   getLocalSiegeZones as computeLocalSiegeZones,
 } from "./bugCanvasLiveState";
 

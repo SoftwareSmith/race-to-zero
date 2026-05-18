@@ -802,7 +802,6 @@ export class BugEntity extends Entity {
     config: typeof DEFAULT_GAME_CONFIG,
     getCrowdingAt?: BugUpdateContext["getCrowdingAt"],
   ) {
-    const profile = this.getActiveProfile();
     const targetMissing = this.roamTargetX == null || this.roamTargetY == null;
     const targetExpired = now >= this.nextRoamTargetAt;
     const targetOutOfBounds =

@@ -1,4 +1,12 @@
-import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import {
+  memo,
+  type MouseEvent,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   type ActiveElement,
   BarElement,
@@ -89,14 +97,23 @@ const ChartCard = memo(function ChartCard({
     chart.update();
   };
 
-  useLayoutEffect(() => {
-    setIsChartVisible(true);
+  useEffect(() => {
+    const frameId = window.requestAnimationFrame(() => {
+      setIsChartVisible(true);
+    });
+
+    return () => {
+      window.cancelAnimationFrame(frameId);
+    };
   }, []);
 
   useEffect(() => {
+    const barChart = barChartRef.current;
+    const lineChart = lineChartRef.current;
+
     return () => {
-      hideCustomChartTooltip(barChartRef.current);
-      hideCustomChartTooltip(lineChartRef.current);
+      hideCustomChartTooltip(barChart);
+      hideCustomChartTooltip(lineChart);
     };
   }, []);
 
@@ -110,39 +127,42 @@ const ChartCard = memo(function ChartCard({
     onHoverStateChange?.(null);
   }, [onHoverStateChange, siegeMode]);
 
-  const handleHover = (
-    _event: ChartEvent,
-    elements: ActiveElement[],
-    chart: ChartJS<ChartType>,
-  ) => {
-    if (!onHoverStateChange) {
-      return;
-    }
+  const handleHover = useCallback(
+    (
+      _event: ChartEvent,
+      elements: ActiveElement[],
+      chart: ChartJS<ChartType>,
+    ) => {
+      if (!onHoverStateChange) {
+        return;
+      }
 
-    const activePoint = elements?.[0];
-    if (!activePoint) {
-      onHoverStateChange(null);
-      return;
-    }
+      const activePoint = elements?.[0];
+      if (!activePoint) {
+        onHoverStateChange(null);
+        return;
+      }
 
-    const labelCount = chart.data.labels?.length ?? 0;
-    const relativeIndex =
-      labelCount > 1 ? activePoint.index / (labelCount - 1) : 0.5;
-    onHoverStateChange({
-      chartKey,
-      dataIndex: activePoint.index,
-      datasetIndex: activePoint.datasetIndex,
-      label: String(chart.data.labels?.[activePoint.index] ?? ""),
-      relativeIndex,
-    });
-  };
+      const labelCount = chart.data.labels?.length ?? 0;
+      const relativeIndex =
+        labelCount > 1 ? activePoint.index / (labelCount - 1) : 0.5;
+      onHoverStateChange({
+        chartKey,
+        dataIndex: activePoint.index,
+        datasetIndex: activePoint.datasetIndex,
+        label: String(chart.data.labels?.[activePoint.index] ?? ""),
+        relativeIndex,
+      });
+    },
+    [chartKey, onHoverStateChange],
+  );
 
   const barOptions = useMemo<ChartOptions<"bar">>(
     () => ({
       ...getLineChartOptions("bar", chartKey, data.datasets.length),
       onHover: handleHover,
     }),
-    [chartKey, data.datasets.length, onHoverStateChange],
+    [chartKey, data.datasets.length, handleHover],
   );
 
   const lineOptions = useMemo<ChartOptions<"line">>(
@@ -150,12 +170,10 @@ const ChartCard = memo(function ChartCard({
       ...getLineChartOptions("line", chartKey, data.datasets.length),
       onHover: handleHover,
     }),
-    [chartKey, data.datasets.length, onHoverStateChange],
+    [chartKey, data.datasets.length, handleHover],
   );
 
-  const handleUnifiedTooltipEnter = (
-    event: React.MouseEvent<HTMLDivElement>,
-  ) => {
+  const handleUnifiedTooltipEnter = (event: MouseEvent<HTMLDivElement>) => {
     if (!useUnifiedTooltip) {
       return;
     }
