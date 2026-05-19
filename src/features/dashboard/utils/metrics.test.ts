@@ -211,6 +211,70 @@ describe("metrics", () => {
     expect(chartData.datasets[0]?.data.slice(0, 6)).toEqual([2, 2, 2, 2, 2, 2]);
   });
 
+  it("projects remaining bugs beyond today using the current net burn rate", () => {
+    const deadlineMetrics = withFrozenDate("2026-01-06T12:00:00.000Z", () =>
+      getDeadlineMetrics(
+        {
+          bugs: [
+            {
+              completedAt: null,
+              createdAt: "2025-12-20",
+              priority: 2,
+              stateName: "Backlog",
+              stateType: "backlog",
+            },
+            {
+              completedAt: null,
+              createdAt: "2025-12-22",
+              priority: 2,
+              stateName: "Backlog",
+              stateType: "backlog",
+            },
+            {
+              completedAt: "2026-01-03",
+              createdAt: "2025-12-28",
+              priority: 2,
+              stateName: "Done",
+              stateType: "completed",
+            },
+            {
+              completedAt: "2026-01-05",
+              createdAt: "2025-12-29",
+              priority: 2,
+              stateName: "Done",
+              stateType: "completed",
+            },
+          ],
+        },
+        {
+          deadlineDate: "2026-01-10",
+          trackingStartDate: "2026-01-01",
+          workdaySettings: {
+            excludePublicHolidays: false,
+            excludeWeekends: false,
+          },
+        },
+      ),
+    );
+
+    const chartData = buildDeadlineBurndownChartData(deadlineMetrics);
+
+    expect(deadlineMetrics.currentNetBurnRate).toBeCloseTo(1 / 3, 5);
+    expect(chartData.datasets[2]?.label).toBe("Projected remaining");
+    expect(chartData.datasets[2]?.data).toEqual([
+      null,
+      null,
+      null,
+      null,
+      null,
+      2,
+      1.67,
+      1.33,
+      1,
+      0.67,
+    ]);
+  });
+
   it("builds a status chart using the fixed Linear column order", () => {
     const metrics = {
       bugs: [

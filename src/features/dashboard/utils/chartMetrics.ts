@@ -147,60 +147,109 @@ export function buildDeadlineBurndownChartData(
     ),
     1,
   );
+  const hasFutureProjection = labels.some((entry) => entry > todayKey);
+
+  const datasets: Array<{
+    label: string;
+    data: Array<number | null>;
+    borderColor: string;
+    backgroundColor: string;
+    fill?: boolean;
+    tension: number;
+    borderWidth: number;
+    pointRadius: number;
+    pointHoverRadius?: number;
+    borderDash?: number[];
+  }> = [
+    {
+      label: "Remaining bugs",
+      data: labels.map((entry) => {
+        if (entry > todayKey) {
+          return null;
+        }
+
+        return entry === trackingStartKey
+          ? getSeriesValueBefore(remainingIndex, entry)
+          : getSeriesValueAtOrBefore(remainingIndex, entry);
+      }),
+      borderColor: "#f87171",
+      backgroundColor: "rgba(248, 113, 113, 0.18)",
+      fill: false,
+      tension: 0.22,
+      borderWidth: 3,
+      pointRadius: 2,
+      pointHoverRadius: 4,
+    },
+    {
+      label: "Ideal line",
+      data: labels.map((entry) => {
+        const currentDate = parseISO(entry);
+        const elapsed = Math.max(
+          countConfiguredDays(
+            idealStartDate,
+            currentDate,
+            deadlineMetrics.workdaySettings,
+            { inclusive: false },
+          ),
+          0,
+        );
+        return Math.max(
+          0,
+          Number(
+            (
+              idealStartCount -
+              (idealStartCount / idealDuration) * elapsed
+            ).toFixed(2),
+          ),
+        );
+      }),
+      borderColor: "#5eead4",
+      backgroundColor: "rgba(94, 234, 212, 0.08)",
+      borderDash: [6, 6],
+      tension: 0,
+      borderWidth: 2,
+      pointRadius: 0,
+    },
+  ];
+
+  if (hasFutureProjection) {
+    datasets.push({
+      label: "Projected remaining",
+      data: labels.map((entry) => {
+        if (entry < todayKey) {
+          return null;
+        }
+
+        const elapsed = Math.max(
+          countConfiguredDays(
+            deadlineMetrics.today,
+            parseISO(entry),
+            deadlineMetrics.workdaySettings,
+            { inclusive: false },
+          ),
+          0,
+        );
+
+        return Number(
+          Math.max(
+            0,
+            deadlineMetrics.remainingBugs -
+              deadlineMetrics.currentNetBurnRate * elapsed,
+          ).toFixed(2),
+        );
+      }),
+      borderColor: "#fca5a5",
+      backgroundColor: "rgba(252, 165, 165, 0.12)",
+      borderDash: [4, 4],
+      tension: 0.18,
+      borderWidth: 2,
+      pointRadius: 0,
+    });
+  }
 
   return {
     labels: labels.map((entry) => formatLabel(entry)),
-    datasets: [
-      {
-        label: "Remaining bugs",
-        data: labels.map((entry) => {
-          if (entry > todayKey) {
-            return null;
-          }
-
-          return entry === trackingStartKey
-            ? getSeriesValueBefore(remainingIndex, entry)
-            : getSeriesValueAtOrBefore(remainingIndex, entry);
-        }),
-        borderColor: "#f87171",
-        backgroundColor: "rgba(248, 113, 113, 0.18)",
-        fill: false,
-        tension: 0.22,
-        borderWidth: 3,
-        pointRadius: 2,
-        pointHoverRadius: 4,
-      },
-      {
-        label: "Ideal line",
-        data: labels.map((entry) => {
-          const currentDate = parseISO(entry);
-          const elapsed = Math.max(
-            countConfiguredDays(
-              idealStartDate,
-              currentDate,
-              deadlineMetrics.workdaySettings,
-              { inclusive: false },
-            ),
-            0,
-          );
-          return Math.max(
-            0,
-            Number(
-              (
-                idealStartCount -
-                (idealStartCount / idealDuration) * elapsed
-              ).toFixed(2),
-            ),
-          );
-        }),
-        borderColor: "#5eead4",
-        backgroundColor: "rgba(94, 234, 212, 0.08)",
-        borderDash: [6, 6],
-        tension: 0,
-        borderWidth: 2,
-        pointRadius: 0,
-      },
-    ],
+    datasets,
   };
 }
 
