@@ -234,11 +234,13 @@ export function useSiegeGame({
   const interactiveBaseElapsedMsRef = useRef(0);
   const interactiveRunningSinceRef = useRef<number | null>(null);
   const runtimeSnapshotRef = useRef<SiegeRuntimeSnapshot>(runtimeSnapshot);
+  const interactiveSessionKeyRef = useRef<string | null>(interactiveSessionKey);
   const survivalStatusRef = useRef(survivalStatus);
   const survivalRemainingBudgetRef = useRef(0);
   const survivalSpawnAccumulatorRef = useRef(0);
   const survivalLastSpawnTickAtRef = useRef<number | null>(null);
   const survivalSpawnSequenceRef = useRef(0);
+  const interactiveSessionSequenceRef = useRef(0);
   const gamePausedRef = useRef(false);
 
   const interactiveMode = siegePhase !== "idle";
@@ -438,13 +440,16 @@ export function useSiegeGame({
     const scaledBugCounts = scaleBugCounts(baseBugCounts, bugMultiplier);
     const totalBugCount = getBugCountTotal(scaledBugCounts);
     const startedAt = Date.now();
+    interactiveSessionSequenceRef.current += 1;
+    const nextSessionKey = `${Date.now()}-${interactiveSessionSequenceRef.current}`;
     cancelTimeout(phaseTimerRef.current);
     setGameMode(nextMode);
     setInteractiveInitialBugCounts(scaledBugCounts);
     setInteractiveStartedAt(startedAt);
     interactiveRunningSinceRef.current = startedAt;
     interactiveBaseElapsedMsRef.current = 0;
-    setInteractiveSessionKey(`${Date.now()}`);
+    interactiveSessionKeyRef.current = nextSessionKey;
+    setInteractiveSessionKey(nextSessionKey);
     runtimeSnapshotRef.current = createRuntimeSnapshot(totalBugCount);
     flushRuntimeSnapshot(true);
     lastKillAtRef.current = null;
@@ -482,6 +487,8 @@ export function useSiegeGame({
     phaseTimerRef.current = scheduleTimeout(() => {
       phaseTimerRef.current = null;
       setInteractiveStartedAt(null);
+      interactiveSessionKeyRef.current = null;
+      setInteractiveSessionKey(null);
       resetCompletion();
       setSiegePhase("idle");
     }, SIEGE_EXIT_DURATION_MS);
@@ -622,6 +629,10 @@ export function useSiegeGame({
   useEffect(() => {
     survivalStatusRef.current = survivalStatus;
   }, [survivalStatus]);
+
+  useEffect(() => {
+    interactiveSessionKeyRef.current = interactiveSessionKey;
+  }, [interactiveSessionKey]);
 
   useEffect(() => {
     if (
@@ -894,8 +905,19 @@ export function useSiegeGame({
   );
 
   const changeGameMode = useCallback((nextMode: SiegeGameMode) => {
+    if (nextMode === gameMode) {
+      return;
+    }
+
+    if (interactiveMode) {
+      enterInteractiveMode(nextMode, {
+        baseBugCounts: interactiveInitialBugCounts,
+      });
+      return;
+    }
+
     setGameMode(nextMode);
-  }, []);
+  }, [enterInteractiveMode, gameMode, interactiveInitialBugCounts, interactiveMode]);
 
   const handleWeaponFired = useCallback((id: SiegeWeaponId, firedAt: number) => {
     updateRuntimeSnapshot((current) => ({
@@ -908,7 +930,14 @@ export function useSiegeGame({
   }, [updateRuntimeSnapshot]);
 
   const syncRemainingBugs = useCallback(
-    (count: number) => {
+    (count: number, sourceSessionKey?: string | null) => {
+      if (
+        sourceSessionKey != null &&
+        sourceSessionKey !== interactiveSessionKeyRef.current
+      ) {
+        return;
+      }
+
       const normalizedCount = Math.max(0, Math.floor(count));
       const shouldForceFlush =
         runtimeSnapshotRef.current.remainingBugs !== normalizedCount ||

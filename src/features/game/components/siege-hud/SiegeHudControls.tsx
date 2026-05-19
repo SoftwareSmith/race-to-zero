@@ -190,9 +190,10 @@ const SiegeHudControls = memo(function SiegeHudControls({
         <div className="flex flex-wrap items-center gap-2">
           <div
             aria-label="Siege mode"
-            className="inline-flex rounded-full border border-white/8 bg-black/28 p-0.5 shadow-[0_12px_28px_rgba(0,0,0,0.24)] backdrop-blur-xl"
+            className="relative inline-flex overflow-hidden rounded-full border border-white/10 bg-[linear-gradient(180deg,rgba(8,11,16,0.88),rgba(9,12,16,0.72))] p-0.5 shadow-[0_12px_28px_rgba(0,0,0,0.24)] backdrop-blur-xl"
             role="tablist"
           >
+            <div className="pointer-events-none absolute inset-x-2 top-0 h-px bg-white/12" />
             {(["purge", "outbreak"] as const).map((mode) => {
               const meta = SIEGE_GAME_MODE_META[mode];
               const selected = mode === gameMode;
@@ -203,9 +204,9 @@ const SiegeHudControls = memo(function SiegeHudControls({
                     aria-selected={selected}
                     data-hud-cursor="pointer"
                     className={cn(
-                      "rounded-full px-3 py-1.5 text-[0.74rem] font-semibold transition duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300/40",
+                      "relative rounded-full px-3 py-1.5 text-[0.74rem] font-semibold transition duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300/40",
                       selected
-                        ? "bg-sky-400/8 text-sky-100 shadow-[inset_0_0_0_1px_rgba(56,189,248,0.14)]"
+                        ? "bg-sky-400/8 text-sky-100 shadow-[inset_0_0_0_1px_rgba(56,189,248,0.16)]"
                         : "text-stone-400 hover:bg-white/4 hover:text-stone-100",
                     )}
                     onClick={() => onChangeGameMode?.(mode)}
@@ -220,7 +221,7 @@ const SiegeHudControls = memo(function SiegeHudControls({
           </div>
 
           <div
-            className="flex items-center gap-1.5"
+            className="flex items-center gap-1.25"
             onPointerEnter={onPointerEnterHud}
             onPointerLeave={onPointerLeaveHud}
           >

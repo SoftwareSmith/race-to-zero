@@ -105,6 +105,48 @@ describe("useSiegeGame", () => {
     expect(result.current.survivalStatus.wave).toBe(1);
   });
 
+  it("ignores stale live bug count updates from a previous mode session", () => {
+    const { result } = renderHook(() =>
+      useSiegeGame({
+        currentBugCount: 20,
+        currentBugCounts: { high: 0, low: 20, medium: 0, urgent: 0 },
+        evolutionStates: {},
+      }),
+    );
+
+    act(() => {
+      result.current.enterInteractiveMode("outbreak");
+    });
+
+    const staleSessionKey = result.current.interactiveSessionKey;
+
+    act(() => {
+      result.current.enterInteractiveMode("purge", {
+        baseBugCounts: result.current.interactiveInitialBugCounts,
+      });
+    });
+
+    const activeSessionKey = result.current.interactiveSessionKey;
+    const startingBugCount = result.current.interactiveRemainingBugs;
+
+    expect(activeSessionKey).not.toBe(staleSessionKey);
+    expect(startingBugCount).toBeGreaterThan(0);
+
+    act(() => {
+      result.current.syncRemainingBugs(0, staleSessionKey);
+    });
+
+    expect(result.current.gameMode).toBe("purge");
+    expect(result.current.interactiveRemainingBugs).toBe(startingBugCount);
+    expect(result.current.completionSummary).toBeNull();
+
+    act(() => {
+      result.current.syncRemainingBugs(7, activeSessionKey);
+    });
+
+    expect(result.current.interactiveRemainingBugs).toBe(7);
+  });
+
   it("freezes the run and stores a leaderboard entry when bugs run out", async () => {
     const { result } = renderHook(() =>
       useSiegeGame({

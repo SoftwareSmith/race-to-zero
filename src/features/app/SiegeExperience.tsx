@@ -169,6 +169,13 @@ const SiegeExperience = memo(function SiegeExperience({
     [resetEvolution, siegeGame, ui],
   );
 
+  const handleLiveBugCountChange = useCallback(
+    (count: number) => {
+      siegeGame.syncRemainingBugs(count, siegeGame.interactiveSessionKey);
+    },
+    [siegeGame.interactiveSessionKey, siegeGame.syncRemainingBugs],
+  );
+
   const backgroundChartFocus = siegeGame.interactiveMode ? ui.chartFocus : null;
   const shouldRenderSiegeField = siegeGame.siegePhase !== "idle";
   const siegeFieldClassName =
@@ -204,7 +211,7 @@ const SiegeExperience = memo(function SiegeExperience({
             siegeGame.interactiveMode ? siegeGame.clearSwarmRequestId : 0
           }
           onLiveBugCountChange={
-            siegeGame.interactiveMode ? siegeGame.syncRemainingBugs : undefined
+            siegeGame.interactiveMode ? handleLiveBugCountChange : undefined
           }
           onWeaponEvolution={handleEvolution}
           onWeaponEvolutionStatesChange={syncFromEngine}
