@@ -1,7 +1,8 @@
 import type { Dispatch, MutableRefObject, RefObject, SetStateAction } from "react";
 import { DEFAULT_GAME_CONFIG } from "@game/engine/types";
-import { isTerminalEntityState, type SiegeCombatStats, type SiegeWeaponId } from "@game/types";
+import type { SiegeCombatStats, SiegeWeaponId } from "@game/types";
 import type {
+  BugCounts,
   BugVisualSettings,
   ChartFocusState,
   MotionProfile,
@@ -22,6 +23,8 @@ import {
   syncQaBugTelemetryFromEngine,
   updateQaBugPositions,
 } from "./qaLoader";
+import { getBugCountsKey } from "../../../../constants/bugs";
+import { getActiveBugCount, getActiveBugCounts } from "./bugCanvasLiveState";
 import type { BugHitPayload, RenderedBugPosition } from "./types";
 import { createPointerDownHandler } from "./weaponInput";
 import type { VfxEngine } from "@game/engine/VfxEngine";
@@ -41,16 +44,6 @@ function interpolate(
 
 function clampNumber(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max);
-}
-
-function getActiveBugCount(bugs: Array<any> | undefined | null) {
-  if (!bugs?.length) {
-    return 0;
-  }
-
-  return bugs.reduce((count, bug) => {
-    return isTerminalEntityState(bug?.state) ? count : count + 1;
-  }, 0);
 }
 
 function getSimulationSteps(frameTimeSeconds: number, bugCount: number) {
@@ -136,10 +129,13 @@ interface BugCanvasRenderLoopOptions {
   isFiringRef: MutableRefObject<boolean>;
   lastFireTimeRef: MutableRefObject<Record<string, number>>;
   lastReportedLiveBugCountRef: MutableRefObject<number | null>;
+  lastReportedLiveBugCountsKeyRef: MutableRefObject<string | null>;
   latestBugPositionsRef: MutableRefObject<RenderedBugPosition[]>;
   motionProfileRef: MutableRefObject<MotionProfile>;
   onHitRef: MutableRefObject<(payload: BugHitPayload) => void>;
-  onLiveBugCountChangeRef: MutableRefObject<((count: number) => void) | undefined>;
+  onLiveBugCountChangeRef: MutableRefObject<
+    ((count: number, bugCounts?: BugCounts, sourceSessionKey?: string | null) => void) | undefined
+  >;
   onWeaponFireRef: MutableRefObject<
     | ((
         weapon: SiegeWeaponId,
@@ -176,6 +172,7 @@ interface BugCanvasRenderLoopOptions {
     speedMultiplier: number;
   }>;
   vfxRef: MutableRefObject<VfxEngine | null>;
+  sessionKeyRef: MutableRefObject<string>;
 }
 
 export function setupBugCanvasRenderLoop({
@@ -195,6 +192,7 @@ export function setupBugCanvasRenderLoop({
   isFiringRef,
   lastFireTimeRef,
   lastReportedLiveBugCountRef,
+  lastReportedLiveBugCountsKeyRef,
   latestBugPositionsRef,
   motionProfileRef,
   onHitRef,
@@ -209,6 +207,7 @@ export function setupBugCanvasRenderLoop({
   syncWeaponEvolutionStates,
   targetSettingsRef,
   vfxRef,
+  sessionKeyRef,
 }: BugCanvasRenderLoopOptions) {
   const currentVfx = vfxRef.current;
   const context = canvas.getContext("2d", { alpha: true });
@@ -343,12 +342,23 @@ export function setupBugCanvasRenderLoop({
     latestBugPositionsRef.current = nextBugPositions;
     if (interactiveModeRef.current) {
       const liveBugCount = getActiveBugCount(activeParticles as Array<any>);
-      if (lastReportedLiveBugCountRef.current !== liveBugCount) {
+      const liveBugCounts = getActiveBugCounts(activeParticles as Array<any>);
+      const liveBugCountsKey = getBugCountsKey(liveBugCounts);
+      if (
+        lastReportedLiveBugCountRef.current !== liveBugCount ||
+        lastReportedLiveBugCountsKeyRef.current !== liveBugCountsKey
+      ) {
         lastReportedLiveBugCountRef.current = liveBugCount;
-        onLiveBugCountChangeRef.current?.(liveBugCount);
+        lastReportedLiveBugCountsKeyRef.current = liveBugCountsKey;
+        onLiveBugCountChangeRef.current?.(
+          liveBugCount,
+          liveBugCounts,
+          sessionKeyRef.current,
+        );
       }
     } else {
       lastReportedLiveBugCountRef.current = null;
+      lastReportedLiveBugCountsKeyRef.current = null;
     }
     if (qaEnabled) {
       updateQaBugPositions(nextBugPositions, boundsRef.current);

@@ -124,7 +124,11 @@ export interface BugCanvasProps {
     newTier: import("@game/types").WeaponTier,
   ) => void;
   clearSwarmRequestId?: number;
-  onLiveBugCountChange?: (count: number) => void;
+  onLiveBugCountChange?: (
+    count: number,
+    bugCounts?: BugCounts,
+    sourceSessionKey?: string | null,
+  ) => void;
   onPhysicsBackendChange?: (backendId: string) => void;
   initialEvolutionStates?: Partial<
     Record<SiegeWeaponId, import("@game/types").WeaponEvolutionState>
@@ -216,9 +220,12 @@ const BugCanvas = memo(
     });
     const latestBugPositionsRef = useRef<RenderedBugPosition[]>([]);
     const lastReportedLiveBugCountRef = useRef<number | null>(null);
+    const lastReportedLiveBugCountsKeyRef = useRef<string | null>(null);
     const qaBindingOwnerRef = useRef<object | null>(null);
     const lastAppliedSpawnPlanRef = useRef(0);
+    const survivalSpawnPlanRef = useRef(survivalSpawnPlan);
     const gamePausedRef = useRef(gamePaused);
+    const sessionKeyRef = useRef(sessionKey);
     const targetSettingsRef = useRef({
       sizeMultiplier: bugVisualSettings?.sizeMultiplier ?? 1,
       speedMultiplier: getSpeedMultiplier(bugVisualSettings?.chaosMultiplier),
@@ -309,6 +316,7 @@ const BugCanvas = memo(
           swarmRef.current = null;
           latestBugPositionsRef.current = [];
           lastReportedLiveBugCountRef.current = null;
+          lastReportedLiveBugCountsKeyRef.current = null;
           return liveSwarm;
         },
       }),
@@ -338,6 +346,8 @@ const BugCanvas = memo(
       combatStatsRef.current = combatStats ?? null;
       reseedInfoRef.current = reseedInfo;
       siegeZonesRef.current = siegeZones;
+      survivalSpawnPlanRef.current = survivalSpawnPlan;
+      sessionKeyRef.current = sessionKey;
       targetSettingsRef.current = {
         sizeMultiplier: bugVisualSettings?.sizeMultiplier ?? 1,
         speedMultiplier: getSpeedMultiplier(bugVisualSettings?.chaosMultiplier),
@@ -360,8 +370,10 @@ const BugCanvas = memo(
       reseedInfo,
       sceneProfile,
       selectedWeaponId,
+      sessionKey,
       siegeZones,
       streakMultiplier,
+      survivalSpawnPlan,
       transitionSnapshot,
       consumeTransitionSwarm,
       interactiveMode,
@@ -425,6 +437,7 @@ const BugCanvas = memo(
         interactiveMode,
         lastAppliedSpawnPlanRef,
         onLiveBugCountChange: onLiveBugCountChangeRef.current,
+        sessionKey: sessionKeyRef.current,
         spawnPlan: survivalSpawnPlan,
         swarm: swarmRef.current,
       });
@@ -523,6 +536,19 @@ const BugCanvas = memo(
         }
 
         swarmRef.current = result.engine;
+        latestBugPositionsRef.current = [];
+        lastReportedLiveBugCountRef.current = null;
+        lastReportedLiveBugCountsKeyRef.current = null;
+        lastAppliedSpawnPlanRef.current = 0;
+        applySurvivalSpawnPlan({
+          getLocalZones: getLocalSiegeZones,
+          interactiveMode: interactiveModeRef.current,
+          lastAppliedSpawnPlanRef,
+          onLiveBugCountChange: onLiveBugCountChangeRef.current,
+          sessionKey: sessionKeyRef.current,
+          spawnPlan: survivalSpawnPlanRef.current,
+          swarm: swarmRef.current,
+        });
         disposePhysicsAdapter = () => result.physicsAdapter.dispose?.();
         qaBindingOwnerRef.current = installBugCanvasQaBindings({
           bounds: boundsRef.current,
@@ -561,6 +587,9 @@ const BugCanvas = memo(
         clearBugCanvasQaBindings(qaBindingOwnerRef.current ?? undefined);
         qaBindingOwnerRef.current = null;
         swarmRef.current = null;
+        latestBugPositionsRef.current = [];
+        lastReportedLiveBugCountRef.current = null;
+        lastReportedLiveBugCountsKeyRef.current = null;
       };
     }, [
       bugCounts,
@@ -597,6 +626,7 @@ const BugCanvas = memo(
         isFiringRef,
         lastFireTimeRef,
         lastReportedLiveBugCountRef,
+        lastReportedLiveBugCountsKeyRef,
         latestBugPositionsRef,
         motionProfileRef,
         onHitRef,
@@ -611,6 +641,7 @@ const BugCanvas = memo(
         syncWeaponEvolutionStates,
         targetSettingsRef,
         vfxRef,
+        sessionKeyRef,
       });
     }, [
       ensureQaBindings,
@@ -626,7 +657,9 @@ const BugCanvas = memo(
         interactiveMode,
         latestBugPositionsRef,
         lastReportedLiveBugCountRef,
+        lastReportedLiveBugCountsKeyRef,
         onLiveBugCountChange: onLiveBugCountChangeRef.current,
+        sessionKey: sessionKeyRef.current,
         swarm: swarmRef.current as
           | (Engine & { clearAllBugs?: () => number })
           | null,

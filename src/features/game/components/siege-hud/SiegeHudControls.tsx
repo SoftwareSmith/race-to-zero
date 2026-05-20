@@ -133,7 +133,7 @@ const SiegeHudControls = memo(function SiegeHudControls({
     ...(debugMode && onEndSurvival && gameMode === "outbreak"
       ? [
           {
-            ariaLabel: "Force survival overrun",
+            ariaLabel: "Force survival failure",
             icon: (
               <svg
                 aria-hidden="true"
@@ -152,7 +152,7 @@ const SiegeHudControls = memo(function SiegeHudControls({
             key: "end-survival",
             onClick: onEndSurvival,
             tone: "danger" as const,
-            tooltip: "Force the site offline and view the overrun modal",
+            tooltip: "Force a survival failure and open the ending modal",
           },
         ]
       : []),

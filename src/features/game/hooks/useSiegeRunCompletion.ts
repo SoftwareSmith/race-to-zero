@@ -7,6 +7,7 @@ import {
   setStorageValue,
 } from "@shared/utils/storage";
 import { getSiegeWeaponLabel } from "@game/progression/progression";
+import type { SurvivalFailureKind } from "@game/sim/survivalDirector";
 import type {
   SiegeGameMode,
   SiegePhase,
@@ -34,6 +35,9 @@ export interface SiegeLeaderboardEntry {
   bugsPerSecond: number;
   completedAt: string;
   elapsedMs: number;
+  failureKind?: SurvivalFailureKind;
+  failureLabel?: string;
+  failureSummary?: string;
   mode: SiegeGameMode;
   offlineReason?: string;
   survivedMs: number;
@@ -42,7 +46,11 @@ export interface SiegeLeaderboardEntry {
   waveReached: number;
 }
 
-export type SiegeCompletionOutcome = "survivalOverrun" | "timeAttackCleared";
+export type SiegeCompletionOutcome =
+  | "errorFlood"
+  | "speedCollapse"
+  | "timeAttackCleared"
+  | "uptimeFailure";
 
 export interface SiegeCompletionSummary extends SiegeLeaderboardEntry {
   isNewBest: boolean;
@@ -57,6 +65,9 @@ export type SiegeLeaderboardsByMode = Record<
 
 interface UseSiegeRunCompletionOptions {
   evolutionStates?: Partial<Record<SiegeWeaponId, WeaponEvolutionState>>;
+  failureKind?: SurvivalFailureKind | null;
+  failureLabel?: string | null;
+  failureSummary?: string | null;
   gameMode: SiegeGameMode;
   getRuntimeSnapshot: () => SiegeRuntimeSnapshotLike;
   interactiveKills: number;
@@ -132,6 +143,21 @@ function normalizeLeaderboardEntry(
     bugsPerSecond: Math.max(0, value.bugsPerSecond),
     completedAt: value.completedAt,
     elapsedMs: Math.max(0, Math.floor(value.elapsedMs)),
+    failureKind:
+      value.mode === "outbreak" &&
+      (value.failureKind === "uptimeFailure" ||
+        value.failureKind === "errorFlood" ||
+        value.failureKind === "speedCollapse")
+        ? value.failureKind
+        : undefined,
+    failureLabel:
+      value.mode === "outbreak" && typeof value.failureLabel === "string"
+        ? value.failureLabel
+        : undefined,
+    failureSummary:
+      value.mode === "outbreak" && typeof value.failureSummary === "string"
+        ? value.failureSummary
+        : undefined,
     mode: value.mode,
     offlineReason:
       value.mode === "outbreak" && typeof value.offlineReason === "string"
@@ -245,6 +271,9 @@ function getStoredLeaderboards(): SiegeLeaderboardsByMode {
 
 export function useSiegeRunCompletion({
   evolutionStates,
+  failureKind,
+  failureLabel,
+  failureSummary,
   gameMode,
   getRuntimeSnapshot,
   interactiveKills,
@@ -269,6 +298,9 @@ export function useSiegeRunCompletion({
   const leaderboardsRef = useRef(leaderboards);
   const latestStateRef = useRef({
     evolutionStates,
+    failureKind,
+    failureLabel,
+    failureSummary,
     gameMode,
     interactiveKills,
     interactiveMode,
@@ -291,6 +323,9 @@ export function useSiegeRunCompletion({
   useEffect(() => {
     latestStateRef.current = {
       evolutionStates,
+      failureKind,
+      failureLabel,
+      failureSummary,
       gameMode,
       interactiveKills,
       interactiveMode,
@@ -303,6 +338,9 @@ export function useSiegeRunCompletion({
     };
   }, [
     evolutionStates,
+    failureKind,
+    failureLabel,
+    failureSummary,
     gameMode,
     interactiveKills,
     interactiveMode,
@@ -355,10 +393,25 @@ export function useSiegeRunCompletion({
           : liveKills,
       completedAt: new Date().toISOString(),
       elapsedMs: finalElapsedMs,
+      failureKind:
+        latestState.gameMode === "outbreak"
+          ? latestState.failureKind ?? "uptimeFailure"
+          : undefined,
+      failureLabel:
+        latestState.gameMode === "outbreak"
+          ? latestState.failureLabel ?? "Uptime"
+          : undefined,
+      failureSummary:
+        latestState.gameMode === "outbreak"
+          ? latestState.failureSummary ??
+            "Too many bugs broke through and took the platform down."
+          : undefined,
       mode: latestState.gameMode,
       offlineReason:
         latestState.gameMode === "outbreak"
-          ? latestState.offlineReason ?? "Site offline under swarm pressure"
+          ? latestState.offlineReason ??
+            latestState.failureSummary ??
+            "Too many bugs broke through and took the platform down."
           : undefined,
       survivedMs: finalElapsedMs,
       topWeaponId: topWeapon.id,
@@ -389,7 +442,7 @@ export function useSiegeRunCompletion({
       isNewBest: rank === 1,
       outcome:
         latestState.gameMode === "outbreak"
-          ? "survivalOverrun"
+          ? latestState.failureKind ?? "uptimeFailure"
           : "timeAttackCleared",
       rank,
     } satisfies SiegeCompletionSummary;

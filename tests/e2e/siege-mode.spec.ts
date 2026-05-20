@@ -131,6 +131,9 @@ test("survival shows wave pressure and advances after a cleared wave", async ({ 
   await expect(page.getByTestId("siege-wave-loader-pill")).toBeVisible();
   await expect(page.getByTestId("siege-wave-loader-fill")).toBeVisible();
   await expect(page.getByTestId("siege-offline-pressure")).toBeVisible();
+  await expect(page.getByTestId("siege-survival-metric-uptime")).toBeVisible();
+  await expect(page.getByTestId("siege-survival-metric-errors")).toBeVisible();
+  await expect(page.getByTestId("siege-survival-metric-speed")).toBeVisible();
 
   const initialLoaderWidth = await page
     .getByTestId("siege-wave-loader-fill")
@@ -208,14 +211,14 @@ test("survival does not collapse in the opening seconds before the player can ac
   await expect(page.getByTestId("siege-complete-overlay")).toHaveCount(0);
   await expect
     .poll(async () => Number.parseInt(
-      (await page.getByTestId("siege-offline-pressure").locator("strong").textContent()) ?? "0",
+      (await page.getByTestId("siege-survival-metric-uptime").textContent()) ?? "0",
       10,
     ))
     .toBeGreaterThan(80);
   await expect.poll(() => getQaLiveBugCount(page)).toBeGreaterThan(0);
 });
 
-test("survival site offline opens the completion overlay", async ({ page }) => {
+test("survival metric failures open the matching completion overlay", async ({ page }) => {
   await page.setViewportSize({ height: 1200, width: 1440 });
   await enableCanvasQa(page);
   await mockMetrics(page, completionMetrics);
@@ -229,10 +232,10 @@ test("survival site offline opens the completion overlay", async ({ page }) => {
   await page.getByRole("tab", { name: "Survival" }).click();
   await expect(page.getByRole("tab", { name: "Survival", selected: true })).toBeVisible();
 
-  await setQaSurvivalState(page, { siteIntegrity: 0 });
+  await setQaSurvivalState(page, { failMetric: "errors" });
 
   await expect(page.getByTestId("siege-complete-overlay")).toBeVisible();
-  await expect(page.getByTestId("siege-complete-title")).toHaveText("Site overrun.");
+  await expect(page.getByTestId("siege-complete-title")).toHaveText("Errors spiked.");
 });
 
 test("completion overlay traps keyboard focus between actions", async ({ page }) => {

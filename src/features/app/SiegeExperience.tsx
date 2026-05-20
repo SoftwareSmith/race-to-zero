@@ -23,6 +23,7 @@ import { triggerNamedShake } from "@game/utils/screenShake";
 import { getWeaponTierTitle } from "@game/weapons/progression";
 import type { BugTransitionSnapshotItem } from "@game/components/BackgroundField/types";
 import type { Engine } from "@game/engine/Engine";
+import type { BugCounts } from "../../types/dashboard";
 
 interface SiegeExperienceProps {
   consumeTransitionSwarm?: () => Engine | null;
@@ -55,7 +56,13 @@ const SiegeExperience = memo(function SiegeExperience({
   const [upgradeToast, setUpgradeToast] = useState<string | null>(null);
   const [justEvolvedWeaponId, setJustEvolvedWeaponId] =
     useState<SiegeWeaponId | null>(null);
+  const [availableTransitionSnapshot, setAvailableTransitionSnapshot] =
+    useState<BugTransitionSnapshotItem[] | null>(transitionSnapshot);
   const lastStartRequestIdRef = useRef(0);
+
+  useEffect(() => {
+    setAvailableTransitionSnapshot(transitionSnapshot);
+  }, [transitionSnapshot]);
 
   const showUpgradeToast = useCallback((message: string) => {
     setUpgradeToast(message);
@@ -115,6 +122,17 @@ const SiegeExperience = memo(function SiegeExperience({
 
   useEffect(() => {
     if (
+      siegeGame.siegePhase === "idle" ||
+      availableTransitionSnapshot == null
+    ) {
+      return;
+    }
+
+    setAvailableTransitionSnapshot(null);
+  }, [availableTransitionSnapshot, siegeGame.siegePhase]);
+
+  useEffect(() => {
+    if (
       startRequestId === 0 ||
       startRequestId === lastStartRequestIdRef.current
     ) {
@@ -138,9 +156,7 @@ const SiegeExperience = memo(function SiegeExperience({
     ui.closeMenus();
     ui.setChartFocus(null);
     resetEvolution();
-    siegeGame.enterInteractiveMode(siegeGame.gameMode, {
-      baseBugCounts: siegeGame.interactiveInitialBugCounts,
-    });
+    siegeGame.enterInteractiveMode(siegeGame.gameMode);
   }, [resetEvolution, siegeGame, ui]);
 
   const handleSwitchMode = useCallback(() => {
@@ -149,7 +165,6 @@ const SiegeExperience = memo(function SiegeExperience({
     resetEvolution();
     siegeGame.enterInteractiveMode(
       siegeGame.gameMode === "purge" ? "outbreak" : "purge",
-      { baseBugCounts: siegeGame.interactiveInitialBugCounts },
     );
   }, [resetEvolution, siegeGame, ui]);
 
@@ -162,18 +177,35 @@ const SiegeExperience = memo(function SiegeExperience({
       ui.closeMenus();
       ui.setChartFocus(null);
       resetEvolution();
-      siegeGame.enterInteractiveMode(mode, {
-        baseBugCounts: siegeGame.interactiveInitialBugCounts,
-      });
+      siegeGame.enterInteractiveMode(mode);
     },
     [resetEvolution, siegeGame, ui],
   );
 
   const handleLiveBugCountChange = useCallback(
-    (count: number) => {
-      siegeGame.syncRemainingBugs(count, siegeGame.interactiveSessionKey);
+    (
+      count: number,
+      liveBugCounts?: BugCounts,
+      sourceSessionKey?: string | null,
+    ) => {
+      const normalizedSourceSessionKey = sourceSessionKey?.startsWith(
+        "interactive:",
+      )
+        ? sourceSessionKey.slice("interactive:".length)
+        : sourceSessionKey;
+
+      if (liveBugCounts) {
+        siegeGame.syncLiveBugState(
+          count,
+          liveBugCounts,
+          normalizedSourceSessionKey,
+        );
+        return;
+      }
+
+      siegeGame.syncRemainingBugs(count, normalizedSourceSessionKey);
     },
-    [siegeGame.interactiveSessionKey, siegeGame.syncRemainingBugs],
+    [siegeGame.syncLiveBugState, siegeGame.syncRemainingBugs],
   );
 
   const backgroundChartFocus = siegeGame.interactiveMode ? ui.chartFocus : null;
@@ -242,7 +274,7 @@ const SiegeExperience = memo(function SiegeExperience({
           }
           tone={metrics.deadlineMetrics.statusTone}
           consumeTransitionSwarm={consumeTransitionSwarm}
-          transitionSnapshot={transitionSnapshot}
+          transitionSnapshot={availableTransitionSnapshot}
         />
       ) : null}
       {siegeGame.siegePhase === "entering" ? (

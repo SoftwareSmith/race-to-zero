@@ -51,6 +51,17 @@ const SURVIVAL_QUIPS = [
   "We’ll call it a flaky issue.",
 ];
 
+const SURVIVAL_FAILURE_DETAILS: Record<
+  Exclude<SiegeCompletionSummary["outcome"], "timeAttackCleared">,
+  string
+> = {
+  errorFlood:
+    "Dangerous bugs stacked up faster than the platform could clear them.",
+  speedCollapse:
+    "Sustained load dragged the board into a crawl before uptime broke.",
+  uptimeFailure: "Total live bug pressure overwhelmed the platform outright.",
+};
+
 function getQuipIndex(runId: string, arrayLength: number): number {
   let hash = 0;
   for (let i = 0; i < runId.length; i++) {
@@ -83,13 +94,30 @@ const SiegeRunCompleteOverlay = memo(function SiegeRunCompleteOverlay({
   const alternateModeMeta = SIEGE_GAME_MODE_META[alternateMode];
   const modeMeta = SIEGE_GAME_MODE_META[completionSummary.mode];
   const isSurvival = completionSummary.mode === "outbreak";
-  const isSurvivalOverrun = completionSummary.outcome === "survivalOverrun";
-  const backdropClassName = isSurvivalOverrun
+  const isTimeAttackCleared = completionSummary.outcome === "timeAttackCleared";
+  const isSurvivalFailure = isSurvival && !isTimeAttackCleared;
+  const backdropClassName = isSurvivalFailure
     ? "bg-[radial-gradient(circle_at_top,rgba(248,113,113,0.22),transparent_34%),radial-gradient(circle_at_20%_20%,rgba(251,191,36,0.16),transparent_28%),rgba(2,6,23,0.76)]"
     : "bg-[radial-gradient(circle_at_top,rgba(125,211,252,0.2),transparent_36%),radial-gradient(circle_at_20%_20%,rgba(251,191,36,0.18),transparent_28%),rgba(2,6,23,0.72)]";
-  const quipPool = isSurvivalOverrun ? SURVIVAL_QUIPS : TIME_ATTACK_QUIPS;
+  const quipPool = isSurvivalFailure ? SURVIVAL_QUIPS : TIME_ATTACK_QUIPS;
   const quip = quipPool[getQuipIndex(completionSummary.id, quipPool.length)];
-  const title = isSurvivalOverrun ? "Site overrun." : "Swarm cleared.";
+  const title =
+    completionSummary.outcome === "uptimeFailure"
+      ? "Uptime lost."
+      : completionSummary.outcome === "errorFlood"
+        ? "Errors spiked."
+        : completionSummary.outcome === "speedCollapse"
+          ? "Speed collapsed."
+          : "Swarm cleared.";
+  const summaryText = isSurvivalFailure
+    ? (completionSummary.failureSummary ??
+      completionSummary.offlineReason ??
+      "Too many bugs broke through and took the platform down.")
+    : quip;
+  const failureDetail =
+    isSurvivalFailure && completionSummary.outcome !== "timeAttackCleared"
+      ? SURVIVAL_FAILURE_DETAILS[completionSummary.outcome]
+      : null;
   const sortOptions: Array<{ key: "primary" | "secondary"; label: string }> = [
     { key: "primary", label: isSurvival ? "Wave" : "Time" },
     { key: "secondary", label: isSurvival ? "Survived" : "Speed" },
@@ -167,7 +195,7 @@ const SiegeRunCompleteOverlay = memo(function SiegeRunCompleteOverlay({
       data-no-hammer="true"
       data-testid="siege-complete-overlay"
     >
-      {!prefersReducedMotion && !isSurvivalOverrun ? (
+      {!prefersReducedMotion && !isSurvivalFailure ? (
         <div
           className="pointer-events-none absolute inset-0"
           aria-hidden="true"
@@ -222,8 +250,17 @@ const SiegeRunCompleteOverlay = memo(function SiegeRunCompleteOverlay({
                   data-testid="siege-complete-quip"
                   id="siege-complete-summary"
                 >
-                  &ldquo;{quip}&rdquo;
+                  {isSurvivalFailure ? (
+                    summaryText
+                  ) : (
+                    <>&ldquo;{summaryText}&rdquo;</>
+                  )}
                 </p>
+                {failureDetail ? (
+                  <p className="mt-2 max-w-[36rem] text-sm leading-relaxed text-stone-400">
+                    {failureDetail}
+                  </p>
+                ) : null}
               </div>
 
               {/* stats — borderless strip */}
@@ -252,11 +289,11 @@ const SiegeRunCompleteOverlay = memo(function SiegeRunCompleteOverlay({
                 <div className="mt-1 h-8 w-px shrink-0 bg-white/10" />
                 <div>
                   <div className="text-[0.62rem] font-semibold uppercase tracking-[0.2em] text-stone-500">
-                    {isSurvival ? "Status" : "Bugs/s"}
+                    {isSurvival ? "Cause" : "Bugs/s"}
                   </div>
                   <div className="mt-1 text-2xl font-semibold tabular-nums tracking-[-0.03em] text-white">
                     {isSurvival
-                      ? "Offline"
+                      ? (completionSummary.failureLabel ?? "Uptime")
                       : completionSummary.bugsPerSecond.toFixed(2)}
                   </div>
                 </div>
@@ -352,7 +389,9 @@ const SiegeRunCompleteOverlay = memo(function SiegeRunCompleteOverlay({
                           {entry.topWeaponLabel}
                           {!isSurvival
                             ? ` · ${entry.bugsPerSecond.toFixed(2)} bugs/s`
-                            : ""}
+                            : entry.failureLabel
+                              ? ` · ${entry.failureLabel}`
+                              : ""}
                         </div>
                       </div>
                     </div>

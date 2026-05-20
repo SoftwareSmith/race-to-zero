@@ -14,12 +14,13 @@ Improve Survival waves with a visible time-based “loader pill” that fills ov
   - `burstSize`
   - `activeBugLimit`
   - variant weights and focus labels.
+- Wave start behavior is now continuous-first: a new Survival wave begins with zero live bugs from the wave itself, then spends its authored budget through rate-based spawning rather than front-loading an opening burst.
 - `src/features/game/hooks/useSiegeGame.ts` already tracks:
   - `survivalWaveEndsAtRef`
   - `survivalRemainingBudgetRef`
   - `secondsUntilNextWave`
   - `survivalSpawnPlan`
-- Current spawning happens once per second by queuing `plan.burstSize`, capped by `remainingBudget` and `activeBugLimit`.
+- Current spawning is accumulator-based and already honors fractional `bugs/second` over short spawn ticks, capped by `remainingBudget` and `activeBugLimit`.
 - `src/features/game/components/SiegeHud.tsx` currently shows small pills for wave, rate, and site online state, but does not show an actual filling wave loader.
 - `src/features/game/components/BackgroundField/BugCanvas.tsx` applies each unique `survivalSpawnPlan.sequenceId` by calling `Engine.spawnBurst()`.
 
@@ -70,18 +71,15 @@ In the survival pressure tick in `useSiegeGame.ts`:
 
 ### 3. Preserve bugs/second spawning
 
-Current code spawns `burstSize = ceil(spawnRatePerSecond)` every 1 second. This is simple but can overshoot the semantic rate for decimal rates.
+Keep the accumulator approach as the source of truth for Survival pacing.
 
-Replace it with an accumulator:
+- `survivalSpawnAccumulatorRef` and `survivalLastSpawnTickAtRef` must stay wave-scoped.
+- Each spawn tick should continue to add `plan.spawnRatePerSecond * elapsedSeconds` to the accumulator.
+- The runtime should spawn `floor(accumulator)` bugs, capped by budget and active limit.
+- The remainder stays in the accumulator so decimal authored rates still land at the intended bugs/second over time.
+- Reset the accumulator at every new wave.
 
-- Add `survivalSpawnAccumulatorRef = useRef(0)` and `survivalLastSpawnTickAtRef = useRef<number | null>(null)`.
-- On every spawn tick:
-  - Calculate elapsed seconds since last tick.
-  - Add `plan.spawnRatePerSecond * elapsedSeconds` to the accumulator.
-  - Spawn `floor(accumulator)` bugs, capped by budget and active limit.
-  - Subtract the spawned count from the accumulator.
-- Keep a short tick interval (250–500ms) so the board receives smoother additions while still honoring `x bugs/second`.
-- Reset accumulator at every new wave.
+This is now part of the gameplay contract rather than just an implementation detail: outbreak waves are authored as rate-driven pressure, with severity mix as a second escalation axis.
 
 ### 4. Create a wave loader component
 
@@ -154,6 +152,7 @@ Do this only if “slider approach” means interactive. If it means loader styl
 - Survival displays a clear filling pill for the current wave.
 - The pill reaches 100% when the wave expires and the next wave starts.
 - Bugs are added continuously according to each wave’s `spawnRatePerSecond`, not only as a single wave lump.
+- Later waves increase overall pressure through `spawnRatePerSecond`, severity mix, or both, without regressing the combined pressure score across the authored range.
 - Existing Survival pressure/offline behavior remains intact.
 - Build and E2E tests remain stable under tab/frame throttling.
 

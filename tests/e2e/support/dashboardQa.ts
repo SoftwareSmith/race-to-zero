@@ -57,8 +57,12 @@ interface QaSiegeProgress {
 
 interface QaSurvivalState {
   completeWave?: boolean;
+  errors?: number;
+  failMetric?: "errors" | "speed" | "uptime";
   siteIntegrity?: number;
+  speed?: number;
   spawnNow?: boolean;
+  uptime?: number;
   wave?: number;
 }
 

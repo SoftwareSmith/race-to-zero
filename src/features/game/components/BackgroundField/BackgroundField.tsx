@@ -85,7 +85,11 @@ interface BackgroundFieldProps {
     newTier: import("@game/types").WeaponTier,
   ) => void;
   clearSwarmRequestId?: number;
-  onLiveBugCountChange?: (count: number) => void;
+  onLiveBugCountChange?: (
+    count: number,
+    bugCounts?: BugCounts,
+    sourceSessionKey?: string | null,
+  ) => void;
   /** Initial evolution states loaded from localStorage. */
   initialEvolutionStates?: Partial<
     Record<SiegeWeaponId, import("@game/types").WeaponEvolutionState>

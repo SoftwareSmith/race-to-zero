@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type RefObject } from "react";
 import { getSiegeWeaponLabel } from "@game/progression/progression";
+import type { SurvivalVariantWeights } from "@game/sim/survivalDirector";
 import Tooltip from "@shared/components/Tooltip";
 import { cn } from "@shared/utils/cn";
 import type {
@@ -12,6 +13,73 @@ import SiegeHudLoadout from "./siege-hud/SiegeHudLoadout";
 import WaveProgressPill from "./siege-hud/WaveProgressPill";
 import { HudEventPill, HudShell } from "./siege-hud/shared";
 import { formatElapsedTime } from "./siege-hud/formatElapsedTime";
+
+type SurvivalHudMetric = NonNullable<
+  SiegeHudProps["survivalStatus"]
+>["metrics"]["uptime"];
+
+function getSurvivalMetricTooltip(metric: SurvivalHudMetric) {
+  const nextStep =
+    metric.id === "errors"
+      ? "Too many high and urgent bugs are active at once."
+      : metric.id === "speed"
+        ? "Medium, high, and urgent bugs are keeping the platform overloaded."
+        : "The total live swarm load is breaking through the defenses.";
+  const timing =
+    metric.secondsToFail != null
+      ? `Failure in about ${metric.secondsToFail}s if this pressure holds.`
+      : "No failure timer is active right now.";
+
+  return `${nextStep} ${timing}`;
+}
+
+function getSurvivalMetricToneClasses(metric: SurvivalHudMetric) {
+  if (metric.status === "critical") {
+    return {
+      borderClassName: "border-red-300/24",
+      dotClassName: "bg-red-300 shadow-[0_0_12px_rgba(248,113,113,0.58)]",
+      glowClassName:
+        "bg-[radial-gradient(circle_at_top,rgba(248,113,113,0.18),transparent_72%)]",
+      pillClassName: "bg-red-500/[0.12]",
+      valueClassName: "text-red-50",
+    };
+  }
+
+  if (metric.status === "warning") {
+    return {
+      borderClassName: "border-amber-200/22",
+      dotClassName: "bg-amber-300 shadow-[0_0_12px_rgba(251,191,36,0.46)]",
+      glowClassName:
+        "bg-[radial-gradient(circle_at_top,rgba(251,191,36,0.16),transparent_72%)]",
+      pillClassName: "bg-amber-400/[0.1]",
+      valueClassName: "text-amber-50",
+    };
+  }
+
+  return {
+    borderClassName: "border-emerald-200/18",
+    dotClassName: "bg-emerald-300 shadow-[0_0_12px_rgba(74,222,128,0.44)]",
+    glowClassName:
+      "bg-[radial-gradient(circle_at_top,rgba(74,222,128,0.15),transparent_72%)]",
+    pillClassName: "bg-emerald-400/[0.08]",
+    valueClassName: "text-emerald-50",
+  };
+}
+
+function getSurvivalMetricDisplayValue(metric: SurvivalHudMetric) {
+  if (
+    metric.secondsToFail != null &&
+    (metric.value <= 34 || metric.secondsToFail <= 12)
+  ) {
+    return `${metric.secondsToFail}s`;
+  }
+
+  if (metric.value < 100 && metric.value > 90) {
+    return `${metric.value.toFixed(1)}%`;
+  }
+
+  return `${Math.round(metric.value)}%`;
+}
 
 interface SiegeHudProps {
   className?: string;
@@ -44,7 +112,18 @@ interface SiegeHudProps {
   streakMultiplier: number;
   survivalStatus?: {
     activeBugLimit: number;
+    failureKind?: "uptimeFailure" | "errorFlood" | "speedCollapse" | null;
     focusLabel: string;
+    metrics: Record<
+      "uptime" | "errors" | "speed",
+      {
+        id: "uptime" | "errors" | "speed";
+        label: string;
+        secondsToFail: number | null;
+        status: "stable" | "warning" | "critical";
+        value: number;
+      }
+    >;
     pressurePercent: number;
     remainingSpawnBudget: number;
     runtimeSpeedMultiplier: number;
@@ -53,6 +132,7 @@ interface SiegeHudProps {
     siteIntegrity: number;
     spawnRatePerSecond: number;
     tacticLabel: string;
+    variantWeights: SurvivalVariantWeights;
     wave: number;
     waveDurationMs: number;
     waveEndsAt: number | null;
@@ -151,37 +231,43 @@ export default function SiegeHud({
   const previousSurvivalWaveRef = useRef<number | null>(null);
   const survivalWarningLabel =
     isSurvival &&
-    survivalStatus?.secondsUntilOffline != null &&
-    survivalStatus.secondsUntilOffline <= 12 &&
+    survivalStatus?.failureKind == null &&
+    survivalStatus?.metrics.uptime.secondsToFail != null &&
+    survivalStatus.metrics.uptime.secondsToFail <= 12 &&
     survivalIntegrityPercent > 0
-      ? `Site critical • ${survivalStatus.secondsUntilOffline}s to offline`
+      ? `Uptime critical • ${survivalStatus.metrics.uptime.secondsToFail}s to fail`
       : null;
-  const survivalAvailabilityLabel =
-    survivalStatus?.secondsUntilOffline != null ? "Offline in" : "Site online";
-  const survivalAvailabilityCompactLabel =
-    survivalStatus?.secondsUntilOffline != null ? "Offline" : "Online";
-  const survivalAvailabilityValue =
-    survivalStatus?.secondsUntilOffline != null
-      ? `${survivalStatus.secondsUntilOffline}s`
-      : `${survivalIntegrityPercent}%`;
-  const survivalAvailabilityAccentClass =
-    survivalStatus?.secondsUntilOffline != null
-      ? "bg-red-300/80"
-      : "bg-emerald-300/75";
-  const survivalAvailabilityGlowClass =
-    survivalStatus?.secondsUntilOffline != null
-      ? "bg-[radial-gradient(circle_at_top,rgba(248,113,113,0.18),transparent_68%)]"
-      : "bg-[radial-gradient(circle_at_top,rgba(74,222,128,0.16),transparent_68%)]";
-  const survivalAvailabilityValueClass =
-    survivalStatus?.secondsUntilOffline != null
-      ? "text-red-50"
-      : "text-emerald-50";
-  const survivalIntegrityTooltip =
-    survivalStatus?.secondsUntilOffline != null
-      ? "The site is taking breach damage. This timer shows how long until the run ends if pressure stays this high."
-      : "Overall site health. If bug pressure overwhelms the defense threshold, this converts into a time-to-offline countdown.";
   const middleTimeLabel = isSurvival ? "Survived" : "Clear time";
-
+  const survivalMetricList = useMemo(
+    () => [
+      survivalStatus?.metrics.uptime ?? {
+        id: "uptime",
+        label: "Uptime",
+        secondsToFail: null,
+        status: "stable",
+        value: 100,
+      },
+      survivalStatus?.metrics.errors ?? {
+        id: "errors",
+        label: "Errors",
+        secondsToFail: null,
+        status: "stable",
+        value: 100,
+      },
+      survivalStatus?.metrics.speed ?? {
+        id: "speed",
+        label: "Speed",
+        secondsToFail: null,
+        status: "stable",
+        value: 100,
+      },
+    ],
+    [
+      survivalStatus?.metrics.errors,
+      survivalStatus?.metrics.speed,
+      survivalStatus?.metrics.uptime,
+    ],
+  );
   useEffect(() => {
     return () => {
       document.body.classList.remove("hud-system-cursor-active");
@@ -262,45 +348,77 @@ export default function SiegeHud({
     >
       {isSurvival ? (
         <div className="pointer-events-none fixed inset-x-0 top-3 z-[220] flex justify-start px-3 sm:top-4">
-          <div className="pointer-events-auto grid w-full max-w-[18.2rem] min-w-0 grid-cols-[minmax(10.8rem,1fr)_4.95rem] gap-0.75 overflow-visible [animation:hud-notch-arrive_320ms_cubic-bezier(0.22,1,0.36,1)_forwards]">
-            <WaveProgressPill
-              activeBugLimit={survivalStatus?.activeBugLimit ?? 0}
-              className="min-w-0 w-full shadow-[0_12px_24px_rgba(0,0,0,0.2)]"
-              focusLabel={survivalStatus?.focusLabel ?? "Bug rush"}
-              progressPercent={liveWaveProgressPercent}
-              remainingSpawnBudget={survivalStatus?.remainingSpawnBudget ?? 0}
-              secondsUntilNextWave={liveSecondsUntilNextWave}
-              spawnRatePerSecond={survivalStatus?.spawnRatePerSecond ?? 0}
-              tacticLabel={survivalStatus?.tacticLabel ?? "Opening wave"}
-              wave={survivalStatus?.wave ?? 1}
-            />
+          <div className="pointer-events-auto grid w-full max-w-[25.8rem] min-w-0 grid-cols-[minmax(8.5rem,9.15rem)_minmax(15.7rem,1fr)] gap-[0.6rem] overflow-visible [animation:hud-notch-arrive_320ms_cubic-bezier(0.22,1,0.36,1)_forwards] sm:max-w-[26.8rem]">
+            <div className="min-w-0">
+              <WaveProgressPill
+                activeBugLimit={survivalStatus?.activeBugLimit ?? 0}
+                className="min-w-0 w-full shadow-[0_12px_24px_rgba(0,0,0,0.2)]"
+                focusLabel={survivalStatus?.focusLabel ?? "Bug rush"}
+                progressPercent={liveWaveProgressPercent}
+                remainingSpawnBudget={survivalStatus?.remainingSpawnBudget ?? 0}
+                secondsUntilNextWave={liveSecondsUntilNextWave}
+                spawnRatePerSecond={survivalStatus?.spawnRatePerSecond ?? 0}
+                tacticLabel={survivalStatus?.tacticLabel ?? "Opening wave"}
+                wave={survivalStatus?.wave ?? 1}
+              />
+              <div
+                className="pointer-events-none mt-1.5 px-1 text-[0.54rem] uppercase tracking-[0.13em] text-stone-400/88"
+                data-testid="siege-wave-debug-details"
+              >
+                <span data-testid="siege-wave-rate-detail">
+                  {`Rate ${Number(survivalStatus?.spawnRatePerSecond ?? 0).toFixed(2)}/s`}
+                </span>{" "}
+                <span data-testid="siege-wave-weights-detail">
+                  {`Mix L${Math.round((survivalStatus?.variantWeights.low ?? 0.72) * 100)} M${Math.round((survivalStatus?.variantWeights.medium ?? 0.22) * 100)} H${Math.round((survivalStatus?.variantWeights.high ?? 0.05) * 100)} U${Math.round((survivalStatus?.variantWeights.urgent ?? 0.01) * 100)}`}
+                </span>
+              </div>
+            </div>
             <div
-              className="relative isolate flex h-[2.35rem] min-w-[4.95rem] items-center overflow-hidden rounded-[14px] border border-white/10 bg-[linear-gradient(180deg,rgba(8,11,16,0.9),rgba(9,12,16,0.74))] px-1.2 shadow-[0_12px_24px_rgba(0,0,0,0.18)] backdrop-blur-xl"
+              className="relative isolate h-[2.35rem] min-w-0 overflow-hidden rounded-[15px] border border-white/10 bg-[linear-gradient(180deg,rgba(8,11,16,0.92),rgba(9,12,16,0.76))] px-2.15 py-1.15 shadow-[0_12px_24px_rgba(0,0,0,0.18)] backdrop-blur-xl"
               data-testid="siege-offline-pressure"
             >
-              <div
-                className={cn(
-                  "pointer-events-none absolute inset-0 rounded-[inherit]",
-                  survivalAvailabilityGlowClass,
-                )}
-              />
-              <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-white/12" />
-              <Tooltip
-                content={survivalIntegrityTooltip}
-                triggerClassName="relative flex h-full w-full min-w-0 flex-col justify-center text-left"
-              >
-                <span className="block text-[0.4rem] font-semibold uppercase tracking-[0.13em] text-stone-400">
-                  {survivalAvailabilityCompactLabel}
-                </span>
-                <strong
-                  className={cn(
-                    "mt-0.35 block font-display text-[0.92rem] leading-none tracking-[-0.045em]",
-                    survivalAvailabilityValueClass,
-                  )}
-                >
-                  {survivalAvailabilityValue}
-                </strong>
-              </Tooltip>
+              <div className="pointer-events-none absolute inset-0 rounded-[inherit] bg-[radial-gradient(circle_at_top,rgba(125,211,252,0.08),transparent_42%),linear-gradient(90deg,rgba(248,113,113,0.03),transparent_40%,rgba(74,222,128,0.03))]" />
+              <div className="relative grid h-full grid-cols-3 gap-[0.54rem]">
+                {survivalMetricList.map((metric) => {
+                  const tone = getSurvivalMetricToneClasses(metric);
+
+                  return (
+                    <Tooltip
+                      key={metric.id}
+                      content={getSurvivalMetricTooltip(metric)}
+                      triggerClassName="relative min-w-0 px-[0.04rem]"
+                    >
+                      <span className="mb-[0.18rem] flex items-center justify-center gap-[0.2rem] text-[0.37rem] font-semibold uppercase tracking-[0.14em] text-stone-400">
+                        <span
+                          className={cn(
+                            "h-1.45 w-1.45 rounded-full",
+                            tone.dotClassName,
+                          )}
+                        />
+                        {metric.label}
+                      </span>
+                      <span
+                        className={cn(
+                          "relative flex min-h-0 flex-1 items-center justify-center overflow-hidden rounded-full border px-[0.45rem] py-[0.18rem] text-center shadow-[0_10px_18px_rgba(0,0,0,0.16)]",
+                          tone.borderClassName,
+                          tone.glowClassName,
+                          tone.pillClassName,
+                        )}
+                      >
+                        <strong
+                          className={cn(
+                            "relative block font-display text-[0.9rem] leading-none tracking-[-0.04em]",
+                            tone.valueClassName,
+                          )}
+                          data-testid={`siege-survival-metric-${metric.id}`}
+                        >
+                          {getSurvivalMetricDisplayValue(metric)}
+                        </strong>
+                      </span>
+                    </Tooltip>
+                  );
+                })}
+              </div>
             </div>
           </div>
         </div>

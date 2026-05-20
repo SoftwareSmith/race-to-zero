@@ -2,6 +2,7 @@ import { act, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { STORAGE_KEYS } from "../../../constants/storageKeys";
+import { getSurvivalWavePlan } from "@game/sim/survivalDirector";
 import { useSiegeGame } from "./useSiegeGame";
 
 describe("useSiegeGame", () => {
@@ -98,8 +99,7 @@ describe("useSiegeGame", () => {
     expect(result.current.completionSummary).toBeNull();
     expect(result.current.interactiveKills).toBe(0);
     expect(result.current.interactivePoints).toBe(0);
-    expect(result.current.interactiveRemainingBugs).toBeGreaterThan(0);
-    expect(result.current.interactiveRemainingBugs).toBeLessThan(20);
+    expect(result.current.interactiveRemainingBugs).toBe(0);
     expect(result.current.killStreak).toBe(0);
     expect(result.current.selectedWeaponId).toBe("hammer");
     expect(result.current.survivalStatus.wave).toBe(1);
@@ -121,16 +121,14 @@ describe("useSiegeGame", () => {
     const staleSessionKey = result.current.interactiveSessionKey;
 
     act(() => {
-      result.current.enterInteractiveMode("purge", {
-        baseBugCounts: result.current.interactiveInitialBugCounts,
-      });
+      result.current.enterInteractiveMode("purge");
     });
 
     const activeSessionKey = result.current.interactiveSessionKey;
     const startingBugCount = result.current.interactiveRemainingBugs;
 
     expect(activeSessionKey).not.toBe(staleSessionKey);
-    expect(startingBugCount).toBeGreaterThan(0);
+    expect(startingBugCount).toBe(20);
 
     act(() => {
       result.current.syncRemainingBugs(0, staleSessionKey);
@@ -344,6 +342,13 @@ describe("useSiegeGame", () => {
 
   it("rolls survival waves forward when the timer expires", async () => {
     vi.useFakeTimers();
+    const qaWindow = window as Window & {
+      __RTZ_QA__?: {
+        enabled?: boolean;
+        setSurvivalState?: (state: { wave?: number }) => void;
+      };
+    };
+    qaWindow.__RTZ_QA__ = { enabled: true };
 
     const { result } = renderHook(() =>
       useSiegeGame({
@@ -358,15 +363,93 @@ describe("useSiegeGame", () => {
       vi.advanceTimersByTime(520);
     });
 
+    const openingSpawnRate = result.current.survivalStatus.spawnRatePerSecond;
+
     expect(result.current.siegePhase).toBe("active");
 
     act(() => {
-      vi.advanceTimersByTime(30_500);
+      vi.advanceTimersByTime(61_000);
     });
 
     expect(result.current.survivalStatus.wave).toBe(2);
+    act(() => {
+      vi.advanceTimersByTime(1);
+    });
 
+    expect(qaWindow.__RTZ_QA__?.setSurvivalState).toEqual(expect.any(Function));
+
+    act(() => {
+      qaWindow.__RTZ_QA__?.setSurvivalState?.({ wave: 3 });
+    });
+
+    expect(result.current.survivalStatus.wave).toBe(3);
+    expect(result.current.survivalStatus.spawnRatePerSecond).toBeGreaterThan(
+      openingSpawnRate,
+    );
     expect(result.current.survivalStatus.secondsUntilNextWave).toBeGreaterThan(0);
+
+    delete qaWindow.__RTZ_QA__;
+  });
+
+  it("starts outbreak from zero live bugs and spends the wave budget over time", () => {
+    vi.useFakeTimers();
+
+    const { result } = renderHook(() =>
+      useSiegeGame({
+        currentBugCount: 20,
+        currentBugCounts: { high: 0, low: 20, medium: 0, urgent: 0 },
+        evolutionStates: {},
+      }),
+    );
+
+    act(() => {
+      result.current.enterInteractiveMode("outbreak");
+      vi.advanceTimersByTime(520);
+    });
+
+    const startingBudget = result.current.survivalStatus.remainingSpawnBudget;
+
+    expect(result.current.interactiveRemainingBugs).toBe(0);
+    expect(startingBudget).toBe(getSurvivalWavePlan(1).spawnBudget);
+
+    act(() => {
+      vi.advanceTimersByTime(1_100);
+    });
+
+    expect(result.current.survivalStatus.remainingSpawnBudget).toBeLessThan(startingBudget);
+    expect(result.current.interactiveRemainingBugs).toBe(0);
+    expect(result.current.survivalStatus.wave).toBe(1);
+  });
+
+  it("resets time attack to the dashboard bugs after leaving survival", () => {
+    const { result } = renderHook(() =>
+      useSiegeGame({
+        currentBugCount: 20,
+        currentBugCounts: { high: 0, low: 20, medium: 0, urgent: 0 },
+        evolutionStates: {},
+      }),
+    );
+
+    act(() => {
+      result.current.enterInteractiveMode("outbreak");
+    });
+
+    const survivalSessionKey = result.current.interactiveSessionKey;
+
+    act(() => {
+      result.current.syncLiveBugState(
+        0,
+        { high: 0, low: 0, medium: 0, urgent: 0 },
+        survivalSessionKey,
+      );
+      result.current.changeGameMode("purge");
+    });
+
+    expect(result.current.gameMode).toBe("purge");
+    expect(result.current.interactiveRemainingBugs).toBe(20);
+    expect(result.current.interactiveKills).toBe(0);
+    expect(result.current.interactivePoints).toBe(0);
+    expect(result.current.completionSummary).toBeNull();
   });
 
   it("updates survival wave loader progress while spawning from the wave budget", async () => {
@@ -468,6 +551,34 @@ describe("useSiegeGame", () => {
 
     expect(result.current.survivalStatus.siteIntegrity).toBeLessThan(startingIntegrity);
     expect(result.current.survivalStatus.secondsUntilOffline).toBeGreaterThan(0);
+  });
+
+  it("makes survival speed and error metrics react before uptime fails", () => {
+    vi.useFakeTimers();
+
+    const { result } = renderHook(() =>
+      useSiegeGame({
+        currentBugCount: 20,
+        currentBugCounts: { high: 0, low: 20, medium: 0, urgent: 0 },
+        evolutionStates: {},
+      }),
+    );
+
+    act(() => {
+      result.current.enterInteractiveMode("outbreak");
+      vi.advanceTimersByTime(520);
+    });
+
+    act(() => {
+      result.current.syncLiveBugState(44, { high: 6, low: 16, medium: 18, urgent: 4 });
+    });
+
+    act(() => {
+      vi.advanceTimersByTime(2_000);
+    });
+
+    expect(result.current.survivalStatus.metrics.speed.value).toBeLessThan(100);
+    expect(result.current.survivalStatus.metrics.errors.value).toBeLessThan(100);
   });
 
   it("keeps survival speed escalation bounded and pressure-reactive", async () => {
@@ -688,15 +799,7 @@ describe("useSiegeGame", () => {
     });
   });
 
-  it("creates a survival overrun completion summary when the site goes offline", async () => {
-    const qaWindow = window as Window & {
-      __RTZ_QA__?: {
-        enabled?: boolean;
-        setSurvivalState?: (state: { siteIntegrity?: number }) => void;
-      };
-    };
-    qaWindow.__RTZ_QA__ = { enabled: true };
-
+  it("creates an uptime failure completion summary when survival collapses", async () => {
     const { result } = renderHook(() =>
       useSiegeGame({
         currentBugCount: 20,
@@ -713,18 +816,12 @@ describe("useSiegeGame", () => {
       expect(result.current.siegePhase).toBe("active");
     });
 
-    await waitFor(() => {
-      expect(qaWindow.__RTZ_QA__?.setSurvivalState).toEqual(expect.any(Function));
-    });
-
     act(() => {
-      qaWindow.__RTZ_QA__?.setSurvivalState?.({ siteIntegrity: 0 });
+      result.current.triggerSurvivalOverrun();
     });
 
     await waitFor(() => {
-      expect(result.current.completionSummary?.outcome).toBe("survivalOverrun");
+      expect(result.current.completionSummary?.outcome).toBe("uptimeFailure");
     });
-
-    delete qaWindow.__RTZ_QA__;
   });
 });

@@ -127,10 +127,10 @@ export const SIEGE_GAME_MODE_META: Record<
     switchActionLabel: "Try Time Attack",
   },
   outbreak: {
-    description: "Survive rolling waves as spawn pressure keeps climbing.",
+    description: "Hold uptime, errors, and speed together as rolling bug waves keep escalating.",
     label: "Survival",
     maxWeaponTier: WeaponTier.TIER_FIVE,
-    objective: "Last as many waves as possible before the site goes offline.",
+    objective: "Last as many waves as possible before uptime, errors, or speed fail.",
     primaryActionLabel: "Play Survival",
     scoringLabel: "Best wave survived",
     shortLabel: "Survival",

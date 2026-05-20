@@ -27,21 +27,12 @@ export default function WaveProgressPill({
   tacticLabel,
   wave,
 }: WaveProgressPillProps) {
-  void activeBugLimit;
-  void focusLabel;
-  void remainingSpawnBudget;
-  void spawnRatePerSecond;
-  void tacticLabel;
   const fillPercent = clampPercent(progressPercent);
-  const countdownToneClass =
-    secondsUntilNextWave != null && secondsUntilNextWave <= 8
-      ? "bg-red-500/10 text-red-50"
-      : "bg-black/18 text-stone-50";
   const countdownLabel =
     secondsUntilNextWave == null
       ? "--"
       : `${Math.max(0, secondsUntilNextWave)}s`;
-  const ariaLabel = `Wave ${wave}, ${tacticLabel}. ${focusLabel}. Next surge in ${countdownLabel}. Cap ${activeBugLimit.toLocaleString()}, ${remainingSpawnBudget.toLocaleString()} queued at ${spawnRatePerSecond.toFixed(1)} per second.`;
+  const ariaLabel = `Wave ${wave}, ${tacticLabel}. ${focusLabel}. ${countdownLabel} until the next wave boundary. Cap ${activeBugLimit.toLocaleString()}, ${remainingSpawnBudget.toLocaleString()} queued at ${spawnRatePerSecond.toFixed(1)} per second.`;
 
   return (
     <div
@@ -64,29 +55,22 @@ export default function WaveProgressPill({
       <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-white/12" />
       <div className="pointer-events-none absolute -left-5 top-0 h-10 w-10 rounded-full bg-sky-300/8 blur-2xl" />
 
-      <div className="relative grid h-full min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-0">
-        <div className="flex min-w-0 items-center gap-2 pr-2">
-          <div className="min-w-0 flex-1">
-            <div className="text-[0.41rem] font-semibold uppercase tracking-[0.13em] text-sky-100/72">
-              Wave
-            </div>
-            <strong className="mt-0.3 block truncate font-display text-[0.94rem] leading-none tracking-[-0.05em] text-stone-50">
-              {wave.toLocaleString()}
-            </strong>
+      <div className="relative flex h-full min-w-0 items-center gap-2 px-0.75">
+        <div className="min-w-0 flex-1">
+          <div className="text-[0.41rem] font-semibold uppercase tracking-[0.13em] text-sky-100/72">
+            Wave
           </div>
+          <strong className="mt-0.3 block truncate font-display text-[0.94rem] leading-none tracking-[-0.05em] text-stone-50">
+            {wave.toLocaleString()}
+          </strong>
         </div>
-        <div className="relative flex h-full min-w-[3.2rem] flex-col justify-center pl-2.5 text-right before:absolute before:bottom-[0.42rem] before:left-0 before:top-[0.42rem] before:w-px before:bg-white/10">
-          <div className="text-[0.34rem] font-semibold uppercase tracking-[0.12em] text-stone-400">
+        <div className="flex shrink-0 flex-col items-end justify-center text-right">
+          <span className="text-[0.38rem] font-semibold uppercase tracking-[0.13em] text-stone-400/82">
             Next
-          </div>
-          <div
-            className={cn(
-              "mt-0.3 inline-flex min-w-[2.35rem] justify-end rounded-full px-1.15 py-[0.22rem] font-display text-[0.88rem] leading-none tracking-[-0.04em] tabular-nums",
-              countdownToneClass,
-            )}
-          >
+          </span>
+          <strong className="mt-0.3 font-display text-[0.76rem] leading-none tracking-[-0.04em] text-stone-100/92">
             {countdownLabel}
-          </div>
+          </strong>
         </div>
       </div>
     </div>
