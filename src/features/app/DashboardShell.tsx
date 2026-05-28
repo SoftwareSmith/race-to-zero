@@ -470,7 +470,9 @@ const DashboardShellContent = memo(function DashboardShellContent({
                 containerRef={ui.settingsMenuRef}
                 onMenuToggle={() => ui.handleTopMenuToggle("settings")}
                 onToggle={settings.handleToggleSetting}
-                onToggleShowBugParticleCount={settings.toggleShowBugParticleCount}
+                onToggleShowBugParticleCount={
+                  settings.toggleShowBugParticleCount
+                }
                 open={!interactiveMode && ui.openTopMenu === "settings"}
                 settings={settings.settings}
                 showBugParticleCount={settings.showBugParticleCount}
