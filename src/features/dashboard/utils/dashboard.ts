@@ -141,12 +141,12 @@ export function getTargetDaysLeftTone(deadlineMetrics: DeadlineMetrics): Tone {
 export function getTrendClosureRateTone(
   comparisonMetrics: ComparisonMetrics,
 ): Tone {
-  if (comparisonMetrics.currentWindow.completionRate > 100) {
+  if (comparisonMetrics.currentWindow.closureRate > 100) {
     return "positive";
   }
 
   if (
-    isApproximatelyEqual(comparisonMetrics.currentWindow.completionRate, 100)
+    isApproximatelyEqual(comparisonMetrics.currentWindow.closureRate, 100)
   ) {
     return "neutral";
   }
@@ -157,15 +157,11 @@ export function getTrendClosureRateTone(
 export function getTrendBugsClosedTone(
   comparisonMetrics: ComparisonMetrics,
 ): Tone {
-  if (
-    comparisonMetrics.currentWindow.fixed > comparisonMetrics.currentWindow.created
-  ) {
+  if (comparisonMetrics.currentWindow.closed > comparisonMetrics.currentWindow.created) {
     return "positive";
   }
 
-  if (
-    comparisonMetrics.currentWindow.fixed === comparisonMetrics.currentWindow.created
-  ) {
+  if (comparisonMetrics.currentWindow.closed === comparisonMetrics.currentWindow.created) {
     return "neutral";
   }
 
@@ -175,15 +171,11 @@ export function getTrendBugsClosedTone(
 export function getTrendBugsCreatedTone(
   comparisonMetrics: ComparisonMetrics,
 ): Tone {
-  if (
-    comparisonMetrics.currentWindow.created < comparisonMetrics.currentWindow.fixed
-  ) {
+  if (comparisonMetrics.currentWindow.created < comparisonMetrics.currentWindow.closed) {
     return "positive";
   }
 
-  if (
-    comparisonMetrics.currentWindow.created === comparisonMetrics.currentWindow.fixed
-  ) {
+  if (comparisonMetrics.currentWindow.created === comparisonMetrics.currentWindow.closed) {
     return "neutral";
   }
 

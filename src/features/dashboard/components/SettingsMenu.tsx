@@ -15,13 +15,17 @@ interface SettingsMenuProps {
   onToggle: (settingKey: SettingToggleKey) => void;
   open: boolean;
   settings: MenuSettingsState;
+  showBugParticleCount: boolean;
+  onToggleShowBugParticleCount: () => void;
 }
 
 const SettingsMenu = memo(function SettingsMenu({
   containerRef,
+  onToggleShowBugParticleCount,
   open,
   onMenuToggle,
   settings,
+  showBugParticleCount,
   onToggle,
 }: SettingsMenuProps) {
   return (
@@ -50,6 +54,20 @@ const SettingsMenu = memo(function SettingsMenu({
 
       {open ? (
         <MenuPanel size="compact" title="Settings">
+          <ToggleField
+            checked={settings.showAmbientBugs}
+            description="Show the animated bug background. Turning this off also hides the interactive game launcher."
+            label="Show background bugs"
+            onChange={() => onToggle("showAmbientBugs")}
+            size="compact"
+          />
+          <ToggleField
+            checked={showBugParticleCount}
+            description="Show the rendered bug particle count overlay on the dashboard background."
+            label="Show bug particle count"
+            onChange={onToggleShowBugParticleCount}
+            size="compact"
+          />
           <ToggleField
             checked={settings.excludeWeekends}
             description="Use weekdays only when calculating days left and required pace."

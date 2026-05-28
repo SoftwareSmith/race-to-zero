@@ -12,7 +12,6 @@ import {
   getNetChangeTone,
   getTrendBugsClosedTone,
   getTrendBugsCreatedTone,
-  getTrendClosureRateTone,
 } from "./utils/dashboard";
 import {
   buildComparisonRateHistoryChartData,
@@ -46,24 +45,36 @@ interface MetricCardDefinition {
 function buildPeriodsMetricCards(
   comparisonMetrics: ComparisonMetrics,
 ): MetricCardDefinition[] {
+  const otherClosures = Math.max(
+    comparisonMetrics.currentWindow.closed -
+      comparisonMetrics.currentWindow.completed,
+    0,
+  );
+
   return [
     {
-      hint: "Created minus closed during the selected period.",
+      hint: "Created minus closed bugs during the selected period. Closures include completed, canceled, duplicate, archived, and auto-closed outcomes.",
       label: "Net change",
       tone: getNetChangeTone(comparisonMetrics.currentWindow.netChange),
       value: formatSignedNumber(comparisonMetrics.currentWindow.netChange),
     },
     {
-      hint: "Closure rate helps normalize periods with different intake volume.",
-      label: "Closure rate",
-      tone: getTrendClosureRateTone(comparisonMetrics),
-      value: formatPercent(comparisonMetrics.currentWindow.completionRate, 1),
+      hint: "Bugs completed in the selected period. This is the fixed-by-engineering subset of all closed bugs.",
+      label: "Bugs completed",
+      tone: "neutral",
+      value: formatNumber(comparisonMetrics.currentWindow.completed),
     },
     {
-      hint: "Bugs that left the active backlog during the selected period, including completed, canceled, duplicate, and archived terminal work.",
+      hint: "Bugs that closed without being completed, including cancelled, duplicated, archived, and auto-closed work.",
+      label: "Other closures",
+      tone: "neutral",
+      value: formatNumber(otherClosures),
+    },
+    {
+      hint: "All bugs closed during the selected period, including completed, cancelled, duplicated, archived, and auto-closed work.",
       label: "Bugs closed",
       tone: getTrendBugsClosedTone(comparisonMetrics),
-      value: formatNumber(comparisonMetrics.currentWindow.fixed),
+      value: formatNumber(comparisonMetrics.currentWindow.closed),
     },
     {
       hint: "New bugs added during the selected period. Lower is better.",
@@ -202,7 +213,7 @@ export const PeriodsView = memo(function PeriodsView({
 
   return (
     <div className="grid content-start gap-1.5 sm:gap-2">
-      <div className="grid gap-1.5 sm:grid-cols-2 sm:gap-2 xl:grid-cols-4">
+      <div className="grid gap-1.5 sm:grid-cols-2 sm:gap-2 xl:grid-cols-5">
         {metricCards.map((metricCard) => (
           <MetricCard
             key={metricCard.label}
@@ -220,16 +231,16 @@ export const PeriodsView = memo(function PeriodsView({
           chartKey="comparison-timeline"
           className="h-full"
           data={comparisonTimelineData}
-          description="Daily intake vs closures — shows whether backlog pressure is rising or easing."
+          description="Daily intake versus total closed bugs across the selected period."
           onHoverStateChange={onChartFocusChange}
           siegeMode={siegeMode}
-          title="Created vs closed over time"
+          title="Created vs closed"
         />
         <ChartCard
           chartKey="comparison-summary"
           className="h-full"
           data={comparisonSummaryData}
-          description="Current vs previous period across intake, closures, net change, and closure rate."
+          description="Current vs previous period across intake, completed work, total closed bugs, net change, and closure rate."
           onHoverStateChange={onChartFocusChange}
           siegeMode={siegeMode}
           title="Current vs previous window"
@@ -249,10 +260,10 @@ export const PeriodsView = memo(function PeriodsView({
           chartKey="period-rate-history"
           className="h-full"
           data={comparisonRateHistoryData}
-          description={`Historical intake rate versus fix rate across matching ${comparisonMetrics.currentWindow.dayCount}-day windows.`}
+          description={`Historical intake rate versus closure rate across matching ${comparisonMetrics.currentWindow.dayCount}-day windows.`}
           onHoverStateChange={onChartFocusChange}
           siegeMode={siegeMode}
-          title="Closure vs intake trend"
+          title="Creation vs closure rate trend"
         />
       </div>
     </div>

@@ -46,6 +46,7 @@ interface DashboardSeedOptions {
   excludeWeekends?: boolean;
   frozenDateIso?: string;
   gameConfig?: Partial<GameConfig>;
+  showAmbientBugs?: boolean;
   terminatorMode?: boolean;
 }
 
@@ -295,6 +296,7 @@ export async function seedDashboardState(
     frozenDateIso = QA_TODAY_ISO,
     gameConfig,
     clearStorage = true,
+    showAmbientBugs = true,
     terminatorMode = false,
   } = options;
 
@@ -308,6 +310,7 @@ export async function seedDashboardState(
       excludeWeekends,
       frozenDateIso,
       gameConfig,
+      showAmbientBugs,
       storageKeys,
       terminatorMode,
     }) => {
@@ -369,6 +372,13 @@ export async function seedDashboardState(
         );
       }
 
+      if (!window.localStorage.getItem(storageKeys.ambientBugsVisible)) {
+        window.localStorage.setItem(
+          storageKeys.ambientBugsVisible,
+          String(showAmbientBugs),
+        );
+      }
+
       if (!window.localStorage.getItem(storageKeys.terminatorMode)) {
         window.localStorage.setItem(storageKeys.terminatorMode, String(terminatorMode));
       }
@@ -388,6 +398,7 @@ export async function seedDashboardState(
       excludeWeekends,
       frozenDateIso,
       gameConfig,
+      showAmbientBugs,
       storageKeys: STORAGE_KEYS,
       terminatorMode,
     },

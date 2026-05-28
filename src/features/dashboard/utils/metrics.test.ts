@@ -2,9 +2,11 @@ import { describe, expect, it } from "vitest";
 import {
   getComparisonMetrics,
   getDeadlineMetrics,
+  getHistoryMetrics,
   getInsightsMetrics,
   getSummaryMetrics,
 } from "./metrics";
+import { getBugTerminalEvent } from "./bugLifecycle";
 import {
   buildComparisonRateHistoryChartData,
   buildComparisonWindowHistoryChartData,
@@ -44,6 +46,114 @@ function withFrozenDate<T>(isoString: string, callback: () => T): T {
 }
 
 describe("metrics", () => {
+  it("uses status-specific terminal event precedence for cancelled and duplicated bugs", () => {
+    expect(
+      getBugTerminalEvent({
+        archivedAt: "2026-03-06",
+        autoClosedAt: "2026-03-05",
+        canceledAt: null,
+        completedAt: null,
+        createdAt: "2026-03-01",
+        priority: 2,
+        stateName: "Canceled",
+        stateType: "canceled",
+        updatedAt: "2026-03-04",
+      }),
+    ).toEqual({
+      date: "2026-03-04",
+      outcome: "cancelled",
+    });
+
+    expect(
+      getBugTerminalEvent({
+        archivedAt: "2026-03-06",
+        autoClosedAt: "2026-03-05",
+        canceledAt: null,
+        completedAt: null,
+        createdAt: "2026-03-01",
+        priority: 2,
+        stateName: "Duplicate",
+        stateType: "canceled",
+        updatedAt: "2026-03-04",
+      }),
+    ).toEqual({
+      date: "2026-03-05",
+      outcome: "duplicated",
+    });
+
+    expect(
+      getBugTerminalEvent({
+        archivedAt: "2026-03-06",
+        autoClosedAt: null,
+        canceledAt: null,
+        completedAt: "2026-03-04",
+        createdAt: "2026-03-01",
+        priority: 2,
+        stateName: "Done",
+        stateType: "completed",
+        updatedAt: "2026-03-06",
+      }),
+    ).toEqual({
+      date: "2026-03-04",
+      outcome: "completed",
+    });
+  });
+
+  it("counts overlapping terminal markers as one terminal outcome per bug", () => {
+    const historyMetrics = withFrozenDate("2026-03-10T12:00:00.000Z", () =>
+      getHistoryMetrics(
+        {
+          bugs: [
+            {
+              archivedAt: "2026-03-06",
+              autoClosedAt: "2026-03-05",
+              canceledAt: "2026-03-04",
+              completedAt: null,
+              createdAt: "2026-03-01",
+              priority: 2,
+              stateName: "Duplicate",
+              stateType: "canceled",
+              updatedAt: "2026-03-04",
+            },
+            {
+              archivedAt: "2026-03-07",
+              autoClosedAt: null,
+              canceledAt: null,
+              completedAt: "2026-03-05",
+              createdAt: "2026-03-02",
+              priority: 2,
+              stateName: "Done",
+              stateType: "completed",
+              updatedAt: "2026-03-07",
+            },
+            {
+              archivedAt: "2026-03-08",
+              autoClosedAt: null,
+              canceledAt: "2026-03-06",
+              completedAt: null,
+              createdAt: "2026-03-03",
+              priority: 2,
+              stateName: "Canceled",
+              stateType: "canceled",
+              updatedAt: "2026-03-06",
+            },
+          ],
+        },
+        { rangeKey: "30" },
+      ),
+    );
+
+    expect(historyMetrics.currentWindow.totalClosed).toBe(3);
+    expect(historyMetrics.currentWindow.completed).toBe(1);
+    expect(historyMetrics.currentWindow.cancelled).toBe(1);
+    expect(historyMetrics.currentWindow.duplicated).toBe(1);
+    expect(historyMetrics.currentWindow.autoClosed).toBe(0);
+    expect(historyMetrics.currentWindow.archived).toBe(0);
+    expect(
+      historyMetrics.outcomeMetrics.reduce((sum, metric) => sum + metric.count, 0),
+    ).toBe(historyMetrics.currentWindow.totalClosed);
+  });
+
   it("calculates remaining bugs and summary rates from a simple snapshot", () => {
     const metrics = {
       bugs: [
@@ -154,8 +264,8 @@ describe("metrics", () => {
       { date: "2026-03-06", count: 1 },
     ]);
     expect(deadlineMetrics.trackingStartBacklog).toBe(3);
-    expect(deadlineMetrics.currentAddRate).toBe(0);
-    expect(deadlineMetrics.currentFixRate).toBeCloseTo(1 / 3, 5);
+    expect(deadlineMetrics.currentAddRate).toBeCloseTo(1 / 3, 5);
+    expect(deadlineMetrics.currentFixRate).toBe(1);
   });
 
   it("starts the burndown chart at the selected date even when no event lands that day", () => {
@@ -490,7 +600,7 @@ describe("metrics", () => {
     expect(chartData.datasets[0]?.data).toContain(1);
 
     const rateChartData = buildComparisonRateHistoryChartData(comparisonMetrics);
-    expect(rateChartData.datasets).toHaveLength(2);
+    expect(rateChartData.datasets).toHaveLength(3);
     expect(rateChartData.labels?.length).toBe(
       comparisonMetrics.historicalWindows.length,
     );
@@ -522,7 +632,8 @@ describe("metrics", () => {
     );
 
     expect(comparisonMetrics.currentWindow.created).toBe(0);
-    expect(comparisonMetrics.currentWindow.fixed).toBe(1);
+    expect(comparisonMetrics.currentWindow.completed).toBe(0);
+    expect(comparisonMetrics.currentWindow.closed).toBe(1);
     expect(comparisonMetrics.currentWindow.netChange).toBe(-1);
   });
 

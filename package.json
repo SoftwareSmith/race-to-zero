@@ -6,9 +6,11 @@
   "homepage": "https://SoftwareSmith.github.io/race-to-zero/",
   "scripts": {
     "check:build-sizes": "tsx scripts/check-build-sizes.ts",
+    "check:public-metrics": "tsx scripts/check-public-metrics.ts",
     "dev": "vite",
     "build": "vite build",
     "build:guard": "npm run build && npm run check:build-sizes",
+    "audit:linear": "tsx scripts/audit-linear-metrics.ts",
     "lint": "node --import tsx ./node_modules/eslint/bin/eslint.js .",
     "prettier": "prettier --write .",
     "prettier:check": "prettier --check .",

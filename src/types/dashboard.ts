@@ -1,7 +1,10 @@
 export type Tone = "positive" | "negative" | "neutral";
 export type StatusBannerKind = "error" | "info";
 export type TopMenuKey = "codex" | "settings" | null;
-export type SettingToggleKey = "excludePublicHolidays" | "excludeWeekends";
+export type SettingToggleKey =
+  | "excludePublicHolidays"
+  | "excludeWeekends"
+  | "showAmbientBugs";
 export type BugVisualSettingKey = "chaosMultiplier" | "sizeMultiplier";
 export type ActiveTab = "overview" | "periods" | "insights" | "history";
 export type CompareRangeKey = "7" | "30" | "90" | "all" | "custom";
@@ -246,12 +249,14 @@ export interface DeadlineMetrics {
 
 export interface ComparisonWindowMetrics {
   addRate: number;
-  completionRate: number;
+  completed: number;
+  completedRate: number;
+  closureRate: number;
   created: number;
   dayCount: number;
   endDate: Date;
-  fixRate: number;
-  fixed: number;
+  closed: number;
+  closedRate: number;
   label: string;
   netBurnRate: number;
   netChange: number;
@@ -269,6 +274,7 @@ export interface ComparisonMetrics {
   previousWindow: ComparisonWindowMetrics | null;
   rangeKey: string;
   rangeLabel: string;
+  closedSeries: DailyCountEntry[];
   tone: Tone;
 }
 
@@ -286,7 +292,9 @@ export interface BugVisualSettings {
   sizeMultiplier: number;
 }
 
-export interface MenuSettingsState extends WorkdaySettings {}
+export interface MenuSettingsState extends WorkdaySettings {
+  showAmbientBugs: boolean;
+}
 
 export interface FireflyParticle {
   color: string;

@@ -607,16 +607,16 @@ export function buildComparisonTimelineChartData(
 ): ChartData<"line", number[], string> {
   const labels = createLabelSeries(
     comparisonMetrics.createdSeries,
-    comparisonMetrics.completedSeries,
+    comparisonMetrics.closedSeries,
   );
   const createdLookup = new Map(
     comparisonMetrics.createdSeries.map((entry) => [entry.date, entry.count]),
   );
-  const completedLookup = new Map(
-    comparisonMetrics.completedSeries.map((entry) => [entry.date, entry.count]),
+  const closedLookup = new Map(
+    comparisonMetrics.closedSeries.map((entry) => [entry.date, entry.count]),
   );
   const createdValues = labels.map((entry) => createdLookup.get(entry) ?? 0);
-  const completedValues = labels.map((entry) => completedLookup.get(entry) ?? 0);
+  const closedValues = labels.map((entry) => closedLookup.get(entry) ?? 0);
 
   return {
     labels: labels.map((entry) => formatLabel(entry)),
@@ -632,10 +632,10 @@ export function buildComparisonTimelineChartData(
         pointHoverRadius: 4,
       },
       {
-        label: "Completed",
-        data: completedValues,
-        borderColor: "#5eead4",
-        backgroundColor: "rgba(94, 234, 212, 0.14)",
+        label: "Closed",
+        data: closedValues,
+        borderColor: "#38bdf8",
+        backgroundColor: "rgba(56, 189, 248, 0.14)",
         tension: 0.25,
         borderWidth: 3,
         pointRadius: 2,
@@ -660,9 +660,10 @@ export function buildComparisonSummaryChartData(
       label: "Current period",
       data: [
         comparisonMetrics.currentWindow.created,
-        comparisonMetrics.currentWindow.fixed,
+        comparisonMetrics.currentWindow.completed,
+        comparisonMetrics.currentWindow.closed,
         comparisonMetrics.currentWindow.netChange,
-        Number(comparisonMetrics.currentWindow.completionRate.toFixed(2)),
+        Number(comparisonMetrics.currentWindow.closureRate.toFixed(2)),
       ],
       backgroundColor: "rgba(125, 211, 252, 0.72)",
       borderColor: "#7dd3fc",
@@ -676,9 +677,10 @@ export function buildComparisonSummaryChartData(
       label: "Previous period",
       data: [
         comparisonMetrics.previousWindow.created,
-        comparisonMetrics.previousWindow.fixed,
+        comparisonMetrics.previousWindow.completed,
+        comparisonMetrics.previousWindow.closed,
         comparisonMetrics.previousWindow.netChange,
-        Number(comparisonMetrics.previousWindow.completionRate.toFixed(2)),
+        Number(comparisonMetrics.previousWindow.closureRate.toFixed(2)),
       ],
       backgroundColor: "rgba(94, 234, 212, 0.68)",
       borderColor: "#5eead4",
@@ -688,7 +690,13 @@ export function buildComparisonSummaryChartData(
   }
 
   return {
-    labels: ["Bugs created", "Bugs completed", "Net change", "Completion rate %"],
+    labels: [
+      "Bugs created",
+      "Bugs completed",
+      "Bugs closed",
+      "Net change",
+      "Closure rate %",
+    ],
     datasets,
   };
 }
@@ -754,10 +762,10 @@ export function buildComparisonRateHistoryChartData(
         pointHoverRadius: 4,
       },
       {
-        label: "Fix rate",
-        data: comparisonMetrics.historicalWindows.map((window) => Number(window.fixRate.toFixed(2))),
-        borderColor: "#5eead4",
-        backgroundColor: "rgba(94, 234, 212, 0.14)",
+        label: "Closure rate",
+        data: comparisonMetrics.historicalWindows.map((window) => Number(window.closedRate.toFixed(2))),
+        borderColor: "#38bdf8",
+        backgroundColor: "rgba(56, 189, 248, 0.14)",
         tension: 0.25,
         borderWidth: 3,
         pointRadius: 2,

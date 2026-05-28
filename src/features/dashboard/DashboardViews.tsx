@@ -78,7 +78,7 @@ function buildOverviewMetricCards(
       value: `${formatNumber(deadlineMetrics.neededNetBurnRate, 2)}/day`,
     },
     {
-      hint: "Recent backlog change per day across all backlog exits. Negative means the backlog is shrinking; positive means it is growing.",
+      hint: "Recent backlog change per day across all bug closures. Negative means the backlog is shrinking; positive means it is growing.",
       label: "Net backlog change",
       tone: getTargetCurrentNetBurnTone(deadlineMetrics),
       value: `${formatSignedNumber(-summary.currentNetBurnRate, 2)}/day`,

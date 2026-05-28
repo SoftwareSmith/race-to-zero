@@ -49,7 +49,9 @@ type DashboardBootstrapSettingsValue = Pick<
   | "gameConfig"
   | "handleToggleSetting"
   | "settings"
+  | "showAmbientBugs"
   | "showBugParticleCount"
+  | "toggleShowAmbientBugs"
   | "toggleShowBugParticleCount"
   | "workdaySettings"
 >;
@@ -135,7 +137,9 @@ export function DashboardBootstrapProvider({
       gameConfig: value.gameConfig,
       handleToggleSetting: value.handleToggleSetting,
       settings: value.settings,
+      showAmbientBugs: value.showAmbientBugs,
       showBugParticleCount: value.showBugParticleCount,
+      toggleShowAmbientBugs: value.toggleShowAmbientBugs,
       toggleShowBugParticleCount: value.toggleShowBugParticleCount,
       workdaySettings: value.workdaySettings,
     }),
@@ -144,7 +148,9 @@ export function DashboardBootstrapProvider({
       value.gameConfig,
       value.handleToggleSetting,
       value.settings,
+      value.showAmbientBugs,
       value.showBugParticleCount,
+      value.toggleShowAmbientBugs,
       value.toggleShowBugParticleCount,
       value.workdaySettings,
     ],

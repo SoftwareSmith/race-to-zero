@@ -1,4 +1,5 @@
 export const STORAGE_KEYS = {
+  ambientBugsVisible: "race-to-zero:ambient-bugs-visible",
   bugParticleCountVisible: "race-to-zero:bug-particle-count-visible",
   bugChaosMultiplier: "race-to-zero:bug-chaos-multiplier",
   bugSizeMultiplier: "race-to-zero:bug-size-multiplier",

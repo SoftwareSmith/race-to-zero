@@ -74,14 +74,14 @@ function buildOutcomeSentence(
   }
 
   if (activeTab === "periods" && comparisonMetrics) {
-    const { netChange, completionRate } = comparisonMetrics.currentWindow;
+    const { closureRate, netChange } = comparisonMetrics.currentWindow;
     if (netChange < 0) {
-      return `Backlog shrank by ${formatNumber(Math.abs(netChange))} this period. Completion rate ${formatPercent(completionRate, 0)}.`;
+      return `Backlog shrank by ${formatNumber(Math.abs(netChange))} this period. Closure rate ${formatPercent(closureRate, 0)}.`;
     }
     if (netChange > 0) {
-      return `Backlog grew by ${formatNumber(netChange)} this period. Completion rate ${formatPercent(completionRate, 0)}.`;
+      return `Backlog grew by ${formatNumber(netChange)} this period. Closure rate ${formatPercent(closureRate, 0)}.`;
     }
-    return `Backlog held flat this period. Completion rate ${formatPercent(completionRate, 0)}.`;
+    return `Backlog held flat this period. Closure rate ${formatPercent(closureRate, 0)}.`;
   }
 
   const gap = summary.currentFixRate - summary.bugsPerDayRequired;

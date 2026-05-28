@@ -36,6 +36,12 @@ import type {
   WorkdaySettings,
 } from "../../../types/dashboard";
 import { countConfiguredDays } from "@shared/utils/workCalendar";
+import {
+  getBugClosureDate,
+  getBugTerminalEvent,
+  getLinearStatusLabel,
+  isTerminalStatusLabel,
+} from "./bugLifecycle";
 
 const DEADLINE_TREND_WINDOW_DAYS = 30;
 const PRIORITY_ORDER = [
@@ -90,6 +96,8 @@ interface SeriesIndex {
 
 interface PreparedMetricsSource {
   bugs: MetricsBug[];
+  completedOnlyIndex: SeriesIndex;
+  completedOnlySeries: DailyCountEntry[];
   completedIndex: SeriesIndex;
   completedSeries: DailyCountEntry[];
   createdIndex: SeriesIndex;
@@ -108,11 +116,6 @@ interface BacklogHistorySource {
   firstBugDate: Date | null;
   remainingIndex: SeriesIndex;
   remainingSeries: DailyCountEntry[];
-}
-
-interface TerminalHistoryEvent {
-  date: string;
-  outcome: HistoryOutcomeKey;
 }
 
 function normalizeBugRecords(
@@ -160,81 +163,6 @@ function buildPriorityDistributionFromCounts(
   }));
 }
 
-function getLinearStatusLabel(bug: MetricsBug) {
-  const rawValue = bug.stateName?.trim() || bug.stateType?.trim() || "";
-  const normalizedValue = rawValue.toLowerCase();
-
-  if (normalizedValue === "backlog") {
-    return "Backlog";
-  }
-
-  if (normalizedValue === "triage" || normalizedValue === "triaged") {
-    return "Triage";
-  }
-
-  if (
-    normalizedValue === "todo" ||
-    normalizedValue === "to do" ||
-    normalizedValue === "unstarted"
-  ) {
-    return "Todo";
-  }
-
-  if (
-    normalizedValue === "in progress" ||
-    normalizedValue === "in-progress" ||
-    normalizedValue === "started" ||
-    normalizedValue === "doing"
-  ) {
-    return "In progress";
-  }
-
-  if (
-    normalizedValue === "in review" ||
-    normalizedValue === "review" ||
-    normalizedValue === "qa" ||
-    normalizedValue === "testing"
-  ) {
-    return "In review";
-  }
-
-  if (
-    normalizedValue === "deploy ready" ||
-    normalizedValue === "ready to deploy" ||
-    normalizedValue === "deploy-ready" ||
-    normalizedValue === "ready for deploy"
-  ) {
-    return "Deploy ready";
-  }
-
-  if (
-    normalizedValue === "done" ||
-    normalizedValue === "completed" ||
-    normalizedValue === "complete" ||
-    (!normalizedValue && bug.completedAt)
-  ) {
-    return "Done";
-  }
-
-  if (
-    normalizedValue === "cancelled" ||
-    normalizedValue === "canceled" ||
-    normalizedValue === "cancel"
-  ) {
-    return "Cancelled";
-  }
-
-  if (
-    normalizedValue === "duplicated" ||
-    normalizedValue === "duplicate" ||
-    normalizedValue === "duplicate bug"
-  ) {
-    return "Duplicated";
-  }
-
-  return "Other";
-}
-
 function getHistoryOutcomeLabel(outcome: HistoryOutcomeKey) {
   switch (outcome) {
     case "completed":
@@ -259,72 +187,6 @@ function buildStatusDistributionFromCounts(
     label,
     count: counts.get(label) ?? 0,
   }));
-}
-
-function isTerminalStatusLabel(statusLabel: string) {
-  return statusLabel === "Cancelled" || statusLabel === "Duplicated";
-}
-
-function getBugTerminalEvent(bug: MetricsBug): TerminalHistoryEvent | null {
-  if (bug.completedAt) {
-    return {
-      date: bug.completedAt,
-      outcome: "completed",
-    };
-  }
-
-  const statusLabel = getLinearStatusLabel(bug);
-
-  if (statusLabel === "Cancelled") {
-    const date =
-      bug.canceledAt ?? bug.updatedAt ?? bug.autoClosedAt ?? bug.archivedAt;
-
-    return date
-      ? {
-          date,
-          outcome: "cancelled",
-        }
-      : null;
-  }
-
-  if (statusLabel === "Duplicated") {
-    const date =
-      bug.canceledAt ?? bug.autoClosedAt ?? bug.archivedAt ?? bug.updatedAt;
-
-    return date
-      ? {
-          date,
-          outcome: "duplicated",
-        }
-      : null;
-  }
-
-  if (bug.autoClosedAt) {
-    return {
-      date: bug.autoClosedAt,
-      outcome: "autoClosed",
-    };
-  }
-
-  if (bug.archivedAt) {
-    return {
-      date: bug.archivedAt,
-      outcome: "archived",
-    };
-  }
-
-  if (bug.canceledAt) {
-    return {
-      date: bug.canceledAt,
-      outcome: "cancelled",
-    };
-  }
-
-  return null;
-}
-
-function getBugClosureDate(bug: MetricsBug) {
-  return getBugTerminalEvent(bug)?.date ?? null;
 }
 
 function buildOpenAgeDistribution(
@@ -406,6 +268,10 @@ function buildClosureSeries(bugs: MetricsBug[]): DailyCountEntry[] {
   return [...countsByDay.entries()]
     .sort(([left], [right]) => left.localeCompare(right))
     .map(([date, count]) => ({ date, count }));
+}
+
+function buildCompletedSeries(bugs: MetricsBug[]): DailyCountEntry[] {
+  return buildSeriesFromField(bugs, "completedAt");
 }
 
 function buildBacklogHistorySource(bugs: MetricsBug[]): BacklogHistorySource {
@@ -595,11 +461,14 @@ function prepareMetricsSource(
   }
 
   const createdSeries = buildSeriesFromField(bugs, "createdAt");
+  const completedOnlySeries = buildCompletedSeries(bugs);
   const completedSeries = buildClosureSeries(bugs);
   const remainingSeries = buildRemainingSeries(createdSeries, completedSeries);
   const preparedSource: PreparedMetricsSource = {
     bugs,
     completedIndex: buildSeriesIndex(completedSeries),
+    completedOnlyIndex: buildSeriesIndex(completedOnlySeries),
+    completedOnlySeries,
     completedSeries,
     createdIndex: buildSeriesIndex(createdSeries),
     createdSeries,
@@ -637,12 +506,15 @@ function createPreparedSourceFromBugs(bugs: MetricsBug[]): PreparedMetricsSource
   }
 
   const createdSeries = buildSeriesFromField(bugs, "createdAt");
+  const completedOnlySeries = buildCompletedSeries(bugs);
   const completedSeries = buildClosureSeries(bugs);
   const remainingSeries = buildRemainingSeries(createdSeries, completedSeries);
 
   return {
     bugs,
     completedIndex: buildSeriesIndex(completedSeries),
+    completedOnlyIndex: buildSeriesIndex(completedOnlySeries),
+    completedOnlySeries,
     completedSeries,
     createdIndex: buildSeriesIndex(createdSeries),
     createdSeries,
@@ -704,30 +576,38 @@ function getWindowStats(
     startDate,
     endDate,
   );
-  const fixed = getSeriesTotalInRange(
+  const completed = getSeriesTotalInRange(
+    preparedSource.completedOnlyIndex,
+    startDate,
+    endDate,
+  );
+  const closed = getSeriesTotalInRange(
     preparedSource.completedIndex,
     startDate,
     endDate,
   );
 
   const addRate = created / dayCount;
-  const fixRate = fixed / dayCount;
-  const netBurnRate = fixRate - addRate;
-  const netChange = created - fixed;
-  const completionRate =
-    created > 0 ? Math.min((fixed / created) * 100, 999) : 0;
+  const completedRate = completed / dayCount;
+  const closedRate = closed / dayCount;
+  const netBurnRate = closedRate - addRate;
+  const netChange = created - closed;
+  const closureRate =
+    created > 0 ? Math.min((closed / created) * 100, 999) : 0;
 
   return {
     startDate,
     endDate,
     dayCount,
     created,
-    fixed,
+    completed,
+    completedRate,
+    closed,
     addRate,
-    fixRate,
+    closedRate,
     netBurnRate,
     netChange,
-    completionRate,
+    closureRate,
     label: getDisplayRangeLabel(startDate, endDate),
   };
 }
@@ -1533,6 +1413,11 @@ export function getComparisonMetrics(
     currentEndDate,
   );
   const completedSeries = filterSeriesByDateRange(
+    preparedSource.completedOnlyIndex,
+    currentStartDate,
+    currentEndDate,
+  );
+  const closedSeries = filterSeriesByDateRange(
     preparedSource.completedIndex,
     currentStartDate,
     currentEndDate,
@@ -1552,16 +1437,16 @@ export function getComparisonMetrics(
         : "neutral";
   let headline =
     currentWindow.netChange > 0
-      ? "Intake is outpacing completions"
+      ? "Intake is outpacing closures"
       : currentWindow.netChange < 0
-        ? "Completions are outpacing intake"
-        : "Intake and completions are running even";
+        ? "Closures are outpacing intake"
+        : "Intake and closures are running even";
   let body =
     currentWindow.netChange > 0
-      ? `The current window created ${currentWindow.created} bugs and closed ${currentWindow.fixed}, so backlog pressure increased by ${currentWindow.netChange}.`
+      ? `The current window created ${currentWindow.created} bugs, completed ${currentWindow.completed}, and closed ${currentWindow.closed}, so backlog pressure increased by ${currentWindow.netChange}.`
       : currentWindow.netChange < 0
-        ? `The current window closed ${currentWindow.fixed} bugs and created ${currentWindow.created}, so the backlog reduced by ${Math.abs(currentWindow.netChange)}.`
-        : `The current window created and closed ${currentWindow.created} bugs, leaving net backlog movement flat.`;
+        ? `The current window closed ${currentWindow.closed} bugs, completed ${currentWindow.completed}, and created ${currentWindow.created}, so the backlog reduced by ${Math.abs(currentWindow.netChange)}.`
+        : `The current window created ${currentWindow.created} bugs and closed ${currentWindow.closed}, leaving net backlog movement flat while ${currentWindow.completed} were completed.`;
 
   if (!hasComparisonWindow) {
     tone = "neutral";
@@ -1590,6 +1475,7 @@ export function getComparisonMetrics(
     body,
     createdSeries,
     completedSeries,
+    closedSeries,
     historicalWindows,
     rangeLabel: isAllTime
       ? "All time"
@@ -2322,9 +2208,9 @@ export function buildComparisonSummaryChartData(
       label: "Current period",
       data: [
         comparisonMetrics.currentWindow.created,
-        comparisonMetrics.currentWindow.fixed,
+        comparisonMetrics.currentWindow.closed,
         comparisonMetrics.currentWindow.netChange,
-        Number(comparisonMetrics.currentWindow.completionRate.toFixed(2)),
+        Number(comparisonMetrics.currentWindow.closureRate.toFixed(2)),
       ],
       backgroundColor: "rgba(125, 211, 252, 0.72)",
       borderColor: "#7dd3fc",
@@ -2338,9 +2224,9 @@ export function buildComparisonSummaryChartData(
       label: "Previous period",
       data: [
         comparisonMetrics.previousWindow.created,
-        comparisonMetrics.previousWindow.fixed,
+        comparisonMetrics.previousWindow.closed,
         comparisonMetrics.previousWindow.netChange,
-        Number(comparisonMetrics.previousWindow.completionRate.toFixed(2)),
+        Number(comparisonMetrics.previousWindow.closureRate.toFixed(2)),
       ],
       backgroundColor: "rgba(94, 234, 212, 0.68)",
       borderColor: "#5eead4",
@@ -2352,9 +2238,9 @@ export function buildComparisonSummaryChartData(
   return {
     labels: [
       "Bugs created",
-      "Bugs completed",
+      "Bugs closed",
       "Net change",
-      "Completion rate %",
+      "Closure rate %",
     ],
     datasets,
   };
@@ -2425,9 +2311,9 @@ export function buildComparisonRateHistoryChartData(
         pointHoverRadius: 4,
       },
       {
-        label: "Fix rate",
+        label: "Closure rate",
         data: comparisonMetrics.historicalWindows.map((window) =>
-          Number(window.fixRate.toFixed(2)),
+          Number(window.closedRate.toFixed(2)),
         ),
         borderColor: "#5eead4",
         backgroundColor: "rgba(94, 234, 212, 0.14)",

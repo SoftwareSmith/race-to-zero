@@ -14,6 +14,7 @@ import type {
 } from "@game/components/BackgroundField/types";
 import { preloadVfxEngine } from "@game/components/vfxEngineLoader";
 import { DashboardBootstrapProvider } from "./features/dashboard/context/DashboardBootstrapContext";
+import { useDashboardBootstrapSettings } from "@dashboard/context/DashboardBootstrapContext";
 
 const loadDashboardShell = () => import("./features/app/DashboardShell");
 const loadSiegeExperience = () => import("./features/app/SiegeExperience");
@@ -26,6 +27,7 @@ const AmbientBackgroundHarness = lazy(
 );
 
 function AppContent() {
+  const dashboardSettings = useDashboardBootstrapSettings();
   const dashboardRef = useRef<HTMLDivElement | null>(null);
   const ambientFieldRef = useRef<BackgroundFieldHandle | null>(null);
   const [siegeMounted, setSiegeMounted] = useState(false);
@@ -105,8 +107,10 @@ function AppContent() {
 
   const shouldRenderDashboard = shellState.siegePhase === "idle";
   const shouldRenderAmbient =
-    !ambientSuspended || shellState.siegePhase === "exiting";
-  const shouldRevealAmbient = !ambientSuspended;
+    dashboardSettings.showAmbientBugs &&
+    (!ambientSuspended || shellState.siegePhase === "exiting");
+  const shouldRevealAmbient =
+    dashboardSettings.showAmbientBugs && !ambientSuspended;
 
   return (
     <div className="relative h-screen overflow-hidden bg-[#050608] text-stone-100">

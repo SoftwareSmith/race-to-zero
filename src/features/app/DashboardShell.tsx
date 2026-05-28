@@ -23,11 +23,6 @@ import {
 } from "@dashboard/context/DashboardContext";
 import { OverviewView } from "@dashboard/DashboardViews";
 import StatusBanner from "@shared/components/StatusBanner";
-import {
-  MenuIconButton,
-  MenuPanel,
-  ToggleField,
-} from "@shared/components/MenuControls";
 import type { SiegePhase } from "@game/types";
 import Tooltip from "@shared/components/Tooltip";
 import { cn } from "@shared/utils/cn";
@@ -247,9 +242,7 @@ const DashboardShellContent = memo(function DashboardShellContent({
   const chartFocusHandler = interactiveMode
     ? ui.handleChartFocusChange
     : undefined;
-  const bugFieldMenuRef = useRef<HTMLDivElement | null>(null);
   const shellFrameRef = useRef<HTMLDivElement | null>(null);
-  const [bugFieldMenuOpen, setBugFieldMenuOpen] = useState(false);
   const [autoFitScale, setAutoFitScale] = useState(1);
   const periodsPanel = (() => {
     if (metrics.isComparisonLoading) {
@@ -417,34 +410,6 @@ const DashboardShellContent = memo(function DashboardShellContent({
   }, []);
 
   useEffect(() => {
-    if (!bugFieldMenuOpen) {
-      return undefined;
-    }
-
-    const handlePointerDown = (event: MouseEvent | TouchEvent) => {
-      const target = event.target;
-      if (!(target instanceof Node)) {
-        return;
-      }
-
-      if (
-        bugFieldMenuRef.current &&
-        !bugFieldMenuRef.current.contains(target)
-      ) {
-        setBugFieldMenuOpen(false);
-      }
-    };
-
-    document.addEventListener("mousedown", handlePointerDown);
-    document.addEventListener("touchstart", handlePointerDown);
-
-    return () => {
-      document.removeEventListener("mousedown", handlePointerDown);
-      document.removeEventListener("touchstart", handlePointerDown);
-    };
-  }, [bugFieldMenuOpen]);
-
-  useEffect(() => {
     if (!interactiveMode) {
       return;
     }
@@ -505,48 +470,12 @@ const DashboardShellContent = memo(function DashboardShellContent({
                 containerRef={ui.settingsMenuRef}
                 onMenuToggle={() => ui.handleTopMenuToggle("settings")}
                 onToggle={settings.handleToggleSetting}
+                onToggleShowBugParticleCount={settings.toggleShowBugParticleCount}
                 open={!interactiveMode && ui.openTopMenu === "settings"}
                 settings={settings.settings}
+                showBugParticleCount={settings.showBugParticleCount}
               />
-              <div className="relative" ref={bugFieldMenuRef}>
-                <MenuIconButton
-                  ariaLabel="Open bug field settings"
-                  onClick={() =>
-                    setBugFieldMenuOpen((currentValue) => !currentValue)
-                  }
-                  open={bugFieldMenuOpen}
-                  size="compact"
-                  tooltip="Bug field overlay controls."
-                >
-                  <svg
-                    aria-hidden="true"
-                    className="h-4 w-4"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth="1.8"
-                    viewBox="0 0 24 24"
-                  >
-                    <path d="M4 12h16" />
-                    <path d="M12 4v16" />
-                    <circle cx="12" cy="12" r="7" />
-                  </svg>
-                </MenuIconButton>
-
-                {bugFieldMenuOpen ? (
-                  <MenuPanel size="compact" title="Bug Field">
-                    <ToggleField
-                      checked={settings.showBugParticleCount}
-                      description="Show the rendered bug particle count overlay on the dashboard background."
-                      label="Show bug particle count"
-                      onChange={settings.toggleShowBugParticleCount}
-                      size="compact"
-                    />
-                  </MenuPanel>
-                ) : null}
-              </div>
-              {!interactiveMode ? (
+              {!interactiveMode && settings.showAmbientBugs ? (
                 <Tooltip content="Start the interactive bug game.">
                   <button
                     aria-label="Open interactive bug game"

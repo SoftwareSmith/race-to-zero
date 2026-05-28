@@ -22,6 +22,11 @@ import type {
   WorkdaySettings,
 } from "../../../types/dashboard.js";
 import { countConfiguredDays } from "../../../shared/utils/workCalendar.js";
+import {
+  getBugClosureDate,
+  getLinearStatusLabel,
+  isTerminalStatusLabel,
+} from "./bugLifecycle.js";
 
 const DEADLINE_TREND_WINDOW_DAYS = 30;
 const PRIORITY_ORDER = [
@@ -105,81 +110,6 @@ function buildPriorityDistributionFromCounts(
   }));
 }
 
-function getLinearStatusLabel(bug: MetricsBug) {
-  const rawValue = bug.stateName?.trim() || bug.stateType?.trim() || "";
-  const normalizedValue = rawValue.toLowerCase();
-
-  if (normalizedValue === "backlog") {
-    return "Backlog";
-  }
-
-  if (normalizedValue === "triage" || normalizedValue === "triaged") {
-    return "Triage";
-  }
-
-  if (
-    normalizedValue === "todo" ||
-    normalizedValue === "to do" ||
-    normalizedValue === "unstarted"
-  ) {
-    return "Todo";
-  }
-
-  if (
-    normalizedValue === "in progress" ||
-    normalizedValue === "in-progress" ||
-    normalizedValue === "started" ||
-    normalizedValue === "doing"
-  ) {
-    return "In progress";
-  }
-
-  if (
-    normalizedValue === "in review" ||
-    normalizedValue === "review" ||
-    normalizedValue === "qa" ||
-    normalizedValue === "testing"
-  ) {
-    return "In review";
-  }
-
-  if (
-    normalizedValue === "deploy ready" ||
-    normalizedValue === "ready to deploy" ||
-    normalizedValue === "deploy-ready" ||
-    normalizedValue === "ready for deploy"
-  ) {
-    return "Deploy ready";
-  }
-
-  if (
-    normalizedValue === "done" ||
-    normalizedValue === "completed" ||
-    normalizedValue === "complete" ||
-    (!normalizedValue && bug.completedAt)
-  ) {
-    return "Done";
-  }
-
-  if (
-    normalizedValue === "cancelled" ||
-    normalizedValue === "canceled" ||
-    normalizedValue === "cancel"
-  ) {
-    return "Cancelled";
-  }
-
-  if (
-    normalizedValue === "duplicated" ||
-    normalizedValue === "duplicate" ||
-    normalizedValue === "duplicate bug"
-  ) {
-    return "Duplicated";
-  }
-
-  return "Other";
-}
-
 function buildStatusDistributionFromCounts(
   counts: Map<string, number>,
 ): StatusDistributionEntry[] {
@@ -187,40 +117,6 @@ function buildStatusDistributionFromCounts(
     count: counts.get(label) ?? 0,
     label,
   }));
-}
-
-function isTerminalStatusLabel(statusLabel: string) {
-  return statusLabel === "Cancelled" || statusLabel === "Duplicated";
-}
-
-function getBugClosureDate(bug: MetricsBug) {
-  if (bug.completedAt) {
-    return bug.completedAt;
-  }
-
-  const statusLabel = getLinearStatusLabel(bug);
-
-  if (statusLabel === "Cancelled") {
-    return bug.canceledAt ?? bug.updatedAt ?? bug.autoClosedAt ?? bug.archivedAt ?? null;
-  }
-
-  if (statusLabel === "Duplicated") {
-    return bug.canceledAt ?? bug.autoClosedAt ?? bug.archivedAt ?? bug.updatedAt ?? null;
-  }
-
-  if (bug.autoClosedAt) {
-    return bug.autoClosedAt;
-  }
-
-  if (bug.archivedAt) {
-    return bug.archivedAt;
-  }
-
-  if (bug.canceledAt) {
-    return bug.canceledAt;
-  }
-
-  return null;
 }
 
 function buildSeriesFromField(

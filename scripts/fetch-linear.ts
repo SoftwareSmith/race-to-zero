@@ -10,8 +10,8 @@ const ROOT_DIR = path.resolve(__dirname, "..");
 const BOOTSTRAP_OUTPUT_PATH = path.join(ROOT_DIR, "public", "data", "metrics.json");
 const ANALYTICS_OUTPUT_PATH = path.join(ROOT_DIR, "public", "data", "metrics-analytics.json");
 const LINEAR_API_URL = "https://api.linear.app/graphql";
-const BUG_LABEL_NAMES = new Set(["bug", "cs bug", "cs bugs"]);
-const BUG_PARENT_NAMES = new Set(["bug reason"]);
+export const BUG_LABEL_NAMES = new Set(["bug", "cs bug", "cs bugs"]);
+export const BUG_PARENT_NAMES = new Set(["bug reason"]);
 
 interface LinearLabelNode {
   name?: string | null;
@@ -21,6 +21,9 @@ interface LinearLabelNode {
 }
 
 interface LinearIssue {
+  id?: string | null;
+  identifier?: string | null;
+  title?: string | null;
   archivedAt?: string | null;
   autoClosedAt?: string | null;
   canceledAt?: string | null;
@@ -56,7 +59,7 @@ interface LinearResponse {
   errors?: Array<{ message: string }>;
 }
 
-function getRequiredEnv(name: string) {
+export function getRequiredEnv(name: string) {
   const value = process.env[name];
   if (!value) {
     throw new Error(`Missing required environment variable: ${name}`);
@@ -65,11 +68,11 @@ function getRequiredEnv(name: string) {
   return value;
 }
 
-function toDay(dateValue: string | Date) {
+export function toDay(dateValue: string | Date) {
   return new Date(dateValue).toISOString().slice(0, 10);
 }
 
-function getTeamKeys() {
+export function getTeamKeys() {
   const rawValue =
     process.env.LINEAR_TEAM_KEYS ?? process.env.LINEAR_TEAM_KEY ?? "CP,T1,TA,PF";
 
@@ -83,7 +86,7 @@ function getTeamKeys() {
   ];
 }
 
-async function fetchBugIssues(): Promise<LinearIssue[]> {
+export async function fetchBugIssues(): Promise<LinearIssue[]> {
   const apiKey = getRequiredEnv("LINEAR_API_KEY");
   const teamKeys = getTeamKeys();
   const teamFilter = teamKeys.length
@@ -103,6 +106,9 @@ async function fetchBugIssues(): Promise<LinearIssue[]> {
           endCursor
         }
         nodes {
+          id
+          identifier
+          title
           createdAt
           completedAt
           canceledAt
@@ -169,7 +175,7 @@ async function fetchBugIssues(): Promise<LinearIssue[]> {
   return issues;
 }
 
-function isBugIssue(issue: LinearIssue) {
+export function isBugIssue(issue: LinearIssue) {
   return issue.labels?.nodes?.some((label) => {
     const labelName = label.name?.trim().toLowerCase() ?? "";
     const parentName = label.parent?.name?.trim().toLowerCase() ?? "";
@@ -177,7 +183,7 @@ function isBugIssue(issue: LinearIssue) {
   });
 }
 
-function buildMetrics(issues: LinearIssue[]): MetricsSource {
+export function buildMetrics(issues: LinearIssue[]): MetricsSource {
   const sortedIssues = [...issues]
     .filter(isBugIssue)
     .sort((left, right) => left.createdAt.localeCompare(right.createdAt));
@@ -203,7 +209,7 @@ function buildMetrics(issues: LinearIssue[]): MetricsSource {
   };
 }
 
-async function writeMetrics(metrics: MetricsSource) {
+export async function writeMetrics(metrics: MetricsSource) {
   await fs.mkdir(path.dirname(BOOTSTRAP_OUTPUT_PATH), { recursive: true });
   await fs.writeFile(
     BOOTSTRAP_OUTPUT_PATH,
@@ -212,7 +218,7 @@ async function writeMetrics(metrics: MetricsSource) {
   await fs.writeFile(ANALYTICS_OUTPUT_PATH, JSON.stringify(metrics, null, 2));
 }
 
-async function main() {
+export async function main() {
   const issues = await fetchBugIssues();
   const metrics = buildMetrics(issues);
   await writeMetrics(metrics);
@@ -220,7 +226,9 @@ async function main() {
   console.log(`Wrote ${ANALYTICS_OUTPUT_PATH}`);
 }
 
-main().catch((error) => {
-  console.error(error);
-  process.exitCode = 1;
-});
+if (process.argv[1] && path.resolve(process.argv[1]) === __filename) {
+  main().catch((error) => {
+    console.error(error);
+    process.exitCode = 1;
+  });
+}

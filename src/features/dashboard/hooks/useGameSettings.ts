@@ -61,6 +61,14 @@ function isGameConfig(value: unknown): value is GameConfig {
 const parseStoredGameConfig = createStoredJsonParser<GameConfig>(isGameConfig);
 
 export function useGameSettings() {
+  const [showAmbientBugs, setShowAmbientBugs] = useStoredState(
+    STORAGE_KEYS.ambientBugsVisible,
+    true,
+    {
+      parse: parseStoredBoolean,
+      serialize: serializeStoredValue,
+    },
+  );
   const [bugSizeMultiplier, setBugSizeMultiplier] = useStoredState(
     STORAGE_KEYS.bugSizeMultiplier,
     2.5,
@@ -161,13 +169,19 @@ export function useGameSettings() {
     setShowBugParticleCount((currentValue) => !currentValue);
   }, [setShowBugParticleCount]);
 
+  const toggleShowAmbientBugs = useCallback(() => {
+    setShowAmbientBugs((currentValue) => !currentValue);
+  }, [setShowAmbientBugs]);
+
   return {
     bugVisualSettings,
     gameConfig,
     handleBugVisualSetting,
     setBugChaosMultiplier: setClampedBugChaosMultiplier,
     setBugSizeMultiplier: setClampedBugSizeMultiplier,
+    showAmbientBugs,
     showBugParticleCount,
+    toggleShowAmbientBugs,
     toggleShowBugParticleCount,
   };
 }

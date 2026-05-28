@@ -41,7 +41,9 @@ export function useDashboardBootstrapController() {
   const {
     bugVisualSettings,
     gameConfig,
+    showAmbientBugs,
     showBugParticleCount,
+    toggleShowAmbientBugs,
     toggleShowBugParticleCount,
   } = useGameSettings();
   const [teamFilterKey, setTeamFilterKey] = useStoredState(
@@ -97,8 +99,9 @@ export function useDashboardBootstrapController() {
     () => ({
       excludePublicHolidays,
       excludeWeekends,
+      showAmbientBugs,
     }),
-    [excludePublicHolidays, excludeWeekends],
+    [excludePublicHolidays, excludeWeekends, showAmbientBugs],
   );
 
   const handleToggleSetting = useCallback(
@@ -110,11 +113,14 @@ export function useDashboardBootstrapController() {
         case "excludePublicHolidays":
           setExcludePublicHolidays((currentValue) => !currentValue);
           break;
+        case "showAmbientBugs":
+          toggleShowAmbientBugs();
+          break;
         default:
           break;
       }
     },
-    [setExcludePublicHolidays, setExcludeWeekends],
+    [setExcludePublicHolidays, setExcludeWeekends, toggleShowAmbientBugs],
   );
 
   const handleTopMenuToggle = useCallback(
@@ -269,10 +275,12 @@ export function useDashboardBootstrapController() {
     settings,
     settingsMenuRef,
     setChartFocus,
+    showAmbientBugs,
     showBugParticleCount,
     teamFilterKey,
     teamFilterOptions,
     todayDate,
+    toggleShowAmbientBugs,
     toggleShowBugParticleCount,
     workdaySettings,
   };
