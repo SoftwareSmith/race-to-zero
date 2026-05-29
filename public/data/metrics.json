@@ -3712,11 +3712,11 @@
     "firstBugDate": "2023-09-18",
     "openAgeDistribution": [
       {
-        "count": 32,
+        "count": 31,
         "label": "0-7d"
       },
       {
-        "count": 47,
+        "count": 48,
         "label": "8-30d"
       },
       {
@@ -5963,7 +5963,7 @@
         "label": "Triage"
       },
       {
-        "count": 31,
+        "count": 30,
         "label": "Todo"
       },
       {
@@ -5975,7 +5975,7 @@
         "label": "In review"
       },
       {
-        "count": 15,
+        "count": 16,
         "label": "Deploy ready"
       },
       {
@@ -13720,11 +13720,11 @@
       "firstBugDate": "2024-04-19",
       "openAgeDistribution": [
         {
-          "count": 9,
+          "count": 8,
           "label": "0-7d"
         },
         {
-          "count": 23,
+          "count": 24,
           "label": "8-30d"
         },
         {
@@ -17664,7 +17664,7 @@
           "label": "Triage"
         },
         {
-          "count": 17,
+          "count": 16,
           "label": "Todo"
         },
         {
@@ -17676,7 +17676,7 @@
           "label": "In review"
         },
         {
-          "count": 7,
+          "count": 8,
           "label": "Deploy ready"
         },
         {
@@ -17686,8 +17686,8 @@
       ]
     }
   },
-  "generatedAt": "2026-05-28T14:39:39.951Z",
-  "lastUpdated": "2026-05-28T14:39:39.951Z",
+  "generatedAt": "2026-05-29T00:31:28.423Z",
+  "lastUpdated": "2026-05-29T00:31:28.423Z",
   "teamKeys": [
     "CP",
     "PF",
