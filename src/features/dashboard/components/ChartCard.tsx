@@ -23,8 +23,8 @@ import {
   PointElement,
   Tooltip,
 } from "chart.js";
-import ChartDataLabels from "chartjs-plugin-datalabels";
 import { Bar, Line } from "react-chartjs-2";
+import { barValueLabelsPlugin } from "@dashboard/utils/barValueLabelsPlugin";
 import {
   getLineChartOptions,
   hideCustomChartTooltip,
@@ -43,7 +43,7 @@ ChartJS.register(
   Filler,
   Tooltip,
   Legend,
-  ChartDataLabels,
+  barValueLabelsPlugin,
 );
 
 type ChartVariant = "bar" | "line";

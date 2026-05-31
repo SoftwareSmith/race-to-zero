@@ -133,7 +133,7 @@ const SiegeHudControls = memo(function SiegeHudControls({
     ...(debugMode && onEndSurvival && gameMode === "outbreak"
       ? [
           {
-            ariaLabel: "Force survival failure",
+            ariaLabel: "Force survival overrun",
             icon: (
               <svg
                 aria-hidden="true"
@@ -152,7 +152,7 @@ const SiegeHudControls = memo(function SiegeHudControls({
             key: "end-survival",
             onClick: onEndSurvival,
             tone: "danger" as const,
-            tooltip: "Force a survival failure and open the ending modal",
+            tooltip: "Force a survival overrun and open the ending modal",
           },
         ]
       : []),
@@ -225,15 +225,19 @@ const SiegeHudControls = memo(function SiegeHudControls({
             onPointerEnter={onPointerEnterHud}
             onPointerLeave={onPointerLeaveHud}
           >
-            {codexMenuRef && onToggleCodex ? (
-              <Suspense fallback={codexTrigger}>
-                <CodexPanel
-                  containerRef={codexMenuRef}
-                  onMenuToggle={onToggleCodex}
-                  open={codexOpen}
-                  trigger={codexTrigger}
-                />
-              </Suspense>
+            {onToggleCodex ? (
+              codexMenuRef ? (
+                <Suspense fallback={codexTrigger}>
+                  <CodexPanel
+                    containerRef={codexMenuRef}
+                    onMenuToggle={onToggleCodex}
+                    open={codexOpen}
+                    trigger={codexTrigger}
+                  />
+                </Suspense>
+              ) : (
+                codexTrigger
+              )
             ) : null}
 
             {controlActions.map((action) => (

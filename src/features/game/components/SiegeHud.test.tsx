@@ -178,7 +178,7 @@ describe("SiegeHud", () => {
     );
 
     expect(screen.getByTestId("siege-remaining-stat")).toHaveTextContent(
-      "Left",
+      "Bugs",
     );
     expect(screen.getByTestId("siege-time-stat")).toHaveTextContent(
       "Clear time",

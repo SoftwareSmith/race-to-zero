@@ -1,7 +1,3 @@
-import type { SiegeWeaponId } from "@game/types";
-import { WEAPON_REGISTRY } from "@game/weapons";
-import { getWeaponEvolutionThresholds } from "@game/weapons/progression";
-
 /**
  * Default game-engine simulation parameters.
  * Import DEFAULT_GAME_CONFIG to use the baseline values,
@@ -49,12 +45,3 @@ export const DEFAULT_GAME_CONFIG: GameConfig = {
   crowdSteerStrength: 1.95,
   crowdTargetPenalty: 58,
 };
-
-/**
- * Per-weapon kill thresholds for tier evolution.
- * Tier promotion thresholds derived from weapon definitions.
- */
-export const WEAPON_EVOLVE_THRESHOLDS: Record<SiegeWeaponId, number[]> =
-  Object.fromEntries(
-    WEAPON_REGISTRY.map((weapon) => [weapon.id, getWeaponEvolutionThresholds(weapon)]),
-  ) as Record<SiegeWeaponId, number[]>;

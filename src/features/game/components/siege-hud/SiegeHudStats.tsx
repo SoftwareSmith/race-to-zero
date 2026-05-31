@@ -36,7 +36,7 @@ const SiegeHudStats = memo(function SiegeHudStats({
               data-testid="siege-remaining-stat"
             >
               <span className="block text-[0.42rem] font-semibold uppercase tracking-[0.14em] text-red-100/68">
-                {isSurvival ? "Alive" : "Left"}
+                {isSurvival ? "Alive" : "Bugs"}
               </span>
               <strong className="mt-0.5 block font-display text-[0.98rem] leading-none tracking-[-0.05em] text-stone-50 sm:text-[1.02rem]">
                 {interactiveRemainingBugs.toLocaleString()}

@@ -1,4 +1,4 @@
-import { WEAPON_EVOLVE_THRESHOLDS } from "@config/gameDefaults";
+import { WEAPON_EVOLVE_THRESHOLDS } from "@config/weaponEvolutionThresholds";
 import {
   ALL_WEAPON_IDS,
   type SiegeWeaponId,

@@ -13,10 +13,6 @@ const dashboardViewsPath = path.resolve(
   __dirname,
   "src/features/dashboard/DashboardViews.tsx",
 );
-const overviewChartsPath = path.resolve(
-  __dirname,
-  "src/features/dashboard/components/OverviewCharts.tsx",
-);
 const chartCardPath = path.resolve(
   __dirname,
   "src/features/dashboard/components/ChartCard.tsx",
@@ -76,12 +72,10 @@ export default defineConfig({
           }
 
           if (
-            id === overviewChartsPath ||
             id === chartCardPath ||
             id === chartConfigPath ||
             id === chartMetricsPath ||
             id.includes("chart.js") ||
-            id.includes("chartjs-plugin-datalabels") ||
             id.includes("react-chartjs-2")
           ) {
             return "dashboard-charts";

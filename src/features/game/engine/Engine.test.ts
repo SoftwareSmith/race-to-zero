@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { WEAPON_EVOLVE_THRESHOLDS } from "@config/gameDefaults";
+import { WEAPON_EVOLVE_THRESHOLDS } from "@config/weaponEvolutionThresholds";
 import { EntityState, WeaponTier, isTerminalEntityState } from "@game/types";
 import { WEAPON_REGISTRY } from "@game/weapons";
 import BUG_CODEX, { cloneCodex, setCodex } from "./bugCodex";

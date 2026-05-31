@@ -104,7 +104,10 @@ describe("chart tooltip formatting", () => {
 
   it("keeps period-rate-history standard tooltips on count-plus-share formatting", () => {
     const options = getLineChartOptions("line", "period-rate-history", 2);
-    const label = options.plugins?.tooltip?.callbacks?.label?.({
+    const labelCallback = options.plugins?.tooltip?.callbacks?.label as
+      | ((context: unknown) => string | string[] | void)
+      | undefined;
+    const label = labelCallback?.({
       dataset: {
         data: [2, 3, 5],
         label: "Closure rate",

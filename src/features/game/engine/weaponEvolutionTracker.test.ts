@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { WEAPON_EVOLVE_THRESHOLDS } from "@config/gameDefaults";
+import { WEAPON_EVOLVE_THRESHOLDS } from "@config/weaponEvolutionThresholds";
 import { WeaponTier } from "@game/types";
 import { WeaponEvolutionTracker } from "./weaponEvolutionTracker";
 

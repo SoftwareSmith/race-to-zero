@@ -189,7 +189,7 @@ function renderTooltipRows(rows: string, title: string) {
 }
 
 function sumNumericValues(values: unknown[]) {
-  return values.reduce((sum, entry) => {
+  return values.reduce<number>((sum, entry) => {
     return typeof entry === "number" && Number.isFinite(entry)
       ? sum + entry
       : sum;
