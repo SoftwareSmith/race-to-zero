@@ -26,7 +26,6 @@
     "test:qa:headed": "playwright test --headed --grep-invert @nightly tests/e2e"
   },
   "dependencies": {
-    "@dimforge/rapier2d-compat": "^0.19.3",
     "chart.js": "^4.5.1",
     "date-fns": "^4.1.0",
     "pixi.js": "^8.17.1",
