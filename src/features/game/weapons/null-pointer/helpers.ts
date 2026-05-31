@@ -1,4 +1,5 @@
 import { WeaponTier } from "@game/types";
+import { getWrappedDistance } from "@game/engine/toroidalMath";
 import { buildLinearWeaponTiers } from "@game/weapons/progression";
 import type { BugSnapshot, GameEngine } from "@game/weapons/runtime/types";
 import { baseTier } from "./tiers/base";
@@ -34,11 +35,13 @@ export function getPriorityTargets(
   searchRadius: number,
   targetCount: number,
 ): Array<{ bug: BugSnapshot; index: number }> {
+  const { width, height } = engine.getFieldSize();
+
   return engine
     .getAllBugs()
     .map((bug, index) => ({
       bug,
-      distance: Math.hypot(bug.x - x, bug.y - y),
+      distance: getWrappedDistance(x, y, bug.x, bug.y, width, height),
       hp: bug.hp ?? 1,
       index,
     }))

@@ -270,6 +270,52 @@ describe("chain-zap behavior", () => {
     expect(overlayCommand?.descriptor?.extras?.chaosScale).toBe(1.42);
     expect(overlayCommand?.descriptor?.extras?.chainNodes?.length).toBeGreaterThan(1);
   });
+
+  it("normalizes seam-crossing lightning nodes onto the local wrapped path", async () => {
+    const { createSession } = await import("../chain-zap/behavior");
+    const engine = makeMockEngine([
+      makeBug({ x: 390, y: 100 }),
+      makeBug({ x: 60, y: 100 }),
+    ]);
+    (engine.chainHitTestPreferUnfrozen as ReturnType<typeof vi.fn>).mockReturnValue([1]);
+    (engine.chainHitTest as ReturnType<typeof vi.fn>).mockReturnValue([1]);
+
+    const session = createSession(
+      makeCtx(engine, {
+        targetX: 10,
+        targetY: 100,
+        viewportX: 210,
+        viewportY: 200,
+        config: {
+          ...((await import("../chain-zap/constants")).BASE_TOGGLES as any),
+          chainRadius: 48,
+          chainMaxBounces: 1,
+        },
+      }) as any,
+    );
+    if (session.mode !== "once") throw new Error("expected once");
+
+    const lightningCommand = session.commands.find(
+      (c) =>
+        c.kind === "spawnEffect" &&
+        (c as any).descriptor.type === "lightning",
+    ) as any;
+    const overlayCommand = session.commands.find(
+      (c) =>
+        c.kind === "spawnEffect" &&
+        (c as any).descriptor.type === "overlayEffect",
+    ) as any;
+
+    expect(lightningCommand?.descriptor?.nodes).toEqual([
+      { x: 10, y: 100 },
+      { x: -10, y: 100 },
+      { x: 60, y: 100 },
+    ]);
+    expect(overlayCommand?.descriptor?.extras?.chainNodes).toEqual([
+      { x: 590, y: 200 },
+      { x: 660, y: 200 },
+    ]);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -353,6 +399,38 @@ describe("null-pointer behavior", () => {
 
     expect(session.commands.some((c) => c.kind === "unstableRadius")).toBe(true);
     expect(session.commands.some((c) => c.kind === "triggerKernelPanic")).toBe(true);
+  });
+
+  it("locks seam-adjacent targets using wrapped distance and local overlay points", async () => {
+    const { createSession } = await import("../null-pointer/behavior");
+    const engine = makeMockEngine([makeBug({ hp: 5, x: 390, y: 100 })]);
+    const session = createSession(
+      makeCtx(engine, {
+        targetX: 10,
+        targetY: 100,
+        viewportX: 210,
+        viewportY: 200,
+        config: {
+          ...((await import("../null-pointer/constants")).BASE_TOGGLES as any),
+          seekRadius: 40,
+          targetCount: 1,
+        },
+      }) as any,
+    );
+    if (session.mode !== "once") throw new Error("expected once");
+
+    const overlayCommand = session.commands.find(
+      (c) =>
+        c.kind === "spawnEffect" &&
+        (c as any).descriptor.type === "overlayEffect",
+    ) as any;
+    const damageCommands = session.commands.filter((c) => c.kind === "damage");
+
+    expect(damageCommands.length).toBeGreaterThan(0);
+    expect(overlayCommand?.descriptor?.extras?.targetPoints).toEqual([
+      { x: 190, y: 200 },
+    ]);
+    expect(overlayCommand?.descriptor?.extras?.targetX).toBe(190);
   });
 });
 

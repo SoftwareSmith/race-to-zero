@@ -35,7 +35,7 @@ export const def: WeaponDef = {
   typeLabel: "Toxin",
   typeHint: "Poisons swarms and rewards area denial over burst damage.",
   weaponType: "toxin",
-  unlockKills: 98,
+  unlockKills: 78,
   detail: BUG_SPRAY_TIERS[0].detail,
   hitPattern: HitPattern.Cone,
   hitRadius: 128,

@@ -41,7 +41,7 @@ export const def: WeaponDef = {
   typeLabel: "Gravity",
   typeHint: "Pulls elite bugs into collapse zones and rewards timing over spam.",
   weaponType: "gravity",
-  unlockKills: 132,
+  unlockKills: 108,
   detail: VOID_PULSE_TIERS[0].detail,
   hitPattern: HitPattern.BlackHole,
   hitRadius: 300,

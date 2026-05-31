@@ -15,17 +15,17 @@ describe("siege progression", () => {
     expect(stats.currentToolLabel).toBe("Hammer");
   });
 
-  it("unlocks garbage collector at 18 kills", () => {
-    const stats = getSiegeCombatStats(18);
+  it("unlocks garbage collector at 14 kills", () => {
+    const stats = getSiegeCombatStats(14);
 
     expect(stats.unlockedWeapons).toContain("hammer");
     expect(stats.unlockedWeapons).toContain("nullpointer");
     expect(stats.unlockedWeapons).not.toContain("chain");
   });
 
-  it("unlocks lightning at 42 kills but not fork bomb", () => {
-    const stats = getSiegeCombatStats(42);
-    const snapshots = getSiegeWeaponSnapshots(42, "chain");
+  it("unlocks lightning at 32 kills but not fork bomb", () => {
+    const stats = getSiegeCombatStats(32);
+    const snapshots = getSiegeWeaponSnapshots(32, "chain");
 
     expect(stats.unlockedWeapons).toContain("chain");
     expect(stats.unlockedWeapons).not.toContain("plasma");
@@ -33,21 +33,21 @@ describe("siege progression", () => {
     expect(snapshots.find((s) => s.id === "plasma")?.locked).toBe(true);
   });
 
-  it("unlocks 5 weapons at 100 kills, all 6 at 132", () => {
+  it("unlocks 5 weapons at 100 kills, all 6 at 108", () => {
     const stats100 = getSiegeCombatStats(100);
-    const stats132 = getSiegeCombatStats(132);
+    const stats108 = getSiegeCombatStats(108);
 
     expect(stats100.unlockedWeapons.length).toBe(5);
     expect(stats100.unlockedWeapons).toContain("zapper");
     expect(stats100.unlockedWeapons).not.toContain("void");
-    expect(stats132.unlockedWeapons.length).toBe(6);
-    expect(stats132.unlockedWeapons).toContain("void");
+    expect(stats108.unlockedWeapons.length).toBe(6);
+    expect(stats108.unlockedWeapons).toContain("void");
   });
 
   it("label reflects highest unlocked weapon", () => {
     expect(getSiegeCombatStats(0).currentToolLabel).toBe("Hammer");
-    expect(getSiegeCombatStats(17).currentToolLabel).toBe("Hammer");
-    expect(getSiegeCombatStats(18).currentToolLabel).toBe("Garbage Collector");
+    expect(getSiegeCombatStats(13).currentToolLabel).toBe("Hammer");
+    expect(getSiegeCombatStats(14).currentToolLabel).toBe("Garbage Collector");
     expect(getSiegeCombatStats(100).currentToolLabel).toBe("Bug Spray");
   });
 

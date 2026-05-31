@@ -70,34 +70,34 @@ const SURVIVAL_WAVE_TUNING = {
     min: 24,
   },
   spawnRate: {
-    base: 3.35,
-    exponent: 1.14,
-    growth: 0.82,
+    base: 3.05,
+    exponent: 1.11,
+    growth: 0.74,
     max: 31,
-    min: 3.35,
+    min: 3.05,
   },
   variantWeights: {
-    earlyRampMaxWave: 20,
+    earlyRampMaxWave: 22,
     lateRampSpan: 32,
     lateStartWave: 18,
     urgentExponent: 1.35,
     high: {
-      base: 0.05,
-      earlyGain: 0.2,
+      base: 0.04,
+      earlyGain: 0.17,
       lateGain: 0.06,
       max: 0.36,
-      min: 0.05,
+      min: 0.04,
     },
     low: {
-      base: 0.72,
-      earlyLoss: 0.34,
+      base: 0.74,
+      earlyLoss: 0.3,
       lateLoss: 0.18,
-      max: 0.72,
+      max: 0.74,
       min: 0.12,
     },
     medium: {
-      base: 0.22,
-      earlyGain: 0.06,
+      base: 0.21,
+      earlyGain: 0.05,
       lateLoss: 0.06,
       max: 0.32,
       min: 0.16,
@@ -153,10 +153,14 @@ const SURVIVAL_CHIP_PRESSURE_START = 0.42;
 const SURVIVAL_CHIP_DAMAGE_SCALE = 0.55;
 const SURVIVAL_METRIC_MAX = 100;
 const SURVIVAL_UPTIME_RECOVERY_PER_SECOND = 0.26;
-const SURVIVAL_ERRORS_RECOVERY_PER_SECOND = 0.44;
-const SURVIVAL_SPEED_RECOVERY_PER_SECOND = 0.3;
-const SURVIVAL_ERRORS_DRAIN_START = 0.2;
-const SURVIVAL_SPEED_DRAIN_START = 0.12;
+const SURVIVAL_ERRORS_RECOVERY_PER_SECOND = 2.8;
+const SURVIVAL_SPEED_RECOVERY_PER_SECOND = 4.2;
+const SURVIVAL_ERRORS_DRAIN_START = 0.12;
+const SURVIVAL_SPEED_DRAIN_START = 0.1;
+const SURVIVAL_ERRORS_RECOVERY_FADE_START = 0.52;
+const SURVIVAL_SPEED_RECOVERY_FADE_START = 0.46;
+const SURVIVAL_RECOVERY_FADE_END = 1.08;
+const SURVIVAL_CALM_RECOVERY_BONUS = 2.6;
 
 export interface SurvivalSpawnAccumulatorInput {
   accumulator: number;
@@ -242,18 +246,51 @@ function evolveMetricValue(
   recoveryPerSecond: number,
   tickSeconds: number,
 ): number {
-  if (drainPerSecond > 0) {
-    return clamp(
-      currentValue - drainPerSecond * tickSeconds,
-      0,
-      SURVIVAL_METRIC_MAX,
-    );
-  }
-
   return clamp(
-    currentValue + recoveryPerSecond * tickSeconds,
+    currentValue + (recoveryPerSecond - drainPerSecond) * tickSeconds,
     0,
     SURVIVAL_METRIC_MAX,
+  );
+}
+
+function getMetricDrainPerSecond(
+  pressureRatio: number,
+  drainStart: number,
+  offlineDamagePerSecond: number,
+  multiplier: number,
+): number {
+  return Number(
+    (
+      Math.max(0, pressureRatio - drainStart) * offlineDamagePerSecond * multiplier
+    ).toFixed(2),
+  );
+}
+
+function getMetricRecoveryPerSecond(
+  currentValue: number,
+  maxRecoveryPerSecond: number,
+  pressureRatio: number,
+  fadeStart: number,
+): number {
+  const missingRatio = clamp(
+    (SURVIVAL_METRIC_MAX - currentValue) / SURVIVAL_METRIC_MAX,
+    0,
+    1,
+  );
+  const recoveryStrength = Math.pow(missingRatio, 0.42);
+  const suppression = clamp(
+    (pressureRatio - fadeStart) /
+      Math.max(SURVIVAL_RECOVERY_FADE_END - fadeStart, 0.01),
+    0,
+    1,
+  );
+  const calmRatio = clamp(1 - pressureRatio / Math.max(fadeStart, 0.01), 0, 1);
+  const calmBonus = 1 + Math.pow(calmRatio, 0.7) * SURVIVAL_CALM_RECOVERY_BONUS;
+
+  return Number(
+    (
+      maxRecoveryPerSecond * recoveryStrength * (1 - suppression) * calmBonus
+    ).toFixed(2),
   );
 }
 
@@ -574,26 +611,36 @@ export function getSurvivalPressure({
   const damagePerSecond = Number(
     (chipDamagePerSecond + overloadDamagePerSecond).toFixed(2),
   );
-  const errorDrainPerSecond = Number(
-    (
-      dangerRatio > SURVIVAL_ERRORS_DRAIN_START
-        ? plan.offlineDamagePerSecond * 0.92 * (0.18 + (dangerRatio - SURVIVAL_ERRORS_DRAIN_START) * 1.18)
-        : 0
-    ).toFixed(2),
+  const errorDrainPerSecond = getMetricDrainPerSecond(
+    dangerRatio,
+    SURVIVAL_ERRORS_DRAIN_START,
+    plan.offlineDamagePerSecond,
+    1.02,
   );
-  const speedDrainPerSecond = Number(
-    (
-      speedRatio > SURVIVAL_SPEED_DRAIN_START
-        ? plan.offlineDamagePerSecond * 0.74 * (0.14 + (speedRatio - SURVIVAL_SPEED_DRAIN_START) * 0.96)
-        : 0
-    ).toFixed(2),
+  const speedDrainPerSecond = getMetricDrainPerSecond(
+    speedRatio,
+    SURVIVAL_SPEED_DRAIN_START,
+    plan.offlineDamagePerSecond,
+    0.82,
+  );
+  const errorRecoveryPerSecond = getMetricRecoveryPerSecond(
+    safeMetricValues.errors,
+    SURVIVAL_ERRORS_RECOVERY_PER_SECOND,
+    dangerRatio,
+    SURVIVAL_ERRORS_RECOVERY_FADE_START,
+  );
+  const speedRecoveryPerSecond = getMetricRecoveryPerSecond(
+    safeMetricValues.speed,
+    SURVIVAL_SPEED_RECOVERY_PER_SECOND,
+    speedRatio,
+    SURVIVAL_SPEED_RECOVERY_FADE_START,
   );
   const nextValues: SurvivalMetricValues = {
     errors: Number(
       evolveMetricValue(
         safeMetricValues.errors,
         errorDrainPerSecond,
-        SURVIVAL_ERRORS_RECOVERY_PER_SECOND,
+        errorRecoveryPerSecond,
         tickSeconds,
       ).toFixed(2),
     ),
@@ -601,7 +648,7 @@ export function getSurvivalPressure({
       evolveMetricValue(
         safeMetricValues.speed,
         speedDrainPerSecond,
-        SURVIVAL_SPEED_RECOVERY_PER_SECOND,
+        speedRecoveryPerSecond,
         tickSeconds,
       ).toFixed(2),
     ),
@@ -609,7 +656,7 @@ export function getSurvivalPressure({
       evolveMetricValue(
         safeMetricValues.uptime,
         damagePerSecond,
-        SURVIVAL_UPTIME_RECOVERY_PER_SECOND,
+        damagePerSecond > 0 ? 0 : SURVIVAL_UPTIME_RECOVERY_PER_SECOND,
         tickSeconds,
       ).toFixed(2),
     ),

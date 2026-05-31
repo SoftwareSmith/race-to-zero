@@ -4,11 +4,11 @@
  *
  * Unlock order (via WEAPON_DEFS.unlockKills):
  *   hammer      0
- *   nullpointer 18   (Garbage Collector)
- *   chain      42   (Lightning)
- *   plasma     70   (Fork Bomb)
- *   zapper     98   (Bug Spray)
- *   void      132   (Void Pulse)
+ *   nullpointer 14   (Garbage Collector)
+ *   chain      32   (Lightning)
+ *   plasma     54   (Fork Bomb)
+ *   zapper     78   (Bug Spray)
+ *   void      108   (Void Pulse)
  */
 
 import { expect, test } from "@playwright/test";
@@ -45,15 +45,15 @@ test.describe("hammer", () => {
   });
 });
 
-// ── Lightning / Chain Zap (unlocks at 42 kills) ────────────────────────────
+// ── Lightning / Chain Zap (unlocks at 32 kills) ────────────────────────────
 
 test.describe("lightning", () => {
-  test("unlocks at 42 kills and bounces between bugs", async ({ page }) => {
+  test("unlocks at 32 kills and bounces between bugs", async ({ page }) => {
     const errs = createConsoleCollectors(page);
     await openSiegeGame(page, 60);
 
-    await setQaSiegeProgress(page, { kills: 42, remainingBugs: 18 });
-    await expect(page.getByTestId("siege-kills-stat").locator("strong")).toHaveText("42");
+    await setQaSiegeProgress(page, { kills: 32, remainingBugs: 28 });
+    await expect(page.getByTestId("siege-kills-stat").locator("strong")).toHaveText("32");
     await expect(page.getByTestId("weapon-chain")).toHaveAttribute("data-locked", "false");
 
     await selectWeapon(page, "chain");
@@ -65,15 +65,15 @@ test.describe("lightning", () => {
   });
 });
 
-// ── Fork Bomb (unlocks at 70 kills) ────────────────────────────────────────
+// ── Fork Bomb (unlocks at 54 kills) ────────────────────────────────────────
 
 test.describe("fork bomb", () => {
-  test("unlocks at 70 kills and hits a clustered area", async ({ page }) => {
+  test("unlocks at 54 kills and hits a clustered area", async ({ page }) => {
     const errs = createConsoleCollectors(page);
     await openSiegeGame(page, 100);
 
-    await setQaSiegeProgress(page, { kills: 70, remainingBugs: 30 });
-    await expect(page.getByTestId("siege-kills-stat").locator("strong")).toHaveText("70");
+    await setQaSiegeProgress(page, { kills: 54, remainingBugs: 46 });
+    await expect(page.getByTestId("siege-kills-stat").locator("strong")).toHaveText("54");
     await expect(page.getByTestId("weapon-plasma")).toHaveAttribute("data-locked", "false");
 
     await selectWeapon(page, "plasma");
@@ -85,15 +85,15 @@ test.describe("fork bomb", () => {
   });
 });
 
-// ── Void Pulse (unlocks at 132 kills) ───────────────────────────────────────
+// ── Void Pulse (unlocks at 108 kills) ───────────────────────────────────────
 
 test.describe("void pulse", () => {
-  test("unlocks at 132 kills and creates a black hole", async ({ page }) => {
+  test("unlocks at 108 kills and creates a black hole", async ({ page }) => {
     const errs = createConsoleCollectors(page);
     await openSiegeGame(page, 150);
 
-    await setQaSiegeProgress(page, { kills: 132, remainingBugs: 18 });
-    await expect(page.getByTestId("siege-kills-stat").locator("strong")).toHaveText("132");
+    await setQaSiegeProgress(page, { kills: 108, remainingBugs: 42 });
+    await expect(page.getByTestId("siege-kills-stat").locator("strong")).toHaveText("108");
     await expect(page.getByTestId("weapon-void")).toHaveAttribute("data-locked", "false");
 
     await selectWeapon(page, "void");
@@ -109,7 +109,7 @@ test.describe("void pulse", () => {
     const errs = createConsoleCollectors(page);
     await openSiegeGame(page, 150);
 
-    await setQaSiegeProgress(page, { kills: 132, remainingBugs: 18 });
+    await setQaSiegeProgress(page, { kills: 108, remainingBugs: 42 });
     await selectWeapon(page, "void");
 
     // Fire twice rapidly

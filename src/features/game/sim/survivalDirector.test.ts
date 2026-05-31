@@ -62,6 +62,20 @@ describe("survival director", () => {
     );
   });
 
+  it("keeps the opening waves softer before the late-survival spike", () => {
+    const wave1 = getSurvivalWavePlan(1);
+    const wave6 = getSurvivalWavePlan(6);
+    const wave10 = getSurvivalWavePlan(10);
+    const wave25 = getSurvivalWavePlan(25);
+
+    expect(wave1.spawnRatePerSecond).toBeLessThan(4);
+    expect(wave6.spawnRatePerSecond).toBeLessThan(9);
+    expect(wave10.spawnRatePerSecond).toBeLessThan(13);
+    expect(wave25.spawnRatePerSecond).toBeGreaterThan(wave10.spawnRatePerSecond);
+    expect(wave6.variantWeights.low).toBeGreaterThan(wave6.variantWeights.high);
+    expect(wave10.variantWeights.low).toBeGreaterThan(wave10.variantWeights.urgent);
+  });
+
   it("keeps severity pressure climbing as waves skew toward dangerous bugs", () => {
     const wave1 = getSurvivalVariantWeights(1);
     const wave10 = getSurvivalVariantWeights(10);
@@ -183,6 +197,47 @@ describe("survival director", () => {
     expect(overloaded.damagePerSecond).toBeGreaterThan(0);
     expect(overloaded.damagePerSecond).toBeGreaterThan(heavy.damagePerSecond);
     expect(overloaded.secondsUntilOffline).toBeGreaterThan(0);
+  });
+
+  it("lets speed recover quickly once the live load falls back to a calm board", () => {
+    const recovered = getSurvivalPressure({
+      activeBugCount: 20,
+      activeBugCounts: { high: 0, low: 20, medium: 0, urgent: 0 },
+      metricValues: { errors: 72, speed: 40, uptime: 100 },
+      tickSeconds: 2,
+      wave: 6,
+    });
+
+    expect(recovered.failure).toBeNull();
+    expect(recovered.metrics.speed.value).toBeGreaterThan(55);
+    expect(recovered.metrics.errors.value).toBeGreaterThan(82);
+  });
+
+  it("lets speed recover under manageable live load instead of only at zero strain", () => {
+    const recovered = getSurvivalPressure({
+      activeBugCount: 50,
+      activeBugCounts: { high: 0, low: 50, medium: 0, urgent: 0 },
+      metricValues: { errors: 100, speed: 38, uptime: 100 },
+      tickSeconds: 2,
+      wave: 6,
+    });
+
+    expect(recovered.failure).toBeNull();
+    expect(recovered.metrics.speed.value).toBeGreaterThan(45);
+  });
+
+  it("starts shaving speed gradually before the board is in obvious danger", () => {
+    const pressured = getSurvivalPressure({
+      activeBugCount: 40,
+      activeBugCounts: { high: 0, low: 40, medium: 0, urgent: 0 },
+      metricValues: { errors: 100, speed: 100, uptime: 100 },
+      tickSeconds: 10,
+      wave: 6,
+    });
+
+    expect(pressured.failure).toBeNull();
+    expect(pressured.metrics.speed.value).toBeLessThan(100);
+    expect(pressured.metrics.speed.value).toBeGreaterThan(95);
   });
 
   it("fails distinct survival systems based on the live bug mix", () => {

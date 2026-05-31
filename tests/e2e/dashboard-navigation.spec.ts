@@ -42,11 +42,20 @@ test.describe("dashboard navigation QA", () => {
     );
     await expectMetricValue(
       page,
-      "Bugs closed",
+      "Bugs completed",
       custom.viewMetrics.bugsCompleted,
     );
+    await expectMetricValue(
+      page,
+      "Other closures",
+      custom.viewMetrics.otherClosures,
+    );
+    await expectMetricValue(
+      page,
+      "Bugs closed",
+      custom.viewMetrics.bugsClosed,
+    );
     await expectMetricValue(page, "Net change", custom.viewMetrics.netChange);
-    await expectMetricValue(page, "Closure rate", custom.viewMetrics.completionRate);
 
     await page.getByRole("tab", { name: "SLAs" }).click();
     await expect(page.getByRole("tab", { name: "SLAs" })).toHaveAttribute(
@@ -56,6 +65,11 @@ test.describe("dashboard navigation QA", () => {
     await expect(
       page.getByRole("button", { name: "Custom" }),
     ).toHaveAttribute("aria-selected", "true");
+    await expectMetricValue(
+      page,
+      "SLA bugs resolved",
+      insights.viewMetrics.slaResolved,
+    );
     await expectMetricValue(
       page,
       "SLA hit rate",

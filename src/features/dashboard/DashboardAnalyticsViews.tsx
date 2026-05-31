@@ -102,10 +102,10 @@ function buildInsightsMetricCards(
 ): MetricCardDefinition[] {
   return [
     {
-      hint: "Bugs completed in the selected period, regardless of whether they landed on time or overdue.",
-      label: "Resolved in period",
+      hint: "Completed bugs in the selected period that had a due date and therefore count toward SLA performance.",
+      label: "SLA bugs resolved",
       tone: "neutral",
-      value: formatNumber(insightsMetrics.totalCompleted),
+      value: formatNumber(insightsMetrics.eligibleCompleted),
     },
     {
       hint: "Share of due-dated completed bugs that landed on time. Green at 90%+, blue at 75-89.9%, red below 75%.",

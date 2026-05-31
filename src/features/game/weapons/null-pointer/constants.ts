@@ -86,7 +86,7 @@ export const def: WeaponDef = {
   typeLabel: "Precision",
   typeHint: "Tracks the highest-value bug and converts setup into clean executions.",
   weaponType: "precision",
-  unlockKills: 18,
+  unlockKills: 14,
   detail: NULL_POINTER_TIERS[0].detail,
   hitPattern: HitPattern.Seeking,
   hitRadius: SEEK_RADIUS,

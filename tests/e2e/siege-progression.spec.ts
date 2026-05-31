@@ -26,7 +26,7 @@ const progressionMetrics = {
 };
 
 test.describe("siege progression QA", () => {
-  test("unlocks garbage collector at 18 kills and lightning at 42 kills", async ({ page }) => {
+  test("unlocks garbage collector at 14 kills, lightning at 32, and fork bomb at 54", async ({ page }) => {
     const clientErrors = createConsoleCollectors(page);
 
     await page.setViewportSize({ height: 1200, width: 1440 });
@@ -56,10 +56,10 @@ test.describe("siege progression QA", () => {
       "true",
     );
 
-    await setQaSiegeProgress(page, { kills: 18, remainingBugs: 72 });
+    await setQaSiegeProgress(page, { kills: 14, remainingBugs: 76 });
 
-    await expect(page.getByTestId("siege-remaining-stat").locator("strong")).toHaveText("72");
-    await expect(page.getByTestId("siege-kills-stat").locator("strong")).toHaveText("18");
+    await expect(page.getByTestId("siege-remaining-stat").locator("strong")).toHaveText("76");
+    await expect(page.getByTestId("siege-kills-stat").locator("strong")).toHaveText("14");
     await expect(page.getByText("New Garbage Collector weapon unlocked")).toBeVisible();
     await expect(page.getByTestId("weapon-nullpointer")).toHaveAttribute(
       "data-locked",
@@ -74,10 +74,10 @@ test.describe("siege progression QA", () => {
       "true",
     );
 
-    await setQaSiegeProgress(page, { kills: 42, remainingBugs: 48 });
+    await setQaSiegeProgress(page, { kills: 32, remainingBugs: 58 });
 
-    await expect(page.getByTestId("siege-remaining-stat").locator("strong")).toHaveText("48");
-    await expect(page.getByTestId("siege-kills-stat").locator("strong")).toHaveText("42");
+    await expect(page.getByTestId("siege-remaining-stat").locator("strong")).toHaveText("58");
+    await expect(page.getByTestId("siege-kills-stat").locator("strong")).toHaveText("32");
     await expect(page.getByText("New Lightning weapon unlocked")).toBeVisible();
     await expect(page.getByTestId("weapon-chain")).toHaveAttribute(
       "data-locked",
@@ -86,6 +86,16 @@ test.describe("siege progression QA", () => {
     await expect(page.getByTestId("weapon-hammer")).toHaveAttribute(
       "data-current",
       "true",
+    );
+
+    await setQaSiegeProgress(page, { kills: 54, remainingBugs: 36 });
+
+    await expect(page.getByTestId("siege-remaining-stat").locator("strong")).toHaveText("36");
+    await expect(page.getByTestId("siege-kills-stat").locator("strong")).toHaveText("54");
+    await expect(page.getByText("New Fork Bomb weapon unlocked")).toBeVisible();
+    await expect(page.getByTestId("weapon-plasma")).toHaveAttribute(
+      "data-locked",
+      "false",
     );
 
     await clientErrors.expectNoClientErrors();

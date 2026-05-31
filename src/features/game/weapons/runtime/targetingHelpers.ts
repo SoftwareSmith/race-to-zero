@@ -5,7 +5,7 @@
  */
 
 import type { GameEngine, CanvasBounds } from "@game/weapons/runtime/types";
-import { getWrappedDistance } from "@game/engine/toroidalMath";
+import { getWrappedDelta, getWrappedDistance } from "@game/engine/toroidalMath";
 
 // ─── Nearest bug ────────────────────────────────────────────────────────────
 
@@ -143,6 +143,47 @@ export function segmentsToViewport(
     x2: Math.round(s.x2 + bounds.left),
     y2: Math.round(s.y2 + bounds.top),
   }));
+}
+
+export interface TargetPoint {
+  x: number;
+  y: number;
+}
+
+export function resolveWrappedPointRelative(
+  origin: TargetPoint,
+  target: TargetPoint,
+  width: number,
+  height: number,
+): TargetPoint {
+  return {
+    x: origin.x + getWrappedDelta(origin.x, target.x, width),
+    y: origin.y + getWrappedDelta(origin.y, target.y, height),
+  };
+}
+
+export function resolveWrappedPathNodes(
+  nodes: TargetPoint[],
+  width: number,
+  height: number,
+): TargetPoint[] {
+  if (nodes.length < 2) {
+    return nodes.map((node) => ({ ...node }));
+  }
+
+  const resolved = [{ ...nodes[0] }];
+  for (let index = 1; index < nodes.length; index += 1) {
+    resolved.push(
+      resolveWrappedPointRelative(
+        resolved[index - 1],
+        nodes[index],
+        width,
+        height,
+      ),
+    );
+  }
+
+  return resolved;
 }
 
 // ─── Coordinate conversion ───────────────────────────────────────────────────

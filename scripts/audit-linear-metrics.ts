@@ -400,7 +400,8 @@ function buildClosureBreakdown(metrics: MetricsSource, comparison: ComparisonWin
       continue;
     }
 
-    breakdown[terminalEvent.outcome] += 1;
+    const outcome = terminalEvent.outcome as keyof ClosureBreakdown;
+    breakdown[outcome] += 1;
   }
 
   return breakdown;
@@ -437,7 +438,8 @@ function buildOverlapDiagnostics(metrics: MetricsSource): OverlapDiagnostics {
     }
 
     if (markerCount > 1 && terminalEvent) {
-      assignmentBreakdown[terminalEvent.outcome] += 1;
+      const outcome = terminalEvent.outcome as keyof ClosureBreakdown;
+      assignmentBreakdown[outcome] += 1;
     }
   }
 
@@ -642,7 +644,7 @@ async function main() {
     },
     deltas: {
       created30: liveSummary.comparison.created - exportedSummary.comparison.created,
-      fixed30: liveSummary.comparison.fixed - exportedSummary.comparison.fixed,
+      completed30: liveSummary.comparison.completed - exportedSummary.comparison.completed,
       netChange30: liveSummary.comparison.netChange - exportedSummary.comparison.netChange,
       remainingBugs: liveSummary.deadline.remainingBugs - exportedSummary.deadline.remainingBugs,
       totalCompleted30: liveSummary.insights.totalCompleted - exportedSummary.insights.totalCompleted,

@@ -73,16 +73,25 @@ test.describe("dashboard core QA", () => {
     );
     await expectMetricValue(
       page,
-      "Bugs closed",
+      "Bugs completed",
       expected.viewMetrics.bugsCompleted,
     );
+    await expectMetricValue(
+      page,
+      "Other closures",
+      expected.viewMetrics.otherClosures,
+    );
+    await expectMetricValue(
+      page,
+      "Bugs closed",
+      expected.viewMetrics.bugsClosed,
+    );
     await expectMetricValue(page, "Net change", expected.viewMetrics.netChange);
-    await expectMetricValue(page, "Closure rate", expected.viewMetrics.completionRate);
 
-    await expect(page.getByText("Created vs closed over time")).toBeVisible();
+    await expect(page.getByText("Created vs closed")).toBeVisible();
     await expect(page.getByText("Current vs previous window")).toBeVisible();
     await expect(page.getByText("Period-by-period net change")).toBeVisible();
-    await expect(page.getByText("Closure vs intake trend")).toBeVisible();
+    await expect(page.getByText("Creation vs closure rate trend")).toBeVisible();
 
     await clientErrors.expectNoClientErrors();
   });

@@ -342,13 +342,6 @@ describe("useSiegeGame", () => {
 
   it("rolls survival waves forward when the timer expires", async () => {
     vi.useFakeTimers();
-    const qaWindow = window as Window & {
-      __RTZ_QA__?: {
-        enabled?: boolean;
-        setSurvivalState?: (state: { wave?: number }) => void;
-      };
-    };
-    qaWindow.__RTZ_QA__ = { enabled: true };
 
     const { result } = renderHook(() =>
       useSiegeGame({
@@ -373,13 +366,7 @@ describe("useSiegeGame", () => {
 
     expect(result.current.survivalStatus.wave).toBe(2);
     act(() => {
-      vi.advanceTimersByTime(1);
-    });
-
-    expect(qaWindow.__RTZ_QA__?.setSurvivalState).toEqual(expect.any(Function));
-
-    act(() => {
-      qaWindow.__RTZ_QA__?.setSurvivalState?.({ wave: 3 });
+      vi.advanceTimersByTime(30_000);
     });
 
     expect(result.current.survivalStatus.wave).toBe(3);
@@ -387,8 +374,6 @@ describe("useSiegeGame", () => {
       openingSpawnRate,
     );
     expect(result.current.survivalStatus.secondsUntilNextWave).toBeGreaterThan(0);
-
-    delete qaWindow.__RTZ_QA__;
   });
 
   it("starts outbreak from zero live bugs and spends the wave budget over time", () => {
@@ -570,7 +555,7 @@ describe("useSiegeGame", () => {
     });
 
     act(() => {
-      result.current.syncLiveBugState(44, { high: 6, low: 16, medium: 18, urgent: 4 });
+      result.current.syncLiveBugState(320, { high: 52, low: 68, medium: 148, urgent: 52 });
     });
 
     act(() => {
@@ -579,6 +564,45 @@ describe("useSiegeGame", () => {
 
     expect(result.current.survivalStatus.metrics.speed.value).toBeLessThan(100);
     expect(result.current.survivalStatus.metrics.errors.value).toBeLessThan(100);
+  });
+
+  it("recovers survival speed after the board calms down", () => {
+    vi.useFakeTimers();
+    const qaWindow = window as Window & {
+      __RTZ_QA__?: {
+        enabled?: boolean;
+        setSurvivalState?: (state: { speed?: number; wave?: number }) => void;
+      };
+    };
+    qaWindow.__RTZ_QA__ = { enabled: true };
+
+    const { result } = renderHook(() =>
+      useSiegeGame({
+        currentBugCount: 20,
+        currentBugCounts: { high: 0, low: 20, medium: 0, urgent: 0 },
+        evolutionStates: {},
+      }),
+    );
+
+    act(() => {
+      result.current.enterInteractiveMode("outbreak");
+      vi.advanceTimersByTime(520);
+      qaWindow.__RTZ_QA__?.setSurvivalState?.({ speed: 40, wave: 6 });
+    });
+
+    const degradedSpeed = result.current.survivalStatus.metrics.speed.value;
+
+    act(() => {
+      result.current.syncLiveBugState(50, { high: 0, low: 50, medium: 0, urgent: 0 });
+      vi.advanceTimersByTime(1_000);
+    });
+
+    expect(degradedSpeed).toBeLessThan(100);
+    expect(result.current.survivalStatus.metrics.speed.value).toBeGreaterThan(
+      degradedSpeed,
+    );
+
+    delete qaWindow.__RTZ_QA__;
   });
 
   it("keeps survival speed escalation bounded and pressure-reactive", async () => {

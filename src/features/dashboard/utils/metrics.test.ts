@@ -600,7 +600,7 @@ describe("metrics", () => {
     expect(chartData.datasets[0]?.data).toContain(1);
 
     const rateChartData = buildComparisonRateHistoryChartData(comparisonMetrics);
-    expect(rateChartData.datasets).toHaveLength(3);
+    expect(rateChartData.datasets).toHaveLength(2);
     expect(rateChartData.labels?.length).toBe(
       comparisonMetrics.historicalWindows.length,
     );

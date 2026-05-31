@@ -221,13 +221,19 @@ export function getExpectedPeriodsMetrics(
       teamKey,
     });
 
+    const otherClosures = Math.max(
+      comparisonMetrics.currentWindow.closed - comparisonMetrics.currentWindow.completed,
+      0,
+    );
+
     return {
       comparisonMetrics,
       viewMetrics: {
-        bugsCompleted: formatNumber(comparisonMetrics.currentWindow.fixed),
+        bugsClosed: formatNumber(comparisonMetrics.currentWindow.closed),
+        bugsCompleted: formatNumber(comparisonMetrics.currentWindow.completed),
         bugsCreated: formatNumber(comparisonMetrics.currentWindow.created),
-        completionRate: formatPercent(comparisonMetrics.currentWindow.completionRate, 1),
         netChange: formatSignedNumber(comparisonMetrics.currentWindow.netChange),
+        otherClosures: formatNumber(otherClosures),
       },
     };
   });
@@ -250,7 +256,7 @@ export function getExpectedInsightsMetrics(
       viewMetrics: {
         onTime: formatNumber(insightsMetrics.onTimeCompleted),
         overdue: formatNumber(insightsMetrics.overdueCompleted),
-        resolvedInPeriod: formatNumber(insightsMetrics.totalCompleted),
+        slaResolved: formatNumber(insightsMetrics.eligibleCompleted),
         slaHitRate: formatPercent(insightsMetrics.slaHitRate, 1),
       },
     };

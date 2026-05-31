@@ -13,6 +13,7 @@ import { WeaponId, WeaponTier } from "@game/types";
 import {
   findNearestBugInRadius,
   canvasToViewport,
+  resolveWrappedPathNodes,
 } from "@game/weapons/runtime/targetingHelpers";
 import { BASE_TOGGLES } from "./constants";
 
@@ -70,21 +71,29 @@ export function createSession(ctx: WeaponContext): ClickFireResult {
   const bugs = engine.getAllBugs();
 
   // Canvas-local positions for Pixi lightning (starts at click, then each bug)
-  const lightningNodes = [
-    { x: targetX, y: targetY },
-    ...chainIndexes.map((idx) => ({
-      x: bugs[idx]?.x ?? targetX,
-      y: bugs[idx]?.y ?? targetY,
-    })),
-  ];
+  const lightningNodes = resolveWrappedPathNodes(
+    [
+      { x: targetX, y: targetY },
+      ...chainIndexes.map((idx) => ({
+        x: bugs[idx]?.x ?? targetX,
+        y: bugs[idx]?.y ?? targetY,
+      })),
+    ],
+    bounds.width,
+    bounds.height,
+  );
 
   // Viewport positions for SVG overlay arc
-  const viewportChainNodes = chainIndexes
-    .map((idx) => {
-      const bug = bugs[idx];
-      return bug ? canvasToViewport(bug.x, bug.y, bounds) : null;
-    })
-    .filter(Boolean) as Array<{ x: number; y: number }>;
+  const viewportChainNodes = resolveWrappedPathNodes(
+    chainIndexes
+      .map((idx) => {
+        const bug = bugs[idx];
+        return bug ? canvasToViewport(bug.x, bug.y, bounds) : null;
+      })
+      .filter(Boolean) as Array<{ x: number; y: number }>,
+    bounds.width,
+    bounds.height,
+  );
 
   // Damage each target in the chain
   for (const idx of chainIndexes) {

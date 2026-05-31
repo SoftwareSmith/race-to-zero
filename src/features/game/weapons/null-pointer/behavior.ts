@@ -13,7 +13,10 @@ import type {
   WeaponCommand,
 } from "@game/weapons/runtime/types";
 import { WeaponTier } from "@game/types";
-import { canvasToViewport } from "@game/weapons/runtime/targetingHelpers";
+import {
+  canvasToViewport,
+  resolveWrappedPointRelative,
+} from "@game/weapons/runtime/targetingHelpers";
 import { BASE_TOGGLES } from "./constants";
 import {
   canSpreadMarks,
@@ -49,7 +52,12 @@ export function createSession(ctx: WeaponContext): ClickFireResult {
 
   const targets = getPriorityTargets(engine, targetX, targetY, seekRadius, targetCount);
   const targetPoints = targets.map(({ bug }) =>
-    canvasToViewport(bug.x, bug.y, bounds),
+    resolveWrappedPointRelative(
+      { x: viewportX, y: viewportY },
+      canvasToViewport(bug.x, bug.y, bounds),
+      bounds.width,
+      bounds.height,
+    ),
   );
 
   // Always emit overlay — null pointer is in OVERLAY_EFFECT_WEAPONS
