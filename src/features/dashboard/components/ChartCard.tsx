@@ -187,6 +187,7 @@ const ChartCard = memo(function ChartCard({
     showUnifiedAllValuesTooltip(
       chart,
       event.currentTarget.getBoundingClientRect(),
+      chartKey,
     );
   };
 

@@ -2,18 +2,60 @@ import type { GameConfig } from "./types";
 import { DEFAULT_GAME_CONFIG } from "./types";
 import { BugEntity } from "./BugEntity";
 import { Entity } from "./Entity";
-import { getBugVariantMaxHp } from "../../../constants/bugs";
-import { ALL_WEAPON_IDS, EntityState, WeaponMatchup, WeaponTier, isTerminalEntityState } from "../types";
+import { EntityState, WeaponMatchup, WeaponTier, isTerminalEntityState } from "../types";
 import type { StructureId, SiegeWeaponId, WeaponEvolutionState } from "../types";
 import type { SiegeStatusId } from "@game/status/statusCatalog";
-import { WEAPON_EVOLVE_THRESHOLDS } from "@config/gameDefaults";
 import { applyMatchupDamage, getBugWeaponMatchup } from "@game/combat/weaponMatchups";
 import type { AllyConversionConfig } from "@game/weapons/runtime/types";
 import type { BugVariant } from "../../../types/dashboard";
+import { WeaponEvolutionTracker } from "./weaponEvolutionTracker";
+import { EngineStructureState } from "./engineStructures";
+import {
+  chainHitTestEntities,
+  chainHitTestPreferUnfrozenEntities,
+  closestTargetIndexForEntities,
+  coneHitTestEntities,
+  hitTestEntity,
+  lineHitTestEntities,
+  radiusHitTestEntities,
+} from "./engineQueries";
+import {
+  applyBurnInRadiusToEntities,
+  applyChargedInRadiusToEntities,
+  applyEnsnareInRadiusToEntities,
+  applyMarkedInRadiusToEntities,
+  applyPoisonInRadiusToEntities,
+  applyUnstableInRadiusToEntities,
+  propagateChargedNetworkOnEntities,
+  triggerAutoScalerPulseOnEntities,
+} from "./engineStatusEffects";
+import {
+  beginEntitySteps,
+  createBugUpdateContext,
+  updateEntitiesForFrame,
+} from "./engineUpdate";
+import {
+  allyBugOnEntities,
+  splitBugOnEntities,
+} from "./engineMutations";
+import { triggerKernelPanicExplosionOnEntities } from "./engineCombatActions";
+import {
+  startBlackHoleState,
+  startEventHorizonState,
+  tickBlackHoleState,
+  tickEventHorizons,
+  type EngineBlackHoleState,
+  type EventHorizonState,
+} from "./engineVoidEffects";
+import {
+  spawnBurstEntities,
+  spawnEntitiesFromCounts,
+  spawnEntitiesFromSnapshot,
+  type SpawnZone,
+} from "./engineSpawn";
 import {
   getWrappedDelta,
   getWrappedDistance,
-  wrapCoordinate,
 } from "./toroidalMath";
 import {
   EntitySpatialIndex,
@@ -22,74 +64,14 @@ import {
   isToroidalEntity as isToroidalFieldEntity,
 } from "./spatialIndex";
 import {
-  MAX_ACTIVE_BUGS,
-  normalizeSpawnCounts,
   sanitizeGameConfig,
-  sanitizeSnapshotItems,
 } from "./runtimeSafety";
 import type {
   BugTransitionSnapshotItem,
   QaBugTelemetryItem,
 } from "@game/components/BackgroundField/types";
 
-interface StructureEntry {
-  id: string;
-  type: StructureId;
-  tier: WeaponTier;
-  x: number;
-  y: number;
-  /** engine ticks until next agent capture */
-  nextCaptureAt: number;
-  /** When the agent is processing a captured bug, holds capture state */
-  absorbing: {
-    variant: string;
-    bugX: number;
-    bugY: number;
-    /** original capture position for pull animation */
-    pullFromX: number;
-    pullFromY: number;
-    /** elapsedMs when pull started */
-    pullStartedAt: number;
-    size: number;
-    completesAt: number;
-    failChance: number;
-  } | null;
-}
-
 const DEFAULT_MAX_ACTIVE_ALLIES = 5;
-const GOLDEN_RATIO_CONJUGATE = 0.61803398875;
-
-function clamp(value: number, min: number, max: number) {
-  return Math.min(max, Math.max(min, value));
-}
-
-function fract(value: number) {
-  return value - Math.floor(value);
-}
-
-interface BugUpdateContextLike {
-  bounds: {
-    height: number;
-    width: number;
-  };
-  config: GameConfig;
-  getCrowdingAt: (x: number, y: number, radius: number, exclude?: Entity) => {
-    centerX: number;
-    centerY: number;
-    count: number;
-    score: number;
-  };
-  getNeighbors: (entity: Entity, radius: number) => Entity[];
-  targetX?: number | null;
-  targetY?: number | null;
-}
-
-interface SpawnZone {
-  height: number;
-  left: number;
-  top: number;
-  width: number;
-}
 
 export interface EngineOptions {
   width: number;
@@ -144,21 +126,14 @@ export class Engine {
       supportStatuses?: SiegeStatusId[];
     },
   ) => void;
-  private structures: StructureEntry[] = [];
   private elapsedMs = 0;
   private onPerformanceSample?: (sample: EnginePerformanceSample) => void;
-  /** Per-weapon kill counts and tiers for the evolution system. */
-  weaponEvolutionStates: Map<SiegeWeaponId, WeaponEvolutionState>;
   onWeaponEvolution?: (weaponId: SiegeWeaponId, newTier: WeaponTier) => void;
   private maxWeaponTier: WeaponTier;
+  private weaponEvolutionTracker: WeaponEvolutionTracker;
+  private structureState = new EngineStructureState();
   /** Active event horizons: consume unstable bugs on contact. */
-  private eventHorizons: Array<{
-    x: number;
-    y: number;
-    radius: number;
-    expiresAt: number;
-    weaponId?: SiegeWeaponId;
-  }> = [];
+  private eventHorizons: EventHorizonState[] = [];
   private spatialIndex = new EntitySpatialIndex(Math.max(
     DEFAULT_GAME_CONFIG.separationRadius * 2,
     56,
@@ -168,19 +143,7 @@ export class Engine {
    * Black hole state for Void Pulse.
    * Only one black hole can exist at a time.
    */
-  private blackHole: {
-    x: number;
-    y: number;
-    radius: number;
-    coreRadius: number;
-    collapseDamage: number;
-    startedAt: number;
-    durationMs: number;
-    active: boolean;
-    weaponId?: SiegeWeaponId;
-    eventHorizonRadius?: number;
-    eventHorizonDurationMs?: number;
-  } | null = null;
+  private blackHole: EngineBlackHoleState | null = null;
 
   constructor(canvas: HTMLCanvasElement, opts: EngineOptions) {
     this.canvas = canvas;
@@ -195,52 +158,21 @@ export class Engine {
     this.onEntityDeath = opts.onEntityDeath;
     this.onWeaponEvolution = opts.onWeaponEvolution;
     this.maxWeaponTier = opts.maxWeaponTier ?? WeaponTier.TIER_THREE;
-    this.weaponEvolutionStates = new Map(
-      ALL_WEAPON_IDS.map((id) => [
-        id,
-        {
-          kills: opts.initialEvolutionStates?.[id]?.kills ?? 0,
-          tier: Math.min(
-            opts.initialEvolutionStates?.[id]?.tier ?? WeaponTier.TIER_ONE,
-            this.maxWeaponTier,
-          ) as WeaponTier,
-        },
-      ]),
-    );
+    this.weaponEvolutionTracker = new WeaponEvolutionTracker({
+      initialEvolutionStates: opts.initialEvolutionStates,
+      maxWeaponTier: this.maxWeaponTier,
+      onWeaponEvolution: this.onWeaponEvolution,
+    });
   }
 
   /** Record a weapon kill and check for evolution. */
   recordWeaponKill(weaponId: SiegeWeaponId | undefined | null): void {
-    if (!weaponId) return;
-    const state = this.weaponEvolutionStates.get(weaponId);
-    if (!state) return;
-    state.kills++;
-
-    if (state.tier >= this.maxWeaponTier) {
-      return;
-    }
-
-    this.checkEvolution(weaponId);
-  }
-
-  private checkEvolution(weaponId: SiegeWeaponId): void {
-    const state = this.weaponEvolutionStates.get(weaponId);
-    if (!state) return;
-    if (state.tier >= this.maxWeaponTier) return;
-
-    const nextTier = (state.tier + 1) as WeaponTier;
-    if (nextTier > this.maxWeaponTier) return;
-
-    const threshold = WEAPON_EVOLVE_THRESHOLDS[weaponId][state.tier - 1];
-    if (threshold != null && state.kills >= threshold) {
-      state.tier = nextTier;
-      this.onWeaponEvolution?.(weaponId, nextTier);
-    }
+    this.weaponEvolutionTracker.recordKill(weaponId);
   }
 
   /** Get all current evolution states (for persistence). */
   getWeaponEvolutionStates(): Map<SiegeWeaponId, WeaponEvolutionState> {
-    return this.weaponEvolutionStates;
+    return this.weaponEvolutionTracker.getStates();
   }
 
   setSize(w: number, h: number) {
@@ -278,269 +210,45 @@ export class Engine {
     counts: Record<string, number>,
     spawnZones: SpawnZone[] = [],
   ) {
-    const normalizedCounts = normalizeSpawnCounts(counts, MAX_ACTIVE_BUGS);
-    const usableZones = spawnZones.filter(
-      (zone) => zone.width > 24 && zone.height > 24,
-    );
-    const totalZoneArea = usableZones.reduce(
-      (total, zone) => total + zone.width * zone.height,
-      0,
-    );
-    const getSpawnPoint = () => {
-      const padding = 18;
-      if (!usableZones.length || Math.random() > 0.38 || totalZoneArea <= 0) {
-        return {
-          x: padding + Math.random() * Math.max(1, this.width - padding * 2),
-          y: padding + Math.random() * Math.max(1, this.height - padding * 2),
-        };
-      }
-
-      let roll = Math.random() * totalZoneArea;
-      let selectedZone = usableZones[0];
-      for (const zone of usableZones) {
-        roll -= zone.width * zone.height;
-        if (roll <= 0) {
-          selectedZone = zone;
-          break;
-        }
-      }
-
-      return {
-        x: Math.min(
-          this.width - padding,
-          Math.max(
-            padding,
-            selectedZone.left + Math.random() * selectedZone.width,
-          ),
-        ),
-        y: Math.min(
-          this.height - padding,
-          Math.max(
-            padding,
-            selectedZone.top + Math.random() * selectedZone.height,
-          ),
-        ),
-      };
-    };
-
-    // reuse pool when possible
-    this.entities = [];
-    const variants = Object.keys(normalizedCounts);
-    for (const v of variants) {
-      const n = normalizedCounts[v] ?? 0;
-      for (let i = 0; i < n; i++) {
-        let be: BugEntity | undefined = undefined;
-        // spawn uniformly across the canvas with random initial headings
-        const { x: spawnX, y: spawnY } = getSpawnPoint();
-        const heading = Math.random() * Math.PI * 2;
-        const speed = this.config.baseSpeed * (0.8 + Math.random() * 0.6);
-
-        if (this.pool.length > 0) {
-          be = this.pool.pop()!;
-          be.revive(this.width, this.height);
-          be.variant = (v as any) || "low";
-          be.size = (6 + Math.random() * 2) * this.config.sizeMultiplier;
-          be.baseSize = be.size;
-          be.maxHp = getBugVariantMaxHp(be.variant as any);
-          be.hp = be.maxHp;
-          be.x = spawnX;
-          be.y = spawnY;
-          be.vx = Math.cos(heading) * speed;
-          be.vy = Math.sin(heading) * speed;
-          be.heading = heading;
-          be.hasEnteredField = true;
-        } else {
-          be = new BugEntity({
-            x: spawnX,
-            y: spawnY,
-            vx: Math.cos(heading) * speed,
-            vy: Math.sin(heading) * speed,
-            size: (6 + Math.random() * 2) * this.config.sizeMultiplier,
-            opacity: 1,
-            variant: (v as any) || "low",
-            heading,
-          } as any);
-          be.baseSize = be.size;
-          be.maxHp = getBugVariantMaxHp(be.variant as any);
-          be.hp = be.maxHp;
-          be.hasEnteredField = true;
-        }
-        this.entities.push(be);
-      }
-    }
-  }
-
-  private getEdgeSpawnPoint(spawnIndex = 0, totalCount = 1) {
-    const padding = 18;
-    const edge = Math.floor(Math.random() * 4);
-    const spanPosition =
-      totalCount > 1
-        ? fract(spawnIndex * GOLDEN_RATIO_CONJUGATE + Math.random() * 0.35)
-        : Math.random();
-    const jitterScale = Math.min(0.22, 0.9 / Math.max(3, totalCount));
-    const lanePosition = clamp(
-      spanPosition + (Math.random() - 0.5) * jitterScale,
-      0.03,
-      0.97,
-    );
-    const x = padding + lanePosition * Math.max(1, this.width - padding * 2);
-    const y = padding + lanePosition * Math.max(1, this.height - padding * 2);
-
-    if (edge === 0) {
-      return { heading: Math.PI / 2, x, y: -padding };
-    }
-
-    if (edge === 1) {
-      return { heading: Math.PI, x: this.width + padding, y };
-    }
-
-    if (edge === 2) {
-      return { heading: -Math.PI / 2, x, y: this.height + padding };
-    }
-
-    return { heading: 0, x: -padding, y };
+    this.entities = spawnEntitiesFromCounts({
+      config: this.config,
+      counts,
+      height: this.height,
+      pool: this.pool,
+      spawnZones,
+      width: this.width,
+    });
   }
 
   spawnBurst(counts: Record<string, number>, spawnZones: SpawnZone[] = []) {
     void spawnZones;
-    const remainingCapacity = Math.max(0, MAX_ACTIVE_BUGS - this.entities.length);
-    const normalizedCounts = normalizeSpawnCounts(counts, remainingCapacity);
-    const variants = Object.keys(normalizedCounts);
-    const totalCount = variants.reduce(
-      (total, variant) => total + Math.max(0, normalizedCounts[variant] ?? 0),
-      0,
+    this.entities.push(
+      ...spawnBurstEntities({
+        config: this.config,
+        counts,
+        currentEntityCount: this.entities.length,
+        height: this.height,
+        pool: this.pool,
+        width: this.width,
+      }),
     );
-    let spawnIndex = 0;
-
-    for (const variant of variants) {
-      const count = normalizedCounts[variant] ?? 0;
-      for (let index = 0; index < count; index += 1) {
-        const spawnPoint = this.getEdgeSpawnPoint(spawnIndex, totalCount);
-        const targetX = this.width * (0.18 + Math.random() * 0.64);
-        const targetY = this.height * (0.18 + Math.random() * 0.64);
-        const inwardHeading = Math.atan2(targetY - spawnPoint.y, targetX - spawnPoint.x);
-        const heading = inwardHeading + (Math.random() - 0.5) * 0.55;
-        const speed = this.config.baseSpeed * (0.9 + Math.random() * 0.85);
-        let bug: BugEntity;
-
-        if (this.pool.length > 0) {
-          bug = this.pool.pop()!;
-          bug.revive(this.width, this.height);
-          bug.variant = (variant as any) || "low";
-          bug.size = (6 + Math.random() * 2) * this.config.sizeMultiplier;
-          bug.baseSize = bug.size;
-          bug.maxHp = getBugVariantMaxHp(bug.variant as any);
-          bug.hp = bug.maxHp;
-          bug.x = spawnPoint.x;
-          bug.y = spawnPoint.y;
-          bug.vx = Math.cos(heading) * speed;
-          bug.vy = Math.sin(heading) * speed;
-          bug.heading = heading;
-          bug.hasEnteredField = false;
-        } else {
-          bug = new BugEntity({
-            heading,
-            opacity: 1,
-            size: (6 + Math.random() * 2) * this.config.sizeMultiplier,
-            variant: (variant as any) || "low",
-            vx: Math.cos(heading) * speed,
-            vy: Math.sin(heading) * speed,
-            x: spawnPoint.x,
-            y: spawnPoint.y,
-          } as any);
-          bug.baseSize = bug.size;
-          bug.maxHp = getBugVariantMaxHp(bug.variant as any);
-          bug.hp = bug.maxHp;
-          bug.hasEnteredField = false;
-        }
-
-        this.entities.push(bug);
-        spawnIndex += 1;
-      }
-    }
   }
 
   spawnFromSnapshot(snapshot: BugTransitionSnapshotItem[]) {
-    const sanitizedSnapshot = sanitizeSnapshotItems(
+    this.entities = spawnEntitiesFromSnapshot({
+      height: this.height,
+      pool: this.pool,
       snapshot,
-      this.width,
-      this.height,
-      MAX_ACTIVE_BUGS,
-    );
-    this.entities = [];
-    const now = performance.now();
-
-    for (const item of sanitizedSnapshot) {
-      let bug = this.pool.pop();
-
-      if (bug) {
-        bug.revive(this.width, this.height);
-        bug.variant = item.variant;
-        bug.size = item.size;
-        bug.baseSize = item.size;
-        bug.maxHp = item.maxHp;
-        bug.hp = item.hp;
-        bug.x = item.x;
-        bug.y = item.y;
-        bug.prevX = item.prevX ?? item.x;
-        bug.prevY = item.prevY ?? item.y;
-        bug.vx = item.vx;
-        bug.vy = item.vy;
-        bug.heading = item.heading;
-        bug.opacity = item.opacity;
-      } else {
-        bug = new BugEntity({
-          heading: item.heading,
-          opacity: item.opacity,
-          size: item.size,
-          variant: item.variant,
-          vx: item.vx,
-          vy: item.vy,
-          x: item.x,
-          y: item.y,
-        } as any);
-        bug.baseSize = item.size;
-        bug.maxHp = item.maxHp;
-        bug.hp = item.hp;
-        bug.prevX = item.prevX ?? item.x;
-        bug.prevY = item.prevY ?? item.y;
-      }
-
-      bug.seed = item.seed ?? bug.seed;
-      bug.wanderAngle = item.wanderAngle ?? bug.wanderAngle;
-      bug.cruiseSpeed = item.cruiseSpeed ?? bug.cruiseSpeed;
-      bug.turnRate = item.turnRate ?? bug.turnRate;
-      bug.motionTime = item.motionTime ?? bug.motionTime;
-      bug.roamTargetX = item.roamTargetX ?? null;
-      bug.roamTargetY = item.roamTargetY ?? null;
-      bug.roamTargetWide = item.roamTargetWide === true;
-      bug.roamTargetLongPath = item.roamTargetLongPath === true;
-      bug.nextRoamTargetAt = now + (item.nextRoamTargetDelayMs ?? 0);
-      bug.roamTargetGeneration = item.roamTargetGeneration ?? 0;
-      bug.movementMood = item.movementMood === "startled" ? "startled" : "patrol";
-      bug.state = item.state === "flee" ? "flee" : "patrol";
-      bug.fleeTimer = item.state === "flee" ? (item.fleeTimer ?? 0) : null;
-      bug.hasEnteredField =
-        item.hasEnteredField ??
-        (item.x >= 0 && item.x <= this.width && item.y >= 0 && item.y <= this.height);
-
-      this.entities.push(bug);
-    }
+      width: this.width,
+    });
   }
 
   // hit-test in canvas-local coordinates (x,y) -> returns nearest entity index within radius
   hitTest(x: number, y: number) {
-    let best: { index: number; distance: number } | null = null;
-    for (let i = 0; i < this.entities.length; i++) {
-      const e = this.entities[i] as any;
-      if (isTerminalEntityState(e.state)) continue;
-      const dist = this.getDistanceFromPointToEntity(x, y, e);
-      const radius = Math.max((e.size ?? 12) * 0.5, 12);
-      if (dist <= radius && (!best || dist < best.distance)) {
-        best = { index: i, distance: dist };
-      }
-    }
-    return best;
+    return hitTestEntity(this.entities, x, y, {
+      getDistanceFromPointToEntity: (px, py, entity) =>
+        this.getDistanceFromPointToEntity(px, py, entity),
+    });
   }
 
   /**
@@ -549,35 +257,12 @@ export class Engine {
    * @param hitRadius - extra tolerance added to each entity's size radius
    */
   lineHitTest(x1: number, y1: number, x2: number, y2: number, hitRadius = 12): number[] {
-    const result: number[] = [];
     const dx = getWrappedDelta(x1, x2, this.width);
     const dy = getWrappedDelta(y1, y2, this.height);
-    const lenSq = dx * dx + dy * dy;
-
-    for (let i = 0; i < this.entities.length; i++) {
-      const e = this.entities[i] as any;
-      if (isTerminalEntityState(e.state)) continue;
-
-      const projected = this.getPointNearEntity(x1, y1, e);
-
-      // Closest point on segment to entity center
-      let t = 0;
-      if (lenSq > 0) {
-        t = Math.max(
-          0,
-          Math.min(1, ((projected.x - x1) * dx + (projected.y - y1) * dy) / lenSq),
-        );
-      }
-      const closestX = x1 + t * dx;
-      const closestY = y1 + t * dy;
-      const dist = Math.hypot(projected.x - closestX, projected.y - closestY);
-
-      if (dist <= Math.max((e.size ?? 12) * 0.5, 8) + hitRadius) {
-        result.push(i);
-      }
-    }
-
-    return result;
+    return lineHitTestEntities(this.entities, x1, y1, x1 + dx, y1 + dy, hitRadius, {
+      getEntityDeltaFromPoint: (px, py, entity) =>
+        this.getEntityDeltaFromPoint(px, py, entity),
+    });
   }
 
   /**
@@ -585,19 +270,10 @@ export class Engine {
    * Used by the pulse weapon.
    */
   radiusHitTest(cx: number, cy: number, radius: number): number[] {
-    const result: number[] = [];
-
-    for (let i = 0; i < this.entities.length; i++) {
-      const e = this.entities[i] as any;
-      if (isTerminalEntityState(e.state)) continue;
-
-      const dist = this.getDistanceFromPointToEntity(cx, cy, e);
-      if (dist <= radius + Math.max((e.size ?? 12) * 0.5, 8)) {
-        result.push(i);
-      }
-    }
-
-    return result;
+    return radiusHitTestEntities(this.entities, cx, cy, radius, {
+      getDistanceFromPointToEntity: (px, py, entity) =>
+        this.getDistanceFromPointToEntity(px, py, entity),
+    });
   }
 
   addEntity(e: Entity) {
@@ -677,9 +353,7 @@ export class Engine {
     this.elapsedMs += dt * 1000;
     const perfStartedAt = this.onPerformanceSample ? performance.now() : 0;
 
-    for (const ent of this.entities) {
-      ent.beginStep();
-    }
+    beginEntitySteps(this.entities);
 
     const spatialGridStartedAt = this.onPerformanceSample
       ? performance.now()
@@ -688,59 +362,28 @@ export class Engine {
     const spatialGridMs = this.onPerformanceSample
       ? performance.now() - spatialGridStartedAt
       : 0;
-    const updateContext: BugUpdateContextLike = {
-      bounds: { height: this.height, width: this.width },
+    const updateContext = createBugUpdateContext({
       config: this.config,
-      getCrowdingAt: (x, y, radius, exclude) =>
-        this.getCrowdingAt(x, y, radius, exclude),
+      getCrowdingAt: (x, y, radius, exclude) => this.getCrowdingAt(x, y, radius, exclude),
       getNeighbors: (entity, radius) => this.getNeighbors(entity, radius),
+      height: this.height,
       targetX,
       targetY,
-    };
+      width: this.width,
+    });
 
     // iterate backwards so we can safely remove dead entities into the pool
     const entityUpdateStartedAt = this.onPerformanceSample
       ? performance.now()
       : 0;
-    for (let i = this.entities.length - 1; i >= 0; i--) {
-      const ent = this.entities[i];
-      if ((ent as any).update.length >= 2) {
-        // pass context expected by BugEntity
-        (ent as any).update(dt, updateContext);
-      } else {
-        (ent as any).update(dt);
-      }
-
-      // handle dead entities: move to pool and remove from active list once
-      if ((ent as any).state === EntityState.Dead) {
-        const be = ent as any as BugEntity;
-        // Attribute DOT kills to the source weapon
-        if (
-          be.dotSourceWeaponId &&
-          !be.deathCredited &&
-          (be.finalBlowStatus === "poison" ||
-            be.finalBlowStatus === "burn" ||
-            be.finalBlowStatus === "looped")
-        ) {
-          this.recordWeaponKill(be.dotSourceWeaponId as SiegeWeaponId);
-        }
-        try {
-          this.onEntityDeath?.(be.x, be.y, be.variant, {
-            credited: be.deathCredited,
-            finisherStatus: be.finalBlowStatus,
-            frozen:
-              be.slow !== null && performance.now() < be.slow.expiresAt,
-            pointValue: be.deathPointValue,
-            supportStatuses: be.supportStatusesAtDeath,
-          });
-        } catch {
-          void 0;
-        }
-        // push to pool for reuse and remove from active entities
-        this.pool.push(be);
-        this.entities.splice(i, 1);
-      }
-    }
+    updateEntitiesForFrame({
+      dt,
+      entities: this.entities,
+      onEntityDeath: this.onEntityDeath,
+      pool: this.pool,
+      recordWeaponKill: (weaponId) => this.recordWeaponKill(weaponId),
+      updateContext,
+    });
     const entityUpdateMs = this.onPerformanceSample
       ? performance.now() - entityUpdateStartedAt
       : 0;
@@ -813,32 +456,10 @@ export class Engine {
     arcDeg: number,
     depth: number,
   ): number[] {
-    const result: number[] = [];
-    const halfArc = (arcDeg / 2) * (Math.PI / 180);
-    const centreAngle = angleDeg * (Math.PI / 180);
-
-    for (let i = 0; i < this.entities.length; i++) {
-      const e = this.entities[i] as any;
-      if (isTerminalEntityState(e.state)) continue;
-
-      const { dx, dy } = this.getEntityDeltaFromPoint(cx, cy, e);
-      const dist = Math.hypot(dx, dy);
-      const entityRadius = Math.max((e.size ?? 12) * 0.5, 8);
-
-      if (dist > depth + entityRadius) continue;
-
-      // Entities very close to the origin are always hit
-      if (dist < 1) {
-        result.push(i);
-        continue;
-      }
-
-      let diff = Math.atan2(dy, dx) - centreAngle;
-      while (diff > Math.PI) diff -= Math.PI * 2;
-      while (diff < -Math.PI) diff += Math.PI * 2;
-      if (Math.abs(diff) <= halfArc) result.push(i);
-    }
-    return result;
+    return coneHitTestEntities(this.entities, cx, cy, angleDeg, arcDeg, depth, {
+      getEntityDeltaFromPoint: (px, py, entity) =>
+        this.getEntityDeltaFromPoint(px, py, entity),
+    });
   }
 
   /**
@@ -851,38 +472,11 @@ export class Engine {
     chainRadius: number,
     maxBounces: number,
   ): number[] {
-    const result: number[] = [];
-    if (startIndex < 0 || startIndex >= this.entities.length) return result;
-
-    const visited = new Set<number>([startIndex]);
-    let currentIndex = startIndex;
-
-    for (let bounce = 0; bounce < maxBounces; bounce++) {
-      const current = this.entities[currentIndex] as any;
-      if (!current) break;
-
-      let bestDist = Infinity;
-      let bestIndex = -1;
-
-      for (let i = 0; i < this.entities.length; i++) {
-        if (visited.has(i)) continue;
-        const e = this.entities[i] as any;
-        if (isTerminalEntityState(e.state)) continue;
-        const dist = this.isToroidalEntity(current) && this.isToroidalEntity(e)
-          ? getWrappedDistance(current.x, current.y, e.x, e.y, this.width, this.height)
-          : Math.hypot(current.x - e.x, current.y - e.y);
-        if (dist <= chainRadius && dist < bestDist) {
-          bestDist = dist;
-          bestIndex = i;
-        }
-      }
-
-      if (bestIndex === -1) break;
-      result.push(bestIndex);
-      visited.add(bestIndex);
-      currentIndex = bestIndex;
-    }
-    return result;
+    return chainHitTestEntities(this.entities, startIndex, chainRadius, maxBounces, {
+      height: this.height,
+      isToroidalEntity: (entity) => this.isToroidalEntity(entity),
+      width: this.width,
+    });
   }
 
   /**
@@ -895,24 +489,10 @@ export class Engine {
     cy: number,
     searchRadius: number,
   ): number {
-    let bestIndex = -1;
-    let bestHp = -1;
-    let bestDist = Infinity;
-    const useRadius = Number.isFinite(searchRadius) ? searchRadius : Infinity;
-
-    for (let i = 0; i < this.entities.length; i++) {
-      const e = this.entities[i] as any;
-      if (isTerminalEntityState(e.state)) continue;
-      const dist = this.getDistanceFromPointToEntity(cx, cy, e);
-      if (dist > useRadius) continue;
-      const hp = e.hp ?? 1;
-      if (hp > bestHp || (hp === bestHp && dist < bestDist)) {
-        bestHp = hp;
-        bestDist = dist;
-        bestIndex = i;
-      }
-    }
-    return bestIndex;
+    return closestTargetIndexForEntities(this.entities, cx, cy, searchRadius, {
+      getDistanceFromPointToEntity: (px, py, entity) =>
+        this.getDistanceFromPointToEntity(px, py, entity),
+    });
   }
 
   // ── Structure management ──────────────────────────────────────────────────
@@ -927,52 +507,34 @@ export class Engine {
     type: StructureId,
     forcedId?: string,
   ): string {
-    const maxPlaced = 2;
-    const existing = this.structures.filter((s) => s.type === type);
-    if (existing.length >= maxPlaced) {
-      const oldest = existing[0];
-      this.structures = this.structures.filter((s) => s.id !== oldest.id);
-    }
-    const id =
-      forcedId ??
-      `${type}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
-    this.structures.push({
-      id, type, tier: WeaponTier.TIER_ONE, x, y,
-      nextCaptureAt: this.elapsedMs + 1400,
-      absorbing: null,
-    });
-    return id;
+    return this.structureState.addStructure(x, y, type, this.elapsedMs, forcedId);
   }
 
   updateStructureTier(id: string, tier: WeaponTier): void {
-    const structure = this.structures.find((entry) => entry.id === id);
-    if (structure) {
-      structure.tier = tier;
-    }
+    this.structureState.updateStructureTier(id, tier);
   }
 
   removeStructure(id: string): void {
-    this.structures = this.structures.filter((s) => s.id !== id);
+    this.structureState.removeStructure(id);
   }
 
   getStructures(): Array<{ id: string; type: StructureId; tier: WeaponTier; x: number; y: number }> {
-    return this.structures.map(({ id, type, tier, x, y }) => ({ id, type, tier, x, y }));
+    return this.structureState.getStructures();
   }
 
   // ── Status-effect area applicators ─────────────────────────────────
 
   applyPoisonInRadius(cx: number, cy: number, radius: number, dps: number, durationMs: number, weaponId?: SiegeWeaponId): void {
-    for (const e of this.entities) {
-      const bug = e as any;
-      if (isTerminalEntityState(bug.state)) continue;
-      if (this.getDistanceFromPointToEntity(cx, cy, e) <= radius) {
-        if (weaponId) {
-          const matchup = getBugWeaponMatchup(bug.variant as BugVariant, weaponId);
-          if (matchup === WeaponMatchup.Immune) continue;
-        }
-        if (typeof bug.applyPoison === "function") bug.applyPoison(dps, durationMs, weaponId);
-      }
-    }
+    applyPoisonInRadiusToEntities(
+      this.entities,
+      cx,
+      cy,
+      radius,
+      dps,
+      durationMs,
+      (x, y, entity) => this.getDistanceFromPointToEntity(x, y, entity),
+      weaponId,
+    );
   }
 
   applyBurnInRadius(
@@ -984,35 +546,29 @@ export class Engine {
     decayPerSecond = 3.2,
     weaponId?: SiegeWeaponId,
   ): void {
-    for (const e of this.entities) {
-      const bug = e as any;
-      if (isTerminalEntityState(bug.state)) continue;
-      const dist = this.getDistanceFromPointToEntity(cx, cy, e);
-      if (dist > radius) continue;
-      if (weaponId) {
-        const matchup = getBugWeaponMatchup(bug.variant as BugVariant, weaponId);
-        if (matchup === WeaponMatchup.Immune) continue;
-      }
-      const normalized = dist / Math.max(1, radius);
-      const intensity = 0.2 + 0.8 * Math.exp(-3.2 * normalized * normalized);
-      if (typeof bug.applyBurn === "function") {
-        bug.applyBurn(peakDps * intensity, durationMs, decayPerSecond, weaponId);
-      }
-    }
+    applyBurnInRadiusToEntities(
+      this.entities,
+      cx,
+      cy,
+      radius,
+      peakDps,
+      durationMs,
+      decayPerSecond,
+      (x, y, entity) => this.getDistanceFromPointToEntity(x, y, entity),
+      weaponId,
+    );
   }
 
   applyEnsnareInRadius(cx: number, cy: number, radius: number, durationMs: number, weaponId?: SiegeWeaponId): void {
-    for (const e of this.entities) {
-      const bug = e as any;
-      if (isTerminalEntityState(bug.state)) continue;
-      if (this.getDistanceFromPointToEntity(cx, cy, e) <= radius) {
-        if (weaponId) {
-          const matchup = getBugWeaponMatchup(bug.variant as BugVariant, weaponId);
-          if (matchup === WeaponMatchup.Immune) continue;
-        }
-        if (typeof bug.applyEnsnare === "function") bug.applyEnsnare(durationMs);
-      }
-    }
+    applyEnsnareInRadiusToEntities(
+      this.entities,
+      cx,
+      cy,
+      radius,
+      durationMs,
+      (x, y, entity) => this.getDistanceFromPointToEntity(x, y, entity),
+      weaponId,
+    );
   }
 
   // ── Black-hole lifecycle ─────────────────────────────────────────────
@@ -1026,18 +582,20 @@ export class Engine {
     eventHorizonRadius?: number,
     eventHorizonDurationMs?: number,
   ): boolean {
-    if (this.blackHole?.active) return false;
-    this.blackHole = {
-      x, y, radius, coreRadius,
+    const { blackHole, started } = startBlackHoleState(this.blackHole, {
       collapseDamage,
-      startedAt: this.elapsedMs,
+      coreRadius,
       durationMs,
-      active: true,
-      weaponId,
+      elapsedMs: this.elapsedMs,
       eventHorizonRadius,
       eventHorizonDurationMs,
-    };
-    return true;
+      radius,
+      weaponId,
+      x,
+      y,
+    });
+    this.blackHole = blackHole;
+    return started;
   }
 
   getBlackHole() {
@@ -1050,99 +608,37 @@ export class Engine {
 
   /** Call each tick; fires onCollapse callback once when duration expires. */
   tickBlackHole(dtMs: number, onCollapse: (x: number, y: number, radius: number) => void): void {
-    if (!this.blackHole?.active) return;
-    const age = this.elapsedMs - this.blackHole.startedAt;
-    const {
-      x,
-      y,
-      radius,
-      coreRadius,
-      collapseDamage,
-      durationMs,
-      weaponId,
-      eventHorizonRadius,
-      eventHorizonDurationMs,
-    } = this.blackHole;
-
-    // Gravity pull towards core
-    for (let index = 0; index < this.entities.length; index++) {
-      const bug = this.entities[index] as any;
-      if (isTerminalEntityState(bug.state)) continue;
-      const dx = this.isToroidalEntity(bug)
-        ? getWrappedDelta(bug.x, x, this.width)
-        : x - bug.x;
-      const dy = this.isToroidalEntity(bug)
-        ? getWrappedDelta(bug.y, y, this.height)
-        : y - bug.y;
-      const dist = Math.hypot(dx, dy);
-      if (dist > radius || dist < 1) continue;
-      const pull = (1 - dist / radius) * 2.5 * (dtMs / 16);
-      bug.x += (dx / dist) * pull;
-      bug.y += (dy / dist) * pull;
-      // Core contact: instant kill tick
-      if (dist <= coreRadius) {
-        this.handleHit(index, bug.maxHp ?? 99, false, weaponId);
-      }
-    }
-
-    // Collapse when time expires
-    if (age >= durationMs) {
-      const hits = this.radiusHitTest(x, y, radius);
-      for (const idx of hits) this.handleHit(idx, collapseDamage, false, weaponId);
-      if (eventHorizonRadius && eventHorizonDurationMs) {
-        this.startEventHorizon(
-          x,
-          y,
-          eventHorizonRadius,
-          eventHorizonDurationMs,
-          weaponId,
-        );
-      }
-      onCollapse(x, y, radius);
-      this.blackHole = null;
-    }
+    this.blackHole = tickBlackHoleState({
+      blackHole: this.blackHole,
+      dtMs,
+      elapsedMs: this.elapsedMs,
+      entities: this.entities,
+      handleHit: (index, damage, creditOnDeath, weaponId) =>
+        this.handleHit(index, damage, creditOnDeath, weaponId),
+      height: this.height,
+      isToroidalEntity: (entity) => this.isToroidalEntity(entity),
+      onCollapse,
+      radiusHitTest: (x, y, radius) => this.radiusHitTest(x, y, radius),
+      startEventHorizon: (x, y, radius, durationMs, weaponId) =>
+        this.startEventHorizon(x, y, radius, durationMs, weaponId),
+      width: this.width,
+    });
   }
 
   // ── Chain-zap synergy: prefer unfrozen targets ──────────────────────
 
   chainHitTestPreferUnfrozen(startIndex: number, chainRadius: number, maxBounces: number): number[] {
-    const result: number[] = [];
-    if (startIndex < 0 || startIndex >= this.entities.length) return result;
-    const visited = new Set<number>([startIndex]);
-    let currentIndex = startIndex;
-    for (let bounce = 0; bounce < maxBounces; bounce++) {
-      const current = this.entities[currentIndex] as any;
-      if (!current) break;
-      let bestDist = Infinity;
-      let bestIndex = -1;
-      let bestFrozen = true;
-      for (let i = 0; i < this.entities.length; i++) {
-        if (visited.has(i)) continue;
-        const e = this.entities[i] as any;
-        if (isTerminalEntityState(e.state)) continue;
-        const dist = this.isToroidalEntity(current) && this.isToroidalEntity(e)
-          ? getWrappedDistance(current.x, current.y, e.x, e.y, this.width, this.height)
-          : Math.hypot(current.x - e.x, current.y - e.y);
-        if (dist > chainRadius) continue;
-        const now = performance.now();
-        const frozen = e.slow != null && now < (e.slow?.expiresAt ?? 0);
-        // Prefer unfrozen; within the same freeze category prefer closest
-        if (
-          bestIndex === -1 ||
-          (!frozen && bestFrozen) ||
-          (frozen === bestFrozen && dist < bestDist)
-        ) {
-          bestDist = dist;
-          bestIndex = i;
-          bestFrozen = frozen;
-        }
-      }
-      if (bestIndex === -1) break;
-      result.push(bestIndex);
-      visited.add(bestIndex);
-      currentIndex = bestIndex;
-    }
-    return result;
+    return chainHitTestPreferUnfrozenEntities(
+      this.entities,
+      startIndex,
+      chainRadius,
+      maxBounces,
+      {
+        height: this.height,
+        isToroidalEntity: (entity) => this.isToroidalEntity(entity),
+        width: this.width,
+      },
+    );
   }
 
   render(alpha = 1) {
@@ -1156,33 +652,36 @@ export class Engine {
   // ── T3 / Evolution-era Engine methods ───────────────────────────────
 
   applyChargedInRadius(cx: number, cy: number, radius: number, durationMs: number): void {
-    for (const e of this.entities) {
-      const bug = e as any;
-      if (isTerminalEntityState(bug.state)) continue;
-      if (this.getDistanceFromPointToEntity(cx, cy, e) <= radius && typeof bug.applyCharged === "function") {
-        bug.applyCharged(durationMs);
-      }
-    }
+    applyChargedInRadiusToEntities(
+      this.entities,
+      cx,
+      cy,
+      radius,
+      durationMs,
+      (x, y, entity) => this.getDistanceFromPointToEntity(x, y, entity),
+    );
   }
 
   applyMarkedInRadius(cx: number, cy: number, radius: number, durationMs: number): void {
-    for (const e of this.entities) {
-      const bug = e as any;
-      if (isTerminalEntityState(bug.state)) continue;
-      if (this.getDistanceFromPointToEntity(cx, cy, e) <= radius && typeof bug.applyMarked === "function") {
-        bug.applyMarked(durationMs);
-      }
-    }
+    applyMarkedInRadiusToEntities(
+      this.entities,
+      cx,
+      cy,
+      radius,
+      durationMs,
+      (x, y, entity) => this.getDistanceFromPointToEntity(x, y, entity),
+    );
   }
 
   applyUnstableInRadius(cx: number, cy: number, radius: number, durationMs: number): void {
-    for (const e of this.entities) {
-      const bug = e as any;
-      if (isTerminalEntityState(bug.state)) continue;
-      if (this.getDistanceFromPointToEntity(cx, cy, e) <= radius && typeof bug.applyUnstable === "function") {
-        bug.applyUnstable(durationMs);
-      }
-    }
+    applyUnstableInRadiusToEntities(
+      this.entities,
+      cx,
+      cy,
+      radius,
+      durationMs,
+      (x, y, entity) => this.getDistanceFromPointToEntity(x, y, entity),
+    );
   }
 
   /** Hits all charged bugs with decaying damage (hop falloff per charged bug encountered). */
@@ -1192,64 +691,30 @@ export class Engine {
     falloff: number,
     weaponId?: SiegeWeaponId,
   ): void {
-    let currentDmg = damage;
-    for (const e of this.entities) {
-      const bug = e as any;
-      if (isTerminalEntityState(bug.state)) continue;
-      if (bug.charged && currentDmg >= 1) {
-        bug.hp = Math.max(0, bug.hp - Math.round(currentDmg));
-        bug.lastHitTime = performance.now();
-        if (bug.hp === 0) {
-          bug.state = EntityState.Dying;
-          bug.deathProgress = 0;
-          bug.vx = 0;
-          bug.vy = 0;
-          bug.deathCredited = false;
-          if (weaponId) bug.dotSourceWeaponId = weaponId;
-        }
-        currentDmg *= falloff;
-      }
-    }
+    void sourceIndex;
+    propagateChargedNetworkOnEntities(this.entities, damage, falloff, weaponId);
   }
 
   /** Reduce target to 50% HP and spawn a second half-HP clone nearby. */
   splitBug(index: number): void {
-    const e = this.entities[index] as any;
-    if (!e || isTerminalEntityState(e.state)) return;
-    e.hp = Math.max(1, Math.ceil(e.maxHp / 2));
-    // Spawn clone from pool
-    const clone = this.pool.pop() ?? new BugEntity();
-    clone.x = this.isToroidalEntity(e)
-      ? wrapCoordinate(e.x + (Math.random() - 0.5) * 40, this.width)
-      : e.x + (Math.random() - 0.5) * 40;
-    clone.y = this.isToroidalEntity(e)
-      ? wrapCoordinate(e.y + (Math.random() - 0.5) * 40, this.height)
-      : e.y + (Math.random() - 0.5) * 40;
-    clone.maxHp = e.maxHp;
-    clone.hp = Math.max(1, Math.ceil(e.maxHp / 2));
-    clone.variant = e.variant;
-    clone.state = "patrol";
-    clone.deathCredited = false;
-    clone.deathProgress = 0;
-    clone.dotSourceWeaponId = null;
-    clone.slow = null; clone.poison = null; clone.burn = null; clone.ensnare = null;
-    clone.charged = null; clone.marked = null; clone.unstable = null; clone.looped = null; clone.ally = null;
-    this.entities.push(clone);
+    splitBugOnEntities({
+      entities: this.entities,
+      height: this.height,
+      index,
+      isToroidalEntity: (entity) => this.isToroidalEntity(entity),
+      pool: this.pool,
+      width: this.width,
+    });
   }
 
   /** Put a bug in ally state — it stops targeting the player base. */
   allyBug(index: number, config: AllyConversionConfig): void {
-    const e = this.entities[index] as any;
-    if (!e || isTerminalEntityState(e.state)) return;
-    const maxActiveAllies = config.maxActiveAllies ?? DEFAULT_MAX_ACTIVE_ALLIES;
-    const activeAllies = this.entities.reduce((count, entity) => {
-      const bug = entity as any;
-      return bug.ally && !isTerminalEntityState(bug.state) ? count + 1 : count;
-    }, 0);
-    if (!e.ally && activeAllies >= maxActiveAllies) {
-      return;
-    }
-    if (typeof e.applyAlly === "function") e.applyAlly(config);
+    allyBugOnEntities({
+      config,
+      defaultMaxActiveAllies: DEFAULT_MAX_ACTIVE_ALLIES,
+      entities: this.entities,
+      index,
+    });
   }
 
   /** Leave a persistent trap zone that instantly kills unstable bugs on contact. */
@@ -1260,13 +725,15 @@ export class Engine {
     durationMs: number,
     weaponId?: SiegeWeaponId,
   ): void {
-    this.eventHorizons.push({
+    this.eventHorizons = startEventHorizonState(
+      this.eventHorizons,
+      this.elapsedMs,
       x,
       y,
       radius,
-      expiresAt: this.elapsedMs + durationMs,
+      durationMs,
       weaponId,
-    });
+    );
   }
 
   /** AoE explosion centered on a burning bug — called by T3 Kernel Panic behavior. */
@@ -1276,51 +743,34 @@ export class Engine {
     damage: number,
     weaponId?: SiegeWeaponId,
   ): void {
-    const src = this.entities[index] as any;
-    if (!src) return;
-    const { x, y } = src;
-    for (let i = 0; i < this.entities.length; i++) {
-      if (i === index) continue;
-      const e = this.entities[i] as any;
-      if (isTerminalEntityState(e.state)) continue;
-      if (this.getDistanceFromPointToEntity(x, y, e) <= splashRadius) {
-        this.handleHit(i, damage, false, weaponId);
-      }
-    }
+    triggerKernelPanicExplosionOnEntities({
+      damage,
+      entities: this.entities,
+      getDistanceFromPointToEntity: (x, y, entity) => this.getDistanceFromPointToEntity(x, y, entity),
+      handleHit: (targetIndex, hitDamage, creditOnDeath, hitWeaponId) =>
+        this.handleHit(targetIndex, hitDamage, creditOnDeath, hitWeaponId),
+      index,
+      splashRadius,
+      weaponId,
+    });
   }
 
   /** Kill all marked bugs below the given HP threshold globally. */
   triggerAutoScalerPulse(hpThreshold: number, weaponId?: SiegeWeaponId): void {
-    for (const e of this.entities) {
-      const bug = e as any;
-      if (isTerminalEntityState(bug.state)) continue;
-      if (bug.marked && (bug.hp / (bug.maxHp || 1)) <= hpThreshold) {
-        bug.hp = 0;
-        bug.state = EntityState.Dying;
-        bug.deathProgress = 0;
-        bug.vx = 0;
-        bug.vy = 0;
-        bug.deathCredited = false;
-        if (weaponId) bug.dotSourceWeaponId = weaponId;
-      }
-    }
+    triggerAutoScalerPulseOnEntities(this.entities, hpThreshold, weaponId);
   }
 
   /** Must be called each update tick to process event horizon kills. */
   private tickEvolutionEffects(_dtMs: number): void {
     void _dtMs;
-    // Event horizon unstable-bug consumption
-    this.eventHorizons = this.eventHorizons.filter(h => h.expiresAt > this.elapsedMs);
-    for (const hz of this.eventHorizons) {
-      for (let i = 0; i < this.entities.length; i++) {
-        const bug = this.entities[i] as any;
-        if (isTerminalEntityState(bug.state)) continue;
-        if (bug.unstable && this.getDistanceFromPointToEntity(hz.x, hz.y, bug) <= hz.radius) {
-          bug.unstable = null;
-          this.handleHit(i, bug.maxHp ?? 99, false, hz.weaponId);
-        }
-      }
-    }
+    this.eventHorizons = tickEventHorizons({
+      elapsedMs: this.elapsedMs,
+      entities: this.entities,
+      eventHorizons: this.eventHorizons,
+      getDistanceFromPointToEntity: (x, y, entity) => this.getDistanceFromPointToEntity(x, y, entity),
+      handleHit: (index, damage, creditOnDeath, weaponId) =>
+        this.handleHit(index, damage, creditOnDeath, weaponId),
+    });
   }
 }
 

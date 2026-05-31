@@ -4,6 +4,7 @@ vi.mock("@game/utils/bugSprite", () => ({
   drawBugSprite: vi.fn(),
 }));
 
+import { installMockLocalStorage } from "../../../test/localStorage";
 import { drawBugSprite } from "@game/utils/bugSprite";
 import { BugEntity } from "./BugEntity";
 import BUG_CODEX, {
@@ -17,22 +18,7 @@ import { DEFAULT_GAME_CONFIG } from "./types";
 
 describe("bug codex", () => {
   beforeEach(() => {
-    let storage = new Map<string, string>();
-    Object.defineProperty(window, "localStorage", {
-      configurable: true,
-      value: {
-        clear: () => {
-          storage = new Map<string, string>();
-        },
-        getItem: (key: string) => storage.get(key) ?? null,
-        removeItem: (key: string) => {
-          storage.delete(key);
-        },
-        setItem: (key: string, value: string) => {
-          storage.set(key, value);
-        },
-      } satisfies Pick<Storage, "clear" | "getItem" | "removeItem" | "setItem">,
-    });
+    installMockLocalStorage();
     window.localStorage.clear();
     setCodex(cloneCodex(BUG_CODEX));
     vi.clearAllMocks();

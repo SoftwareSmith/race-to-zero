@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState, type MutableRefObject } from "react";
 import type { BugCounts } from "../../../types/dashboard";
 import type { SiegeWeaponId } from "@game/types";
 import type { SiegeRuntimeSnapshotLike } from "./useSiegeRunCompletion";
+import { getBugCountTotal } from "./useSiegeGameSupport";
 
 interface SiegeQaState {
   enabled?: boolean;
@@ -22,10 +23,6 @@ interface UseSiegeGameDebugOptions {
     updater: (current: SiegeRuntimeSnapshotLike) => SiegeRuntimeSnapshotLike,
     force?: boolean,
   ) => void;
-}
-
-function getBugCountTotal(bugCounts: BugCounts): number {
-  return Object.values(bugCounts).reduce((total, value) => total + value, 0);
 }
 
 function getInitialDebugMode() {

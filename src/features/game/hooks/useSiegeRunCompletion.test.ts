@@ -2,6 +2,7 @@ import { renderHook, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import { STORAGE_KEYS } from "../../../constants/storageKeys";
+import { installMockLocalStorage } from "../../../test/localStorage";
 import {
   buildSiegeLeaderboards,
   useSiegeRunCompletion,
@@ -94,12 +95,8 @@ describe("siege run completion leaderboards", () => {
   });
 
   it("falls back safely when stored leaderboard data is malformed", () => {
-    Object.defineProperty(window, "localStorage", {
-      configurable: true,
-      value: {
-        getItem: vi.fn(() => "not-json"),
-        setItem: vi.fn(),
-      },
+    installMockLocalStorage({
+      [STORAGE_KEYS.siegeRunLeaderboardsV2]: "not-json",
     });
 
     const { result } = renderHook(() =>

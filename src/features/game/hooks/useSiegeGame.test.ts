@@ -2,17 +2,14 @@ import { act, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { STORAGE_KEYS } from "../../../constants/storageKeys";
+import { installMockLocalStorage } from "../../../test/localStorage";
 import { getSurvivalWavePlan } from "@game/sim/survivalDirector";
 import { useSiegeGame } from "./useSiegeGame";
 
 describe("useSiegeGame", () => {
   beforeEach(() => {
-    Object.defineProperty(window, "localStorage", {
-      configurable: true,
-      value: {
-        getItem: vi.fn(() => "0"),
-        setItem: vi.fn(),
-      },
+    installMockLocalStorage({
+      [STORAGE_KEYS.weaponEvolutionStates]: "0",
     });
   });
 

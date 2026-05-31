@@ -13,10 +13,19 @@ import {
   perlin1D,
 } from "./bugMotionMath";
 import {
-  clearExpiredStatus,
-  tickBurnStatus,
-  tickDotStatus,
-} from "./bugStatusRuntime";
+  resolveBugStatusRuntime,
+} from "./bugStatusResolution";
+import {
+  applyAllyToBug,
+  applyBurnToBug,
+  applyChargedToBug,
+  applyEnsnareToBug,
+  applyFreezeToBug,
+  applyLoopedToBug,
+  applyMarkedToBug,
+  applyPoisonToBug,
+  applyUnstableToBug,
+} from "./bugStatusApplications";
 import { getWrappedDelta, wrapCoordinate } from "./toroidalMath";
 import { EntityState, isTerminalEntityState } from "../types";
 import type { AllyConversionConfig } from "@game/weapons/runtime/types";
@@ -1271,70 +1280,30 @@ export class BugEntity extends Entity {
     const speedBoost = this.state === "flee"
       ? (1.4 + cursorFleeMultiplier * 0.75) * cursorSpeedBoost
       : cursorSpeedBoost;
-    const expiredAlly = this.ally !== null && now >= this.ally.expiresAt ? this.ally : null;
-
-    this.slow = clearExpiredStatus(this.slow, now);
-    this.ensnare = clearExpiredStatus(this.ensnare, now);
-    this.poison = clearExpiredStatus(this.poison, now);
-    this.burn = clearExpiredStatus(this.burn, now);
-    this.charged = clearExpiredStatus(this.charged, now);
-    this.marked = clearExpiredStatus(this.marked, now);
-    this.unstable = clearExpiredStatus(this.unstable, now);
-    this.looped = clearExpiredStatus(this.looped, now);
-    if (expiredAlly) {
-      const expireBurstRadius = expiredAlly.expireBurstRadius;
-      const expireBurstDamage = expiredAlly.expireBurstDamage;
-      if (expireBurstRadius > 0 && expireBurstDamage > 0) {
-        const burstTargets = ctx
-          .getNeighbors(this, Math.max(expireBurstRadius, config.separationRadius * 2))
+    const statusResolution = resolveBugStatusRuntime({
+      bug: this,
+      dt,
+      getExpireBurstTargets: (radius) =>
+        ctx
+          .getNeighbors(this, radius)
           .filter((neighbor): neighbor is BugEntity => neighbor instanceof BugEntity)
-          .filter((neighbor) => !neighbor.isAllyActive(now) && !isTerminalEntityState(neighbor.state));
-
-        for (const hostile of burstTargets) {
-          const toHostile = this.getDeltaToPoint(hostile.x, hostile.y);
-          const distance = getLength(toHostile.x, toHostile.y);
-          if (distance > expireBurstRadius) {
-            continue;
-          }
-
-          hostile.applyIncidentalDamage(expireBurstDamage, "ally");
-          hostile.state = "flee";
-          hostile.fleeTimer = Math.max(hostile.fleeTimer ?? 0, 0.32);
-        }
-      }
-
-      this.ally = null;
-      this.state = "flee";
-      this.fleeTimer = 0.36;
-    }
-
-    if (!isTerminalEntityState(this.state)) {
-      const poisonTick = tickDotStatus(this.poison, dt);
-      this.poison = poisonTick.status;
-      if (poisonTick.damage > 0) {
-        this.applyIncidentalDamage(poisonTick.damage, "poison");
-      }
-
-      const burnTick = tickBurnStatus(this.burn, dt);
-      this.burn = burnTick.status;
-      if (burnTick.damage > 0) {
-        this.applyIncidentalDamage(burnTick.damage, "burn");
-      }
-
-      const loopedTick = tickDotStatus(this.looped, dt);
-      this.looped = loopedTick.status;
-      if (loopedTick.damage > 0) {
-        this.applyIncidentalDamage(loopedTick.damage, "looped");
-      }
-    }
+          .filter((neighbor) => !neighbor.isAllyActive(now) && !isTerminalEntityState(neighbor.state)),
+      getTargetDistance: (hostile) => {
+        const toHostile = this.getDeltaToPoint((hostile as BugEntity).x, (hostile as BugEntity).y);
+        return getLength(toHostile.x, toHostile.y);
+      },
+      now,
+      onBurstHit: (hostile, damage) => {
+        (hostile as BugEntity).applyIncidentalDamage(damage, "ally");
+      },
+      onSelfDamage: (damage, finisherStatus) => {
+        this.applyIncidentalDamage(damage, finisherStatus);
+      },
+      separationRadius: config.separationRadius,
+    });
 
     // Ensnared bugs cannot move at all
-    if (this.ensnare && now < this.ensnare.expiresAt) {
-      this.vx = 0;
-      this.vy = 0;
-      this.movementMood = "patrol";
-      this.opacity = 1;
-      this.size = this.baseSize;
+    if (statusResolution.movementLocked) {
       return;
     }
 
@@ -1480,30 +1449,12 @@ export class BugEntity extends Entity {
 
   /** Apply a Freeze Cone slow. Stacks to extend duration. */
   applyFreeze(multiplier: number, durationMs: number) {
-    const now = performance.now();
-    if (this.slow && now < this.slow.expiresAt) {
-      // Extend: add remaining time + new duration
-      this.slow.expiresAt = this.slow.expiresAt + durationMs;
-    } else {
-      this.slow = { multiplier, expiresAt: now + durationMs };
-    }
+    applyFreezeToBug(this, multiplier, durationMs, performance.now());
   }
 
   /** Apply Bug Spray poison DOT. Stacks to extend duration. */
   applyPoison(dps: number, durationMs: number, sourceWeaponId?: string) {
-    const now = performance.now();
-    if (this.poison && now < this.poison.expiresAt) {
-      this.poison.expiresAt = this.poison.expiresAt + durationMs;
-      this.poison.sourceWeaponId = sourceWeaponId ?? this.poison.sourceWeaponId;
-    } else {
-      this.poison = {
-        dps,
-        expiresAt: now + durationMs,
-        accumulatedDmg: 0,
-        sourceWeaponId,
-      };
-    }
-    if (sourceWeaponId) this.dotSourceWeaponId = sourceWeaponId;
+    applyPoisonToBug(this, dps, durationMs, performance.now(), sourceWeaponId);
   }
 
   /** Apply flamethrower burn. Reapplication refreshes duration and keeps the stronger flame. */
@@ -1513,89 +1464,37 @@ export class BugEntity extends Entity {
     decayPerSecond = 3.2,
     sourceWeaponId?: string,
   ) {
-    const now = performance.now();
-    if (this.burn && now < this.burn.expiresAt) {
-      this.burn.dps = Math.max(this.burn.dps, dps);
-      this.burn.decayPerSecond = Math.max(this.burn.decayPerSecond, decayPerSecond);
-      this.burn.expiresAt = Math.max(this.burn.expiresAt, now + durationMs);
-      this.burn.sourceWeaponId = sourceWeaponId ?? this.burn.sourceWeaponId;
-    } else {
-      this.burn = {
-        dps,
-        expiresAt: now + durationMs,
-        accumulatedDmg: 0,
-        decayPerSecond,
-        sourceWeaponId,
-      };
-    }
-    if (sourceWeaponId) this.dotSourceWeaponId = sourceWeaponId;
+    applyBurnToBug(this, dps, durationMs, performance.now(), decayPerSecond, sourceWeaponId);
   }
 
   /** Apply Chain Zap charged status — amplifies damage taken (×1.1), enables network propagation. */
   applyCharged(durationMs: number) {
-    const now = performance.now();
-    if (this.charged && now < this.charged.expiresAt) {
-      this.charged.expiresAt = this.charged.expiresAt + durationMs;
-    } else {
-      this.charged = { expiresAt: now + durationMs };
-    }
+    applyChargedToBug(this, durationMs, performance.now());
   }
 
   /** Apply Garbage Collector mark — amplifies damage (×1.2, or ×1.4 when unstable). */
   applyMarked(durationMs: number) {
-    const now = performance.now();
-    if (this.marked && now < this.marked.expiresAt) {
-      this.marked.expiresAt = this.marked.expiresAt + durationMs;
-    } else {
-      this.marked = { expiresAt: now + durationMs };
-    }
+    applyMarkedToBug(this, durationMs, performance.now());
   }
 
   /** Apply unstable status — consumed by Event Horizon; doubles mark bonus when combined. */
   applyUnstable(durationMs: number) {
-    const now = performance.now();
-    if (this.unstable && now < this.unstable.expiresAt) {
-      this.unstable.expiresAt = this.unstable.expiresAt + durationMs;
-    } else {
-      this.unstable = { expiresAt: now + durationMs };
-    }
+    applyUnstableToBug(this, durationMs, performance.now());
   }
 
   /** Apply looped echo DOT — periodic damage over time. */
   applyLooped(dps: number, durationMs: number, sourceWeaponId?: string) {
-    const now = performance.now();
-    if (this.looped && now < this.looped.expiresAt) {
-      this.looped.dps = Math.max(this.looped.dps, dps);
-      this.looped.expiresAt = Math.max(this.looped.expiresAt, now + durationMs);
-    } else {
-      this.looped = { dps, expiresAt: now + durationMs, accumulatedDmg: 0 };
-    }
-    if (sourceWeaponId) this.dotSourceWeaponId = sourceWeaponId;
+    applyLoopedToBug(this, dps, durationMs, performance.now(), sourceWeaponId);
   }
 
   /** Apply ally state — bug stops targeting the player base. */
   applyAlly(config: AllyConversionConfig) {
-    const now = performance.now();
-    this.ally = {
-      expiresAt: now + config.durationMs,
-      expireBurstDamage: config.expireBurstDamage ?? 0,
-      expireBurstRadius: config.expireBurstRadius ?? 0,
-      interceptForce: config.interceptForce ?? 2.5,
-    };
-    this.allyContactReadyAt = now + 180;
-    this.dotSourceWeaponId = null;
-    this.state = "patrol";
-    this.fleeTimer = null;
+    applyAllyToBug(this, config, performance.now());
   }
 
   /** Apply Static Net ensnare — completely immobilises; next hit = instakill. */
   applyEnsnare(durationMs: number) {
-    this.ensnare = { expiresAt: performance.now() + durationMs, canInstakill: true };
-    // Stop movement immediately
-    this.vx = 0;
-    this.vy = 0;
-    this.state = "patrol";
-    this.fleeTimer = null;
+    applyEnsnareToBug(this, durationMs, performance.now());
   }
 
   /** Apply an impulse and trigger flee state (Pulse Cannon knockback). */

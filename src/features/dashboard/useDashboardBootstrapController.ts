@@ -6,7 +6,7 @@ import {
   getBugTotal,
 } from "../../constants/bugs";
 import { STORAGE_KEYS } from "../../constants/storageKeys";
-import { useStoredState } from "../../hooks/useStoredState";
+import { useStoredState } from "@shared/hooks/useStoredState";
 import { parseStoredString } from "@shared/utils/storage";
 import type {
   ActiveTab,

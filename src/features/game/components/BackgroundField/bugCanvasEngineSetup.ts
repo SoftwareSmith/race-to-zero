@@ -146,7 +146,7 @@ export async function setupBugCanvasEngine(
       (engine as any).maxWeaponTier = options.maxWeaponTier;
     }
     if (options.initialEvolutionStates) {
-      for (const [weaponId, state] of engine.weaponEvolutionStates.entries()) {
+      for (const [weaponId, state] of engine.getWeaponEvolutionStates().entries()) {
         const initialState = options.initialEvolutionStates[weaponId];
         if (!initialState) {
           continue;
@@ -324,6 +324,49 @@ export function installBugCanvasQaBindings({
   };
 
   return bindingOwner;
+}
+
+export function ensureBugCanvasQaBindings({
+  bounds,
+  canvas,
+  engine,
+  latestBugPositionsRef,
+  onLiveBugCountChange,
+  qaBindingOwnerRef,
+}: {
+  bounds: CanvasBounds;
+  canvas: HTMLCanvasElement | null;
+  engine: Engine | null;
+  latestBugPositionsRef: { current: RenderedBugPosition[] };
+  onLiveBugCountChange?: (count: number) => void;
+  qaBindingOwnerRef: { current: object | null };
+}) {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  const qaState = (window as QaWindow).__RTZ_QA__;
+
+  if (!qaState?.enabled || !engine) {
+    return;
+  }
+
+  if (
+    typeof qaState.repositionLiveBug === "function" &&
+    typeof qaState.getLiveBugCount === "function" &&
+    typeof qaState.clearLiveBugs === "function"
+  ) {
+    return;
+  }
+
+  qaBindingOwnerRef.current = installBugCanvasQaBindings({
+    bounds,
+    engine,
+    height: canvas?.clientHeight || bounds.height || 600,
+    latestBugPositionsRef,
+    onLiveBugCountChange,
+    width: canvas?.clientWidth || bounds.width || 800,
+  });
 }
 
 export function clearBugCanvasQaBindings(bindingOwner?: object) {

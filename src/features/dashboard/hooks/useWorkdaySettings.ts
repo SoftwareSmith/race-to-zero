@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { STORAGE_KEYS } from "../../../constants/storageKeys";
-import { useStoredState } from "../../../hooks/useStoredState";
+import { useStoredState } from "@shared/hooks/useStoredState";
 import { parseStoredBoolean } from "@shared/utils/storage";
 import type { WorkdaySettings } from "../../../types/dashboard";
 

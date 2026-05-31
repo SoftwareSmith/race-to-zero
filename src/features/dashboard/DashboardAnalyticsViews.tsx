@@ -14,7 +14,7 @@ import {
   getTrendBugsCreatedTone,
 } from "./utils/dashboard";
 import {
-  buildComparisonRateHistoryChartData,
+  buildComparisonOutcomeChartData,
   buildComparisonSummaryChartData,
   buildComparisonTimelineChartData,
   buildComparisonWindowHistoryChartData,
@@ -202,8 +202,8 @@ export const PeriodsView = memo(function PeriodsView({
     () => buildComparisonWindowHistoryChartData(comparisonMetrics),
     [comparisonMetrics],
   );
-  const comparisonRateHistoryData = useMemo(
-    () => buildComparisonRateHistoryChartData(comparisonMetrics),
+  const comparisonOutcomeData = useMemo(
+    () => buildComparisonOutcomeChartData(comparisonMetrics),
     [comparisonMetrics],
   );
   const metricCards = useMemo(
@@ -259,11 +259,12 @@ export const PeriodsView = memo(function PeriodsView({
         <ChartCard
           chartKey="period-rate-history"
           className="h-full"
-          data={comparisonRateHistoryData}
-          description={`Historical intake rate versus closure rate across matching ${comparisonMetrics.currentWindow.dayCount}-day windows.`}
+          data={comparisonOutcomeData}
+          description={`Closed bugs in ${comparisonMetrics.rangeLabel}, split by completed, cancelled, duplicated, auto-closed, and archived outcomes.`}
           onHoverStateChange={onChartFocusChange}
           siegeMode={siegeMode}
-          title="Creation vs closure rate trend"
+          title="Closed outcome spread"
+          variant="bar"
         />
       </div>
     </div>

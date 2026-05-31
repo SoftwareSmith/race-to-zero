@@ -701,6 +701,30 @@ export function buildComparisonSummaryChartData(
   };
 }
 
+export function buildComparisonOutcomeChartData(
+  comparisonMetrics: ComparisonMetrics,
+): ChartData<"bar", number[], string> {
+  return {
+    labels: comparisonMetrics.outcomeMetrics.map((entry) => entry.label),
+    datasets: [
+      {
+        label: "Closed bugs",
+        data: comparisonMetrics.outcomeMetrics.map((entry) => entry.count),
+        backgroundColor: [
+          "rgba(45, 212, 191, 0.72)",
+          "rgba(248, 113, 113, 0.72)",
+          "rgba(249, 168, 212, 0.7)",
+          "rgba(251, 191, 36, 0.7)",
+          "rgba(148, 163, 184, 0.72)",
+        ],
+        borderColor: ["#2dd4bf", "#f87171", "#f9a8d4", "#fbbf24", "#94a3b8"],
+        borderWidth: 1,
+        borderRadius: 8,
+      },
+    ],
+  };
+}
+
 export function buildComparisonWindowHistoryChartData(
   comparisonMetrics: ComparisonMetrics,
 ): ChartData<"bar", number[], string> {

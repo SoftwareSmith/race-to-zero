@@ -3724,19 +3724,19 @@
         "label": "0-7d"
       },
       {
-        "count": 49,
+        "count": 50,
         "label": "8-30d"
       },
       {
-        "count": 39,
+        "count": 38,
         "label": "31-90d"
       },
       {
-        "count": 48,
+        "count": 49,
         "label": "91-180d"
       },
       {
-        "count": 179,
+        "count": 178,
         "label": "181d+"
       }
     ],
@@ -3751,7 +3751,7 @@
       },
       {
         "count": 88,
-        "label": "Normal"
+        "label": "Medium"
       },
       {
         "count": 164,
@@ -8658,11 +8658,11 @@
           "label": "0-7d"
         },
         {
-          "count": 8,
+          "count": 9,
           "label": "8-30d"
         },
         {
-          "count": 6,
+          "count": 5,
           "label": "31-90d"
         },
         {
@@ -8685,7 +8685,7 @@
         },
         {
           "count": 23,
-          "label": "Normal"
+          "label": "Medium"
         },
         {
           "count": 69,
@@ -11522,7 +11522,7 @@
         },
         {
           "count": 9,
-          "label": "Normal"
+          "label": "Medium"
         },
         {
           "count": 6,
@@ -13772,11 +13772,11 @@
           "label": "31-90d"
         },
         {
-          "count": 8,
+          "count": 9,
           "label": "91-180d"
         },
         {
-          "count": 24,
+          "count": 23,
           "label": "181d+"
         }
       ],
@@ -13791,7 +13791,7 @@
         },
         {
           "count": 13,
-          "label": "Normal"
+          "label": "Medium"
         },
         {
           "count": 44,
@@ -16580,7 +16580,7 @@
         },
         {
           "count": 43,
-          "label": "Normal"
+          "label": "Medium"
         },
         {
           "count": 45,
@@ -17742,8 +17742,8 @@
       ]
     }
   },
-  "generatedAt": "2026-05-31T00:29:50.929Z",
-  "lastUpdated": "2026-05-31T00:29:50.929Z",
+  "generatedAt": "2026-05-30T00:29:20.408Z",
+  "lastUpdated": "2026-05-30T00:29:20.408Z",
   "teamKeys": [
     "CP",
     "PF",

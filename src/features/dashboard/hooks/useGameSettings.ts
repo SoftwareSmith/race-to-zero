@@ -1,7 +1,8 @@
 import { useCallback, useMemo } from "react";
 import { STORAGE_KEYS } from "../../../constants/storageKeys";
 import { DEFAULT_GAME_CONFIG, type GameConfig } from "@game/engine/types";
-import { useStoredState } from "../../../hooks/useStoredState";
+import { sanitizeGameConfig } from "@game/engine/runtimeSafety";
+import { useStoredState } from "@shared/hooks/useStoredState";
 import {
   createStoredJsonParser,
   isStoredRecord,
@@ -18,29 +19,6 @@ const BUG_CHAOS_MULTIPLIER_MAX = 4;
 
 function clampNumber(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, value));
-}
-
-function getGameConfigBounds(defaultValue: number) {
-  return {
-    max: Math.max(1, defaultValue * 10),
-    min: defaultValue >= 1 ? 0.1 : 0.01,
-  };
-}
-
-function sanitizeGameConfig(config: GameConfig): GameConfig {
-  const sanitizedConfig = { ...DEFAULT_GAME_CONFIG };
-
-  for (const [key, defaultValue] of Object.entries(DEFAULT_GAME_CONFIG)) {
-    const configKey = key as keyof GameConfig;
-    const bounds = getGameConfigBounds(defaultValue);
-    sanitizedConfig[configKey] = clampNumber(
-      config[configKey],
-      bounds.min,
-      bounds.max,
-    );
-  }
-
-  return sanitizedConfig;
 }
 
 function isGameConfig(value: unknown): value is GameConfig {

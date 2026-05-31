@@ -4,6 +4,7 @@ import type { GameConfig } from "./types";
 import { DEFAULT_GAME_CONFIG } from "./types";
 
 const VALID_BUG_VARIANTS = new Set<BugVariant>(["low", "medium", "high", "urgent"]);
+const GAME_CONFIG_KEYS = Object.keys(DEFAULT_GAME_CONFIG) as Array<keyof GameConfig>;
 
 export const MAX_ACTIVE_BUGS = 5000;
 
@@ -50,6 +51,12 @@ export function sanitizeGameConfig(config?: Partial<GameConfig>): GameConfig {
   }
 
   return sanitizedConfig;
+}
+
+export function createGameConfigKey(config?: Partial<GameConfig>) {
+  const sanitizedConfig = sanitizeGameConfig(config);
+
+  return GAME_CONFIG_KEYS.map((key) => String(sanitizedConfig[key])).join("|");
 }
 
 export function normalizeSpawnCounts(

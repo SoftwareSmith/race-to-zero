@@ -47,7 +47,7 @@ const DEADLINE_TREND_WINDOW_DAYS = 30;
 const PRIORITY_ORDER = [
   "Urgent",
   "High",
-  "Normal",
+  "Medium",
   "Low",
   "Unspecified",
 ] as const;
@@ -146,7 +146,7 @@ function getPriorityLabel(priority: number) {
     case 2:
       return "High";
     case 3:
-      return "Normal";
+      return "Medium";
     case 4:
       return "Low";
     default:
@@ -178,6 +178,41 @@ function getHistoryOutcomeLabel(outcome: HistoryOutcomeKey) {
     default:
       return "Closed";
   }
+}
+
+function buildOutcomeMetricsForRange(
+  bugs: MetricsBug[],
+  startDate: Date,
+  endDate: Date,
+): HistoryOutcomeMetric[] {
+  const outcomeCounts = new Map<HistoryOutcomeKey, number>(
+    HISTORY_OUTCOME_ORDER.map((outcome) => [outcome, 0]),
+  );
+  let totalClosed = 0;
+
+  for (const bug of bugs) {
+    const terminalEvent = getBugTerminalEvent(bug);
+    if (!terminalEvent || !isDateInRange(terminalEvent.date, startDate, endDate)) {
+      continue;
+    }
+
+    outcomeCounts.set(
+      terminalEvent.outcome,
+      (outcomeCounts.get(terminalEvent.outcome) ?? 0) + 1,
+    );
+    totalClosed += 1;
+  }
+
+  return HISTORY_OUTCOME_ORDER.map((outcome) => {
+    const count = outcomeCounts.get(outcome) ?? 0;
+
+    return {
+      count,
+      key: outcome,
+      label: getHistoryOutcomeLabel(outcome),
+      percent: totalClosed > 0 ? (count / totalClosed) * 100 : 0,
+    };
+  });
 }
 
 function buildStatusDistributionFromCounts(
@@ -1422,6 +1457,11 @@ export function getComparisonMetrics(
     currentStartDate,
     currentEndDate,
   );
+  const outcomeMetrics = buildOutcomeMetricsForRange(
+    preparedSource.bugs,
+    currentStartDate,
+    currentEndDate,
+  );
   const historicalWindows = buildHistoricalWindows(
     preparedSource,
     earliestDate,
@@ -1477,6 +1517,7 @@ export function getComparisonMetrics(
     completedSeries,
     closedSeries,
     historicalWindows,
+    outcomeMetrics,
     rangeLabel: isAllTime
       ? "All time"
       : isCustom

@@ -1,6 +1,6 @@
 import { useCallback, useState } from "react";
 import type { SetStateAction } from "react";
-import type { StorageKey } from "../constants/storageKeys";
+import type { StorageKey } from "../../constants/storageKeys";
 import {
   readStorageValue,
   serializeStoredValue,

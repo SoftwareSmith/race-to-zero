@@ -153,4 +153,35 @@ describe("SiegeHud", () => {
       "L72 M22 H5 U1",
     );
   });
+
+  it("renders mode-specific stat labels", () => {
+    const { rerender } = renderHud();
+
+    expect(screen.getByTestId("siege-remaining-stat")).toHaveTextContent(
+      "Alive",
+    );
+    expect(screen.getByTestId("siege-time-stat")).toHaveTextContent("Survived");
+
+    rerender(
+      <SiegeHud
+        gameMode="purge"
+        interactiveKills={0}
+        interactivePoints={0}
+        interactiveRemainingBugs={12}
+        killStreak={0}
+        onExit={vi.fn()}
+        onSelectWeapon={vi.fn()}
+        selectedWeaponId="hammer"
+        streakMultiplier={1}
+        weaponSnapshots={weaponSnapshots}
+      />,
+    );
+
+    expect(screen.getByTestId("siege-remaining-stat")).toHaveTextContent(
+      "Left",
+    );
+    expect(screen.getByTestId("siege-time-stat")).toHaveTextContent(
+      "Clear time",
+    );
+  });
 });

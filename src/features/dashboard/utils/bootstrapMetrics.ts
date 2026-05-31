@@ -32,7 +32,7 @@ const DEADLINE_TREND_WINDOW_DAYS = 30;
 const PRIORITY_ORDER = [
   "Urgent",
   "High",
-  "Normal",
+  "Medium",
   "Low",
   "Unspecified",
 ] as const;
@@ -93,7 +93,7 @@ function getPriorityLabel(priority: number) {
     case 2:
       return "High";
     case 3:
-      return "Normal";
+      return "Medium";
     case 4:
       return "Low";
     default:

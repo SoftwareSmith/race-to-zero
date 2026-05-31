@@ -32,140 +32,38 @@ import type {
   WeaponEvolutionState,
 } from "@game/types";
 import { SIEGE_GAME_MODE_META } from "@game/types";
+import {
+  areRuntimeSnapshotsEqual,
+  cancelScheduledAnimationFrame,
+  cancelTimeout,
+  createEmptyBugCounts,
+  createRuntimeSnapshot,
+  createSurvivalRuntimeStatus,
+  getBugCountTotal,
+  normalizeBugCountsForSurvival,
+  recordSurvivalPressureQaSnapshot,
+  scaleBugCounts,
+  scheduleAnimationFrame,
+  scheduleTimeout,
+  type SiegeRuntimeSnapshot,
+  type SurvivalRuntimeStatus,
+} from "./useSiegeGameSupport";
+import {
+  normalizeSyncedBugCount,
+  shouldFinalizePurgeFromBugSync,
+  shouldForceBugSyncFlush,
+  shouldIgnoreBugSync,
+  updateRuntimeSnapshotRemainingBugs,
+  updateSurvivalStatusLiveBugCounts,
+} from "./useSiegeGameBugSync";
+import {
+  applySiteIntegrityOverride,
+  applySurvivalMetricOverrides,
+} from "./useSiegeGameSurvivalOverrides";
 
 const SIEGE_ENTER_DURATION_MS = 520;
 const SIEGE_EXIT_DURATION_MS = 220;
 const SURVIVAL_SPAWN_TICK_MS = 100;
-
-function createEmptyBugCounts(): BugCounts {
-  return { high: 0, low: 0, medium: 0, urgent: 0 };
-}
-
-function normalizeBugCountsForSurvival(
-  count: number,
-  bugCounts: BugCounts | undefined,
-  wave: number,
-): BugCounts {
-  if (!bugCounts) {
-    return buildCountsFromWeights(count, getSurvivalWavePlan(wave).variantWeights);
-  }
-
-  const normalized = {
-    high: Math.max(0, Math.floor(bugCounts.high ?? 0)),
-    low: Math.max(0, Math.floor(bugCounts.low ?? 0)),
-    medium: Math.max(0, Math.floor(bugCounts.medium ?? 0)),
-    urgent: Math.max(0, Math.floor(bugCounts.urgent ?? 0)),
-  } satisfies BugCounts;
-  const total = getBugCountTotal(normalized);
-
-  if (total === count) {
-    return normalized;
-  }
-
-  if (count <= 0) {
-    return createEmptyBugCounts();
-  }
-
-  if (total <= 0) {
-    return buildCountsFromWeights(count, getSurvivalWavePlan(wave).variantWeights);
-  }
-
-  return buildCountsFromWeights(count, {
-    high: normalized.high / total,
-    low: normalized.low / total,
-    medium: normalized.medium / total,
-    urgent: normalized.urgent / total,
-  });
-}
-
-function scheduleTimeout(callback: () => void, delay: number): number {
-  if (typeof window !== "undefined") {
-    return window.setTimeout(callback, delay);
-  }
-
-  return globalThis.setTimeout(callback, delay) as unknown as number;
-}
-
-function cancelTimeout(timeoutId: number | null): void {
-  if (timeoutId == null) {
-    return;
-  }
-
-  globalThis.clearTimeout(timeoutId);
-}
-
-function scheduleAnimationFrame(callback: (timestamp: number) => void): number {
-  if (
-    typeof window !== "undefined" &&
-    typeof window.requestAnimationFrame === "function"
-  ) {
-    return window.requestAnimationFrame(callback);
-  }
-
-  return globalThis.setTimeout(
-    () => callback(globalThis.performance.now()),
-    16,
-  ) as unknown as number;
-}
-
-function cancelScheduledAnimationFrame(frameId: number | null): void {
-  if (frameId == null) {
-    return;
-  }
-
-  if (
-    typeof window !== "undefined" &&
-    typeof window.cancelAnimationFrame === "function"
-  ) {
-    window.cancelAnimationFrame(frameId);
-    return;
-  }
-
-  globalThis.clearTimeout(frameId);
-}
-
-function getBugCountTotal(bugCounts: BugCounts): number {
-  return Object.values(bugCounts).reduce((total, value) => total + value, 0);
-}
-
-function recordSurvivalPressureQaSnapshot(payload: {
-  activeBugCount: number;
-  errors: number;
-  pressurePercent: number;
-  speed: number;
-  tickedAt: number;
-  uptime: number;
-  wave: number;
-}) {
-  if (typeof window === "undefined") {
-    return;
-  }
-
-  const qaState = (window as Window & {
-    __RTZ_QA__?: {
-      enabled?: boolean;
-      survivalPressureSnapshot?: typeof payload;
-    };
-  }).__RTZ_QA__;
-
-  if (!qaState?.enabled) {
-    return;
-  }
-
-  qaState.survivalPressureSnapshot = payload;
-}
-
-function scaleBugCounts(
-  bugCounts: BugCounts,
-  multiplier: number,
-): BugCounts {
-  return Object.fromEntries(
-    Object.entries(bugCounts).map(([variant, count]) => [
-      variant,
-      Math.max(0, Math.round(count * multiplier)),
-    ]),
-  ) as BugCounts;
-}
 
 interface UseSiegeGameOptions {
   currentBugCount: number;
@@ -173,122 +71,6 @@ interface UseSiegeGameOptions {
   evolutionStates?: Partial<Record<SiegeWeaponId, WeaponEvolutionState>>;
   onEscape?: () => boolean;
   pauseTimer?: boolean;
-}
-
-interface SiegeRuntimeSnapshot {
-  elapsedMs: number;
-  killStreak: number;
-  kills: number;
-  lastFireTimes: Record<SiegeWeaponId, number>;
-  points: number;
-  remainingBugs: number;
-  streakMultiplier: number;
-}
-
-interface SurvivalRuntimeStatus {
-  activeBugLimit: number;
-  failureKind: SurvivalFailureKind | null;
-  failureLabel: string | null;
-  failureSummary: string | null;
-  focusLabel: string;
-  liveBugCounts: BugCounts;
-  metrics: Record<"uptime" | "errors" | "speed", SurvivalMetricSnapshot>;
-  offlineReason: string | null;
-  pressurePercent: number;
-  remainingSpawnBudget: number;
-  secondsUntilNextWave: number | null;
-  secondsUntilOffline: number | null;
-  siteIntegrity: number;
-  spawnRatePerSecond: number;
-  tacticLabel: string;
-  variantWeights: SurvivalVariantWeights;
-  wave: number;
-  waveDurationMs: number;
-  waveEndsAt: number | null;
-  waveProgressPercent: number;
-  waveStartedAt: number | null;
-}
-
-function createRuntimeSnapshot(
-  remainingBugs = 0,
-): SiegeRuntimeSnapshot {
-  return {
-    elapsedMs: 0,
-    killStreak: 0,
-    kills: 0,
-    lastFireTimes: {} as Record<SiegeWeaponId, number>,
-    points: 0,
-    remainingBugs,
-    streakMultiplier: 1,
-  };
-}
-
-function areRuntimeSnapshotsEqual(
-  left: SiegeRuntimeSnapshot,
-  right: SiegeRuntimeSnapshot,
-): boolean {
-  return (
-    left.elapsedMs === right.elapsedMs &&
-    left.killStreak === right.killStreak &&
-    left.kills === right.kills &&
-    left.lastFireTimes === right.lastFireTimes &&
-    left.points === right.points &&
-    left.remainingBugs === right.remainingBugs &&
-    left.streakMultiplier === right.streakMultiplier
-  );
-}
-
-function createSurvivalRuntimeStatus(
-  plan: SurvivalSpawnPlan,
-  options: {
-    liveBugCounts?: BugCounts;
-    metricValues?: SurvivalMetricValues;
-    now?: number | null;
-    remainingSpawnBudget?: number;
-    siteIntegrity?: number;
-  } = {},
-): SurvivalRuntimeStatus {
-  const now = options.now ?? null;
-  const waveEndsAt = now == null ? null : now + plan.waveDurationMs;
-  const baseMetricValues = {
-    ...createInitialSurvivalMetricValues(),
-    ...options.metricValues,
-  };
-  if (options.siteIntegrity != null) {
-    baseMetricValues.uptime = options.siteIntegrity;
-  }
-  const liveBugCounts = options.liveBugCounts ?? createEmptyBugCounts();
-  const metrics = getSurvivalPressure({
-    activeBugCount: getBugCountTotal(liveBugCounts),
-    activeBugCounts: liveBugCounts,
-    metricValues: baseMetricValues,
-    tickSeconds: 0,
-    wave: plan.wave,
-  }).metrics;
-
-  return {
-    activeBugLimit: plan.activeBugLimit,
-    failureKind: null,
-    failureLabel: null,
-    failureSummary: null,
-    focusLabel: plan.focusLabel ?? "Bug rush",
-    liveBugCounts,
-    metrics,
-    offlineReason: null,
-    pressurePercent: 0,
-    remainingSpawnBudget: Math.max(0, options.remainingSpawnBudget ?? 0),
-    secondsUntilNextWave: Math.ceil(plan.waveDurationMs / 1000),
-    secondsUntilOffline: metrics.uptime.secondsToFail,
-    siteIntegrity: metrics.uptime.value,
-    spawnRatePerSecond: plan.spawnRatePerSecond,
-    tacticLabel: plan.tacticLabel ?? "Opening wave",
-    variantWeights: plan.variantWeights,
-    wave: plan.wave,
-    waveDurationMs: plan.waveDurationMs,
-    waveEndsAt,
-    waveProgressPercent: 0,
-    waveStartedAt: now,
-  };
 }
 
 export function useSiegeGame({
@@ -988,35 +770,7 @@ export function useSiegeGame({
       }
 
       if (siteIntegrity != null) {
-        setSurvivalStatus((current) => ({
-          ...current,
-          failureKind: siteIntegrity <= 0 ? "uptimeFailure" : null,
-          failureLabel: siteIntegrity <= 0 ? "Uptime" : null,
-          failureSummary:
-            siteIntegrity <= 0
-              ? "Too many bugs broke through and took the platform down."
-              : null,
-          metrics: {
-            ...current.metrics,
-            uptime: {
-              ...current.metrics.uptime,
-              secondsToFail: siteIntegrity <= 0 ? 0 : current.metrics.uptime.secondsToFail,
-              status:
-                siteIntegrity <= 34
-                  ? "critical"
-                  : siteIntegrity <= 67
-                    ? "warning"
-                    : "stable",
-              value: Math.max(0, Math.min(100, siteIntegrity)),
-            },
-          },
-          offlineReason:
-            siteIntegrity <= 0
-              ? "Too many bugs broke through and took the platform down."
-              : null,
-          secondsUntilOffline: siteIntegrity <= 0 ? 0 : current.secondsUntilOffline,
-          siteIntegrity: Math.max(0, Math.min(100, siteIntegrity)),
-        }));
+        setSurvivalStatus((current) => applySiteIntegrityOverride(current, siteIntegrity));
         if (siteIntegrity <= 0) {
           updateRuntimeSnapshot((current) => ({ ...current, remainingBugs: 0 }), true);
           finalizeRun({ siteOffline: true });
@@ -1024,93 +778,14 @@ export function useSiegeGame({
       }
 
       if (uptime != null || errors != null || speed != null || failMetric != null) {
-        setSurvivalStatus((current) => {
-          const nextMetrics = {
-            ...current.metrics,
-            errors: {
-              ...current.metrics.errors,
-              secondsToFail: errors != null && errors <= 0 ? 0 : current.metrics.errors.secondsToFail,
-              status:
-                errors != null
-                  ? errors <= 34
-                    ? "critical"
-                    : errors <= 67
-                      ? "warning"
-                      : "stable"
-                  : current.metrics.errors.status,
-              value: errors != null ? Math.max(0, Math.min(100, errors)) : current.metrics.errors.value,
-            },
-            speed: {
-              ...current.metrics.speed,
-              secondsToFail: speed != null && speed <= 0 ? 0 : current.metrics.speed.secondsToFail,
-              status:
-                speed != null
-                  ? speed <= 34
-                    ? "critical"
-                    : speed <= 67
-                      ? "warning"
-                      : "stable"
-                  : current.metrics.speed.status,
-              value: speed != null ? Math.max(0, Math.min(100, speed)) : current.metrics.speed.value,
-            },
-            uptime: {
-              ...current.metrics.uptime,
-              secondsToFail: uptime != null && uptime <= 0 ? 0 : current.metrics.uptime.secondsToFail,
-              status:
-                uptime != null
-                  ? uptime <= 34
-                    ? "critical"
-                    : uptime <= 67
-                      ? "warning"
-                      : "stable"
-                  : current.metrics.uptime.status,
-              value: uptime != null ? Math.max(0, Math.min(100, uptime)) : current.metrics.uptime.value,
-            },
-          };
-          const nextFailureMetric =
-            failMetric ??
-            (nextMetrics.errors.value <= 0
-              ? "errors"
-              : nextMetrics.speed.value <= 0
-                ? "speed"
-                : nextMetrics.uptime.value <= 0
-                  ? "uptime"
-                  : null);
-          const failureSummary =
-            nextFailureMetric === "errors"
-              ? "Errors spiked faster than the platform could recover."
-              : nextFailureMetric === "speed"
-                ? "Load pushed the site into a crawl."
-                : nextFailureMetric === "uptime"
-                  ? "Too many bugs broke through and took the platform down."
-                  : null;
-
-          return {
-            ...current,
-            failureKind:
-              nextFailureMetric === "errors"
-                ? "errorFlood"
-                : nextFailureMetric === "speed"
-                  ? "speedCollapse"
-                  : nextFailureMetric === "uptime"
-                    ? "uptimeFailure"
-                    : null,
-            failureLabel:
-              nextFailureMetric === "errors"
-                ? "Errors"
-                : nextFailureMetric === "speed"
-                  ? "Speed"
-                  : nextFailureMetric === "uptime"
-                    ? "Uptime"
-                    : null,
-            failureSummary,
-            metrics: nextMetrics,
-            offlineReason: failureSummary,
-            secondsUntilOffline:
-              nextFailureMetric === "uptime" ? 0 : nextMetrics.uptime.secondsToFail,
-            siteIntegrity: nextMetrics.uptime.value,
-          };
-        });
+        setSurvivalStatus((current) =>
+          applySurvivalMetricOverrides(current, {
+            errors,
+            failMetric,
+            speed,
+            uptime,
+          }),
+        );
 
         if (
           failMetric != null ||
@@ -1178,47 +853,40 @@ export function useSiegeGame({
     }));
   }, [updateRuntimeSnapshot]);
 
-  const syncRemainingBugs = useCallback(
-    (count: number, sourceSessionKey?: string | null) => {
-      if (
-        sourceSessionKey != null &&
-        sourceSessionKey !== interactiveSessionKeyRef.current
-      ) {
+  const syncBugState = useCallback(
+    (
+      count: number,
+      bugCounts: BugCounts,
+      sourceSessionKey?: string | null,
+    ) => {
+      if (shouldIgnoreBugSync(sourceSessionKey, interactiveSessionKeyRef.current)) {
         return;
       }
 
-      const normalizedCount = Math.max(0, Math.floor(count));
-      const shouldForceFlush =
-        runtimeSnapshotRef.current.remainingBugs !== normalizedCount ||
-        normalizedCount === 0;
+      const normalizedCount = normalizeSyncedBugCount(count);
+      const shouldForceFlush = shouldForceBugSyncFlush(
+        runtimeSnapshotRef.current.remainingBugs,
+        normalizedCount,
+      );
 
-      updateRuntimeSnapshot((current) => {
-        if (current.remainingBugs === normalizedCount && normalizedCount !== 0) {
-          return current;
-        }
-
-        return {
-          ...current,
-          remainingBugs: normalizedCount,
-        };
-      }, shouldForceFlush);
+      updateRuntimeSnapshot(
+        (current) => updateRuntimeSnapshotRemainingBugs(current, normalizedCount),
+        shouldForceFlush,
+      );
 
       if (gameMode === "outbreak") {
-        setSurvivalStatus((current) => ({
-          ...current,
-          liveBugCounts: normalizeBugCountsForSurvival(
-            normalizedCount,
-            current.liveBugCounts,
-            current.wave,
-          ),
-        }));
+        setSurvivalStatus((current) =>
+          updateSurvivalStatusLiveBugCounts(current, normalizedCount, bugCounts),
+        );
       }
 
       if (
-        normalizedCount === 0 &&
-        interactiveMode &&
-        siegePhase === "active" &&
-        gameMode === "purge"
+        shouldFinalizePurgeFromBugSync({
+          gameMode,
+          interactiveMode,
+          normalizedCount,
+          siegePhase,
+        })
       ) {
         finalizeRun({ interactiveRemainingBugs: 0 });
       }
@@ -1226,52 +894,22 @@ export function useSiegeGame({
     [finalizeRun, gameMode, interactiveMode, siegePhase, updateRuntimeSnapshot],
   );
 
+  const syncRemainingBugs = useCallback(
+    (count: number, sourceSessionKey?: string | null) => {
+      syncBugState(
+        count,
+        survivalStatusRef.current.liveBugCounts,
+        sourceSessionKey,
+      );
+    },
+    [syncBugState],
+  );
+
   const syncLiveBugState = useCallback(
     (count: number, bugCounts: BugCounts, sourceSessionKey?: string | null) => {
-      if (
-        sourceSessionKey != null &&
-        sourceSessionKey !== interactiveSessionKeyRef.current
-      ) {
-        return;
-      }
-
-      const normalizedCount = Math.max(0, Math.floor(count));
-      const shouldForceFlush =
-        runtimeSnapshotRef.current.remainingBugs !== normalizedCount ||
-        normalizedCount === 0;
-
-      updateRuntimeSnapshot((current) => {
-        if (current.remainingBugs === normalizedCount && normalizedCount !== 0) {
-          return current;
-        }
-
-        return {
-          ...current,
-          remainingBugs: normalizedCount,
-        };
-      }, shouldForceFlush);
-
-      if (gameMode === "outbreak") {
-        setSurvivalStatus((current) => ({
-          ...current,
-          liveBugCounts: normalizeBugCountsForSurvival(
-            normalizedCount,
-            bugCounts,
-            current.wave,
-          ),
-        }));
-      }
-
-      if (
-        normalizedCount === 0 &&
-        interactiveMode &&
-        siegePhase === "active" &&
-        gameMode === "purge"
-      ) {
-        finalizeRun({ interactiveRemainingBugs: 0 });
-      }
+      syncBugState(count, bugCounts, sourceSessionKey);
     },
-    [finalizeRun, gameMode, interactiveMode, siegePhase, updateRuntimeSnapshot],
+    [syncBugState],
   );
 
   const togglePause = useCallback(() => {

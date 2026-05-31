@@ -27,7 +27,7 @@ describe("bug utilities", () => {
       getBugCountsFromPriorityDistribution([
         { count: 4, label: "Urgent" },
         { count: 6, label: "High" },
-        { count: 8, label: "Normal" },
+        { count: 8, label: "Medium" },
         { count: 10, label: "Low" },
         { count: 3, label: "Unspecified" },
       ]),
@@ -36,6 +36,17 @@ describe("bug utilities", () => {
       low: 13,
       medium: 8,
       urgent: 4,
+    });
+  });
+
+  it("accepts legacy normal priority labels", () => {
+    expect(
+      getBugCountsFromPriorityDistribution([{ count: 8, label: "Normal" }]),
+    ).toEqual({
+      high: 0,
+      low: 0,
+      medium: 8,
+      urgent: 0,
     });
   });
 

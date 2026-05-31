@@ -5,7 +5,7 @@ import type { QaWindowState, RenderedBugPosition } from "./types";
 
 declare global {
   interface Window {
-    __RTZ_QA__?: QaWindowState;
+    __RTZ_QA__?: QaWindowState & { __bugCanvasBindingOwner?: object };
   }
 }
 

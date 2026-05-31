@@ -8,6 +8,7 @@ import {
 } from "./metrics";
 import { getBugTerminalEvent } from "./bugLifecycle";
 import {
+  buildComparisonOutcomeChartData,
   buildComparisonRateHistoryChartData,
   buildComparisonWindowHistoryChartData,
   buildDeadlineBurndownChartData,
@@ -604,6 +605,16 @@ describe("metrics", () => {
     expect(rateChartData.labels?.length).toBe(
       comparisonMetrics.historicalWindows.length,
     );
+
+    const outcomeChartData = buildComparisonOutcomeChartData(comparisonMetrics);
+    expect(outcomeChartData.datasets).toHaveLength(1);
+    expect(outcomeChartData.labels).toEqual([
+      "Completed",
+      "Cancelled",
+      "Duplicated",
+      "Auto-closed",
+      "Archived",
+    ]);
   });
 
   it("counts archived terminal tickets as backlog closures in period comparisons", () => {
@@ -635,6 +646,38 @@ describe("metrics", () => {
     expect(comparisonMetrics.currentWindow.completed).toBe(0);
     expect(comparisonMetrics.currentWindow.closed).toBe(1);
     expect(comparisonMetrics.currentWindow.netChange).toBe(-1);
+    expect(comparisonMetrics.outcomeMetrics).toEqual([
+      {
+        count: 0,
+        key: "completed",
+        label: "Completed",
+        percent: 0,
+      },
+      {
+        count: 1,
+        key: "cancelled",
+        label: "Cancelled",
+        percent: 100,
+      },
+      {
+        count: 0,
+        key: "duplicated",
+        label: "Duplicated",
+        percent: 0,
+      },
+      {
+        count: 0,
+        key: "autoClosed",
+        label: "Auto-closed",
+        percent: 0,
+      },
+      {
+        count: 0,
+        key: "archived",
+        label: "Archived",
+        percent: 0,
+      },
+    ]);
   });
 
   it("calculates SLA insights from due dates and completed dates", () => {
@@ -733,14 +776,14 @@ describe("metrics", () => {
     const highMetrics = insightsMetrics.priorityMetrics.find(
       (entry) => entry.label === "High",
     );
-    const normalMetrics = insightsMetrics.priorityMetrics.find(
-      (entry) => entry.label === "Normal",
+    const mediumMetrics = insightsMetrics.priorityMetrics.find(
+      (entry) => entry.label === "Medium",
     );
 
     expect(urgentMetrics?.onTime).toBe(1);
     expect(highMetrics?.overdueCompleted).toBe(1);
-    expect(normalMetrics?.totalCompleted).toBe(1);
-    expect(normalMetrics?.missingDueDate).toBe(1);
+    expect(mediumMetrics?.totalCompleted).toBe(1);
+    expect(mediumMetrics?.missingDueDate).toBe(1);
 
     const hitRateChart = buildSlaHitRateChartData(insightsMetrics);
     expect(hitRateChart.datasets[0]?.data.slice(0, 3)).toEqual([100, 0, 0]);

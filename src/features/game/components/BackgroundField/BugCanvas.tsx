@@ -36,27 +36,20 @@ import type {
 import { type CanvasBounds, type ReseedInfo } from "./canvasState";
 import {
   clearBugCanvasQaBindings,
-  installBugCanvasQaBindings,
-  setupBugCanvasEngine,
+  ensureBugCanvasQaBindings,
 } from "./bugCanvasEngineSetup";
+import { createGameConfigKey } from "@game/engine/runtimeSafety";
 import { setupBugCanvasRenderLoop } from "./bugCanvasRenderLoop";
+import { setupBugCanvasEngineSession } from "./bugCanvasEngineSession";
+import {
+  getBugCanvasTargetSettings,
+  syncBugCanvasRefs,
+} from "./bugCanvasRefSync";
 import {
   applySurvivalSpawnPlan,
   clearInteractiveSwarm,
   getLocalSiegeZones as computeLocalSiegeZones,
 } from "./bugCanvasLiveState";
-
-function clampNumber(value: number, min: number, max: number) {
-  return Math.min(Math.max(value, min), max);
-}
-
-function getSpeedMultiplier(chaosMultiplier?: number) {
-  return clampNumber(
-    Math.pow(Math.max(0.25, chaosMultiplier ?? 1), 0.32),
-    0.5,
-    1.35,
-  );
-}
 
 export interface BugCanvasProps {
   bugVisualSettings: BugVisualSettings;
@@ -175,6 +168,7 @@ const BugCanvas = memo(
     }: BugCanvasProps,
     ref,
   ) {
+    const initialTargetSettings = getBugCanvasTargetSettings(bugVisualSettings);
     const canvasRef = useRef<HTMLCanvasElement | null>(null);
     const swarmRef = useRef<any | null>(null);
     const motionProfileRef = useRef(motionProfile);
@@ -226,17 +220,11 @@ const BugCanvas = memo(
     const survivalSpawnPlanRef = useRef(survivalSpawnPlan);
     const gamePausedRef = useRef(gamePaused);
     const sessionKeyRef = useRef(sessionKey);
-    const targetSettingsRef = useRef({
-      sizeMultiplier: bugVisualSettings?.sizeMultiplier ?? 1,
-      speedMultiplier: getSpeedMultiplier(bugVisualSettings?.chaosMultiplier),
-    });
-    const animatedStateRef = useRef({
-      sizeMultiplier: bugVisualSettings?.sizeMultiplier ?? 1,
-      speedMultiplier: getSpeedMultiplier(bugVisualSettings?.chaosMultiplier),
-    });
+    const targetSettingsRef = useRef({ ...initialTargetSettings });
+    const animatedStateRef = useRef({ ...initialTargetSettings });
     const [reseedInfo, setReseedInfo] = useState<ReseedInfo | null>(null);
     const gameConfigKey = useMemo(
-      () => JSON.stringify(gameConfig ?? {}),
+      () => createGameConfigKey(gameConfig),
       [gameConfig],
     );
 
@@ -324,34 +312,58 @@ const BugCanvas = memo(
     );
 
     useEffect(() => {
-      interactiveModeRef.current = interactiveMode;
-      gamePausedRef.current = gamePaused;
-      onWeaponEvolutionStatesChangeRef.current = onWeaponEvolutionStatesChange;
-      getWeaponTierRef.current = getWeaponTier;
-      onLiveBugCountChangeRef.current = onLiveBugCountChange;
-      onPhysicsBackendChangeRef.current = onPhysicsBackendChange;
-      gameConfigRef.current = gameConfig;
-      initialEvolutionStatesRef.current = initialEvolutionStates;
-      consumeTransitionSwarmRef.current = consumeTransitionSwarm;
-      transitionSnapshotRef.current = transitionSnapshot;
-      streakMultiplierRef.current = streakMultiplier;
-      motionProfileRef.current = motionProfile;
-      sceneProfileRef.current = sceneProfile;
-      chartFocusRef.current = chartFocus;
-      onHitRef.current = onHit;
-      onCoreBreachRef.current = onCoreBreach;
-      onEntityDeathRef.current = onEntityDeath;
-      onWeaponFireRef.current = onWeaponFire;
-      selectedWeaponIdRef.current = selectedWeaponId;
-      combatStatsRef.current = combatStats ?? null;
-      reseedInfoRef.current = reseedInfo;
-      siegeZonesRef.current = siegeZones;
-      survivalSpawnPlanRef.current = survivalSpawnPlan;
-      sessionKeyRef.current = sessionKey;
-      targetSettingsRef.current = {
-        sizeMultiplier: bugVisualSettings?.sizeMultiplier ?? 1,
-        speedMultiplier: getSpeedMultiplier(bugVisualSettings?.chaosMultiplier),
-      };
+      syncBugCanvasRefs({
+        bugVisualSettings,
+        chartFocus,
+        chartFocusRef,
+        combatStats,
+        combatStatsRef,
+        consumeTransitionSwarm,
+        consumeTransitionSwarmRef,
+        gameConfig,
+        gameConfigRef,
+        gamePaused,
+        gamePausedRef,
+        getWeaponTier,
+        getWeaponTierRef,
+        initialEvolutionStates,
+        initialEvolutionStatesRef,
+        interactiveMode,
+        interactiveModeRef,
+        motionProfile,
+        motionProfileRef,
+        onCoreBreach,
+        onCoreBreachRef,
+        onEntityDeath,
+        onEntityDeathRef,
+        onHit,
+        onHitRef,
+        onLiveBugCountChange,
+        onLiveBugCountChangeRef,
+        onPhysicsBackendChange,
+        onPhysicsBackendChangeRef,
+        onWeaponEvolutionStatesChange,
+        onWeaponEvolutionStatesChangeRef,
+        onWeaponFire,
+        onWeaponFireRef,
+        reseedInfo,
+        reseedInfoRef,
+        sceneProfile,
+        sceneProfileRef,
+        selectedWeaponId,
+        selectedWeaponIdRef,
+        sessionKey,
+        sessionKeyRef,
+        siegeZones,
+        siegeZonesRef,
+        streakMultiplier,
+        streakMultiplierRef,
+        survivalSpawnPlan,
+        survivalSpawnPlanRef,
+        targetSettingsRef,
+        transitionSnapshot,
+        transitionSnapshotRef,
+      });
     }, [
       bugVisualSettings,
       chartFocus,
@@ -386,48 +398,13 @@ const BugCanvas = memo(
     );
 
     const ensureQaBindings = useCallback(() => {
-      if (typeof window === "undefined") {
-        return;
-      }
-
-      const qaState = (
-        window as Window & {
-          __RTZ_QA__?: {
-            clearLiveBugs?: () => number;
-            enabled?: boolean;
-            getLiveBugCount?: () => number;
-            repositionLiveBug?: (request: {
-              heading?: number;
-              index: number;
-              vx?: number;
-              vy?: number;
-              x: number;
-              y: number;
-            }) => boolean;
-          };
-        }
-      ).__RTZ_QA__;
-
-      if (!qaState?.enabled || !swarmRef.current) {
-        return;
-      }
-
-      if (
-        typeof qaState.repositionLiveBug === "function" &&
-        typeof qaState.getLiveBugCount === "function" &&
-        typeof qaState.clearLiveBugs === "function"
-      ) {
-        return;
-      }
-
-      qaBindingOwnerRef.current = installBugCanvasQaBindings({
+      ensureBugCanvasQaBindings({
         bounds: boundsRef.current,
+        canvas: canvasRef.current,
         engine: swarmRef.current,
-        height:
-          canvasRef.current?.clientHeight || boundsRef.current.height || 600,
         latestBugPositionsRef,
         onLiveBugCountChange: onLiveBugCountChangeRef.current ?? undefined,
-        width: canvasRef.current?.clientWidth || boundsRef.current.width || 800,
+        qaBindingOwnerRef,
       });
     }, []);
 
@@ -447,150 +424,36 @@ const BugCanvas = memo(
       // Recreate the engine only when the logical session changes.
       // In interactive play, live bug counts can change on every kill and must
       // not rebuild the entire swarm or the canvas will visibly flicker.
-      const canvas = canvasRef.current;
-      const currentVfx = vfxRef.current;
-      const w = canvas?.clientWidth || boundsRef.current.width || 800;
-      const h = canvas?.clientHeight || boundsRef.current.height || 600;
-      let cancelled = false;
-      let disposePhysicsAdapter: (() => void) | undefined;
-
-      const setupEngine = async () => {
-        if (!canvas) {
-          return;
-        }
-
-        if (
-          swarmRef.current &&
-          typeof (swarmRef.current as any).destroy === "function"
-        ) {
-          try {
-            (swarmRef.current as any).destroy();
-          } catch {
-            void 0;
-          }
-        }
-
-        const result = await setupBugCanvasEngine({
-          bugCounts,
-          bounds: boundsRef.current,
-          canvas,
-          gameConfig: (gameConfigRef.current as any) ?? undefined,
-          getLocalSiegeZones,
-          height: h,
-          initialEvolutionStates:
-            initialEvolutionStatesRef.current ?? undefined,
-          interactiveMode,
-          latestBugPositionsRef,
-          maxWeaponTier,
-          notifyPhysicsBackendChange: (backendId) =>
-            onPhysicsBackendChangeRef.current?.(backendId),
-          notifyWeaponEvolution: (weaponId, newTier) => {
-            const bounds = boundsRef.current;
-            vfxRef.current?.spawnLevelUp?.(
-              Math.round((bounds.width || w) * 0.5),
-              Math.round(Math.max(72, (bounds.height || h) * 0.24)),
-            );
-            onWeaponEvolution?.(weaponId, newTier);
-          },
-          onEntityDeath: (x, y, variant, meta) => {
-            try {
-              const viewportX = Math.round(x + (boundsRef.current.left || 0));
-              const viewportY = Math.round(y + (boundsRef.current.top || 0));
-              if (meta.finisherStatus) {
-                vfxRef.current?.spawnStatusResolution?.(
-                  viewportX,
-                  viewportY,
-                  meta.finisherStatus,
-                  "finisher",
-                );
-              } else {
-                const supportStatus = meta.supportStatuses?.find(
-                  (status) => status !== "marked",
-                );
-                if (supportStatus) {
-                  vfxRef.current?.spawnStatusResolution?.(
-                    viewportX,
-                    viewportY,
-                    supportStatus,
-                    "support",
-                  );
-                }
-              }
-              onEntityDeathRef.current?.(viewportX, viewportY, variant, meta);
-              syncWeaponEvolutionStates();
-            } catch {
-              void 0;
-            }
-          },
-          onLiveBugCountChange: onLiveBugCountChangeRef.current ?? undefined,
-          reseedSpeedMultiplier: targetSettingsRef.current.speedMultiplier,
-          syncWeaponEvolutionStates,
-          consumeTransitionSwarm: () =>
-            consumeTransitionSwarmRef.current?.() ?? null,
-          transitionSnapshot: transitionSnapshotRef.current,
-          width: w,
-        });
-        if (cancelled) {
-          result.physicsAdapter.dispose?.();
-          return;
-        }
-
-        swarmRef.current = result.engine;
-        latestBugPositionsRef.current = [];
-        lastReportedLiveBugCountRef.current = null;
-        lastReportedLiveBugCountsKeyRef.current = null;
-        lastAppliedSpawnPlanRef.current = 0;
-        applySurvivalSpawnPlan({
-          getLocalZones: getLocalSiegeZones,
-          interactiveMode: interactiveModeRef.current,
-          lastAppliedSpawnPlanRef,
-          onLiveBugCountChange: onLiveBugCountChangeRef.current,
-          sessionKey: sessionKeyRef.current,
-          spawnPlan: survivalSpawnPlanRef.current,
-          swarm: swarmRef.current,
-        });
-        disposePhysicsAdapter = () => result.physicsAdapter.dispose?.();
-        qaBindingOwnerRef.current = installBugCanvasQaBindings({
-          bounds: boundsRef.current,
-          engine: result.engine,
-          height: h,
-          latestBugPositionsRef,
-          onLiveBugCountChange: onLiveBugCountChangeRef.current ?? undefined,
-          width: w,
-        });
-
-        if (result.reseedInfo) {
-          setReseedInfo(result.reseedInfo);
-        }
-      };
-
-      void setupEngine();
-
-      return () => {
-        if (blackHoleVfxIdRef.current && currentVfx) {
-          currentVfx.destroyBlackHole(blackHoleVfxIdRef.current);
-          blackHoleVfxIdRef.current = null;
-        }
-        cancelled = true;
-        // if effect re-runs or component unmounts, clear engine reference
-        if (
-          swarmRef.current &&
-          typeof (swarmRef.current as any).destroy === "function"
-        ) {
-          try {
-            (swarmRef.current as any).destroy();
-          } catch {
-            void 0;
-          }
-        }
-        disposePhysicsAdapter?.();
-        clearBugCanvasQaBindings(qaBindingOwnerRef.current ?? undefined);
-        qaBindingOwnerRef.current = null;
-        swarmRef.current = null;
-        latestBugPositionsRef.current = [];
-        lastReportedLiveBugCountRef.current = null;
-        lastReportedLiveBugCountsKeyRef.current = null;
-      };
+      return setupBugCanvasEngineSession({
+        blackHoleVfxIdRef,
+        boundsRef,
+        bugCounts,
+        canvasRef,
+        consumeTransitionSwarmRef,
+        gameConfigRef,
+        getLocalSiegeZones,
+        initialEvolutionStatesRef,
+        interactiveMode,
+        interactiveModeRef,
+        lastAppliedSpawnPlanRef,
+        lastReportedLiveBugCountRef,
+        lastReportedLiveBugCountsKeyRef,
+        latestBugPositionsRef,
+        maxWeaponTier,
+        onEntityDeathRef,
+        onLiveBugCountChangeRef,
+        onPhysicsBackendChangeRef,
+        onWeaponEvolution,
+        qaBindingOwnerRef,
+        setReseedInfo,
+        sessionKeyRef,
+        survivalSpawnPlanRef,
+        swarmRef,
+        syncWeaponEvolutionStates,
+        targetSettingsRef,
+        transitionSnapshotRef,
+        vfxRef,
+      });
     }, [
       bugCounts,
       gameConfigKey,

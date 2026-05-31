@@ -1,6 +1,6 @@
 import { endOfYear, format, subDays } from "date-fns";
 import { STORAGE_KEYS } from "../../../constants/storageKeys";
-import { useStoredState } from "../../../hooks/useStoredState";
+import { useStoredState } from "@shared/hooks/useStoredState";
 import { parseStoredString } from "@shared/utils/storage";
 
 export function useDeadlineRange() {

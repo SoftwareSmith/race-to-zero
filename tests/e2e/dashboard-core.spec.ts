@@ -91,7 +91,7 @@ test.describe("dashboard core QA", () => {
     await expect(page.getByText("Created vs closed")).toBeVisible();
     await expect(page.getByText("Current vs previous window")).toBeVisible();
     await expect(page.getByText("Period-by-period net change")).toBeVisible();
-    await expect(page.getByText("Creation vs closure rate trend")).toBeVisible();
+    await expect(page.getByText("Closed outcome spread")).toBeVisible();
 
     await clientErrors.expectNoClientErrors();
   });

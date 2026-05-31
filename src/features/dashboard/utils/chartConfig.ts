@@ -17,6 +17,17 @@ const allValuesTooltipChartKeys = new Set([
   "history-cycle-buckets",
 ]);
 
+const tooltipShareOfTotalChartKeys = new Set([
+  "priority-breakdown",
+  "status-breakdown",
+  "open-age-breakdown",
+  "history-outcome-breakdown",
+  "history-cycle-buckets",
+  "period-rate-history",
+]);
+
+const tooltipPercentValueChartKeys = new Set(["sla-hit-rate-by-priority"]);
+
 function shouldShowBarValueLabels(
   variant: ChartVariant,
   chartKey?: string,
@@ -177,7 +188,58 @@ function renderTooltipRows(rows: string, title: string) {
   `;
 }
 
-function renderStandardTooltip(context: any) {
+function sumNumericValues(values: unknown[]) {
+  return values.reduce((sum, entry) => {
+    return typeof entry === "number" && Number.isFinite(entry)
+      ? sum + entry
+      : sum;
+  }, 0);
+}
+
+function formatValueWithPercentSuffix(value: number) {
+  return Number.isInteger(value) ? `${value}%` : `${value.toFixed(1)}%`;
+}
+
+function formatValueWithShareOfTotal(value: number, datasetValues: unknown[]) {
+  const total = sumNumericValues(datasetValues);
+  const percent = total > 0 ? Math.round((value / total) * 100) : 0;
+  return `${value} (${percent}%)`;
+}
+
+function formatTooltipDisplayValue(
+  chartKey: string | undefined,
+  value: unknown,
+  datasetValues: unknown[] = [],
+) {
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    return String(value);
+  }
+
+  if (chartKey && tooltipPercentValueChartKeys.has(chartKey)) {
+    return formatValueWithPercentSuffix(value);
+  }
+
+  if (chartKey && tooltipShareOfTotalChartKeys.has(chartKey)) {
+    return formatValueWithShareOfTotal(value, datasetValues);
+  }
+
+  return String(value);
+}
+
+function formatTooltipValue(chartKey: string | undefined, point: any) {
+  const value =
+    typeof point.raw === "number"
+      ? point.raw
+      : point.parsed?.y ?? point.parsed?.x ?? point.formattedValue;
+
+  const datasetValues = Array.isArray(point.dataset?.data)
+    ? point.dataset.data
+    : [];
+
+  return formatTooltipDisplayValue(chartKey, value, datasetValues);
+}
+
+function renderStandardTooltip(context: any, chartKey?: string) {
   const { chart, tooltip } = context;
   const tooltipEl = getOrCreateTooltipElement(chart);
 
@@ -198,10 +260,7 @@ function renderStandardTooltip(context: any) {
         point.dataset?.borderColor ??
         point.dataset?.backgroundColor ??
         "#7dd3fc";
-      const value =
-        typeof point.raw === "number"
-          ? point.raw
-          : point.parsed?.y ?? point.parsed?.x ?? point.formattedValue;
+      const value = formatTooltipValue(chartKey, point);
       const label = point.dataset?.label ?? point.label ?? "Value";
 
       return `
@@ -219,7 +278,11 @@ function renderStandardTooltip(context: any) {
   positionTooltipElement(chart, tooltip, tooltipEl);
 }
 
-export function showUnifiedAllValuesTooltip(chart: any, anchorRect: DOMRect) {
+export function showUnifiedAllValuesTooltip(
+  chart: any,
+  anchorRect: DOMRect,
+  chartKey?: string,
+) {
   if (!chart) {
     return;
   }
@@ -237,12 +300,13 @@ export function showUnifiedAllValuesTooltip(chart: any, anchorRect: DOMRect) {
     .map((label: unknown, index: number) => {
       const color = getTooltipRowColor(dataset, index);
       const value = values[index] ?? 0;
+      const displayValue = formatTooltipDisplayValue(chartKey, value, values);
 
       return `
         <div style="display:grid;grid-template-columns:10px minmax(0,1fr) auto;align-items:center;column-gap:8px;">
           <span style="width:10px;height:10px;border-radius:2px;background:${String(color)};display:block;"></span>
           <span style="color:#dbeafe;font-size:12px;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${String(label)}</span>
-          <span style="color:#f8fafc;font-size:12px;line-height:1.2;font-weight:700;text-align:right;">${String(value)}</span>
+          <span style="color:#f8fafc;font-size:12px;line-height:1.2;font-weight:700;text-align:right;">${String(displayValue)}</span>
         </div>
       `;
     })
@@ -329,7 +393,7 @@ export function getLineChartOptions<TVariant extends ChartVariant>(
         enabled: false,
         external: useUnifiedAllValuesTooltip
           ? undefined
-          : renderStandardTooltip,
+          : (context: any) => renderStandardTooltip(context, chartKey),
         backgroundColor: "#0f172a",
         titleColor: "#fafaf9",
         bodyColor: "#dbeafe",
@@ -346,10 +410,7 @@ export function getLineChartOptions<TVariant extends ChartVariant>(
             const datasetLabel = context.dataset.label
               ? `${context.dataset.label}: `
               : "";
-            const value =
-              typeof context.raw === "number"
-                ? context.raw
-                : context.parsed?.y ?? context.parsed?.x ?? context.raw;
+            const value = formatTooltipValue(chartKey, context);
             return `${datasetLabel}${value}`;
           },
           title: (items: any[]) => {

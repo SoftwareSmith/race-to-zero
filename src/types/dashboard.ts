@@ -271,6 +271,7 @@ export interface ComparisonMetrics {
   hasComparisonWindow: boolean;
   headline: string;
   historicalWindows: ComparisonWindowMetrics[];
+  outcomeMetrics: HistoryOutcomeMetric[];
   previousWindow: ComparisonWindowMetrics | null;
   rangeKey: string;
   rangeLabel: string;
