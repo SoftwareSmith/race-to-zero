@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-05-31T00:29:50.929Z",
-  "lastUpdated": "2026-05-31T00:29:50.929Z",
+  "generatedAt": "2026-06-01T00:30:39.527Z",
+  "lastUpdated": "2026-06-01T00:30:39.527Z",
   "bugs": [
     {
       "archivedAt": null,
@@ -27807,7 +27807,7 @@
       "stateName": "In Review",
       "stateType": "started",
       "teamKey": "TA",
-      "updatedAt": "2026-05-29"
+      "updatedAt": "2026-05-31"
     },
     {
       "archivedAt": "2026-05-07",
