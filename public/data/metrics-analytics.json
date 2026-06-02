@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-06-01T00:30:39.527Z",
-  "lastUpdated": "2026-06-01T00:30:39.527Z",
+  "generatedAt": "2026-06-02T00:34:32.001Z",
+  "lastUpdated": "2026-06-02T00:34:32.001Z",
   "bugs": [
     {
       "archivedAt": null,
@@ -26,7 +26,7 @@
       "stateName": "Backlog",
       "stateType": "backlog",
       "teamKey": "CP",
-      "updatedAt": "2026-05-08"
+      "updatedAt": "2026-06-01"
     },
     {
       "archivedAt": null,
@@ -52,7 +52,7 @@
       "stateName": "Backlog",
       "stateType": "backlog",
       "teamKey": "CP",
-      "updatedAt": "2026-04-15"
+      "updatedAt": "2026-06-01"
     },
     {
       "archivedAt": null,
@@ -338,7 +338,7 @@
       "stateName": "Backlog",
       "stateType": "backlog",
       "teamKey": "CP",
-      "updatedAt": "2026-04-15"
+      "updatedAt": "2026-06-01"
     },
     {
       "archivedAt": null,
@@ -416,7 +416,7 @@
       "stateName": "Backlog",
       "stateType": "backlog",
       "teamKey": "CP",
-      "updatedAt": "2025-06-20"
+      "updatedAt": "2026-06-01"
     },
     {
       "archivedAt": null,
@@ -520,7 +520,7 @@
       "stateName": "Backlog",
       "stateType": "backlog",
       "teamKey": "CP",
-      "updatedAt": "2026-04-15"
+      "updatedAt": "2026-06-01"
     },
     {
       "archivedAt": null,
@@ -962,7 +962,7 @@
       "stateName": "Backlog",
       "stateType": "backlog",
       "teamKey": "CP",
-      "updatedAt": "2026-04-15"
+      "updatedAt": "2026-06-01"
     },
     {
       "archivedAt": null,
@@ -3887,7 +3887,7 @@
       "stateName": "Backlog",
       "stateType": "backlog",
       "teamKey": "CP",
-      "updatedAt": "2026-05-08"
+      "updatedAt": "2026-06-01"
     },
     {
       "archivedAt": null,
@@ -3939,7 +3939,7 @@
       "stateName": "Backlog",
       "stateType": "backlog",
       "teamKey": "CP",
-      "updatedAt": "2026-04-16"
+      "updatedAt": "2026-06-01"
     },
     {
       "archivedAt": null,
@@ -3965,7 +3965,7 @@
       "stateName": "Backlog",
       "stateType": "backlog",
       "teamKey": "CP",
-      "updatedAt": "2025-06-20"
+      "updatedAt": "2026-06-01"
     },
     {
       "archivedAt": "2025-12-19",
@@ -4238,7 +4238,7 @@
       "stateName": "Backlog",
       "stateType": "backlog",
       "teamKey": "CP",
-      "updatedAt": "2026-05-08"
+      "updatedAt": "2026-06-01"
     },
     {
       "archivedAt": null,
@@ -6617,7 +6617,7 @@
       "stateName": "Backlog",
       "stateType": "backlog",
       "teamKey": "CP",
-      "updatedAt": "2025-06-20"
+      "updatedAt": "2026-06-01"
     },
     {
       "archivedAt": null,
@@ -8164,7 +8164,7 @@
       "stateName": "Backlog",
       "stateType": "backlog",
       "teamKey": "CP",
-      "updatedAt": "2025-06-20"
+      "updatedAt": "2026-06-01"
     },
     {
       "archivedAt": null,
@@ -9607,7 +9607,7 @@
       "stateName": "Backlog",
       "stateType": "backlog",
       "teamKey": "CP",
-      "updatedAt": "2026-05-08"
+      "updatedAt": "2026-06-01"
     },
     {
       "archivedAt": null,
@@ -9867,7 +9867,7 @@
       "stateName": "Backlog",
       "stateType": "backlog",
       "teamKey": "CP",
-      "updatedAt": "2025-06-20"
+      "updatedAt": "2026-06-01"
     },
     {
       "archivedAt": null,
@@ -11258,7 +11258,7 @@
       "stateName": "Backlog",
       "stateType": "backlog",
       "teamKey": "CP",
-      "updatedAt": "2026-05-08"
+      "updatedAt": "2026-06-01"
     },
     {
       "archivedAt": "2026-05-14",
@@ -11466,7 +11466,7 @@
       "stateName": "Backlog",
       "stateType": "backlog",
       "teamKey": "CP",
-      "updatedAt": "2025-06-20"
+      "updatedAt": "2026-06-01"
     },
     {
       "archivedAt": null,
@@ -14755,7 +14755,7 @@
       "stateName": "Triage",
       "stateType": "triage",
       "teamKey": "CP",
-      "updatedAt": "2026-03-06"
+      "updatedAt": "2026-06-01"
     },
     {
       "archivedAt": "2025-08-18",
@@ -15106,7 +15106,7 @@
       "stateName": "Triage",
       "stateType": "triage",
       "teamKey": "CP",
-      "updatedAt": "2026-03-06"
+      "updatedAt": "2026-06-01"
     },
     {
       "archivedAt": "2026-05-14",
@@ -16567,15 +16567,15 @@
     {
       "archivedAt": null,
       "autoClosedAt": null,
-      "canceledAt": null,
+      "canceledAt": "2026-06-01",
       "createdAt": "2025-08-26",
       "completedAt": null,
       "dueDate": null,
       "priority": 4,
-      "stateName": "Backlog",
-      "stateType": "backlog",
+      "stateName": "Canceled",
+      "stateType": "canceled",
       "teamKey": "CP",
-      "updatedAt": "2025-08-26"
+      "updatedAt": "2026-06-01"
     },
     {
       "archivedAt": "2025-09-26",
@@ -17971,15 +17971,15 @@
     {
       "archivedAt": null,
       "autoClosedAt": null,
-      "canceledAt": null,
+      "canceledAt": "2026-06-01",
       "createdAt": "2025-09-26",
       "completedAt": null,
       "dueDate": null,
       "priority": 3,
-      "stateName": "Triage",
-      "stateType": "triage",
+      "stateName": "Canceled",
+      "stateType": "canceled",
       "teamKey": "CP",
-      "updatedAt": "2026-03-06"
+      "updatedAt": "2026-06-01"
     },
     {
       "archivedAt": "2026-04-24",
@@ -20852,7 +20852,7 @@
       "stateName": "Triage",
       "stateType": "triage",
       "teamKey": "CP",
-      "updatedAt": "2026-03-17"
+      "updatedAt": "2026-06-01"
     },
     {
       "archivedAt": null,
@@ -21892,7 +21892,7 @@
       "stateName": "Triage",
       "stateType": "triage",
       "teamKey": "CP",
-      "updatedAt": "2026-04-07"
+      "updatedAt": "2026-06-01"
     },
     {
       "archivedAt": null,
@@ -22649,7 +22649,7 @@
       "updatedAt": "2026-02-27"
     },
     {
-      "archivedAt": null,
+      "archivedAt": "2026-06-01",
       "autoClosedAt": null,
       "canceledAt": null,
       "createdAt": "2026-01-13",
@@ -22659,7 +22659,7 @@
       "stateName": "Done",
       "stateType": "completed",
       "teamKey": "TA",
-      "updatedAt": "2026-05-01"
+      "updatedAt": "2026-06-01"
     },
     {
       "archivedAt": null,
@@ -24037,7 +24037,7 @@
       "stateName": "Triage",
       "stateType": "triage",
       "teamKey": "CP",
-      "updatedAt": "2026-03-06"
+      "updatedAt": "2026-06-01"
     },
     {
       "archivedAt": "2026-03-01",
@@ -24141,7 +24141,7 @@
       "stateName": "Triage",
       "stateType": "triage",
       "teamKey": "CP",
-      "updatedAt": "2026-03-06"
+      "updatedAt": "2026-06-01"
     },
     {
       "archivedAt": null,
@@ -24154,7 +24154,7 @@
       "stateName": "Triage",
       "stateType": "triage",
       "teamKey": "CP",
-      "updatedAt": "2026-03-06"
+      "updatedAt": "2026-06-02"
     },
     {
       "archivedAt": null,
@@ -24235,7 +24235,7 @@
       "updatedAt": "2026-02-12"
     },
     {
-      "archivedAt": null,
+      "archivedAt": "2026-06-01",
       "autoClosedAt": null,
       "canceledAt": "2026-04-24",
       "createdAt": "2026-02-02",
@@ -24482,7 +24482,7 @@
       "updatedAt": "2026-02-18"
     },
     {
-      "archivedAt": null,
+      "archivedAt": "2026-06-01",
       "autoClosedAt": null,
       "canceledAt": null,
       "createdAt": "2026-02-05",
@@ -24495,7 +24495,7 @@
       "updatedAt": "2026-04-23"
     },
     {
-      "archivedAt": null,
+      "archivedAt": "2026-06-01",
       "autoClosedAt": null,
       "canceledAt": "2026-02-06",
       "createdAt": "2026-02-05",
@@ -24508,7 +24508,7 @@
       "updatedAt": "2026-04-23"
     },
     {
-      "archivedAt": null,
+      "archivedAt": "2026-06-01",
       "autoClosedAt": null,
       "canceledAt": null,
       "createdAt": "2026-02-05",
@@ -24547,7 +24547,7 @@
       "updatedAt": "2026-03-24"
     },
     {
-      "archivedAt": null,
+      "archivedAt": "2026-06-01",
       "autoClosedAt": null,
       "canceledAt": null,
       "createdAt": "2026-02-06",
@@ -28106,7 +28106,7 @@
       "stateName": "In Review",
       "stateType": "started",
       "teamKey": "TA",
-      "updatedAt": "2026-05-28"
+      "updatedAt": "2026-06-01"
     },
     {
       "archivedAt": null,
@@ -29136,7 +29136,7 @@
       "updatedAt": "2026-04-29"
     },
     {
-      "archivedAt": null,
+      "archivedAt": "2026-06-01",
       "autoClosedAt": null,
       "canceledAt": "2026-05-01",
       "createdAt": "2026-04-29",
@@ -30017,7 +30017,7 @@
       "stateName": "Triage",
       "stateType": "triage",
       "teamKey": "CP",
-      "updatedAt": "2026-05-14"
+      "updatedAt": "2026-06-02"
     },
     {
       "archivedAt": null,
@@ -30056,7 +30056,7 @@
       "stateName": "Backlog",
       "stateType": "backlog",
       "teamKey": "CP",
-      "updatedAt": "2026-05-18"
+      "updatedAt": "2026-06-01"
     },
     {
       "archivedAt": null,
@@ -31473,7 +31473,7 @@
       "stateName": "In Review",
       "stateType": "started",
       "teamKey": "TA",
-      "updatedAt": "2026-05-29"
+      "updatedAt": "2026-06-01"
     },
     {
       "archivedAt": null,
