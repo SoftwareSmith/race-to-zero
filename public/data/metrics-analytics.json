@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-06-07T00:31:17.025Z",
-  "lastUpdated": "2026-06-07T00:31:17.025Z",
+  "generatedAt": "2026-06-08T00:33:19.930Z",
+  "lastUpdated": "2026-06-08T00:33:19.930Z",
   "bugs": [
     {
       "archivedAt": null,
@@ -14173,7 +14173,7 @@
       "updatedAt": "2025-08-01"
     },
     {
-      "archivedAt": null,
+      "archivedAt": "2026-06-07",
       "autoClosedAt": null,
       "canceledAt": null,
       "createdAt": "2025-06-18",
@@ -14183,7 +14183,7 @@
       "stateName": "Done",
       "stateType": "completed",
       "teamKey": "T1",
-      "updatedAt": "2026-05-07"
+      "updatedAt": "2026-06-07"
     },
     {
       "archivedAt": "2026-02-27",
@@ -25688,7 +25688,7 @@
       "stateName": "Done",
       "stateType": "completed",
       "teamKey": "PF",
-      "updatedAt": "2026-05-13"
+      "updatedAt": "2026-06-07"
     },
     {
       "archivedAt": "2026-03-26",
@@ -28577,7 +28577,7 @@
       "updatedAt": "2026-05-21"
     },
     {
-      "archivedAt": null,
+      "archivedAt": "2026-06-07",
       "autoClosedAt": null,
       "canceledAt": null,
       "createdAt": "2026-04-20",
@@ -29084,7 +29084,7 @@
       "updatedAt": "2026-05-01"
     },
     {
-      "archivedAt": null,
+      "archivedAt": "2026-06-07",
       "autoClosedAt": null,
       "canceledAt": "2026-05-01",
       "createdAt": "2026-04-28",
@@ -31694,7 +31694,7 @@
       "stateName": "In Review",
       "stateType": "started",
       "teamKey": "TA",
-      "updatedAt": "2026-06-05"
+      "updatedAt": "2026-06-07"
     },
     {
       "archivedAt": null,
@@ -31941,7 +31941,7 @@
       "stateName": "In Review",
       "stateType": "started",
       "teamKey": "TA",
-      "updatedAt": "2026-06-05"
+      "updatedAt": "2026-06-07"
     },
     {
       "archivedAt": null,
@@ -32354,10 +32354,10 @@
       "completedAt": null,
       "dueDate": null,
       "priority": 3,
-      "stateName": "Todo",
-      "stateType": "unstarted",
+      "stateName": "In Review",
+      "stateType": "started",
       "teamKey": "TA",
-      "updatedAt": "2026-06-05"
+      "updatedAt": "2026-06-07"
     },
     {
       "archivedAt": null,

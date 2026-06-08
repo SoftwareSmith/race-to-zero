@@ -3760,7 +3760,7 @@
         "label": "0-7d"
       },
       {
-        "count": 50,
+        "count": 49,
         "label": "8-30d"
       },
       {
@@ -3772,7 +3772,7 @@
         "label": "91-180d"
       },
       {
-        "count": 174,
+        "count": 175,
         "label": "181d+"
       }
     ],
@@ -6031,7 +6031,7 @@
         "label": "Triage"
       },
       {
-        "count": 37,
+        "count": 36,
         "label": "Todo"
       },
       {
@@ -6039,7 +6039,7 @@
         "label": "In progress"
       },
       {
-        "count": 17,
+        "count": 18,
         "label": "In review"
       },
       {
@@ -8730,11 +8730,11 @@
           "label": "31-90d"
         },
         {
-          "count": 18,
+          "count": 17,
           "label": "91-180d"
         },
         {
-          "count": 103,
+          "count": 104,
           "label": "181d+"
         }
       ],
@@ -16741,7 +16741,7 @@
           "label": "0-7d"
         },
         {
-          "count": 22,
+          "count": 21,
           "label": "8-30d"
         },
         {
@@ -16749,7 +16749,7 @@
           "label": "31-90d"
         },
         {
-          "count": 15,
+          "count": 16,
           "label": "91-180d"
         },
         {
@@ -17924,7 +17924,7 @@
           "label": "Triage"
         },
         {
-          "count": 26,
+          "count": 25,
           "label": "Todo"
         },
         {
@@ -17932,7 +17932,7 @@
           "label": "In progress"
         },
         {
-          "count": 7,
+          "count": 8,
           "label": "In review"
         },
         {
@@ -17946,8 +17946,8 @@
       ]
     }
   },
-  "generatedAt": "2026-06-07T00:31:17.025Z",
-  "lastUpdated": "2026-06-07T00:31:17.025Z",
+  "generatedAt": "2026-06-08T00:33:19.930Z",
+  "lastUpdated": "2026-06-08T00:33:19.930Z",
   "teamKeys": [
     "CP",
     "PF",
