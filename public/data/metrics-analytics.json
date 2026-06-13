@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-06-12T00:35:09.549Z",
-  "lastUpdated": "2026-06-12T00:35:09.550Z",
+  "generatedAt": "2026-06-13T00:35:32.604Z",
+  "lastUpdated": "2026-06-13T00:35:32.604Z",
   "bugs": [
     {
       "archivedAt": null,
@@ -432,7 +432,7 @@
       "updatedAt": "2026-05-20"
     },
     {
-      "archivedAt": null,
+      "archivedAt": "2026-06-12",
       "autoClosedAt": null,
       "canceledAt": "2026-05-11",
       "createdAt": "2024-04-08",
@@ -3931,15 +3931,15 @@
     {
       "archivedAt": null,
       "autoClosedAt": null,
-      "canceledAt": null,
+      "canceledAt": "2026-06-12",
       "createdAt": "2024-07-08",
       "completedAt": null,
       "dueDate": null,
       "priority": 4,
-      "stateName": "Backlog",
-      "stateType": "backlog",
+      "stateName": "Canceled",
+      "stateType": "canceled",
       "teamKey": "CP",
-      "updatedAt": "2026-06-11"
+      "updatedAt": "2026-06-12"
     },
     {
       "archivedAt": null,
@@ -7956,7 +7956,7 @@
       "stateName": "In Review",
       "stateType": "started",
       "teamKey": "TA",
-      "updatedAt": "2026-06-11"
+      "updatedAt": "2026-06-12"
     },
     {
       "archivedAt": null,
@@ -9838,10 +9838,10 @@
       "completedAt": null,
       "dueDate": null,
       "priority": 4,
-      "stateName": "In Review",
+      "stateName": "Ready to deploy",
       "stateType": "started",
       "teamKey": "CP",
-      "updatedAt": "2026-06-11"
+      "updatedAt": "2026-06-12"
     },
     {
       "archivedAt": null,
@@ -15811,7 +15811,7 @@
       "updatedAt": "2026-03-10"
     },
     {
-      "archivedAt": null,
+      "archivedAt": "2026-06-12",
       "autoClosedAt": null,
       "canceledAt": null,
       "createdAt": "2025-08-11",
@@ -15837,7 +15837,7 @@
       "updatedAt": "2025-08-12"
     },
     {
-      "archivedAt": null,
+      "archivedAt": "2026-06-12",
       "autoClosedAt": null,
       "canceledAt": null,
       "createdAt": "2025-08-11",
@@ -15850,7 +15850,7 @@
       "updatedAt": "2025-08-13"
     },
     {
-      "archivedAt": null,
+      "archivedAt": "2026-06-12",
       "autoClosedAt": null,
       "canceledAt": null,
       "createdAt": "2025-08-11",
@@ -15863,7 +15863,7 @@
       "updatedAt": "2026-01-19"
     },
     {
-      "archivedAt": null,
+      "archivedAt": "2026-06-12",
       "autoClosedAt": null,
       "canceledAt": null,
       "createdAt": "2025-08-11",
@@ -15876,7 +15876,7 @@
       "updatedAt": "2025-08-21"
     },
     {
-      "archivedAt": null,
+      "archivedAt": "2026-06-12",
       "autoClosedAt": null,
       "canceledAt": "2025-08-11",
       "createdAt": "2025-08-11",
@@ -15902,7 +15902,7 @@
       "updatedAt": "2025-09-03"
     },
     {
-      "archivedAt": null,
+      "archivedAt": "2026-06-12",
       "autoClosedAt": null,
       "canceledAt": null,
       "createdAt": "2025-08-11",
@@ -15928,7 +15928,7 @@
       "updatedAt": "2025-09-11"
     },
     {
-      "archivedAt": null,
+      "archivedAt": "2026-06-12",
       "autoClosedAt": null,
       "canceledAt": "2025-09-23",
       "createdAt": "2025-08-11",
@@ -16019,7 +16019,7 @@
       "updatedAt": "2025-09-26"
     },
     {
-      "archivedAt": null,
+      "archivedAt": "2026-06-12",
       "autoClosedAt": null,
       "canceledAt": null,
       "createdAt": "2025-08-12",
@@ -16032,7 +16032,7 @@
       "updatedAt": "2025-10-13"
     },
     {
-      "archivedAt": null,
+      "archivedAt": "2026-06-12",
       "autoClosedAt": null,
       "canceledAt": null,
       "createdAt": "2025-08-12",
@@ -16149,7 +16149,7 @@
       "updatedAt": "2026-01-19"
     },
     {
-      "archivedAt": null,
+      "archivedAt": "2026-06-12",
       "autoClosedAt": null,
       "canceledAt": null,
       "createdAt": "2025-08-14",
@@ -16162,7 +16162,7 @@
       "updatedAt": "2026-01-19"
     },
     {
-      "archivedAt": null,
+      "archivedAt": "2026-06-12",
       "autoClosedAt": null,
       "canceledAt": null,
       "createdAt": "2025-08-14",
@@ -16175,7 +16175,7 @@
       "updatedAt": "2025-08-18"
     },
     {
-      "archivedAt": null,
+      "archivedAt": "2026-06-12",
       "autoClosedAt": null,
       "canceledAt": null,
       "createdAt": "2025-08-14",
@@ -16188,7 +16188,7 @@
       "updatedAt": "2025-08-18"
     },
     {
-      "archivedAt": null,
+      "archivedAt": "2026-06-12",
       "autoClosedAt": null,
       "canceledAt": null,
       "createdAt": "2025-08-14",
@@ -16227,7 +16227,7 @@
       "updatedAt": "2025-09-26"
     },
     {
-      "archivedAt": null,
+      "archivedAt": "2026-06-12",
       "autoClosedAt": null,
       "canceledAt": null,
       "createdAt": "2025-08-15",
@@ -16487,7 +16487,7 @@
       "updatedAt": "2025-08-26"
     },
     {
-      "archivedAt": null,
+      "archivedAt": "2026-06-12",
       "autoClosedAt": null,
       "canceledAt": "2026-03-09",
       "createdAt": "2025-08-25",
@@ -16500,7 +16500,7 @@
       "updatedAt": "2026-03-09"
     },
     {
-      "archivedAt": null,
+      "archivedAt": "2026-06-12",
       "autoClosedAt": null,
       "canceledAt": null,
       "createdAt": "2025-08-25",
@@ -16513,7 +16513,7 @@
       "updatedAt": "2025-08-25"
     },
     {
-      "archivedAt": null,
+      "archivedAt": "2026-06-12",
       "autoClosedAt": null,
       "canceledAt": "2026-01-29",
       "createdAt": "2025-08-25",
@@ -16591,7 +16591,7 @@
       "updatedAt": "2025-08-26"
     },
     {
-      "archivedAt": null,
+      "archivedAt": "2026-06-12",
       "autoClosedAt": null,
       "canceledAt": null,
       "createdAt": "2025-08-26",
@@ -16604,7 +16604,7 @@
       "updatedAt": "2025-10-03"
     },
     {
-      "archivedAt": null,
+      "archivedAt": "2026-06-12",
       "autoClosedAt": null,
       "canceledAt": null,
       "createdAt": "2025-08-26",
@@ -16617,7 +16617,7 @@
       "updatedAt": "2025-10-03"
     },
     {
-      "archivedAt": null,
+      "archivedAt": "2026-06-12",
       "autoClosedAt": null,
       "canceledAt": null,
       "createdAt": "2025-08-26",
@@ -16630,7 +16630,7 @@
       "updatedAt": "2026-01-09"
     },
     {
-      "archivedAt": null,
+      "archivedAt": "2026-06-12",
       "autoClosedAt": null,
       "canceledAt": "2025-08-26",
       "createdAt": "2025-08-26",
@@ -16669,7 +16669,7 @@
       "updatedAt": "2026-01-23"
     },
     {
-      "archivedAt": null,
+      "archivedAt": "2026-06-12",
       "autoClosedAt": null,
       "canceledAt": null,
       "createdAt": "2025-08-26",
@@ -17124,7 +17124,7 @@
       "updatedAt": "2025-09-17"
     },
     {
-      "archivedAt": null,
+      "archivedAt": "2026-06-12",
       "autoClosedAt": null,
       "canceledAt": null,
       "createdAt": "2025-09-10",
@@ -19022,7 +19022,7 @@
       "updatedAt": "2025-10-14"
     },
     {
-      "archivedAt": null,
+      "archivedAt": "2026-06-12",
       "autoClosedAt": null,
       "canceledAt": null,
       "createdAt": "2025-10-14",
@@ -19061,7 +19061,7 @@
       "updatedAt": "2025-10-21"
     },
     {
-      "archivedAt": null,
+      "archivedAt": "2026-06-12",
       "autoClosedAt": null,
       "canceledAt": null,
       "createdAt": "2025-10-14",
@@ -19152,7 +19152,7 @@
       "updatedAt": "2025-12-04"
     },
     {
-      "archivedAt": null,
+      "archivedAt": "2026-06-12",
       "autoClosedAt": null,
       "canceledAt": null,
       "createdAt": "2025-10-17",
@@ -19165,7 +19165,7 @@
       "updatedAt": "2026-01-19"
     },
     {
-      "archivedAt": null,
+      "archivedAt": "2026-06-12",
       "autoClosedAt": null,
       "canceledAt": null,
       "createdAt": "2025-10-17",
@@ -19204,7 +19204,7 @@
       "updatedAt": "2026-01-28"
     },
     {
-      "archivedAt": null,
+      "archivedAt": "2026-06-12",
       "autoClosedAt": null,
       "canceledAt": null,
       "createdAt": "2025-10-17",
@@ -19295,7 +19295,7 @@
       "updatedAt": "2025-10-30"
     },
     {
-      "archivedAt": null,
+      "archivedAt": "2026-06-12",
       "autoClosedAt": null,
       "canceledAt": null,
       "createdAt": "2025-10-20",
@@ -19607,7 +19607,7 @@
       "updatedAt": "2026-05-04"
     },
     {
-      "archivedAt": null,
+      "archivedAt": "2026-06-12",
       "autoClosedAt": null,
       "canceledAt": "2025-11-04",
       "createdAt": "2025-10-23",
@@ -19620,7 +19620,7 @@
       "updatedAt": "2025-11-04"
     },
     {
-      "archivedAt": null,
+      "archivedAt": "2026-06-12",
       "autoClosedAt": null,
       "canceledAt": null,
       "createdAt": "2025-10-23",
@@ -21167,7 +21167,7 @@
       "updatedAt": "2025-11-24"
     },
     {
-      "archivedAt": null,
+      "archivedAt": "2026-06-12",
       "autoClosedAt": null,
       "canceledAt": null,
       "createdAt": "2025-11-20",
@@ -21180,7 +21180,7 @@
       "updatedAt": "2025-11-21"
     },
     {
-      "archivedAt": null,
+      "archivedAt": "2026-06-12",
       "autoClosedAt": null,
       "canceledAt": null,
       "createdAt": "2025-11-20",
@@ -21193,7 +21193,7 @@
       "updatedAt": "2025-11-21"
     },
     {
-      "archivedAt": null,
+      "archivedAt": "2026-06-12",
       "autoClosedAt": null,
       "canceledAt": null,
       "createdAt": "2025-11-20",
@@ -21271,7 +21271,7 @@
       "updatedAt": "2026-04-24"
     },
     {
-      "archivedAt": null,
+      "archivedAt": "2026-06-12",
       "autoClosedAt": null,
       "canceledAt": null,
       "createdAt": "2025-11-21",
@@ -23949,7 +23949,7 @@
       "updatedAt": "2026-02-23"
     },
     {
-      "archivedAt": null,
+      "archivedAt": "2026-06-12",
       "autoClosedAt": null,
       "canceledAt": null,
       "createdAt": "2026-01-28",
@@ -27372,13 +27372,13 @@
       "autoClosedAt": null,
       "canceledAt": null,
       "createdAt": "2026-03-17",
-      "completedAt": null,
+      "completedAt": "2026-06-12",
       "dueDate": "2026-04-28",
       "priority": 4,
-      "stateName": "In Review",
-      "stateType": "started",
+      "stateName": "Done",
+      "stateType": "completed",
       "teamKey": "TA",
-      "updatedAt": "2026-06-11"
+      "updatedAt": "2026-06-12"
     },
     {
       "archivedAt": "2026-04-18",
@@ -29595,13 +29595,13 @@
       "autoClosedAt": null,
       "canceledAt": null,
       "createdAt": "2026-05-05",
-      "completedAt": null,
+      "completedAt": "2026-06-12",
       "dueDate": null,
       "priority": 4,
-      "stateName": "Ready to deploy",
-      "stateType": "started",
+      "stateName": "Done",
+      "stateType": "completed",
       "teamKey": "TA",
-      "updatedAt": "2026-06-11"
+      "updatedAt": "2026-06-12"
     },
     {
       "archivedAt": null,
@@ -30199,7 +30199,7 @@
       "stateName": "In Progress",
       "stateType": "started",
       "teamKey": "T1",
-      "updatedAt": "2026-06-11"
+      "updatedAt": "2026-06-12"
     },
     {
       "archivedAt": null,
@@ -31590,7 +31590,7 @@
       "stateName": "In Review",
       "stateType": "started",
       "teamKey": "TA",
-      "updatedAt": "2026-06-11"
+      "updatedAt": "2026-06-12"
     },
     {
       "archivedAt": null,
@@ -31850,20 +31850,20 @@
       "stateName": "In Review",
       "stateType": "started",
       "teamKey": "TA",
-      "updatedAt": "2026-06-10"
+      "updatedAt": "2026-06-12"
     },
     {
       "archivedAt": null,
       "autoClosedAt": null,
       "canceledAt": null,
       "createdAt": "2026-06-02",
-      "completedAt": null,
+      "completedAt": "2026-06-12",
       "dueDate": "2026-06-30",
       "priority": 4,
-      "stateName": "Ready to deploy",
-      "stateType": "started",
+      "stateName": "Done",
+      "stateType": "completed",
       "teamKey": "T1",
-      "updatedAt": "2026-06-11"
+      "updatedAt": "2026-06-12"
     },
     {
       "archivedAt": null,
@@ -32552,7 +32552,7 @@
       "stateName": "In Review",
       "stateType": "started",
       "teamKey": "T1",
-      "updatedAt": "2026-06-09"
+      "updatedAt": "2026-06-12"
     },
     {
       "archivedAt": null,
@@ -32695,7 +32695,7 @@
       "stateName": "In Progress",
       "stateType": "started",
       "teamKey": "PF",
-      "updatedAt": "2026-06-11"
+      "updatedAt": "2026-06-12"
     },
     {
       "archivedAt": null,
@@ -32773,7 +32773,7 @@
       "stateName": "Triage",
       "stateType": "triage",
       "teamKey": "CP",
-      "updatedAt": "2026-06-11"
+      "updatedAt": "2026-06-12"
     },
     {
       "archivedAt": null,
@@ -32796,10 +32796,10 @@
       "completedAt": null,
       "dueDate": null,
       "priority": 4,
-      "stateName": "In Review",
+      "stateName": "Ready to deploy",
       "stateType": "started",
       "teamKey": "CP",
-      "updatedAt": "2026-06-11"
+      "updatedAt": "2026-06-12"
     },
     {
       "archivedAt": null,
@@ -32812,7 +32812,7 @@
       "stateName": "In Review",
       "stateType": "started",
       "teamKey": "PF",
-      "updatedAt": "2026-06-11"
+      "updatedAt": "2026-06-12"
     },
     {
       "archivedAt": null,
@@ -32843,13 +32843,52 @@
     {
       "archivedAt": null,
       "autoClosedAt": null,
-      "canceledAt": null,
+      "canceledAt": "2026-06-12",
       "createdAt": "2026-06-11",
       "completedAt": null,
       "dueDate": "2026-06-19",
       "priority": 2,
-      "stateName": "Triage",
-      "stateType": "triage",
+      "stateName": "Canceled",
+      "stateType": "canceled",
+      "teamKey": "CP",
+      "updatedAt": "2026-06-12"
+    },
+    {
+      "archivedAt": null,
+      "autoClosedAt": null,
+      "canceledAt": null,
+      "createdAt": "2026-06-12",
+      "completedAt": null,
+      "dueDate": "2026-07-03",
+      "priority": 3,
+      "stateName": "Todo",
+      "stateType": "unstarted",
+      "teamKey": "TA",
+      "updatedAt": "2026-06-12"
+    },
+    {
+      "archivedAt": null,
+      "autoClosedAt": null,
+      "canceledAt": null,
+      "createdAt": "2026-06-12",
+      "completedAt": null,
+      "dueDate": "2026-07-24",
+      "priority": 4,
+      "stateName": "Todo",
+      "stateType": "unstarted",
+      "teamKey": "TA",
+      "updatedAt": "2026-06-12"
+    },
+    {
+      "archivedAt": null,
+      "autoClosedAt": null,
+      "canceledAt": "2026-06-12",
+      "createdAt": "2026-06-12",
+      "completedAt": null,
+      "dueDate": "2026-06-19",
+      "priority": 2,
+      "stateName": "Canceled",
+      "stateType": "canceled",
       "teamKey": "CP",
       "updatedAt": "2026-06-12"
     }
