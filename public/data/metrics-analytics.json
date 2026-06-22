@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-06-21T00:33:33.501Z",
-  "lastUpdated": "2026-06-21T00:33:33.501Z",
+  "generatedAt": "2026-06-22T00:34:14.611Z",
+  "lastUpdated": "2026-06-22T00:34:14.611Z",
   "bugs": [
     {
       "archivedAt": null,
@@ -29354,7 +29354,7 @@
       "stateName": "Triage",
       "stateType": "triage",
       "teamKey": "CP",
-      "updatedAt": "2026-05-04"
+      "updatedAt": "2026-06-21"
     },
     {
       "archivedAt": null,
