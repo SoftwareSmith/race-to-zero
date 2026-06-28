@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-06-27T00:30:29.015Z",
-  "lastUpdated": "2026-06-27T00:30:29.015Z",
+  "generatedAt": "2026-06-28T00:29:18.473Z",
+  "lastUpdated": "2026-06-28T00:29:18.473Z",
   "bugs": [
     {
       "archivedAt": null,
@@ -29058,7 +29058,7 @@
       "updatedAt": "2026-05-12"
     },
     {
-      "archivedAt": null,
+      "archivedAt": "2026-06-27",
       "autoClosedAt": null,
       "canceledAt": "2026-04-28",
       "createdAt": "2026-04-28",
@@ -29068,7 +29068,7 @@
       "stateName": "Canceled",
       "stateType": "canceled",
       "teamKey": "CP",
-      "updatedAt": "2026-05-27"
+      "updatedAt": "2026-06-27"
     },
     {
       "archivedAt": "2026-05-29",
