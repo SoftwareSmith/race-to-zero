@@ -3922,29 +3922,33 @@
       {
         "date": "2026-07-03",
         "count": 1
+      },
+      {
+        "date": "2026-07-04",
+        "count": 1
       }
     ],
     "doneCount": 1873,
     "firstBugDate": "2023-09-18",
     "openAgeDistribution": [
       {
-        "count": 29,
+        "count": 30,
         "label": "0-7d"
       },
       {
-        "count": 63,
+        "count": 61,
         "label": "8-30d"
       },
       {
-        "count": 33,
+        "count": 35,
         "label": "31-90d"
       },
       {
-        "count": 48,
+        "count": 46,
         "label": "91-180d"
       },
       {
-        "count": 152,
+        "count": 154,
         "label": "181d+"
       }
     ],
@@ -3962,7 +3966,7 @@
         "label": "Medium"
       },
       {
-        "count": 145,
+        "count": 146,
         "label": "Low"
       },
       {
@@ -3970,7 +3974,7 @@
         "label": "Unspecified"
       }
     ],
-    "remainingBugs": 325,
+    "remainingBugs": 326,
     "remainingSeries": [
       {
         "date": "2023-09-18",
@@ -6279,6 +6283,10 @@
       {
         "date": "2026-07-03",
         "count": 325
+      },
+      {
+        "date": "2026-07-04",
+        "count": 326
       }
     ],
     "statusDistribution": [
@@ -6287,7 +6295,7 @@
         "label": "Backlog"
       },
       {
-        "count": 67,
+        "count": 68,
         "label": "Triage"
       },
       {
@@ -9088,29 +9096,33 @@
         {
           "date": "2026-07-02",
           "count": 2
+        },
+        {
+          "date": "2026-07-04",
+          "count": 1
         }
       ],
       "doneCount": 702,
       "firstBugDate": "2023-10-26",
       "openAgeDistribution": [
         {
-          "count": 6,
+          "count": 7,
           "label": "0-7d"
         },
         {
-          "count": 14,
+          "count": 13,
           "label": "8-30d"
         },
         {
-          "count": 11,
+          "count": 12,
           "label": "31-90d"
         },
         {
-          "count": 16,
+          "count": 15,
           "label": "91-180d"
         },
         {
-          "count": 80,
+          "count": 81,
           "label": "181d+"
         }
       ],
@@ -9128,7 +9140,7 @@
           "label": "Medium"
         },
         {
-          "count": 55,
+          "count": 56,
           "label": "Low"
         },
         {
@@ -9136,7 +9148,7 @@
           "label": "Unspecified"
         }
       ],
-      "remainingBugs": 127,
+      "remainingBugs": 128,
       "remainingSeries": [
         {
           "date": "2023-10-26",
@@ -11009,6 +11021,10 @@
         {
           "date": "2026-07-02",
           "count": 127
+        },
+        {
+          "date": "2026-07-04",
+          "count": 128
         }
       ],
       "statusDistribution": [
@@ -11017,7 +11033,7 @@
           "label": "Backlog"
         },
         {
-          "count": 53,
+          "count": 54,
           "label": "Triage"
         },
         {
@@ -17673,19 +17689,19 @@
           "label": "0-7d"
         },
         {
-          "count": 32,
+          "count": 31,
           "label": "8-30d"
         },
         {
-          "count": 10,
+          "count": 11,
           "label": "31-90d"
         },
         {
-          "count": 15,
+          "count": 14,
           "label": "91-180d"
         },
         {
-          "count": 42,
+          "count": 43,
           "label": "181d+"
         }
       ],
@@ -18958,8 +18974,8 @@
       ]
     }
   },
-  "generatedAt": "2026-07-04T00:25:57.848Z",
-  "lastUpdated": "2026-07-04T00:25:57.848Z",
+  "generatedAt": "2026-07-05T00:26:13.326Z",
+  "lastUpdated": "2026-07-05T00:26:13.326Z",
   "teamKeys": [
     "CP",
     "PF",

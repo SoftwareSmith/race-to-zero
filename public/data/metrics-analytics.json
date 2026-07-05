@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-07-04T00:25:57.848Z",
-  "lastUpdated": "2026-07-04T00:25:57.848Z",
+  "generatedAt": "2026-07-05T00:26:13.326Z",
+  "lastUpdated": "2026-07-05T00:26:13.326Z",
   "bugs": [
     {
       "archivedAt": null,
@@ -14550,7 +14550,7 @@
       "updatedAt": "2025-07-25"
     },
     {
-      "archivedAt": null,
+      "archivedAt": "2026-07-04",
       "autoClosedAt": null,
       "canceledAt": "2026-06-04",
       "createdAt": "2025-07-10",
@@ -34789,6 +34789,19 @@
       "stateType": "triage",
       "teamKey": "T1",
       "updatedAt": "2026-07-03"
+    },
+    {
+      "archivedAt": null,
+      "autoClosedAt": null,
+      "canceledAt": null,
+      "createdAt": "2026-07-04",
+      "completedAt": null,
+      "dueDate": "2026-08-14",
+      "priority": 4,
+      "stateName": "Triage",
+      "stateType": "triage",
+      "teamKey": "CP",
+      "updatedAt": "2026-07-04"
     }
   ]
 }
