@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-07-05T00:26:13.326Z",
-  "lastUpdated": "2026-07-05T00:26:13.326Z",
+  "generatedAt": "2026-07-06T00:27:09.612Z",
+  "lastUpdated": "2026-07-06T00:27:09.613Z",
   "bugs": [
     {
       "archivedAt": null,
@@ -29344,7 +29344,7 @@
       "updatedAt": "2026-06-05"
     },
     {
-      "archivedAt": null,
+      "archivedAt": "2026-07-05",
       "autoClosedAt": null,
       "canceledAt": null,
       "createdAt": "2026-05-04",
@@ -29435,7 +29435,7 @@
       "updatedAt": "2026-06-05"
     },
     {
-      "archivedAt": null,
+      "archivedAt": "2026-07-05",
       "autoClosedAt": null,
       "canceledAt": null,
       "createdAt": "2026-05-04",
@@ -32981,7 +32981,7 @@
       "stateName": "Todo",
       "stateType": "unstarted",
       "teamKey": "TA",
-      "updatedAt": "2026-06-30"
+      "updatedAt": "2026-07-05"
     },
     {
       "archivedAt": null,
@@ -33384,7 +33384,7 @@
       "stateName": "In Review",
       "stateType": "started",
       "teamKey": "TA",
-      "updatedAt": "2026-07-03"
+      "updatedAt": "2026-07-05"
     },
     {
       "archivedAt": null,
@@ -33488,7 +33488,7 @@
       "stateName": "In Review",
       "stateType": "started",
       "teamKey": "TA",
-      "updatedAt": "2026-07-03"
+      "updatedAt": "2026-07-06"
     },
     {
       "archivedAt": null,
@@ -34463,7 +34463,7 @@
       "stateName": "In Review",
       "stateType": "started",
       "teamKey": "T1",
-      "updatedAt": "2026-07-03"
+      "updatedAt": "2026-07-05"
     },
     {
       "archivedAt": null,
@@ -34801,7 +34801,7 @@
       "stateName": "Triage",
       "stateType": "triage",
       "teamKey": "CP",
-      "updatedAt": "2026-07-04"
+      "updatedAt": "2026-07-05"
     }
   ]
 }
