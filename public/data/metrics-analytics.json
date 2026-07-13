@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-07-12T00:22:49.750Z",
-  "lastUpdated": "2026-07-12T00:22:49.750Z",
+  "generatedAt": "2026-07-13T00:22:56.565Z",
+  "lastUpdated": "2026-07-13T00:22:56.565Z",
   "bugs": [
     {
       "archivedAt": null,
@@ -29679,7 +29679,7 @@
       "stateName": "Todo",
       "stateType": "unstarted",
       "teamKey": "TA",
-      "updatedAt": "2026-07-02"
+      "updatedAt": "2026-07-12"
     },
     {
       "archivedAt": "2026-06-19",
@@ -32854,7 +32854,7 @@
       "updatedAt": "2026-07-10"
     },
     {
-      "archivedAt": null,
+      "archivedAt": "2026-07-12",
       "autoClosedAt": null,
       "canceledAt": "2026-06-12",
       "createdAt": "2026-06-11",
@@ -32864,7 +32864,7 @@
       "stateName": "Canceled",
       "stateType": "canceled",
       "teamKey": "CP",
-      "updatedAt": "2026-06-12"
+      "updatedAt": "2026-07-12"
     },
     {
       "archivedAt": null,
@@ -33004,10 +33004,10 @@
       "completedAt": null,
       "dueDate": "2026-06-24",
       "priority": 3,
-      "stateName": "Todo",
-      "stateType": "unstarted",
-      "teamKey": "CP",
-      "updatedAt": "2026-06-16"
+      "stateName": "In Review",
+      "stateType": "started",
+      "teamKey": "TA",
+      "updatedAt": "2026-07-12"
     },
     {
       "archivedAt": null,
@@ -33891,7 +33891,7 @@
       "stateName": "In Review",
       "stateType": "started",
       "teamKey": "TA",
-      "updatedAt": "2026-07-09"
+      "updatedAt": "2026-07-12"
     },
     {
       "archivedAt": null,
@@ -34187,10 +34187,10 @@
       "completedAt": null,
       "dueDate": "2026-07-20",
       "priority": 3,
-      "stateName": "Todo",
-      "stateType": "unstarted",
-      "teamKey": "CP",
-      "updatedAt": "2026-06-30"
+      "stateName": "In Review",
+      "stateType": "started",
+      "teamKey": "TA",
+      "updatedAt": "2026-07-12"
     },
     {
       "archivedAt": null,
@@ -34827,7 +34827,7 @@
       "stateName": "Triage",
       "stateType": "triage",
       "teamKey": "CP",
-      "updatedAt": "2026-07-11"
+      "updatedAt": "2026-07-12"
     },
     {
       "archivedAt": null,
@@ -34892,7 +34892,7 @@
       "stateName": "Done",
       "stateType": "completed",
       "teamKey": "CP",
-      "updatedAt": "2026-07-07"
+      "updatedAt": "2026-07-12"
     },
     {
       "archivedAt": null,
