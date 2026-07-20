@@ -4008,11 +4008,11 @@
         "label": "0-7d"
       },
       {
-        "count": 49,
+        "count": 48,
         "label": "8-30d"
       },
       {
-        "count": 52,
+        "count": 53,
         "label": "31-90d"
       },
       {
@@ -6399,7 +6399,7 @@
     ],
     "statusDistribution": [
       {
-        "count": 198,
+        "count": 196,
         "label": "Backlog"
       },
       {
@@ -6415,7 +6415,7 @@
         "label": "In progress"
       },
       {
-        "count": 20,
+        "count": 22,
         "label": "In review"
       },
       {
@@ -12339,11 +12339,11 @@
           "label": "0-7d"
         },
         {
-          "count": 3,
+          "count": 2,
           "label": "8-30d"
         },
         {
-          "count": 7,
+          "count": 8,
           "label": "31-90d"
         },
         {
@@ -16063,7 +16063,7 @@
       ],
       "statusDistribution": [
         {
-          "count": 40,
+          "count": 39,
           "label": "Backlog"
         },
         {
@@ -16075,7 +16075,7 @@
           "label": "Todo"
         },
         {
-          "count": 4,
+          "count": 5,
           "label": "In progress"
         },
         {
@@ -19392,7 +19392,7 @@
       ],
       "statusDistribution": [
         {
-          "count": 70,
+          "count": 69,
           "label": "Backlog"
         },
         {
@@ -19404,11 +19404,11 @@
           "label": "Todo"
         },
         {
-          "count": 3,
+          "count": 2,
           "label": "In progress"
         },
         {
-          "count": 7,
+          "count": 9,
           "label": "In review"
         },
         {
@@ -19422,8 +19422,8 @@
       ]
     }
   },
-  "generatedAt": "2026-07-19T00:22:05.258Z",
-  "lastUpdated": "2026-07-19T00:22:05.258Z",
+  "generatedAt": "2026-07-20T00:23:57.877Z",
+  "lastUpdated": "2026-07-20T00:23:57.877Z",
   "teamKeys": [
     "CP",
     "PF",
