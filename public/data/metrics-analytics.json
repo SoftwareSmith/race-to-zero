@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-07-26T00:24:56.933Z",
-  "lastUpdated": "2026-07-26T00:24:56.933Z",
+  "generatedAt": "2026-07-27T00:24:38.163Z",
+  "lastUpdated": "2026-07-27T00:24:38.163Z",
   "bugs": [
     {
       "archivedAt": null,
@@ -34073,7 +34073,7 @@
       "stateName": "In Review",
       "stateType": "started",
       "teamKey": "CP",
-      "updatedAt": "2026-07-24"
+      "updatedAt": "2026-07-26"
     },
     {
       "archivedAt": null,
@@ -35906,7 +35906,7 @@
       "stateName": "In Review",
       "stateType": "started",
       "teamKey": "T1",
-      "updatedAt": "2026-07-24"
+      "updatedAt": "2026-07-27"
     },
     {
       "archivedAt": null,
