@@ -6587,11 +6587,11 @@
         "label": "Triage"
       },
       {
-        "count": 16,
+        "count": 14,
         "label": "Todo"
       },
       {
-        "count": 2,
+        "count": 4,
         "label": "In progress"
       },
       {
@@ -20104,11 +20104,11 @@
           "label": "Triage"
         },
         {
-          "count": 6,
+          "count": 4,
           "label": "Todo"
         },
         {
-          "count": 2,
+          "count": 4,
           "label": "In progress"
         },
         {
@@ -20126,8 +20126,8 @@
       ]
     }
   },
-  "generatedAt": "2026-08-09T00:09:55.544Z",
-  "lastUpdated": "2026-08-09T00:09:55.544Z",
+  "generatedAt": "2026-08-10T00:10:51.703Z",
+  "lastUpdated": "2026-08-10T00:10:51.703Z",
   "teamKeys": [
     "CP",
     "PF",
