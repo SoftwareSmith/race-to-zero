@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-08-16T00:06:03.633Z",
-  "lastUpdated": "2026-08-16T00:06:03.633Z",
+  "generatedAt": "2026-08-17T00:05:45.358Z",
+  "lastUpdated": "2026-08-17T00:05:45.358Z",
   "bugs": [
     {
       "archivedAt": null,
@@ -35880,7 +35880,7 @@
       "stateName": "In Progress",
       "stateType": "started",
       "teamKey": "T1",
-      "updatedAt": "2026-08-14"
+      "updatedAt": "2026-08-16"
     },
     {
       "archivedAt": null,
@@ -37206,7 +37206,7 @@
       "stateName": "In Review",
       "stateType": "started",
       "teamKey": "CP",
-      "updatedAt": "2026-08-14"
+      "updatedAt": "2026-08-16"
     },
     {
       "archivedAt": null,
@@ -37246,6 +37246,19 @@
       "stateType": "unstarted",
       "teamKey": "PF",
       "updatedAt": "2026-08-14"
+    },
+    {
+      "archivedAt": null,
+      "autoClosedAt": null,
+      "canceledAt": null,
+      "createdAt": "2026-08-17",
+      "completedAt": null,
+      "dueDate": null,
+      "priority": 3,
+      "stateName": "Backlog",
+      "stateType": "backlog",
+      "teamKey": "CP",
+      "updatedAt": "2026-08-17"
     }
   ]
 }
