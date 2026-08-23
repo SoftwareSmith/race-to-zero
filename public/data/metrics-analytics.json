@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-08-22T00:06:39.162Z",
-  "lastUpdated": "2026-08-22T00:06:39.162Z",
+  "generatedAt": "2026-08-23T00:05:55.467Z",
+  "lastUpdated": "2026-08-23T00:05:55.467Z",
   "bugs": [
     {
       "archivedAt": null,
@@ -35792,32 +35792,6 @@
       "updatedAt": "2026-08-03"
     },
     {
-      "archivedAt": "2026-07-23",
-      "autoClosedAt": null,
-      "canceledAt": "2026-07-23",
-      "createdAt": "2026-07-22",
-      "completedAt": null,
-      "dueDate": null,
-      "priority": 4,
-      "stateName": "Duplicate",
-      "stateType": "duplicate",
-      "teamKey": "CP",
-      "updatedAt": "2026-07-23"
-    },
-    {
-      "archivedAt": "2026-07-23",
-      "autoClosedAt": null,
-      "canceledAt": "2026-07-23",
-      "createdAt": "2026-07-22",
-      "completedAt": null,
-      "dueDate": null,
-      "priority": 4,
-      "stateName": "Duplicate",
-      "stateType": "duplicate",
-      "teamKey": "CP",
-      "updatedAt": "2026-07-23"
-    },
-    {
       "archivedAt": null,
       "autoClosedAt": null,
       "canceledAt": "2026-07-23",
@@ -37687,7 +37661,7 @@
       "stateName": "Done",
       "stateType": "completed",
       "teamKey": "CP",
-      "updatedAt": "2026-08-21"
+      "updatedAt": "2026-08-22"
     },
     {
       "archivedAt": "2026-08-21",
