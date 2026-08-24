@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-08-23T00:05:55.467Z",
-  "lastUpdated": "2026-08-23T00:05:55.467Z",
+  "generatedAt": "2026-08-24T00:06:01.704Z",
+  "lastUpdated": "2026-08-24T00:06:01.704Z",
   "bugs": [
     {
       "archivedAt": null,
@@ -35792,7 +35792,7 @@
       "updatedAt": "2026-08-03"
     },
     {
-      "archivedAt": null,
+      "archivedAt": "2026-08-23",
       "autoClosedAt": null,
       "canceledAt": "2026-07-23",
       "createdAt": "2026-07-23",
@@ -37557,7 +37557,7 @@
       "stateName": "In Review",
       "stateType": "started",
       "teamKey": "T1",
-      "updatedAt": "2026-08-21"
+      "updatedAt": "2026-08-23"
     },
     {
       "archivedAt": null,
@@ -37651,19 +37651,6 @@
       "updatedAt": "2026-08-21"
     },
     {
-      "archivedAt": null,
-      "autoClosedAt": null,
-      "canceledAt": null,
-      "createdAt": "2026-08-21",
-      "completedAt": "2026-08-21",
-      "dueDate": null,
-      "priority": 3,
-      "stateName": "Done",
-      "stateType": "completed",
-      "teamKey": "CP",
-      "updatedAt": "2026-08-22"
-    },
-    {
       "archivedAt": "2026-08-21",
       "autoClosedAt": null,
       "canceledAt": null,
@@ -37688,6 +37675,19 @@
       "stateType": "backlog",
       "teamKey": "CP",
       "updatedAt": "2026-08-21"
+    },
+    {
+      "archivedAt": null,
+      "autoClosedAt": null,
+      "canceledAt": null,
+      "createdAt": "2026-08-23",
+      "completedAt": null,
+      "dueDate": null,
+      "priority": 3,
+      "stateName": "Backlog",
+      "stateType": "backlog",
+      "teamKey": "TA",
+      "updatedAt": "2026-08-23"
     }
   ]
 }
