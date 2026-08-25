@@ -1891,7 +1891,7 @@
       },
       {
         "date": "2026-08-18",
-        "count": 8
+        "count": 7
       },
       {
         "date": "2026-08-19",
@@ -1904,6 +1904,10 @@
       {
         "date": "2026-08-21",
         "count": 15
+      },
+      {
+        "date": "2026-08-24",
+        "count": 5
       }
     ],
     "createdSeries": [
@@ -4185,34 +4189,38 @@
       },
       {
         "date": "2026-08-21",
-        "count": 9
+        "count": 10
       },
       {
         "date": "2026-08-23",
         "count": 1
+      },
+      {
+        "date": "2026-08-24",
+        "count": 4
       }
     ],
-    "doneCount": 2100,
+    "doneCount": 2103,
     "firstBugDate": "2023-09-18",
     "openAgeDistribution": [
       {
-        "count": 23,
+        "count": 16,
         "label": "0-7d"
       },
       {
-        "count": 27,
+        "count": 34,
         "label": "8-30d"
       },
       {
-        "count": 36,
+        "count": 37,
         "label": "31-90d"
       },
       {
-        "count": 26,
+        "count": 25,
         "label": "91-180d"
       },
       {
-        "count": 142,
+        "count": 143,
         "label": "181d+"
       }
     ],
@@ -4222,11 +4230,11 @@
         "label": "Urgent"
       },
       {
-        "count": 29,
+        "count": 27,
         "label": "High"
       },
       {
-        "count": 68,
+        "count": 71,
         "label": "Medium"
       },
       {
@@ -4238,7 +4246,7 @@
         "label": "Unspecified"
       }
     ],
-    "remainingBugs": 254,
+    "remainingBugs": 255,
     "remainingSeries": [
       {
         "date": "2023-09-18",
@@ -6674,28 +6682,32 @@
       },
       {
         "date": "2026-08-18",
-        "count": 247
+        "count": 248
       },
       {
         "date": "2026-08-19",
-        "count": 259
+        "count": 260
       },
       {
         "date": "2026-08-20",
-        "count": 259
+        "count": 260
       },
       {
         "date": "2026-08-21",
-        "count": 253
+        "count": 255
       },
       {
         "date": "2026-08-23",
-        "count": 254
+        "count": 256
+      },
+      {
+        "date": "2026-08-24",
+        "count": 255
       }
     ],
     "statusDistribution": [
       {
-        "count": 202,
+        "count": 179,
         "label": "Backlog"
       },
       {
@@ -6703,15 +6715,15 @@
         "label": "Triage"
       },
       {
-        "count": 17,
+        "count": 42,
         "label": "Todo"
       },
       {
-        "count": 2,
+        "count": 3,
         "label": "In progress"
       },
       {
-        "count": 3,
+        "count": 1,
         "label": "In review"
       },
       {
@@ -9543,7 +9555,7 @@
         },
         {
           "date": "2026-06-11",
-          "count": 4
+          "count": 3
         },
         {
           "date": "2026-06-12",
@@ -9555,7 +9567,7 @@
         },
         {
           "date": "2026-06-16",
-          "count": 2
+          "count": 1
         },
         {
           "date": "2026-06-18",
@@ -9663,7 +9675,7 @@
         },
         {
           "date": "2026-08-05",
-          "count": 3
+          "count": 2
         },
         {
           "date": "2026-08-06",
@@ -9706,7 +9718,7 @@
       "firstBugDate": "2023-10-26",
       "openAgeDistribution": [
         {
-          "count": 2,
+          "count": 1,
           "label": "0-7d"
         },
         {
@@ -9714,7 +9726,7 @@
           "label": "8-30d"
         },
         {
-          "count": 9,
+          "count": 7,
           "label": "31-90d"
         },
         {
@@ -9736,11 +9748,11 @@
           "label": "High"
         },
         {
-          "count": 18,
+          "count": 17,
           "label": "Medium"
         },
         {
-          "count": 45,
+          "count": 43,
           "label": "Low"
         },
         {
@@ -9748,7 +9760,7 @@
           "label": "Unspecified"
         }
       ],
-      "remainingBugs": 100,
+      "remainingBugs": 97,
       "remainingSeries": [
         {
           "date": "2023-10-26",
@@ -11568,183 +11580,183 @@
         },
         {
           "date": "2026-06-11",
-          "count": 120
+          "count": 119
         },
         {
           "date": "2026-06-12",
-          "count": 118
-        },
-        {
-          "date": "2026-06-15",
-          "count": 111
-        },
-        {
-          "date": "2026-06-16",
-          "count": 111
-        },
-        {
-          "date": "2026-06-18",
-          "count": 113
-        },
-        {
-          "date": "2026-06-19",
-          "count": 113
-        },
-        {
-          "date": "2026-06-22",
-          "count": 112
-        },
-        {
-          "date": "2026-06-23",
-          "count": 113
-        },
-        {
-          "date": "2026-06-25",
-          "count": 115
-        },
-        {
-          "date": "2026-06-29",
-          "count": 115
-        },
-        {
-          "date": "2026-06-30",
-          "count": 118
-        },
-        {
-          "date": "2026-07-01",
-          "count": 120
-        },
-        {
-          "date": "2026-07-02",
-          "count": 120
-        },
-        {
-          "date": "2026-07-04",
-          "count": 121
-        },
-        {
-          "date": "2026-07-06",
-          "count": 121
-        },
-        {
-          "date": "2026-07-07",
-          "count": 122
-        },
-        {
-          "date": "2026-07-08",
-          "count": 122
-        },
-        {
-          "date": "2026-07-09",
-          "count": 122
-        },
-        {
-          "date": "2026-07-13",
-          "count": 123
-        },
-        {
-          "date": "2026-07-14",
-          "count": 122
-        },
-        {
-          "date": "2026-07-15",
-          "count": 121
-        },
-        {
-          "date": "2026-07-16",
           "count": 117
         },
         {
-          "date": "2026-07-17",
-          "count": 114
-        },
-        {
-          "date": "2026-07-20",
-          "count": 113
-        },
-        {
-          "date": "2026-07-21",
-          "count": 114
-        },
-        {
-          "date": "2026-07-22",
-          "count": 114
-        },
-        {
-          "date": "2026-07-23",
-          "count": 114
-        },
-        {
-          "date": "2026-07-27",
-          "count": 111
-        },
-        {
-          "date": "2026-07-28",
+          "date": "2026-06-15",
           "count": 110
         },
         {
-          "date": "2026-07-29",
-          "count": 112
-        },
-        {
-          "date": "2026-07-30",
-          "count": 110
-        },
-        {
-          "date": "2026-07-31",
+          "date": "2026-06-16",
           "count": 109
         },
         {
-          "date": "2026-08-03",
+          "date": "2026-06-18",
+          "count": 111
+        },
+        {
+          "date": "2026-06-19",
+          "count": 111
+        },
+        {
+          "date": "2026-06-22",
+          "count": 110
+        },
+        {
+          "date": "2026-06-23",
+          "count": 111
+        },
+        {
+          "date": "2026-06-25",
+          "count": 113
+        },
+        {
+          "date": "2026-06-29",
+          "count": 113
+        },
+        {
+          "date": "2026-06-30",
+          "count": 116
+        },
+        {
+          "date": "2026-07-01",
+          "count": 118
+        },
+        {
+          "date": "2026-07-02",
+          "count": 118
+        },
+        {
+          "date": "2026-07-04",
+          "count": 119
+        },
+        {
+          "date": "2026-07-06",
+          "count": 119
+        },
+        {
+          "date": "2026-07-07",
+          "count": 120
+        },
+        {
+          "date": "2026-07-08",
+          "count": 120
+        },
+        {
+          "date": "2026-07-09",
+          "count": 120
+        },
+        {
+          "date": "2026-07-13",
+          "count": 121
+        },
+        {
+          "date": "2026-07-14",
+          "count": 120
+        },
+        {
+          "date": "2026-07-15",
+          "count": 119
+        },
+        {
+          "date": "2026-07-16",
+          "count": 115
+        },
+        {
+          "date": "2026-07-17",
+          "count": 112
+        },
+        {
+          "date": "2026-07-20",
+          "count": 111
+        },
+        {
+          "date": "2026-07-21",
+          "count": 112
+        },
+        {
+          "date": "2026-07-22",
+          "count": 112
+        },
+        {
+          "date": "2026-07-23",
+          "count": 112
+        },
+        {
+          "date": "2026-07-27",
+          "count": 109
+        },
+        {
+          "date": "2026-07-28",
           "count": 108
+        },
+        {
+          "date": "2026-07-29",
+          "count": 110
+        },
+        {
+          "date": "2026-07-30",
+          "count": 108
+        },
+        {
+          "date": "2026-07-31",
+          "count": 107
+        },
+        {
+          "date": "2026-08-03",
+          "count": 106
         },
         {
           "date": "2026-08-04",
-          "count": 108
+          "count": 106
         },
         {
           "date": "2026-08-05",
-          "count": 105
+          "count": 102
         },
         {
           "date": "2026-08-06",
-          "count": 102
-        },
-        {
-          "date": "2026-08-07",
-          "count": 102
-        },
-        {
-          "date": "2026-08-10",
-          "count": 101
-        },
-        {
-          "date": "2026-08-11",
-          "count": 100
-        },
-        {
-          "date": "2026-08-13",
-          "count": 103
-        },
-        {
-          "date": "2026-08-14",
-          "count": 104
-        },
-        {
-          "date": "2026-08-17",
-          "count": 103
-        },
-        {
-          "date": "2026-08-18",
           "count": 99
         },
         {
-          "date": "2026-08-19",
+          "date": "2026-08-07",
+          "count": 99
+        },
+        {
+          "date": "2026-08-10",
+          "count": 98
+        },
+        {
+          "date": "2026-08-11",
+          "count": 97
+        },
+        {
+          "date": "2026-08-13",
           "count": 100
         },
         {
-          "date": "2026-08-21",
+          "date": "2026-08-14",
+          "count": 101
+        },
+        {
+          "date": "2026-08-17",
           "count": 100
+        },
+        {
+          "date": "2026-08-18",
+          "count": 96
+        },
+        {
+          "date": "2026-08-19",
+          "count": 97
+        },
+        {
+          "date": "2026-08-21",
+          "count": 97
         }
       ],
       "statusDistribution": [
@@ -11753,7 +11765,7 @@
           "label": "Backlog"
         },
         {
-          "count": 42,
+          "count": 39,
           "label": "Triage"
         },
         {
@@ -12282,6 +12294,10 @@
         },
         {
           "date": "2026-08-17",
+          "count": 2
+        },
+        {
+          "date": "2026-08-24",
           "count": 2
         }
       ],
@@ -12901,13 +12917,17 @@
         {
           "date": "2026-08-19",
           "count": 1
+        },
+        {
+          "date": "2026-08-21",
+          "count": 1
         }
       ],
-      "doneCount": 189,
+      "doneCount": 190,
       "firstBugDate": "2025-01-21",
       "openAgeDistribution": [
         {
-          "count": 2,
+          "count": 1,
           "label": "0-7d"
         },
         {
@@ -12933,7 +12953,7 @@
           "label": "Urgent"
         },
         {
-          "count": 8,
+          "count": 7,
           "label": "High"
         },
         {
@@ -12949,7 +12969,7 @@
           "label": "Unspecified"
         }
       ],
-      "remainingBugs": 27,
+      "remainingBugs": 26,
       "remainingSeries": [
         {
           "date": "2025-01-21",
@@ -13746,11 +13766,19 @@
         {
           "date": "2026-08-19",
           "count": 27
+        },
+        {
+          "date": "2026-08-21",
+          "count": 28
+        },
+        {
+          "date": "2026-08-24",
+          "count": 26
         }
       ],
       "statusDistribution": [
         {
-          "count": 18,
+          "count": 17,
           "label": "Backlog"
         },
         {
@@ -13758,7 +13786,7 @@
           "label": "Triage"
         },
         {
-          "count": 1,
+          "count": 2,
           "label": "Todo"
         },
         {
@@ -13766,7 +13794,7 @@
           "label": "In progress"
         },
         {
-          "count": 1,
+          "count": 0,
           "label": "In review"
         },
         {
@@ -14651,6 +14679,10 @@
         },
         {
           "date": "2026-08-20",
+          "count": 1
+        },
+        {
+          "date": "2026-08-24",
           "count": 1
         }
       ],
@@ -15706,17 +15738,21 @@
         {
           "date": "2026-08-20",
           "count": 1
+        },
+        {
+          "date": "2026-08-24",
+          "count": 1
         }
       ],
-      "doneCount": 512,
+      "doneCount": 513,
       "firstBugDate": "2024-04-19",
       "openAgeDistribution": [
         {
-          "count": 7,
+          "count": 5,
           "label": "0-7d"
         },
         {
-          "count": 11,
+          "count": 13,
           "label": "8-30d"
         },
         {
@@ -15724,11 +15760,11 @@
           "label": "31-90d"
         },
         {
-          "count": 5,
+          "count": 4,
           "label": "91-180d"
         },
         {
-          "count": 18,
+          "count": 19,
           "label": "181d+"
         }
       ],
@@ -15738,11 +15774,11 @@
           "label": "Urgent"
         },
         {
-          "count": 5,
+          "count": 4,
           "label": "High"
         },
         {
-          "count": 11,
+          "count": 12,
           "label": "Medium"
         },
         {
@@ -16975,11 +17011,15 @@
         {
           "date": "2026-08-20",
           "count": 55
+        },
+        {
+          "date": "2026-08-24",
+          "count": 55
         }
       ],
       "statusDistribution": [
         {
-          "count": 49,
+          "count": 40,
           "label": "Backlog"
         },
         {
@@ -16987,7 +17027,7 @@
           "label": "Triage"
         },
         {
-          "count": 6,
+          "count": 15,
           "label": "Todo"
         },
         {
@@ -16995,11 +17035,11 @@
           "label": "In progress"
         },
         {
-          "count": 2,
+          "count": 1,
           "label": "In review"
         },
         {
-          "count": 0,
+          "count": 1,
           "label": "Deploy ready"
         },
         {
@@ -17988,7 +18028,7 @@
         },
         {
           "date": "2026-08-18",
-          "count": 2
+          "count": 1
         },
         {
           "date": "2026-08-19",
@@ -18001,6 +18041,10 @@
         {
           "date": "2026-08-21",
           "count": 9
+        },
+        {
+          "date": "2026-08-24",
+          "count": 2
         }
       ],
       "createdSeries": [
@@ -18982,7 +19026,7 @@
         },
         {
           "date": "2026-06-11",
-          "count": 4
+          "count": 5
         },
         {
           "date": "2026-06-12",
@@ -18994,7 +19038,7 @@
         },
         {
           "date": "2026-06-16",
-          "count": 3
+          "count": 4
         },
         {
           "date": "2026-06-17",
@@ -19118,7 +19162,7 @@
         },
         {
           "date": "2026-08-05",
-          "count": 1
+          "count": 2
         },
         {
           "date": "2026-08-06",
@@ -19159,21 +19203,25 @@
         {
           "date": "2026-08-23",
           "count": 1
+        },
+        {
+          "date": "2026-08-24",
+          "count": 3
         }
       ],
-      "doneCount": 667,
+      "doneCount": 668,
       "firstBugDate": "2023-09-18",
       "openAgeDistribution": [
         {
-          "count": 12,
+          "count": 9,
           "label": "0-7d"
         },
         {
-          "count": 9,
+          "count": 14,
           "label": "8-30d"
         },
         {
-          "count": 7,
+          "count": 10,
           "label": "31-90d"
         },
         {
@@ -19195,11 +19243,11 @@
           "label": "High"
         },
         {
-          "count": 30,
+          "count": 33,
           "label": "Medium"
         },
         {
-          "count": 33,
+          "count": 35,
           "label": "Low"
         },
         {
@@ -19207,7 +19255,7 @@
           "label": "Unspecified"
         }
       ],
-      "remainingBugs": 72,
+      "remainingBugs": 77,
       "remainingSeries": [
         {
           "date": "2023-09-18",
@@ -20347,224 +20395,228 @@
         },
         {
           "date": "2026-06-11",
-          "count": 97
+          "count": 98
         },
         {
           "date": "2026-06-12",
-          "count": 96
-        },
-        {
-          "date": "2026-06-15",
-          "count": 98
-        },
-        {
-          "date": "2026-06-16",
           "count": 97
         },
         {
-          "date": "2026-06-17",
-          "count": 95
-        },
-        {
-          "date": "2026-06-18",
-          "count": 98
-        },
-        {
-          "date": "2026-06-19",
-          "count": 100
-        },
-        {
-          "date": "2026-06-22",
-          "count": 101
-        },
-        {
-          "date": "2026-06-23",
-          "count": 109
-        },
-        {
-          "date": "2026-06-24",
-          "count": 105
-        },
-        {
-          "date": "2026-06-25",
-          "count": 103
-        },
-        {
-          "date": "2026-06-26",
-          "count": 101
-        },
-        {
-          "date": "2026-06-29",
-          "count": 100
-        },
-        {
-          "date": "2026-06-30",
-          "count": 98
-        },
-        {
-          "date": "2026-07-01",
-          "count": 101
-        },
-        {
-          "date": "2026-07-02",
-          "count": 101
-        },
-        {
-          "date": "2026-07-03",
-          "count": 100
-        },
-        {
-          "date": "2026-07-06",
-          "count": 100
-        },
-        {
-          "date": "2026-07-07",
-          "count": 103
-        },
-        {
-          "date": "2026-07-08",
+          "date": "2026-06-15",
           "count": 99
         },
         {
+          "date": "2026-06-16",
+          "count": 99
+        },
+        {
+          "date": "2026-06-17",
+          "count": 97
+        },
+        {
+          "date": "2026-06-18",
+          "count": 100
+        },
+        {
+          "date": "2026-06-19",
+          "count": 102
+        },
+        {
+          "date": "2026-06-22",
+          "count": 103
+        },
+        {
+          "date": "2026-06-23",
+          "count": 111
+        },
+        {
+          "date": "2026-06-24",
+          "count": 107
+        },
+        {
+          "date": "2026-06-25",
+          "count": 105
+        },
+        {
+          "date": "2026-06-26",
+          "count": 103
+        },
+        {
+          "date": "2026-06-29",
+          "count": 102
+        },
+        {
+          "date": "2026-06-30",
+          "count": 100
+        },
+        {
+          "date": "2026-07-01",
+          "count": 103
+        },
+        {
+          "date": "2026-07-02",
+          "count": 103
+        },
+        {
+          "date": "2026-07-03",
+          "count": 102
+        },
+        {
+          "date": "2026-07-06",
+          "count": 102
+        },
+        {
+          "date": "2026-07-07",
+          "count": 105
+        },
+        {
+          "date": "2026-07-08",
+          "count": 101
+        },
+        {
           "date": "2026-07-09",
-          "count": 96
+          "count": 98
         },
         {
           "date": "2026-07-10",
-          "count": 93
+          "count": 95
         },
         {
           "date": "2026-07-13",
-          "count": 91
+          "count": 93
         },
         {
           "date": "2026-07-14",
-          "count": 87
+          "count": 89
         },
         {
           "date": "2026-07-15",
-          "count": 84
+          "count": 86
         },
         {
           "date": "2026-07-16",
-          "count": 82
+          "count": 84
         },
         {
           "date": "2026-07-17",
-          "count": 80
+          "count": 82
         },
         {
           "date": "2026-07-20",
-          "count": 78
+          "count": 80
         },
         {
           "date": "2026-07-22",
-          "count": 71
-        },
-        {
-          "date": "2026-07-23",
           "count": 73
         },
         {
+          "date": "2026-07-23",
+          "count": 75
+        },
+        {
           "date": "2026-07-24",
-          "count": 72
+          "count": 74
         },
         {
           "date": "2026-07-27",
-          "count": 71
+          "count": 73
         },
         {
           "date": "2026-07-28",
-          "count": 72
+          "count": 74
         },
         {
           "date": "2026-07-29",
-          "count": 80
+          "count": 82
         },
         {
           "date": "2026-07-30",
-          "count": 79
-        },
-        {
-          "date": "2026-07-31",
-          "count": 79
-        },
-        {
-          "date": "2026-08-03",
-          "count": 78
-        },
-        {
-          "date": "2026-08-04",
-          "count": 79
-        },
-        {
-          "date": "2026-08-05",
-          "count": 76
-        },
-        {
-          "date": "2026-08-06",
-          "count": 78
-        },
-        {
-          "date": "2026-08-07",
           "count": 81
         },
         {
-          "date": "2026-08-10",
-          "count": 83
+          "date": "2026-07-31",
+          "count": 81
         },
         {
-          "date": "2026-08-11",
+          "date": "2026-08-03",
           "count": 80
         },
         {
+          "date": "2026-08-04",
+          "count": 81
+        },
+        {
+          "date": "2026-08-05",
+          "count": 79
+        },
+        {
+          "date": "2026-08-06",
+          "count": 81
+        },
+        {
+          "date": "2026-08-07",
+          "count": 84
+        },
+        {
+          "date": "2026-08-10",
+          "count": 86
+        },
+        {
+          "date": "2026-08-11",
+          "count": 83
+        },
+        {
           "date": "2026-08-12",
-          "count": 74
+          "count": 77
         },
         {
           "date": "2026-08-14",
-          "count": 74
+          "count": 77
         },
         {
           "date": "2026-08-17",
-          "count": 74
+          "count": 77
         },
         {
           "date": "2026-08-18",
-          "count": 72
+          "count": 76
         },
         {
           "date": "2026-08-19",
-          "count": 77
+          "count": 81
         },
         {
           "date": "2026-08-20",
-          "count": 77
+          "count": 81
         },
         {
           "date": "2026-08-21",
-          "count": 71
+          "count": 75
         },
         {
           "date": "2026-08-23",
-          "count": 72
+          "count": 76
+        },
+        {
+          "date": "2026-08-24",
+          "count": 77
         }
       ],
       "statusDistribution": [
         {
-          "count": 67,
+          "count": 54,
           "label": "Backlog"
         },
         {
-          "count": 4,
+          "count": 7,
           "label": "Triage"
         },
         {
-          "count": 6,
+          "count": 21,
           "label": "Todo"
         },
         {
-          "count": 1,
+          "count": 2,
           "label": "In progress"
         },
         {
@@ -20572,7 +20624,7 @@
           "label": "In review"
         },
         {
-          "count": 1,
+          "count": 0,
           "label": "Deploy ready"
         },
         {
@@ -20582,8 +20634,8 @@
       ]
     }
   },
-  "generatedAt": "2026-08-24T00:06:01.704Z",
-  "lastUpdated": "2026-08-24T00:06:01.704Z",
+  "generatedAt": "2026-08-25T00:06:28.269Z",
+  "lastUpdated": "2026-08-25T00:06:28.269Z",
   "teamKeys": [
     "CP",
     "PF",
