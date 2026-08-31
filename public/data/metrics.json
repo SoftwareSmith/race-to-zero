@@ -4236,7 +4236,7 @@
     "firstBugDate": "2023-09-18",
     "openAgeDistribution": [
       {
-        "count": 18,
+        "count": 17,
         "label": "0-7d"
       },
       {
@@ -4244,7 +4244,7 @@
         "label": "8-30d"
       },
       {
-        "count": 42,
+        "count": 43,
         "label": "31-90d"
       },
       {
@@ -6763,11 +6763,11 @@
         "label": "Triage"
       },
       {
-        "count": 15,
+        "count": 14,
         "label": "Todo"
       },
       {
-        "count": 2,
+        "count": 3,
         "label": "In progress"
       },
       {
@@ -17167,11 +17167,11 @@
           "label": "Triage"
         },
         {
-          "count": 7,
+          "count": 6,
           "label": "Todo"
         },
         {
-          "count": 0,
+          "count": 1,
           "label": "In progress"
         },
         {
@@ -19377,7 +19377,7 @@
       "firstBugDate": "2023-09-18",
       "openAgeDistribution": [
         {
-          "count": 4,
+          "count": 3,
           "label": "0-7d"
         },
         {
@@ -19385,7 +19385,7 @@
           "label": "8-30d"
         },
         {
-          "count": 13,
+          "count": 14,
           "label": "31-90d"
         },
         {
@@ -20814,8 +20814,8 @@
       ]
     }
   },
-  "generatedAt": "2026-08-30T00:11:31.211Z",
-  "lastUpdated": "2026-08-30T00:11:31.211Z",
+  "generatedAt": "2026-08-31T00:11:30.238Z",
+  "lastUpdated": "2026-08-31T00:11:30.238Z",
   "teamKeys": [
     "CP",
     "PF",

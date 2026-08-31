@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-08-30T00:11:31.211Z",
-  "lastUpdated": "2026-08-30T00:11:31.211Z",
+  "generatedAt": "2026-08-31T00:11:30.238Z",
+  "lastUpdated": "2026-08-31T00:11:30.238Z",
   "bugs": [
     {
       "archivedAt": null,
@@ -37177,10 +37177,10 @@
       "completedAt": null,
       "dueDate": null,
       "priority": 3,
-      "stateName": "Todo",
-      "stateType": "unstarted",
+      "stateName": "In Progress",
+      "stateType": "started",
       "teamKey": "T1",
-      "updatedAt": "2026-08-25"
+      "updatedAt": "2026-08-30"
     },
     {
       "archivedAt": null,
