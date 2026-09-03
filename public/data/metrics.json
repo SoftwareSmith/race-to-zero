@@ -1932,6 +1932,10 @@
       {
         "date": "2026-09-01",
         "count": 3
+      },
+      {
+        "date": "2026-09-02",
+        "count": 8
       }
     ],
     "createdSeries": [
@@ -4246,9 +4250,13 @@
       {
         "date": "2026-09-01",
         "count": 2
+      },
+      {
+        "date": "2026-09-02",
+        "count": 7
       }
     ],
-    "doneCount": 2124,
+    "doneCount": 2132,
     "firstBugDate": "2023-09-18",
     "openAgeDistribution": [
       {
@@ -4256,19 +4264,19 @@
         "label": "0-7d"
       },
       {
-        "count": 32,
+        "count": 33,
         "label": "8-30d"
       },
       {
-        "count": 42,
+        "count": 41,
         "label": "31-90d"
       },
       {
-        "count": 23,
+        "count": 19,
         "label": "91-180d"
       },
       {
-        "count": 130,
+        "count": 133,
         "label": "181d+"
       }
     ],
@@ -4282,19 +4290,19 @@
         "label": "High"
       },
       {
-        "count": 62,
+        "count": 61,
         "label": "Medium"
       },
       {
-        "count": 117,
+        "count": 114,
         "label": "Low"
       },
       {
-        "count": 35,
+        "count": 38,
         "label": "Unspecified"
       }
     ],
-    "remainingBugs": 243,
+    "remainingBugs": 242,
     "remainingSeries": [
       {
         "date": "2023-09-18",
@@ -6775,27 +6783,31 @@
       {
         "date": "2026-09-01",
         "count": 243
+      },
+      {
+        "date": "2026-09-02",
+        "count": 242
       }
     ],
     "statusDistribution": [
       {
-        "count": 189,
+        "count": 193,
         "label": "Backlog"
       },
       {
-        "count": 58,
+        "count": 55,
         "label": "Triage"
       },
       {
-        "count": 12,
+        "count": 11,
         "label": "Todo"
       },
       {
-        "count": 1,
+        "count": 6,
         "label": "In progress"
       },
       {
-        "count": 15,
+        "count": 9,
         "label": "In review"
       },
       {
@@ -8122,6 +8134,10 @@
         {
           "date": "2026-09-01",
           "count": 2
+        },
+        {
+          "date": "2026-09-02",
+          "count": 1
         }
       ],
       "createdSeries": [
@@ -9808,9 +9824,13 @@
         {
           "date": "2026-09-01",
           "count": 2
+        },
+        {
+          "date": "2026-09-02",
+          "count": 1
         }
       ],
-      "doneCount": 735,
+      "doneCount": 736,
       "firstBugDate": "2023-10-26",
       "openAgeDistribution": [
         {
@@ -11869,6 +11889,10 @@
         {
           "date": "2026-09-01",
           "count": 100
+        },
+        {
+          "date": "2026-09-02",
+          "count": 100
         }
       ],
       "statusDistribution": [
@@ -11877,7 +11901,7 @@
           "label": "Backlog"
         },
         {
-          "count": 44,
+          "count": 43,
           "label": "Triage"
         },
         {
@@ -11885,7 +11909,7 @@
           "label": "Todo"
         },
         {
-          "count": 0,
+          "count": 1,
           "label": "In progress"
         },
         {
@@ -13053,29 +13077,33 @@
         {
           "date": "2026-08-31",
           "count": 3
+        },
+        {
+          "date": "2026-09-02",
+          "count": 4
         }
       ],
       "doneCount": 193,
       "firstBugDate": "2025-01-21",
       "openAgeDistribution": [
         {
-          "count": 4,
+          "count": 8,
           "label": "0-7d"
         },
         {
-          "count": 2,
+          "count": 1,
           "label": "8-30d"
         },
         {
-          "count": 5,
+          "count": 6,
           "label": "31-90d"
         },
         {
-          "count": 5,
+          "count": 2,
           "label": "91-180d"
         },
         {
-          "count": 12,
+          "count": 15,
           "label": "181d+"
         }
       ],
@@ -13085,11 +13113,11 @@
           "label": "Urgent"
         },
         {
-          "count": 8,
+          "count": 9,
           "label": "High"
         },
         {
-          "count": 8,
+          "count": 10,
           "label": "Medium"
         },
         {
@@ -13097,11 +13125,11 @@
           "label": "Low"
         },
         {
-          "count": 2,
+          "count": 3,
           "label": "Unspecified"
         }
       ],
-      "remainingBugs": 28,
+      "remainingBugs": 32,
       "remainingSeries": [
         {
           "date": "2025-01-21",
@@ -13922,15 +13950,19 @@
         {
           "date": "2026-08-31",
           "count": 28
+        },
+        {
+          "date": "2026-09-02",
+          "count": 32
         }
       ],
       "statusDistribution": [
         {
-          "count": 19,
+          "count": 22,
           "label": "Backlog"
         },
         {
-          "count": 5,
+          "count": 3,
           "label": "Triage"
         },
         {
@@ -13938,15 +13970,15 @@
           "label": "Todo"
         },
         {
-          "count": 0,
+          "count": 3,
           "label": "In progress"
         },
         {
-          "count": 4,
+          "count": 0,
           "label": "In review"
         },
         {
-          "count": 0,
+          "count": 4,
           "label": "Deploy ready"
         },
         {
@@ -14852,6 +14884,10 @@
         {
           "date": "2026-09-01",
           "count": 1
+        },
+        {
+          "date": "2026-09-02",
+          "count": 3
         }
       ],
       "createdSeries": [
@@ -15928,23 +15964,23 @@
           "count": 1
         }
       ],
-      "doneCount": 518,
+      "doneCount": 521,
       "firstBugDate": "2024-04-19",
       "openAgeDistribution": [
         {
-          "count": 6,
+          "count": 2,
           "label": "0-7d"
         },
         {
-          "count": 15,
+          "count": 18,
           "label": "8-30d"
         },
         {
-          "count": 16,
+          "count": 15,
           "label": "31-90d"
         },
         {
-          "count": 4,
+          "count": 3,
           "label": "91-180d"
         },
         {
@@ -15958,7 +15994,7 @@
           "label": "Urgent"
         },
         {
-          "count": 4,
+          "count": 3,
           "label": "High"
         },
         {
@@ -15966,7 +16002,7 @@
           "label": "Medium"
         },
         {
-          "count": 38,
+          "count": 36,
           "label": "Low"
         },
         {
@@ -15974,7 +16010,7 @@
           "label": "Unspecified"
         }
       ],
-      "remainingBugs": 58,
+      "remainingBugs": 55,
       "remainingSeries": [
         {
           "date": "2024-04-19",
@@ -17219,6 +17255,10 @@
         {
           "date": "2026-09-01",
           "count": 58
+        },
+        {
+          "date": "2026-09-02",
+          "count": 55
         }
       ],
       "statusDistribution": [
@@ -17235,15 +17275,15 @@
           "label": "Todo"
         },
         {
-          "count": 1,
+          "count": 0,
           "label": "In progress"
         },
         {
-          "count": 5,
+          "count": 4,
           "label": "In review"
         },
         {
-          "count": 2,
+          "count": 1,
           "label": "Deploy ready"
         },
         {
@@ -18269,6 +18309,10 @@
         {
           "date": "2026-08-31",
           "count": 1
+        },
+        {
+          "date": "2026-09-02",
+          "count": 4
         }
       ],
       "createdSeries": [
@@ -19439,9 +19483,13 @@
         {
           "date": "2026-08-26",
           "count": 2
+        },
+        {
+          "date": "2026-09-02",
+          "count": 2
         }
       ],
-      "doneCount": 678,
+      "doneCount": 682,
       "firstBugDate": "2023-09-18",
       "openAgeDistribution": [
         {
@@ -19449,11 +19497,11 @@
           "label": "0-7d"
         },
         {
-          "count": 11,
+          "count": 10,
           "label": "8-30d"
         },
         {
-          "count": 13,
+          "count": 12,
           "label": "31-90d"
         },
         {
@@ -19475,19 +19523,19 @@
           "label": "High"
         },
         {
-          "count": 24,
+          "count": 21,
           "label": "Medium"
         },
         {
-          "count": 27,
+          "count": 26,
           "label": "Low"
         },
         {
-          "count": 4,
+          "count": 6,
           "label": "Unspecified"
         }
       ],
-      "remainingBugs": 57,
+      "remainingBugs": 55,
       "remainingSeries": [
         {
           "date": "2023-09-18",
@@ -20852,11 +20900,15 @@
         {
           "date": "2026-08-31",
           "count": 57
+        },
+        {
+          "date": "2026-09-02",
+          "count": 55
         }
       ],
       "statusDistribution": [
         {
-          "count": 54,
+          "count": 55,
           "label": "Backlog"
         },
         {
@@ -20864,19 +20916,19 @@
           "label": "Triage"
         },
         {
-          "count": 4,
+          "count": 3,
           "label": "Todo"
         },
         {
-          "count": 0,
+          "count": 2,
           "label": "In progress"
         },
         {
-          "count": 6,
+          "count": 5,
           "label": "In review"
         },
         {
-          "count": 3,
+          "count": 0,
           "label": "Deploy ready"
         },
         {
@@ -20886,8 +20938,8 @@
       ]
     }
   },
-  "generatedAt": "2026-09-02T00:10:40.525Z",
-  "lastUpdated": "2026-09-02T00:10:40.525Z",
+  "generatedAt": "2026-09-03T00:10:47.322Z",
+  "lastUpdated": "2026-09-03T00:10:47.322Z",
   "teamKeys": [
     "CP",
     "PF",
