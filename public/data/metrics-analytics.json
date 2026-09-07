@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-09-06T00:11:17.944Z",
-  "lastUpdated": "2026-09-06T00:11:17.944Z",
+  "generatedAt": "2026-09-07T00:11:02.384Z",
+  "lastUpdated": "2026-09-07T00:11:02.384Z",
   "bugs": [
     {
       "archivedAt": null,
@@ -28057,7 +28057,7 @@
       "updatedAt": "2026-05-21"
     },
     {
-      "archivedAt": null,
+      "archivedAt": "2026-09-06",
       "autoClosedAt": null,
       "canceledAt": "2026-08-05",
       "createdAt": "2026-04-01",
@@ -28067,7 +28067,7 @@
       "stateName": "Canceled",
       "stateType": "canceled",
       "teamKey": "CP",
-      "updatedAt": "2026-08-05"
+      "updatedAt": "2026-09-06"
     },
     {
       "archivedAt": "2026-05-07",
@@ -32227,7 +32227,7 @@
       "stateName": "Done",
       "stateType": "completed",
       "teamKey": "TA",
-      "updatedAt": "2026-08-06"
+      "updatedAt": "2026-09-06"
     },
     {
       "archivedAt": null,
@@ -33400,7 +33400,7 @@
       "updatedAt": "2026-07-23"
     },
     {
-      "archivedAt": null,
+      "archivedAt": "2026-09-06",
       "autoClosedAt": null,
       "canceledAt": "2026-08-06",
       "createdAt": "2026-06-18",
@@ -33410,7 +33410,7 @@
       "stateName": "Canceled",
       "stateType": "canceled",
       "teamKey": "CP",
-      "updatedAt": "2026-08-06"
+      "updatedAt": "2026-09-06"
     },
     {
       "archivedAt": null,
@@ -33699,7 +33699,7 @@
       "updatedAt": "2026-07-27"
     },
     {
-      "archivedAt": null,
+      "archivedAt": "2026-09-06",
       "autoClosedAt": null,
       "canceledAt": "2026-08-06",
       "createdAt": "2026-06-23",
@@ -37934,7 +37934,7 @@
       "stateName": "In Review",
       "stateType": "started",
       "teamKey": "T1",
-      "updatedAt": "2026-09-04"
+      "updatedAt": "2026-09-06"
     },
     {
       "archivedAt": null,
@@ -38220,7 +38220,7 @@
       "stateName": "Triage",
       "stateType": "triage",
       "teamKey": "CP",
-      "updatedAt": "2026-09-04"
+      "updatedAt": "2026-09-06"
     },
     {
       "archivedAt": null,
@@ -38429,6 +38429,19 @@
       "stateType": "triage",
       "teamKey": "CP",
       "updatedAt": "2026-09-04"
+    },
+    {
+      "archivedAt": null,
+      "autoClosedAt": null,
+      "canceledAt": null,
+      "createdAt": "2026-09-06",
+      "completedAt": null,
+      "dueDate": null,
+      "priority": 0,
+      "stateName": "Backlog",
+      "stateType": "backlog",
+      "teamKey": "T1",
+      "updatedAt": "2026-09-06"
     }
   ]
 }
