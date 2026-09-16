@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-09-15T00:10:28.681Z",
-  "lastUpdated": "2026-09-15T00:10:28.681Z",
+  "generatedAt": "2026-09-16T00:09:52.281Z",
+  "lastUpdated": "2026-09-16T00:09:52.281Z",
   "bugs": [
     {
       "archivedAt": null,
@@ -32854,7 +32854,7 @@
       "updatedAt": "2026-09-12"
     },
     {
-      "archivedAt": null,
+      "archivedAt": "2026-09-15",
       "autoClosedAt": null,
       "canceledAt": null,
       "createdAt": "2026-06-12",
@@ -32864,7 +32864,7 @@
       "stateName": "Done",
       "stateType": "completed",
       "teamKey": "TA",
-      "updatedAt": "2026-08-14"
+      "updatedAt": "2026-09-15"
     },
     {
       "archivedAt": null,
@@ -35893,7 +35893,7 @@
       "stateName": "Todo",
       "stateType": "unstarted",
       "teamKey": "TA",
-      "updatedAt": "2026-08-28"
+      "updatedAt": "2026-09-15"
     },
     {
       "archivedAt": null,
@@ -35965,13 +35965,13 @@
       "autoClosedAt": null,
       "canceledAt": null,
       "createdAt": "2026-07-27",
-      "completedAt": null,
+      "completedAt": "2026-09-15",
       "dueDate": null,
       "priority": 3,
-      "stateName": "Ready to deploy",
-      "stateType": "started",
+      "stateName": "Done",
+      "stateType": "completed",
       "teamKey": "TA",
-      "updatedAt": "2026-09-14"
+      "updatedAt": "2026-09-15"
     },
     {
       "archivedAt": null,
@@ -36205,7 +36205,7 @@
       "stateName": "In Review",
       "stateType": "started",
       "teamKey": "T1",
-      "updatedAt": "2026-09-14"
+      "updatedAt": "2026-09-15"
     },
     {
       "archivedAt": "2026-09-11",
@@ -37356,13 +37356,13 @@
       "autoClosedAt": null,
       "canceledAt": null,
       "createdAt": "2026-08-19",
-      "completedAt": null,
+      "completedAt": "2026-09-15",
       "dueDate": null,
       "priority": 4,
-      "stateName": "In Review",
-      "stateType": "started",
+      "stateName": "Done",
+      "stateType": "completed",
       "teamKey": "T1",
-      "updatedAt": "2026-09-14"
+      "updatedAt": "2026-09-15"
     },
     {
       "archivedAt": null,
@@ -37759,39 +37759,39 @@
       "autoClosedAt": null,
       "canceledAt": null,
       "createdAt": "2026-08-25",
-      "completedAt": null,
+      "completedAt": "2026-09-15",
       "dueDate": null,
       "priority": 4,
-      "stateName": "In Review",
-      "stateType": "started",
+      "stateName": "Done",
+      "stateType": "completed",
       "teamKey": "T1",
-      "updatedAt": "2026-09-14"
+      "updatedAt": "2026-09-15"
     },
     {
       "archivedAt": null,
       "autoClosedAt": null,
       "canceledAt": null,
       "createdAt": "2026-08-25",
-      "completedAt": null,
+      "completedAt": "2026-09-15",
       "dueDate": null,
       "priority": 4,
-      "stateName": "In Review",
-      "stateType": "started",
+      "stateName": "Done",
+      "stateType": "completed",
       "teamKey": "T1",
-      "updatedAt": "2026-09-14"
+      "updatedAt": "2026-09-15"
     },
     {
       "archivedAt": null,
       "autoClosedAt": null,
       "canceledAt": null,
       "createdAt": "2026-08-25",
-      "completedAt": null,
+      "completedAt": "2026-09-15",
       "dueDate": null,
       "priority": 4,
-      "stateName": "In Review",
-      "stateType": "started",
+      "stateName": "Done",
+      "stateType": "completed",
       "teamKey": "T1",
-      "updatedAt": "2026-09-14"
+      "updatedAt": "2026-09-15"
     },
     {
       "archivedAt": null,
@@ -37843,7 +37843,7 @@
       "stateName": "In Review",
       "stateType": "started",
       "teamKey": "T1",
-      "updatedAt": "2026-09-14"
+      "updatedAt": "2026-09-15"
     },
     {
       "archivedAt": null,
@@ -37863,13 +37863,13 @@
       "autoClosedAt": null,
       "canceledAt": null,
       "createdAt": "2026-08-26",
-      "completedAt": null,
+      "completedAt": "2026-09-15",
       "dueDate": null,
       "priority": 4,
-      "stateName": "In Review",
-      "stateType": "started",
+      "stateName": "Done",
+      "stateType": "completed",
       "teamKey": "T1",
-      "updatedAt": "2026-09-14"
+      "updatedAt": "2026-09-15"
     },
     {
       "archivedAt": null,
@@ -38474,78 +38474,78 @@
       "autoClosedAt": null,
       "canceledAt": null,
       "createdAt": "2026-09-07",
-      "completedAt": null,
+      "completedAt": "2026-09-15",
       "dueDate": null,
       "priority": 3,
-      "stateName": "In Review",
-      "stateType": "started",
+      "stateName": "Done",
+      "stateType": "completed",
       "teamKey": "T1",
-      "updatedAt": "2026-09-14"
+      "updatedAt": "2026-09-15"
     },
     {
       "archivedAt": null,
       "autoClosedAt": null,
       "canceledAt": null,
       "createdAt": "2026-09-07",
-      "completedAt": null,
+      "completedAt": "2026-09-15",
       "dueDate": null,
       "priority": 3,
-      "stateName": "In Review",
-      "stateType": "started",
+      "stateName": "Done",
+      "stateType": "completed",
       "teamKey": "T1",
-      "updatedAt": "2026-09-14"
+      "updatedAt": "2026-09-15"
     },
     {
       "archivedAt": null,
       "autoClosedAt": null,
       "canceledAt": null,
       "createdAt": "2026-09-07",
-      "completedAt": null,
+      "completedAt": "2026-09-15",
       "dueDate": null,
       "priority": 2,
-      "stateName": "In Review",
-      "stateType": "started",
+      "stateName": "Done",
+      "stateType": "completed",
       "teamKey": "T1",
-      "updatedAt": "2026-09-14"
+      "updatedAt": "2026-09-15"
     },
     {
       "archivedAt": null,
       "autoClosedAt": null,
       "canceledAt": null,
       "createdAt": "2026-09-07",
-      "completedAt": null,
+      "completedAt": "2026-09-15",
       "dueDate": null,
       "priority": 3,
-      "stateName": "In Progress",
-      "stateType": "started",
+      "stateName": "Done",
+      "stateType": "completed",
       "teamKey": "T1",
-      "updatedAt": "2026-09-14"
+      "updatedAt": "2026-09-15"
     },
     {
       "archivedAt": null,
       "autoClosedAt": null,
       "canceledAt": null,
       "createdAt": "2026-09-07",
-      "completedAt": null,
+      "completedAt": "2026-09-15",
       "dueDate": null,
       "priority": 3,
-      "stateName": "In Review",
-      "stateType": "started",
+      "stateName": "Done",
+      "stateType": "completed",
       "teamKey": "T1",
-      "updatedAt": "2026-09-14"
+      "updatedAt": "2026-09-15"
     },
     {
       "archivedAt": null,
       "autoClosedAt": null,
       "canceledAt": null,
       "createdAt": "2026-09-07",
-      "completedAt": null,
+      "completedAt": "2026-09-15",
       "dueDate": null,
       "priority": 2,
-      "stateName": "In Review",
-      "stateType": "started",
+      "stateName": "Done",
+      "stateType": "completed",
       "teamKey": "T1",
-      "updatedAt": "2026-09-14"
+      "updatedAt": "2026-09-15"
     },
     {
       "archivedAt": null,
@@ -38565,13 +38565,13 @@
       "autoClosedAt": null,
       "canceledAt": null,
       "createdAt": "2026-09-07",
-      "completedAt": null,
+      "completedAt": "2026-09-15",
       "dueDate": null,
       "priority": 3,
-      "stateName": "In Review",
-      "stateType": "started",
+      "stateName": "Done",
+      "stateType": "completed",
       "teamKey": "T1",
-      "updatedAt": "2026-09-14"
+      "updatedAt": "2026-09-15"
     },
     {
       "archivedAt": "2026-09-07",
@@ -38630,26 +38630,26 @@
       "autoClosedAt": null,
       "canceledAt": null,
       "createdAt": "2026-09-07",
-      "completedAt": null,
+      "completedAt": "2026-09-15",
       "dueDate": null,
       "priority": 3,
-      "stateName": "In Review",
-      "stateType": "started",
+      "stateName": "Done",
+      "stateType": "completed",
       "teamKey": "T1",
-      "updatedAt": "2026-09-14"
+      "updatedAt": "2026-09-15"
     },
     {
       "archivedAt": null,
       "autoClosedAt": null,
       "canceledAt": null,
       "createdAt": "2026-09-07",
-      "completedAt": null,
+      "completedAt": "2026-09-15",
       "dueDate": null,
       "priority": 3,
-      "stateName": "In Review",
-      "stateType": "started",
+      "stateName": "Done",
+      "stateType": "completed",
       "teamKey": "T1",
-      "updatedAt": "2026-09-14"
+      "updatedAt": "2026-09-15"
     },
     {
       "archivedAt": "2026-09-07",
@@ -38828,10 +38828,10 @@
       "completedAt": null,
       "dueDate": "2026-09-15",
       "priority": 2,
-      "stateName": "In Progress",
+      "stateName": "In Review",
       "stateType": "started",
       "teamKey": "TA",
-      "updatedAt": "2026-09-14"
+      "updatedAt": "2026-09-15"
     },
     {
       "archivedAt": null,
@@ -38895,8 +38895,8 @@
       "priority": 3,
       "stateName": "In Review",
       "stateType": "started",
-      "teamKey": "TA",
-      "updatedAt": "2026-09-14"
+      "teamKey": "T1",
+      "updatedAt": "2026-09-15"
     },
     {
       "archivedAt": null,
@@ -38984,23 +38984,23 @@
       "completedAt": null,
       "dueDate": null,
       "priority": 4,
-      "stateName": "In Review",
+      "stateName": "Ready to deploy",
       "stateType": "started",
       "teamKey": "T1",
-      "updatedAt": "2026-09-14"
+      "updatedAt": "2026-09-15"
     },
     {
       "archivedAt": null,
       "autoClosedAt": null,
       "canceledAt": null,
       "createdAt": "2026-09-09",
-      "completedAt": null,
+      "completedAt": "2026-09-15",
       "dueDate": null,
       "priority": 3,
-      "stateName": "Ready to deploy",
-      "stateType": "started",
+      "stateName": "Done",
+      "stateType": "completed",
       "teamKey": "TA",
-      "updatedAt": "2026-09-14"
+      "updatedAt": "2026-09-15"
     },
     {
       "archivedAt": null,
@@ -39052,7 +39052,7 @@
       "stateName": "In Review",
       "stateType": "started",
       "teamKey": "PF",
-      "updatedAt": "2026-09-14"
+      "updatedAt": "2026-09-15"
     },
     {
       "archivedAt": null,
@@ -39104,7 +39104,7 @@
       "stateName": "Done",
       "stateType": "completed",
       "teamKey": "TA",
-      "updatedAt": "2026-09-14"
+      "updatedAt": "2026-09-15"
     },
     {
       "archivedAt": null,
@@ -39114,10 +39114,10 @@
       "completedAt": null,
       "dueDate": null,
       "priority": 2,
-      "stateName": "In Progress",
+      "stateName": "In Review",
       "stateType": "started",
       "teamKey": "T1",
-      "updatedAt": "2026-09-14"
+      "updatedAt": "2026-09-15"
     },
     {
       "archivedAt": null,
@@ -39156,7 +39156,7 @@
       "stateName": "Done",
       "stateType": "completed",
       "teamKey": "PF",
-      "updatedAt": "2026-09-14"
+      "updatedAt": "2026-09-15"
     },
     {
       "archivedAt": null,
@@ -39182,7 +39182,7 @@
       "stateName": "In Progress",
       "stateType": "started",
       "teamKey": "T1",
-      "updatedAt": "2026-09-14"
+      "updatedAt": "2026-09-15"
     },
     {
       "archivedAt": null,
@@ -39208,6 +39208,58 @@
       "stateName": "Todo",
       "stateType": "unstarted",
       "teamKey": "T1",
+      "updatedAt": "2026-09-15"
+    },
+    {
+      "archivedAt": null,
+      "autoClosedAt": null,
+      "canceledAt": null,
+      "createdAt": "2026-09-14",
+      "completedAt": null,
+      "dueDate": null,
+      "priority": 2,
+      "stateName": "In Progress",
+      "stateType": "started",
+      "teamKey": "T1",
+      "updatedAt": "2026-09-15"
+    },
+    {
+      "archivedAt": null,
+      "autoClosedAt": null,
+      "canceledAt": null,
+      "createdAt": "2026-09-14",
+      "completedAt": "2026-09-15",
+      "dueDate": null,
+      "priority": 3,
+      "stateName": "Done",
+      "stateType": "completed",
+      "teamKey": "TA",
+      "updatedAt": "2026-09-15"
+    },
+    {
+      "archivedAt": null,
+      "autoClosedAt": null,
+      "canceledAt": null,
+      "createdAt": "2026-09-14",
+      "completedAt": null,
+      "dueDate": null,
+      "priority": 2,
+      "stateName": "Backlog",
+      "stateType": "backlog",
+      "teamKey": "TA",
+      "updatedAt": "2026-09-14"
+    },
+    {
+      "archivedAt": null,
+      "autoClosedAt": null,
+      "canceledAt": null,
+      "createdAt": "2026-09-14",
+      "completedAt": null,
+      "dueDate": null,
+      "priority": 4,
+      "stateName": "Backlog",
+      "stateType": "backlog",
+      "teamKey": "TA",
       "updatedAt": "2026-09-14"
     },
     {
@@ -39218,6 +39270,45 @@
       "completedAt": null,
       "dueDate": null,
       "priority": 2,
+      "stateName": "Backlog",
+      "stateType": "backlog",
+      "teamKey": "TA",
+      "updatedAt": "2026-09-14"
+    },
+    {
+      "archivedAt": null,
+      "autoClosedAt": null,
+      "canceledAt": null,
+      "createdAt": "2026-09-14",
+      "completedAt": null,
+      "dueDate": null,
+      "priority": 2,
+      "stateName": "Backlog",
+      "stateType": "backlog",
+      "teamKey": "TA",
+      "updatedAt": "2026-09-14"
+    },
+    {
+      "archivedAt": null,
+      "autoClosedAt": null,
+      "canceledAt": null,
+      "createdAt": "2026-09-14",
+      "completedAt": null,
+      "dueDate": null,
+      "priority": 4,
+      "stateName": "Backlog",
+      "stateType": "backlog",
+      "teamKey": "TA",
+      "updatedAt": "2026-09-14"
+    },
+    {
+      "archivedAt": null,
+      "autoClosedAt": null,
+      "canceledAt": null,
+      "createdAt": "2026-09-14",
+      "completedAt": null,
+      "dueDate": null,
+      "priority": 3,
       "stateName": "Todo",
       "stateType": "unstarted",
       "teamKey": "T1",
@@ -39231,127 +39322,36 @@
       "completedAt": null,
       "dueDate": null,
       "priority": 3,
+      "stateName": "In Progress",
+      "stateType": "started",
+      "teamKey": "T1",
+      "updatedAt": "2026-09-15"
+    },
+    {
+      "archivedAt": null,
+      "autoClosedAt": null,
+      "canceledAt": null,
+      "createdAt": "2026-09-14",
+      "completedAt": null,
+      "dueDate": null,
+      "priority": 3,
+      "stateName": "Todo",
+      "stateType": "unstarted",
+      "teamKey": "T1",
+      "updatedAt": "2026-09-14"
+    },
+    {
+      "archivedAt": null,
+      "autoClosedAt": null,
+      "canceledAt": null,
+      "createdAt": "2026-09-14",
+      "completedAt": null,
+      "dueDate": null,
+      "priority": 2,
       "stateName": "In Review",
       "stateType": "started",
-      "teamKey": "TA",
-      "updatedAt": "2026-09-14"
-    },
-    {
-      "archivedAt": null,
-      "autoClosedAt": null,
-      "canceledAt": null,
-      "createdAt": "2026-09-14",
-      "completedAt": null,
-      "dueDate": null,
-      "priority": 2,
-      "stateName": "Backlog",
-      "stateType": "backlog",
-      "teamKey": "TA",
-      "updatedAt": "2026-09-14"
-    },
-    {
-      "archivedAt": null,
-      "autoClosedAt": null,
-      "canceledAt": null,
-      "createdAt": "2026-09-14",
-      "completedAt": null,
-      "dueDate": null,
-      "priority": 4,
-      "stateName": "Backlog",
-      "stateType": "backlog",
-      "teamKey": "TA",
-      "updatedAt": "2026-09-14"
-    },
-    {
-      "archivedAt": null,
-      "autoClosedAt": null,
-      "canceledAt": null,
-      "createdAt": "2026-09-14",
-      "completedAt": null,
-      "dueDate": null,
-      "priority": 2,
-      "stateName": "Backlog",
-      "stateType": "backlog",
-      "teamKey": "TA",
-      "updatedAt": "2026-09-14"
-    },
-    {
-      "archivedAt": null,
-      "autoClosedAt": null,
-      "canceledAt": null,
-      "createdAt": "2026-09-14",
-      "completedAt": null,
-      "dueDate": null,
-      "priority": 2,
-      "stateName": "Backlog",
-      "stateType": "backlog",
-      "teamKey": "TA",
-      "updatedAt": "2026-09-14"
-    },
-    {
-      "archivedAt": null,
-      "autoClosedAt": null,
-      "canceledAt": null,
-      "createdAt": "2026-09-14",
-      "completedAt": null,
-      "dueDate": null,
-      "priority": 4,
-      "stateName": "Backlog",
-      "stateType": "backlog",
-      "teamKey": "TA",
-      "updatedAt": "2026-09-14"
-    },
-    {
-      "archivedAt": null,
-      "autoClosedAt": null,
-      "canceledAt": null,
-      "createdAt": "2026-09-14",
-      "completedAt": null,
-      "dueDate": null,
-      "priority": 3,
-      "stateName": "Todo",
-      "stateType": "unstarted",
-      "teamKey": "T1",
-      "updatedAt": "2026-09-14"
-    },
-    {
-      "archivedAt": null,
-      "autoClosedAt": null,
-      "canceledAt": null,
-      "createdAt": "2026-09-14",
-      "completedAt": null,
-      "dueDate": null,
-      "priority": 3,
-      "stateName": "Todo",
-      "stateType": "unstarted",
-      "teamKey": "T1",
-      "updatedAt": "2026-09-14"
-    },
-    {
-      "archivedAt": null,
-      "autoClosedAt": null,
-      "canceledAt": null,
-      "createdAt": "2026-09-14",
-      "completedAt": null,
-      "dueDate": null,
-      "priority": 3,
-      "stateName": "Todo",
-      "stateType": "unstarted",
-      "teamKey": "T1",
-      "updatedAt": "2026-09-14"
-    },
-    {
-      "archivedAt": null,
-      "autoClosedAt": null,
-      "canceledAt": null,
-      "createdAt": "2026-09-14",
-      "completedAt": null,
-      "dueDate": null,
-      "priority": 2,
-      "stateName": "In Progress",
-      "stateType": "started",
       "teamKey": "PF",
-      "updatedAt": "2026-09-14"
+      "updatedAt": "2026-09-15"
     },
     {
       "archivedAt": null,
@@ -39361,10 +39361,88 @@
       "completedAt": null,
       "dueDate": "2026-09-22",
       "priority": 2,
+      "stateName": "In Progress",
+      "stateType": "started",
+      "teamKey": "CP",
+      "updatedAt": "2026-09-15"
+    },
+    {
+      "archivedAt": null,
+      "autoClosedAt": null,
+      "canceledAt": null,
+      "createdAt": "2026-09-15",
+      "completedAt": null,
+      "dueDate": null,
+      "priority": 4,
+      "stateName": "Backlog",
+      "stateType": "backlog",
+      "teamKey": "TA",
+      "updatedAt": "2026-09-15"
+    },
+    {
+      "archivedAt": null,
+      "autoClosedAt": null,
+      "canceledAt": null,
+      "createdAt": "2026-09-15",
+      "completedAt": null,
+      "dueDate": null,
+      "priority": 2,
+      "stateName": "Todo",
+      "stateType": "unstarted",
+      "teamKey": "TA",
+      "updatedAt": "2026-09-15"
+    },
+    {
+      "archivedAt": null,
+      "autoClosedAt": null,
+      "canceledAt": null,
+      "createdAt": "2026-09-15",
+      "completedAt": null,
+      "dueDate": null,
+      "priority": 0,
+      "stateName": "Triage",
+      "stateType": "triage",
+      "teamKey": "TA",
+      "updatedAt": "2026-09-15"
+    },
+    {
+      "archivedAt": null,
+      "autoClosedAt": null,
+      "canceledAt": null,
+      "createdAt": "2026-09-15",
+      "completedAt": null,
+      "dueDate": null,
+      "priority": 0,
+      "stateName": "Triage",
+      "stateType": "triage",
+      "teamKey": "TA",
+      "updatedAt": "2026-09-15"
+    },
+    {
+      "archivedAt": null,
+      "autoClosedAt": null,
+      "canceledAt": "2026-09-15",
+      "createdAt": "2026-09-15",
+      "completedAt": null,
+      "dueDate": null,
+      "priority": 3,
+      "stateName": "Canceled",
+      "stateType": "canceled",
+      "teamKey": "T1",
+      "updatedAt": "2026-09-15"
+    },
+    {
+      "archivedAt": null,
+      "autoClosedAt": null,
+      "canceledAt": null,
+      "createdAt": "2026-09-15",
+      "completedAt": null,
+      "dueDate": "2026-10-07",
+      "priority": 3,
       "stateName": "Triage",
       "stateType": "triage",
       "teamKey": "CP",
-      "updatedAt": "2026-09-14"
+      "updatedAt": "2026-09-15"
     }
   ]
 }
