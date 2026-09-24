@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-09-23T00:09:53.383Z",
-  "lastUpdated": "2026-09-23T00:09:53.383Z",
+  "generatedAt": "2026-09-24T00:09:32.721Z",
+  "lastUpdated": "2026-09-24T00:09:32.721Z",
   "bugs": [
     {
       "archivedAt": null,
@@ -39098,13 +39098,13 @@
       "autoClosedAt": null,
       "canceledAt": null,
       "createdAt": "2026-09-14",
-      "completedAt": null,
+      "completedAt": "2026-09-23",
       "dueDate": null,
       "priority": 3,
-      "stateName": "Ready to deploy",
-      "stateType": "started",
+      "stateName": "Done",
+      "stateType": "completed",
       "teamKey": "T1",
-      "updatedAt": "2026-09-22"
+      "updatedAt": "2026-09-23"
     },
     {
       "archivedAt": null,
@@ -39124,13 +39124,13 @@
       "autoClosedAt": null,
       "canceledAt": null,
       "createdAt": "2026-09-14",
-      "completedAt": null,
+      "completedAt": "2026-09-23",
       "dueDate": null,
       "priority": 3,
-      "stateName": "Ready to deploy",
-      "stateType": "started",
+      "stateName": "Done",
+      "stateType": "completed",
       "teamKey": "T1",
-      "updatedAt": "2026-09-22"
+      "updatedAt": "2026-09-23"
     },
     {
       "archivedAt": null,
@@ -39205,10 +39205,10 @@
       "completedAt": null,
       "dueDate": null,
       "priority": 2,
-      "stateName": "Todo",
-      "stateType": "unstarted",
+      "stateName": "In Review",
+      "stateType": "started",
       "teamKey": "T1",
-      "updatedAt": "2026-09-22"
+      "updatedAt": "2026-09-23"
     },
     {
       "archivedAt": null,
@@ -39218,10 +39218,10 @@
       "completedAt": null,
       "dueDate": null,
       "priority": 2,
-      "stateName": "Todo",
-      "stateType": "unstarted",
+      "stateName": "In Review",
+      "stateType": "started",
       "teamKey": "T1",
-      "updatedAt": "2026-09-22"
+      "updatedAt": "2026-09-23"
     },
     {
       "archivedAt": null,
@@ -39247,7 +39247,7 @@
       "stateName": "In Review",
       "stateType": "started",
       "teamKey": "T1",
-      "updatedAt": "2026-09-22"
+      "updatedAt": "2026-09-23"
     },
     {
       "archivedAt": null,
@@ -39364,7 +39364,7 @@
       "stateName": "In Review",
       "stateType": "started",
       "teamKey": "T1",
-      "updatedAt": "2026-09-21"
+      "updatedAt": "2026-09-23"
     },
     {
       "archivedAt": null,
@@ -39429,7 +39429,7 @@
       "stateName": "In Review",
       "stateType": "started",
       "teamKey": "T1",
-      "updatedAt": "2026-09-22"
+      "updatedAt": "2026-09-23"
     },
     {
       "archivedAt": null,
@@ -39439,10 +39439,10 @@
       "completedAt": null,
       "dueDate": null,
       "priority": 2,
-      "stateName": "Ready to deploy",
+      "stateName": "In Review",
       "stateType": "started",
       "teamKey": "T1",
-      "updatedAt": "2026-09-22"
+      "updatedAt": "2026-09-23"
     },
     {
       "archivedAt": null,
@@ -39468,7 +39468,7 @@
       "stateName": "In Review",
       "stateType": "started",
       "teamKey": "T1",
-      "updatedAt": "2026-09-22"
+      "updatedAt": "2026-09-23"
     },
     {
       "archivedAt": null,
@@ -39488,13 +39488,13 @@
       "autoClosedAt": null,
       "canceledAt": null,
       "createdAt": "2026-09-16",
-      "completedAt": null,
+      "completedAt": "2026-09-23",
       "dueDate": null,
       "priority": 2,
-      "stateName": "Ready to deploy",
-      "stateType": "started",
+      "stateName": "Done",
+      "stateType": "completed",
       "teamKey": "T1",
-      "updatedAt": "2026-09-22"
+      "updatedAt": "2026-09-23"
     },
     {
       "archivedAt": null,
@@ -39637,20 +39637,20 @@
       "stateName": "Triage",
       "stateType": "triage",
       "teamKey": "CP",
-      "updatedAt": "2026-09-17"
+      "updatedAt": "2026-09-23"
     },
     {
       "archivedAt": null,
       "autoClosedAt": null,
       "canceledAt": null,
       "createdAt": "2026-09-17",
-      "completedAt": null,
+      "completedAt": "2026-09-23",
       "dueDate": null,
       "priority": 2,
-      "stateName": "Ready to deploy",
-      "stateType": "started",
+      "stateName": "Done",
+      "stateType": "completed",
       "teamKey": "T1",
-      "updatedAt": "2026-09-22"
+      "updatedAt": "2026-09-23"
     },
     {
       "archivedAt": null,
@@ -39689,7 +39689,7 @@
       "stateName": "In Review",
       "stateType": "started",
       "teamKey": "T1",
-      "updatedAt": "2026-09-22"
+      "updatedAt": "2026-09-23"
     },
     {
       "archivedAt": null,
@@ -39709,26 +39709,26 @@
       "autoClosedAt": null,
       "canceledAt": null,
       "createdAt": "2026-09-17",
-      "completedAt": null,
+      "completedAt": "2026-09-23",
       "dueDate": null,
       "priority": 3,
-      "stateName": "Ready to deploy",
-      "stateType": "started",
+      "stateName": "Done",
+      "stateType": "completed",
       "teamKey": "TA",
-      "updatedAt": "2026-09-22"
+      "updatedAt": "2026-09-23"
     },
     {
       "archivedAt": null,
       "autoClosedAt": null,
       "canceledAt": null,
       "createdAt": "2026-09-17",
-      "completedAt": null,
+      "completedAt": "2026-09-23",
       "dueDate": null,
       "priority": 3,
-      "stateName": "Ready to deploy",
-      "stateType": "started",
+      "stateName": "Done",
+      "stateType": "completed",
       "teamKey": "TA",
-      "updatedAt": "2026-09-22"
+      "updatedAt": "2026-09-23"
     },
     {
       "archivedAt": null,
@@ -39832,7 +39832,7 @@
       "stateName": "In Review",
       "stateType": "started",
       "teamKey": "T1",
-      "updatedAt": "2026-09-21"
+      "updatedAt": "2026-09-23"
     },
     {
       "archivedAt": null,
@@ -39858,7 +39858,7 @@
       "stateName": "Todo",
       "stateType": "unstarted",
       "teamKey": "T1",
-      "updatedAt": "2026-09-22"
+      "updatedAt": "2026-09-23"
     },
     {
       "archivedAt": null,
@@ -39884,20 +39884,20 @@
       "stateName": "Todo",
       "stateType": "unstarted",
       "teamKey": "T1",
-      "updatedAt": "2026-09-22"
+      "updatedAt": "2026-09-23"
     },
     {
       "archivedAt": null,
       "autoClosedAt": null,
       "canceledAt": null,
       "createdAt": "2026-09-21",
-      "completedAt": null,
+      "completedAt": "2026-09-23",
       "dueDate": null,
       "priority": 4,
-      "stateName": "Ready to deploy",
-      "stateType": "started",
+      "stateName": "Done",
+      "stateType": "completed",
       "teamKey": "TA",
-      "updatedAt": "2026-09-22"
+      "updatedAt": "2026-09-23"
     },
     {
       "archivedAt": null,
@@ -39936,7 +39936,46 @@
       "stateName": "Todo",
       "stateType": "unstarted",
       "teamKey": "PF",
-      "updatedAt": "2026-09-22"
+      "updatedAt": "2026-09-23"
+    },
+    {
+      "archivedAt": null,
+      "autoClosedAt": null,
+      "canceledAt": null,
+      "createdAt": "2026-09-23",
+      "completedAt": null,
+      "dueDate": null,
+      "priority": 4,
+      "stateName": "Backlog",
+      "stateType": "backlog",
+      "teamKey": "T1",
+      "updatedAt": "2026-09-23"
+    },
+    {
+      "archivedAt": null,
+      "autoClosedAt": null,
+      "canceledAt": null,
+      "createdAt": "2026-09-23",
+      "completedAt": null,
+      "dueDate": null,
+      "priority": 3,
+      "stateName": "Triage",
+      "stateType": "triage",
+      "teamKey": "TA",
+      "updatedAt": "2026-09-23"
+    },
+    {
+      "archivedAt": null,
+      "autoClosedAt": null,
+      "canceledAt": null,
+      "createdAt": "2026-09-23",
+      "completedAt": null,
+      "dueDate": "2026-10-15",
+      "priority": 3,
+      "stateName": "Triage",
+      "stateType": "triage",
+      "teamKey": "CP",
+      "updatedAt": "2026-09-23"
     }
   ]
 }
