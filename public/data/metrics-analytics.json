@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-09-28T00:12:00.961Z",
-  "lastUpdated": "2026-09-28T00:12:00.961Z",
+  "generatedAt": "2026-09-29T00:11:42.506Z",
+  "lastUpdated": "2026-09-29T00:11:42.507Z",
   "bugs": [
     {
       "archivedAt": null,
@@ -25327,7 +25327,7 @@
       "updatedAt": "2026-02-26"
     },
     {
-      "archivedAt": null,
+      "archivedAt": "2026-09-28",
       "autoClosedAt": null,
       "canceledAt": "2026-08-03",
       "createdAt": "2026-02-20",
@@ -25337,7 +25337,7 @@
       "stateName": "Canceled",
       "stateType": "canceled",
       "teamKey": "CP",
-      "updatedAt": "2026-08-28"
+      "updatedAt": "2026-09-28"
     },
     {
       "archivedAt": "2026-08-02",
@@ -36455,7 +36455,7 @@
       "updatedAt": "2026-08-04"
     },
     {
-      "archivedAt": null,
+      "archivedAt": "2026-09-28",
       "autoClosedAt": null,
       "canceledAt": null,
       "createdAt": "2026-08-04",
@@ -36465,7 +36465,7 @@
       "stateName": "Done",
       "stateType": "completed",
       "teamKey": "TA",
-      "updatedAt": "2026-08-28"
+      "updatedAt": "2026-09-28"
     },
     {
       "archivedAt": null,
@@ -39793,7 +39793,7 @@
       "stateName": "Todo",
       "stateType": "unstarted",
       "teamKey": "T1",
-      "updatedAt": "2026-09-18"
+      "updatedAt": "2026-09-29"
     },
     {
       "archivedAt": null,
@@ -40024,10 +40024,23 @@
       "completedAt": null,
       "dueDate": null,
       "priority": 4,
-      "stateName": "Todo",
-      "stateType": "unstarted",
+      "stateName": "In Review",
+      "stateType": "started",
       "teamKey": "TA",
-      "updatedAt": "2026-09-25"
+      "updatedAt": "2026-09-28"
+    },
+    {
+      "archivedAt": null,
+      "autoClosedAt": null,
+      "canceledAt": null,
+      "createdAt": "2026-09-28",
+      "completedAt": null,
+      "dueDate": "2026-09-29",
+      "priority": 1,
+      "stateName": "Triage",
+      "stateType": "triage",
+      "teamKey": "CP",
+      "updatedAt": "2026-09-28"
     }
   ]
 }
