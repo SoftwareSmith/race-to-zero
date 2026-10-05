@@ -2020,6 +2020,10 @@
       {
         "date": "2026-10-02",
         "count": 10
+      },
+      {
+        "date": "2026-10-04",
+        "count": 1
       }
     ],
     "createdSeries": [
@@ -4440,7 +4444,7 @@
         "label": "0-7d"
       },
       {
-        "count": 32,
+        "count": 30,
         "label": "8-30d"
       },
       {
@@ -4448,7 +4452,7 @@
         "label": "31-90d"
       },
       {
-        "count": 35,
+        "count": 36,
         "label": "91-180d"
       },
       {
@@ -4466,7 +4470,7 @@
         "label": "High"
       },
       {
-        "count": 58,
+        "count": 57,
         "label": "Medium"
       },
       {
@@ -4478,7 +4482,7 @@
         "label": "Unspecified"
       }
     ],
-    "remainingBugs": 252,
+    "remainingBugs": 251,
     "remainingSeries": [
       {
         "date": "2023-09-18",
@@ -7055,6 +7059,10 @@
       {
         "date": "2026-10-02",
         "count": 252
+      },
+      {
+        "date": "2026-10-04",
+        "count": 251
       }
     ],
     "statusDistribution": [
@@ -10178,11 +10186,11 @@
           "label": "0-7d"
         },
         {
-          "count": 4,
+          "count": 2,
           "label": "8-30d"
         },
         {
-          "count": 12,
+          "count": 14,
           "label": "31-90d"
         },
         {
@@ -16712,11 +16720,11 @@
           "label": "8-30d"
         },
         {
-          "count": 16,
+          "count": 15,
           "label": "31-90d"
         },
         {
-          "count": 6,
+          "count": 7,
           "label": "91-180d"
         },
         {
@@ -19193,6 +19201,10 @@
         {
           "date": "2026-10-02",
           "count": 1
+        },
+        {
+          "date": "2026-10-04",
+          "count": 1
         }
       ],
       "createdSeries": [
@@ -20445,7 +20457,7 @@
           "label": "8-30d"
         },
         {
-          "count": 8,
+          "count": 7,
           "label": "31-90d"
         },
         {
@@ -20467,7 +20479,7 @@
           "label": "High"
         },
         {
-          "count": 21,
+          "count": 20,
           "label": "Medium"
         },
         {
@@ -20479,7 +20491,7 @@
           "label": "Unspecified"
         }
       ],
-      "remainingBugs": 64,
+      "remainingBugs": 63,
       "remainingSeries": [
         {
           "date": "2023-09-18",
@@ -21916,6 +21928,10 @@
         {
           "date": "2026-10-02",
           "count": 64
+        },
+        {
+          "date": "2026-10-04",
+          "count": 63
         }
       ],
       "statusDistribution": [
@@ -21950,8 +21966,8 @@
       ]
     }
   },
-  "generatedAt": "2026-10-04T00:54:45.556Z",
-  "lastUpdated": "2026-10-04T00:54:45.556Z",
+  "generatedAt": "2026-10-05T00:11:52.186Z",
+  "lastUpdated": "2026-10-05T00:11:52.186Z",
   "teamKeys": [
     "CP",
     "PF",
