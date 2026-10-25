@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-10-24T00:09:15.888Z",
-  "lastUpdated": "2026-10-24T00:09:15.888Z",
+  "generatedAt": "2026-10-25T00:10:46.889Z",
+  "lastUpdated": "2026-10-25T00:10:46.889Z",
   "bugs": [
     {
       "archivedAt": null,
@@ -39965,7 +39965,7 @@
       "updatedAt": "2026-09-25"
     },
     {
-      "archivedAt": null,
+      "archivedAt": "2026-10-24",
       "autoClosedAt": null,
       "canceledAt": null,
       "createdAt": "2026-09-23",
