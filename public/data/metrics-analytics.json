@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-11-01T00:08:53.906Z",
-  "lastUpdated": "2026-11-01T00:08:53.906Z",
+  "generatedAt": "2026-11-02T00:07:18.906Z",
+  "lastUpdated": "2026-11-02T00:07:18.906Z",
   "bugs": [
     {
       "archivedAt": null,
@@ -38808,7 +38808,7 @@
       "updatedAt": "2026-09-22"
     },
     {
-      "archivedAt": null,
+      "archivedAt": "2026-11-01",
       "autoClosedAt": null,
       "canceledAt": null,
       "createdAt": "2026-09-08",
@@ -41610,10 +41610,10 @@
       "completedAt": null,
       "dueDate": null,
       "priority": 3,
-      "stateName": "In Progress",
+      "stateName": "In Review",
       "stateType": "started",
       "teamKey": "T1",
-      "updatedAt": "2026-10-30"
+      "updatedAt": "2026-11-01"
     },
     {
       "archivedAt": null,
@@ -41626,7 +41626,7 @@
       "stateName": "In Review",
       "stateType": "started",
       "teamKey": "T1",
-      "updatedAt": "2026-10-30"
+      "updatedAt": "2026-11-01"
     },
     {
       "archivedAt": null,

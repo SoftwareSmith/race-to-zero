@@ -4612,15 +4612,15 @@
         "label": "0-7d"
       },
       {
-        "count": 24,
+        "count": 23,
         "label": "8-30d"
       },
       {
-        "count": 50,
+        "count": 49,
         "label": "31-90d"
       },
       {
-        "count": 44,
+        "count": 46,
         "label": "91-180d"
       },
       {
@@ -7335,11 +7335,11 @@
         "label": "Todo"
       },
       {
-        "count": 4,
+        "count": 3,
         "label": "In progress"
       },
       {
-        "count": 17,
+        "count": 18,
         "label": "In review"
       },
       {
@@ -14135,11 +14135,11 @@
           "label": "8-30d"
         },
         {
-          "count": 4,
+          "count": 3,
           "label": "31-90d"
         },
         {
-          "count": 6,
+          "count": 7,
           "label": "91-180d"
         },
         {
@@ -17436,7 +17436,7 @@
           "label": "0-7d"
         },
         {
-          "count": 13,
+          "count": 12,
           "label": "8-30d"
         },
         {
@@ -17444,7 +17444,7 @@
           "label": "31-90d"
         },
         {
-          "count": 13,
+          "count": 14,
           "label": "91-180d"
         },
         {
@@ -18907,11 +18907,11 @@
           "label": "Todo"
         },
         {
-          "count": 2,
+          "count": 1,
           "label": "In progress"
         },
         {
-          "count": 7,
+          "count": 8,
           "label": "In review"
         },
         {
@@ -22946,8 +22946,8 @@
       ]
     }
   },
-  "generatedAt": "2026-11-01T00:08:53.906Z",
-  "lastUpdated": "2026-11-01T00:08:53.906Z",
+  "generatedAt": "2026-11-02T00:07:18.906Z",
+  "lastUpdated": "2026-11-02T00:07:18.906Z",
   "teamKeys": [
     "CP",
     "PF",
