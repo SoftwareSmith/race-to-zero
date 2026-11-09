@@ -2128,6 +2128,10 @@
       {
         "date": "2026-11-06",
         "count": 23
+      },
+      {
+        "date": "2026-11-08",
+        "count": 1
       }
     ],
     "createdSeries": [
@@ -4652,23 +4656,23 @@
     "firstBugDate": "2023-09-18",
     "openAgeDistribution": [
       {
-        "count": 19,
+        "count": 18,
         "label": "0-7d"
       },
       {
-        "count": 29,
+        "count": 28,
         "label": "8-30d"
       },
       {
-        "count": 47,
+        "count": 48,
         "label": "31-90d"
       },
       {
-        "count": 49,
+        "count": 48,
         "label": "91-180d"
       },
       {
-        "count": 112,
+        "count": 113,
         "label": "181d+"
       }
     ],
@@ -4686,7 +4690,7 @@
         "label": "Medium"
       },
       {
-        "count": 122,
+        "count": 121,
         "label": "Low"
       },
       {
@@ -4694,7 +4698,7 @@
         "label": "Unspecified"
       }
     ],
-    "remainingBugs": 256,
+    "remainingBugs": 255,
     "remainingSeries": [
       {
         "date": "2023-09-18",
@@ -7387,11 +7391,15 @@
       {
         "date": "2026-11-07",
         "count": 256
+      },
+      {
+        "date": "2026-11-08",
+        "count": 255
       }
     ],
     "statusDistribution": [
       {
-        "count": 203,
+        "count": 202,
         "label": "Backlog"
       },
       {
@@ -10650,11 +10658,11 @@
           "label": "31-90d"
         },
         {
-          "count": 15,
+          "count": 14,
           "label": "91-180d"
         },
         {
-          "count": 66,
+          "count": 67,
           "label": "181d+"
         }
       ],
@@ -16352,6 +16360,10 @@
         {
           "date": "2026-11-06",
           "count": 7
+        },
+        {
+          "date": "2026-11-08",
+          "count": 1
         }
       ],
       "createdSeries": [
@@ -17600,7 +17612,7 @@
       "firstBugDate": "2024-04-19",
       "openAgeDistribution": [
         {
-          "count": 5,
+          "count": 4,
           "label": "0-7d"
         },
         {
@@ -17634,7 +17646,7 @@
           "label": "Medium"
         },
         {
-          "count": 46,
+          "count": 45,
           "label": "Low"
         },
         {
@@ -17642,7 +17654,7 @@
           "label": "Unspecified"
         }
       ],
-      "remainingBugs": 68,
+      "remainingBugs": 67,
       "remainingSeries": [
         {
           "date": "2024-04-19",
@@ -19075,11 +19087,15 @@
         {
           "date": "2026-11-06",
           "count": 68
+        },
+        {
+          "date": "2026-11-08",
+          "count": 67
         }
       ],
       "statusDistribution": [
         {
-          "count": 59,
+          "count": 58,
           "label": "Backlog"
         },
         {
@@ -21573,11 +21589,11 @@
           "label": "0-7d"
         },
         {
-          "count": 10,
+          "count": 9,
           "label": "8-30d"
         },
         {
-          "count": 15,
+          "count": 16,
           "label": "31-90d"
         },
         {
@@ -23178,8 +23194,8 @@
       ]
     }
   },
-  "generatedAt": "2026-11-08T00:07:34.374Z",
-  "lastUpdated": "2026-11-08T00:07:34.374Z",
+  "generatedAt": "2026-11-09T00:07:18.985Z",
+  "lastUpdated": "2026-11-09T00:07:18.985Z",
   "teamKeys": [
     "CP",
     "PF",

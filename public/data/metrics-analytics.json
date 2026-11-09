@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-11-08T00:07:34.374Z",
-  "lastUpdated": "2026-11-08T00:07:34.374Z",
+  "generatedAt": "2026-11-09T00:07:18.985Z",
+  "lastUpdated": "2026-11-09T00:07:18.985Z",
   "bugs": [
     {
       "archivedAt": null,
@@ -41496,7 +41496,7 @@
       "stateName": "Backlog",
       "stateType": "backlog",
       "teamKey": "T1",
-      "updatedAt": "2026-11-05"
+      "updatedAt": "2026-11-08"
     },
     {
       "archivedAt": null,
@@ -42008,15 +42008,15 @@
     {
       "archivedAt": null,
       "autoClosedAt": null,
-      "canceledAt": null,
+      "canceledAt": "2026-11-08",
       "createdAt": "2026-11-06",
       "completedAt": null,
       "dueDate": null,
       "priority": 4,
-      "stateName": "Backlog",
-      "stateType": "backlog",
+      "stateName": "Duplicate",
+      "stateType": "duplicate",
       "teamKey": "T1",
-      "updatedAt": "2026-11-06"
+      "updatedAt": "2026-11-08"
     },
     {
       "archivedAt": null,
