@@ -4692,23 +4692,23 @@
     "firstBugDate": "2023-09-18",
     "openAgeDistribution": [
       {
-        "count": 51,
+        "count": 47,
         "label": "0-7d"
       },
       {
-        "count": 27,
+        "count": 30,
         "label": "8-30d"
       },
       {
-        "count": 47,
+        "count": 48,
         "label": "31-90d"
       },
       {
-        "count": 47,
+        "count": 46,
         "label": "91-180d"
       },
       {
-        "count": 116,
+        "count": 117,
         "label": "181d+"
       }
     ],
@@ -10718,23 +10718,23 @@
       "firstBugDate": "2023-10-26",
       "openAgeDistribution": [
         {
-          "count": 9,
+          "count": 5,
           "label": "0-7d"
         },
         {
-          "count": 4,
+          "count": 7,
           "label": "8-30d"
         },
         {
-          "count": 10,
+          "count": 11,
           "label": "31-90d"
         },
         {
-          "count": 13,
+          "count": 12,
           "label": "91-180d"
         },
         {
-          "count": 68,
+          "count": 69,
           "label": "181d+"
         }
       ],
@@ -23410,8 +23410,8 @@
       ]
     }
   },
-  "generatedAt": "2026-11-14T00:06:55.232Z",
-  "lastUpdated": "2026-11-14T00:06:55.233Z",
+  "generatedAt": "2026-11-15T00:07:39.187Z",
+  "lastUpdated": "2026-11-15T00:07:39.187Z",
   "teamKeys": [
     "CP",
     "PF",
