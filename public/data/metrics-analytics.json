@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-11-15T00:07:39.187Z",
-  "lastUpdated": "2026-11-15T00:07:39.187Z",
+  "generatedAt": "2026-11-16T00:08:56.521Z",
+  "lastUpdated": "2026-11-16T00:08:56.521Z",
   "bugs": [
     {
       "archivedAt": null,
@@ -40976,7 +40976,7 @@
       "stateName": "Done",
       "stateType": "completed",
       "teamKey": "T1",
-      "updatedAt": "2026-11-09"
+      "updatedAt": "2026-11-15"
     },
     {
       "archivedAt": null,
@@ -42172,7 +42172,7 @@
       "stateName": "In Review",
       "stateType": "started",
       "teamKey": "T1",
-      "updatedAt": "2026-11-12"
+      "updatedAt": "2026-11-15"
     },
     {
       "archivedAt": null,
@@ -42185,7 +42185,7 @@
       "stateName": "In Review",
       "stateType": "started",
       "teamKey": "T1",
-      "updatedAt": "2026-11-12"
+      "updatedAt": "2026-11-15"
     },
     {
       "archivedAt": null,
@@ -42458,7 +42458,7 @@
       "stateName": "In Review",
       "stateType": "started",
       "teamKey": "T1",
-      "updatedAt": "2026-11-13"
+      "updatedAt": "2026-11-15"
     },
     {
       "archivedAt": null,
